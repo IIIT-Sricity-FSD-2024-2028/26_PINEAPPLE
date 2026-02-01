@@ -1,0 +1,200 @@
+# Domain: Digital Project Collaboration Systems
+
+# Problem Statement: To design and develop a web-based platform that enables structured project collaboration with real-time project status monitoring, task accountability, and performance visibility to improve coordination and transparency in team-based projects.
+
+# Last Updated: 2026-01-31
+
+---
+
+ProjectOwner: Project Owner
+definition:
+A user who initiates a project on the platform by proposing an idea, defining its scope, assigning tasks, and managing the overall execution of the project.
+examples:
+
+* A user creates a web development project and invites collaborators to work on frontend and backend modules.
+  aliases:
+* Project Creator
+* Initiator
+
+---
+
+Collaborator: Collaborator
+definition:
+A user who participates in a project by contributing work to assigned tasks in order to gain practical, hands-on experience and build a contribution record.
+examples:
+
+* A user joins a machine learning project and submits code for data preprocessing.
+  aliases:
+* Contributor
+* Team Member
+
+---
+
+Mentor: Mentor
+definition:
+An experienced individual who provides guidance, technical suggestions, and doubt clarification to users during project development without evaluating, rating, or approving their work.
+examples:
+
+* A mentor suggesting best practices for database normalization in a project discussion.
+  aliases:
+* Guide
+* Advisor
+
+---
+
+Project: Project
+definition:
+A structured collaboration effort consisting of defined objectives, tasks, roles, and timelines created to achieve a specific outcome through teamwork.
+examples:
+
+* Development of a mobile application using a collaborative team.
+  aliases:
+* Initiative
+* Collaboration
+
+---
+
+Task: Task
+definition:
+A discrete and measurable unit of work within a project that is assigned to a collaborator and contributes toward overall project completion.
+examples:
+
+* Implementing the authentication module for an application.
+  aliases:
+* Work Item
+* Assignment
+
+---
+
+
+TaskStatus: Task Status
+definition:
+An indicator representing the current stage of a task in its workflow lifecycle.
+examples:
+
+* To Do, In Progress, Completed.
+  aliases:
+* Task State
+* Workflow Status
+
+---
+
+ProgressTracker: Progress Tracker
+definition:
+A system feature that visually represents the percentage of completed tasks within a project to indicate overall progress.
+examples:
+
+* A progress bar showing 60% project completion.
+  aliases:
+* Progress Monitor
+* Completion Indicator
+
+---
+
+AuditLog: Audit Log
+definition:
+A system-generated, immutable record of significant actions and events related to projects and user activities, maintained for transparency, accountability, and dispute resolution.
+examples:
+
+* Recording when a task is created, updated, or submitted.
+  aliases:
+* Activity Log
+* System Log
+
+---
+
+ContributionHistory: Contribution History
+definition:
+A summarized record of a user’s completed tasks, roles, and project involvement, derived from audit logs and displayed as verifiable proof of experience.
+examples:
+
+* A profile section listing completed projects and contributions.
+  aliases:
+* Work History
+* Experience Record
+
+---
+
+UserProfile: User Profile
+definition:
+A digital representation of a user that displays personal details, skills, contribution history, ratings, and collaboration experience.
+examples:
+
+* A profile showing a user’s completed projects and reviews.
+  aliases:
+* User Account
+* Profile Page
+
+---
+
+Rating: Rating
+definition:
+A numerical or qualitative assessment provided after project completion to reflect the quality of collaboration and contribution.
+examples:
+
+* A 5-star rating for timely and high-quality task delivery.
+  aliases:
+* Score
+* Feedback Rating
+
+---
+
+Review: Review
+definition:
+A written evaluation describing a collaborator’s performance, professionalism, and contribution quality after project completion.
+examples:
+
+* Feedback highlighting teamwork and technical skills.
+  aliases:
+* Feedback
+* Testimonial
+
+---
+
+Notification: Notification
+definition:
+A system-generated message that informs users about important updates, actions, or changes related to projects and tasks.
+examples:
+
+* Notification sent when a task is assigned to a collaborator.
+  aliases:
+* Alert
+* Update Message
+
+---
+
+Dispute: Dispute
+definition:
+A formal disagreement raised by a user regarding task outcomes, collaboration issues, or feedback provided on the platform.
+examples:
+
+* A collaborator disputing an unfair review.
+  aliases:
+* Conflict
+* Issue
+
+---
+
+DisputeResolution: Dispute Resolution
+definition:
+A structured process for reviewing and resolving disputes using audit logs, platform policies, and administrative intervention when required.
+examples:
+
+* An admin reviewing activity logs to resolve a conflict.
+  aliases:
+* Conflict Resolution
+* Issue Handling
+
+---
+
+PlatformPolicy: Platform Policy
+definition:
+A set of rules and guidelines governing acceptable behavior, usage standards, and ethical practices on the platform.
+examples:
+
+* A policy prohibiting plagiarism in project submissions.
+  aliases:
+* Usage Policy
+* Code of Conduct
+
+---
