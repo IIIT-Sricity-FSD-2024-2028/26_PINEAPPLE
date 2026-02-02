@@ -43,6 +43,7 @@ Students often struggle to find meaningful project collaboration opportunities t
  2. **Resource Sharing:** Share useful learning materials and references with the team.
  3. **Request Management:** Review mentorship requests from project owners and accept or decline them.
  4. **Student Recognition & Badge Assignment:** Identify skilled students and award achievement badges to recognize their abilities.
+
 *Note: The mentor does not evaluate, approve, or rate projects.*
 
 ---
