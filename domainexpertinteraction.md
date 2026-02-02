@@ -103,4 +103,4 @@
 
     * **Correction:** High XP alone is insufficient; mentors require a vetted status or manual approval to ensure they provide quality advice, distinguishing them from high-performing collaborators.
 * **Open questions that need follow-up**
-    * Abandonment Penalties: What happens if a Collaborator accepts a task but goes silent (ghosts)? Do they lose XP, or are they just restricted from applying          for new tasks for a set period?*
+    * Abandonment Penalties: What happens if a Collaborator accepts a task but goes silent (ghosts)? Do they lose XP, or are they just restricted from applying          for new tasks for a set period?
