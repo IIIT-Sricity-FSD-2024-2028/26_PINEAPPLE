@@ -8,10 +8,10 @@
 
 ProjectOwner: Project Owner
 definition:
-A user who initiates a project on the platform by proposing an idea, defining its scope, assigning tasks, and managing the overall execution of the project.
+The user who starts the project, sets the goals, and manages the team.
 
 examples:
-* A user creates a web development project and invites collaborators to work on frontend and backend modules.
+* A person creates a web development project and invites collaborators to work on frontend and backend modules.
 
   aliases:
 * Project Creator
@@ -21,7 +21,7 @@ examples:
 
 Collaborator: Collaborator
 definition:
-A user who participates in a project by contributing work to assigned tasks in order to gain practical, hands-on experience and build a contribution record.
+A person who joins a project to do tasks, learn new skills, and build a history of their work.
 examples:
 * A user joins a machine learning project and submits code for data preprocessing.
 
@@ -34,7 +34,7 @@ examples:
 
 Mentor: Mentor
 definition:
-An experienced individual who provides guidance, technical suggestions, and doubt clarification to users during project development without evaluating, rating, or approving their work.
+An expert who gives advice and answers questions but does not grade or approve the work.
 examples:
 * A mentor suggesting best practices for database normalization in a project discussion.
 
@@ -44,9 +44,21 @@ examples:
 
 ---
 
+System Administrator: System Administrator
+definition:
+It is a platform authority responsible for managing users, enforcing system policies, monitoring activities, and handling violations to ensure the system operates securely and correctly.
+examples:
+*A system administrator reviews reported violations, checks audit logs, and suspends a user account if platform rules are broken.
+
+  aliases:
+* System Admin
+* Platform Moderator
+
+---
+
 Project: Project
 definition:
-A structured collaboration effort consisting of defined objectives, tasks, roles, and timelines created to achieve a specific outcome through teamwork.
+A team effort with clear goals and tasks created to build something together.
 examples:
 * Development of a mobile application using a collaborative team.
 
@@ -58,7 +70,7 @@ examples:
 
 Task: Task
 definition:
-A discrete and measurable unit of work within a project that is assigned to a collaborator and contributes toward overall project completion.
+A specific part of the project assigned to one collaborator.
 examples:
 * Implementing the authentication module for an application.
 
@@ -71,9 +83,9 @@ examples:
 
 TaskStatus: Task Status
 definition:
-An indicator representing the current stage of a task in its workflow lifecycle.
+A label showing if a task is "To Do," "In Progress," or "Finished".
 examples:
-* To Do, In Progress, Completed.
+* A task is currently in "To Do" state.
 
   aliases:
 * Task State
@@ -83,7 +95,7 @@ examples:
 
 ProgressTracker: Progress Tracker
 definition:
-A system feature that visually represents the percentage of completed tasks within a project to indicate overall progress.
+A visual tool, like a progress bar, that shows how much of the project is done.
 examples:
 * A progress bar showing 60% project completion.
 
@@ -95,7 +107,7 @@ examples:
 
 AuditLog: Audit Log
 definition:
-A system-generated, immutable record of significant actions and events related to projects and user activities, maintained for transparency, accountability, and dispute resolution.
+A permanent, immutable list of everything that happens in a project.
 examples:
 * Recording when a task is created, updated, or submitted.
 
@@ -107,7 +119,7 @@ examples:
 
 ContributionHistory: Contribution History
 definition:
-A summarized record of a user’s completed tasks, roles, and project involvement, derived from audit logs and displayed as verifiable proof of experience.
+A verified list of the tasks you finished, used as proof of your experience.
 examples:
 * A profile section listing completed projects and contributions.
 
@@ -119,7 +131,7 @@ examples:
 
 UserProfile: User Profile
 definition:
-A digital representation of a user that displays personal details, skills, contribution history, ratings, and collaboration experience.
+It is a page showing skills, projects completed, and ratings of a collaborator.
 examples:
 * A profile showing a user’s completed projects and reviews.
 
@@ -131,7 +143,7 @@ examples:
 
 Rating: Rating
 definition:
-A numerical or qualitative assessment provided after project completion to reflect the quality of collaboration and contribution.
+A numerical value given to a collaborator based on their work throughout the project.
 examples:
 * A 5-star rating for timely and high-quality task delivery.
 
@@ -143,7 +155,7 @@ examples:
 
 Review: Review
 definition:
-A written evaluation describing a collaborator’s performance, professionalism, and contribution quality after project completion.
+Feedback about the collaborator's performance and teamwork.
 examples:
 * Feedback highlighting teamwork and technical skills.
 
@@ -155,7 +167,7 @@ examples:
 
 Notification: Notification
 definition:
-A system-generated message that informs users about important updates, actions, or changes related to projects and tasks.
+A system-generated message that informs actors about important updates or changes related to project.
 examples:
 * Notification sent when a task is assigned to a collaborator.
 
@@ -165,15 +177,39 @@ examples:
 
 ---
 
-Dispute: Dispute
+Report: Report
 definition:
-A formal disagreement raised by a user regarding task outcomes, collaboration issues, or feedback provided on the platform.
+It is the process of informing the administrators about a user’s inappropriate behavior or PlatformPolicy violation so that corrective action can be taken.
 examples:
-* A collaborator disputing an unfair review.
+* A collaborator reports another user for submitting plagiarized work or using offensive language in team communication.
 
   aliases:
-* Conflict
-* Issue
+*Violation Report
+*Abuse Report
+
+
+---
+
+Skill: Skill
+definition:
+It is a specific technical ability that shows what you can do.
+
+examples:
+*A Project Owner searches for a Collaborator with "Node.js" skills to build a backend module.
+  aliases:
+*Technical Ability
+*Expertise
+
+---
+
+Dispute: Dispute
+definition:
+It is a way to complain if user thinks something is unfair.
+examples:
+*A disagreement between a Project Owner and a collaborator over whether a task was actually finished correctly.
+  aliases:
+*Conflict
+*Formal Complaint
 
 ---
 
@@ -191,7 +227,7 @@ examples:
 
 PlatformPolicy: Platform Policy
 definition:
-A set of rules and guidelines governing acceptable behavior, usage standards, and ethical practices on the platform.
+A set of rules and guidelines that users agree while creating an account.
 examples:
 * A policy prohibiting plagiarism in project submissions.
 
