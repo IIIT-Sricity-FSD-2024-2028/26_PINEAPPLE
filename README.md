@@ -30,19 +30,19 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ### 👥 Collaborator
 
-  **Project Discovery:** Look for projects that match your skills and request to participate.
-  **Task Execution:** Works on assigned tasks and submit the completed work for review.
-  **Experience & Level Progress:** Earn experience points (XP), move to higher levels, and see your ranking on the leaderboard after approved work.
-  **Team Communication:** Use the chat box to coordinate tasks with the team.
+ 1. **Project Discovery:** Look for projects that match your skills and request to participate.
+ 2. **Task Execution:** Works on assigned tasks and submit the completed work for review.
+ 3. **Experience & Level Progress:** Earn experience points (XP), move to higher levels, and see your ranking on the leaderboard after approved work.
+ 4. **Team Communication:** Use the chat box to coordinate tasks with the team.
 
 ---
 
 ### 🎓 Mentor
 
-  **Technical Guidance:** Give technical suggestions during project work.
-  **Resource Sharing:** Share useful learning materials and references with the team.
-  **Request Management:** Review mentorship requests from project owners and accept or decline them.
-  **Student Recognition & Badge Assignment:** Identify skilled students and award achievement badges to recognize their abilities.
+ 1. **Technical Guidance:** Give technical suggestions during project work.
+ 2. **Resource Sharing:** Share useful learning materials and references with the team.
+ 3. **Request Management:** Review mentorship requests from project owners and accept or decline them.
+ 4. **Student Recognition & Badge Assignment:** Identify skilled students and award achievement badges to recognize their abilities.
 *Note: The mentor does not evaluate, approve, or rate projects.*
 
 ---
