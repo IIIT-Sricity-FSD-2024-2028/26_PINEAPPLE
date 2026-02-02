@@ -23,9 +23,9 @@ Students often struggle to find meaningful project collaboration opportunities t
 
   **Project Initiation:**  Create project structures and define the tasks.
   **Collaborator Recruitment:**  Review applications and select collaborators based on required skills.
-  **Quality Assurance (QA) Review:** Review submitted work and approve it or request revisions.
+  **Quality Review:** Review submitted work and approve it or request revisions.
   **Performance Evaluation:** Assign ratings and provide written feedback to collaborators after project completion.
-  **Progress Monitoring:** Track task progress and overall project status using a dashboard.
+  **Progress Monitoring:** Monitor overall project status.
 ---
 
 ### 👥 Collaborator
