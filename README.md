@@ -21,11 +21,11 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ### 👤 Project Owner
 
-  **Project Initiation:**  Create project structures and define the tasks.
-  **Collaborator Recruitment:**  Review applications and select collaborators based on required skills.
-  **Quality Review:** Review submitted work and approve it or request revisions.
-  **Performance Evaluation:** Assign ratings and provide written feedback to collaborators after project completion.
-  **Progress Monitoring:** Monitor overall project status.
+ 1. **Project Initiation:**  Create project structures and define the tasks.
+ 2. **Collaborator Recruitment:**  Review applications and select collaborators based on required skills.
+ 3. **Quality Review:** Review submitted work and approve it or request revisions.
+ 4. **Performance Evaluation:** Assign ratings and provide written feedback to collaborators after project completion.
+ 5. **Progress Monitoring:** Monitor overall project status.
 ---
 
 ### 👥 Collaborator
