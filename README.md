@@ -21,32 +21,29 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ### 👤 Project Owner
 
-1.  **Project Lifecycle Initiation:** Create project structures and define comprehensive scopes to ensure clear project roadmaps.
-2.  **Strategic Recruitment:** Review applicant profiles and invite specific collaborators to build a balanced team based on required skills.
-3.  **Quality Assurance (QA) Review:** Validate submitted deliverables against requirements, with the ability to approve work or trigger rework loops.
-4.  **Performance Evaluation:** Assign numerical ratings and written performance reviews to collaborators upon project completion.
-5.  **Real-Time Progress Monitoring:** Utilize a visual dashboard to track task completion rates and overall project health status.
+  **Project Lifecycle Initiation:** Create project structures and define comprehensive scopes to ensure clear project roadmaps.
+  **Strategic Recruitment:** Review applicant profiles and invite specific collaborators to build a balanced team based on required skills.
+  **Quality Assurance (QA) Review:** Validate submitted deliverables against requirements, with the ability to approve work or trigger rework loops.
+  **Performance Evaluation:** Assign numerical ratings and written performance reviews to collaborators upon project completion.
+  **Real-Time Progress Monitoring:** Utilize a visual dashboard to track task completion rates and overall project health status.
 
 ---
 
 ### 👥 Collaborator
 
-1.  **Opportunity Discovery:** execute targeted searches for projects matching specific skill sets and submit formal collaboration proposals.
-2.  **Task Execution Cycle:** Manage the complete workflow of accepting assignments, executing tasks, and submitting deliverables for review.
-3.  **XP, Levels & Leaderboard:** Accrue Experience Points (XP), unlock new **User Levels** through successfully approved submissions, and compete for top rankings on the platform **Leaderboard**.
-4.  **Team Communication:** Use the **Chat Box** for team coordination and to clarify doubts during development.
-5.  **Project Portfolio:** Showcase a comprehensive list of previously completed **Projects** and earned **XP** directly on the **User Profile** as verifiable proof of experience.
+  **Project Discovery:** Look for projects that match your skills and request to participate.
+  **Task Execution:** Work on assigned tasks and submit the completed work for review.
+  **Experience & Level Progress:** Earn experience points (XP), move to higher levels, and see your ranking on the leaderboard after approved work.
+  **Team Communication:** Use the chat box to coordinate tasks with the team.
 
 ---
 
 ### 🎓 Mentor
 
-1.  **Technical Consultation:** Provide non-binding technical suggestions and clarify conceptual doubts during the development phase.
-2.  **Resource Provisioning:** Share curated learning materials, references, and best-practice documentation to support the team.
-3.  **Talent Scouting:** Identify high-potential contributors and formally recommend them to Project Owners for future initiatives.
-4.  **Manage Requests:** Review incoming requests from **Project Owners** and decide whether to **Accept** or **Decline** the request.
-5.  **Recommend Students:** Identify skilled users and formally suggest them to **Project Owners** for future roles.
-
+  **Technical Guidance:** Give technical suggestions during project work.
+  **Resource Sharing:** Share useful learning materials and references with the team.
+  **Request Management:** Review mentorship requests from project owners and accept or decline them.
+  **Student Recommendation:** Identify skilled students and recommend them to project owners for future projects.
 *Note: The mentor does not evaluate, approve, or rate projects.*
 
 ---
