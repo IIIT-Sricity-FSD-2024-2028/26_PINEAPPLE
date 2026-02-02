@@ -21,18 +21,17 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ### 👤 Project Owner
 
-  **Project Lifecycle Initiation:** Create project structures and define comprehensive scopes to ensure clear project roadmaps.
-  **Strategic Recruitment:** Review applicant profiles and invite specific collaborators to build a balanced team based on required skills.
-  **Quality Assurance (QA) Review:** Validate submitted deliverables against requirements, with the ability to approve work or trigger rework loops.
-  **Performance Evaluation:** Assign numerical ratings and written performance reviews to collaborators upon project completion.
-  **Real-Time Progress Monitoring:** Utilize a visual dashboard to track task completion rates and overall project health status.
-
+  **Project Initiation:**  Create project structures and define the tasks.
+  **Collaborator Recruitment:**  Review applications and select collaborators based on required skills.
+  **Quality Assurance (QA) Review:** Review submitted work and approve it or request revisions.
+  **Performance Evaluation:** Assign ratings and provide written feedback to collaborators after project completion.
+  **Progress Monitoring:** Track task progress and overall project status using a dashboard.
 ---
 
 ### 👥 Collaborator
 
   **Project Discovery:** Look for projects that match your skills and request to participate.
-  **Task Execution:** Work on assigned tasks and submit the completed work for review.
+  **Task Execution:** Works on assigned tasks and submit the completed work for review.
   **Experience & Level Progress:** Earn experience points (XP), move to higher levels, and see your ranking on the leaderboard after approved work.
   **Team Communication:** Use the chat box to coordinate tasks with the team.
 
