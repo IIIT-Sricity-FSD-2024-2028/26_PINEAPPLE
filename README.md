@@ -21,7 +21,7 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ### 👤 Project Owner
 
- 1. **Project Initiation:**  Create project structures and define the tasks.
+ 1. **Project Initiation:**  Create project and define the tasks.
  2. **Collaborator Recruitment:**  Review applications and select collaborators based on required skills.
  3. **Quality Review:** Review submitted work and approve it or request revisions.
  4. **Performance Evaluation:** Assign ratings and provide written feedback to collaborators after project completion.
