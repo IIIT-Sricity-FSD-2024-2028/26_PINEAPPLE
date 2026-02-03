@@ -204,7 +204,7 @@ examples:
 
 Dispute: Dispute
 definition:
-It is a way to complain if user thinks something is unfair.
+A disagreement between users.
 examples:
 *A disagreement between a Project Owner and a collaborator over whether a task was actually finished correctly.
   aliases:
