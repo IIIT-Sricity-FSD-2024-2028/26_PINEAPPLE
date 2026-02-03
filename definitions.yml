@@ -46,7 +46,7 @@ examples:
 
 System Administrator: System Administrator
 definition:
-It is a platform authority responsible for managing users, enforcing system policies, monitoring activities, and handling violations to ensure the system operates securely and correctly.
+It is a platform authority responsible for managing users, enforcing PlatformPolicy, and resolving disputes.
 examples:
 *A system administrator reviews reported violations, checks audit logs, and suspends a user account if platform rules are broken.
 
