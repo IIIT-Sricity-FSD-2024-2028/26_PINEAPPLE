@@ -107,7 +107,7 @@ examples:
 
 AuditLog: Audit Log
 definition:
-A permanent, immutable list of everything that happens in a project.
+A immutable list of everything that happens in a project.
 examples:
 * Recording when a task is created, updated, or submitted.
 
