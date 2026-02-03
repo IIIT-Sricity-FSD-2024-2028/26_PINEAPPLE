@@ -83,7 +83,7 @@ examples:
 
 TaskStatus: Task Status
 definition:
-A label showing if a task is "To Do," "In Progress," or "Finished".
+A label showing if a task is "In Progress," or "Finished".
 examples:
 * A task is currently in "To Do" state.
 
