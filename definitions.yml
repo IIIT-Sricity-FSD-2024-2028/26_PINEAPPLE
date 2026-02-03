@@ -131,7 +131,7 @@ examples:
 
 UserProfile: User Profile
 definition:
-It is a page showing skills, projects completed, and ratings of a collaborator.
+It is a page showing skills, projects completed, and ratings of a user.
 examples:
 * A profile showing a user’s completed projects and reviews.
 
