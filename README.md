@@ -55,11 +55,4 @@ Students often struggle to find meaningful project collaboration opportunities t
 
 ---
 
-## Key Highlights
 
-* **Student-focused collaboration:** Bridges the gap between academic learning and practical industry experience.
-* **Transparent Tracking:** Utilizes immutable Audit Logs to create a verifiable Contribution History.
-* **Non-Evaluative Mentorship:** Provides a guidance-oriented model distinct from administrative management.
-* **Structured Workflows:** Follows a clear, step-by-step process for Project Setup, Task Execution, and XP/Leveling.
-
----
