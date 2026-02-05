@@ -18,7 +18,7 @@
     Currently, collaboration is managed through disjointed tools: code hosting platforms are used for storage and professional networking sites for connections. However, these existing workflows lack structure and do not provide integrated guidance or transparent tracking of contributions.
 * **What are the primary goals or outcomes of this problem statement?**
     1.  Bridge the gap between academic learning and practical experience.
-    2.  Provide a dedicated platform for structured workflows and mentorship.
+    2.  Provide a dedicated platform for structured collaborations and mentorship.
     3.  Create verifiable contribution records (Audit Logs/Contribution History) for transparency.
 
 * **List key terms used by the domain expert and their meanings**
