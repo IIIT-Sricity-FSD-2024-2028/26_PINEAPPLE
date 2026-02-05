@@ -4,7 +4,7 @@
 
 ## Problem Statement
 
-Students often struggle to find meaningful project collaboration opportunities that allow them to apply their skills, work with peers, and gain verifiable real-world experience. Existing platforms either focus on code hosting or professional networking, but lack structured collaboration and transparent contribution tracking. This project aims to provide a dedicated platform where students can collaborate on projects, receive mentorship, and build credible experience through structured workflows.
+StudentsFreshers often struggle to find meaningful project collaboration opportunities that allow them to apply their skills, work with peers, and gain verifiable real-world experience. Existing platforms either focus on code hosting or professional networking, but lack structured collaboration and transparent contribution tracking. This project aims to provide a dedicated platform where students can collaborate on projects, receive mentorship, and build credible experience through structured workflows.
 
 ---
 
