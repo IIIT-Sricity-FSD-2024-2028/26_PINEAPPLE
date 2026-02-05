@@ -2,7 +2,7 @@
 
 ## Basic information
 * **Domain:** Digital Project Collaboration Systems
-* **Problem statement:** Students often struggle to find meaningful project collaboration opportunities to apply skills and gain verifiable experience. Existing platforms lack structured collaboration, guided learning, and transparent contribution tracking.
+* **Problem statement:** Students/freshers often struggle to find meaningful project collaboration opportunities to apply skills and gain verifiable experience. Existing platforms lack structured collaboration, guided learning, and transparent contribution tracking.
 * **Date of interaction:** 2026-01-31
 * **Mode of interaction:** Video call 
 * **Duration (in-minutes):** *46 minutes*
