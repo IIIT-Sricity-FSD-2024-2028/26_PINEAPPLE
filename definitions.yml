@@ -217,3 +217,93 @@ examples:
 * Code of Conduct
 
 ---
+
+EvidenceLink: Evidence Link
+definition:
+An external reference or URL submitted by a collaborator as proof that a task has been completed.
+examples:
+* A GitHub pull request link submitted as proof of completing a coding task.
+aliases:
+* Work Evidence
+* Proof Link
+
+---
+
+ExperiencePoints: Experience Points (XP)
+definition:
+A numerical score representing the amount of productive work completed by a collaborator through approved tasks.
+examples:
+* Completing a medium difficulty task awards 20 XP.
+aliases:
+* XP
+* Experience Score
+
+---
+
+ReputationScore: Reputation Score
+definition:
+A dynamic metric that reflects the reliability and professional conduct of a collaborator based on task outcomes and behavior.
+examples:
+* A collaborator gains reputation after completing tasks successfully.
+aliases:
+* Trust Score
+* Reliability Score
+
+---
+
+TaskDifficulty: Task Difficulty
+definition:
+A classification assigned to a task that determines the base experience points awarded upon completion.
+examples:
+* Hard tasks award more XP than easy tasks.
+aliases:
+* Difficulty Level
+* Task Complexity
+
+---
+
+Leaderboard: Leaderboard
+definition:
+A ranked list of users based on the total experience points earned from approved contributions.
+examples:
+* The monthly leaderboard shows the top contributors on the platform.
+aliases:
+* Ranking Board
+* XP Rankings
+
+---
+
+MentorRecommendationBadge: Mentor Recommendation Badge
+definition:
+A recognition issued by a mentor to acknowledge a collaborator’s positive contributions and professional behavior.
+examples:
+* A mentor awards the "Reliable Team Member" badge to a contributor.
+aliases:
+* Recommendation Badge
+* Mentor Endorsement
+
+---
+
+
+RoleMode: Role Mode
+definition:
+A contextual capability that determines how a user interacts with the platform, such as ProjectOwner, Collaborator, or Mentor.
+examples:
+* A user acts as a collaborator in one project and a project owner in another.
+aliases:
+* User Mode
+* Operational Role
+
+---
+
+ProjectReport: Project Report
+definition:
+A structured summary of a user's contributions and activities across projects, including completed tasks, descriptions of work performed, and evidence links used to verify the contributions.
+
+examples:
+* A report showing the tasks a collaborator completed in a web application project along with links to pull requests and approval records.
+
+aliases:
+* Contribution Report
+* Work Summary
+* Project Activity Report
