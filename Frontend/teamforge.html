@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>TeamForge</title>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+    rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <script>
+    // Check authentication before loading dashboard
+    (function () {
+      const params = new URLSearchParams(window.location.search);
+      const openAdminMode = params.get("admin") === "1";
+      if (openAdminMode) {
+        window.__openAdminOnLoad = true;
+        return;
+      }
+
+      const currentUser = typeof localStorage !== "undefined"
+        ? localStorage.getItem("currentUser")
+        : "";
+      if (!currentUser) {
+        window.location.href = "index.html";
+      }
+    })();
+  </script>
+
+  <!-- ══════════════════════════════ APP SHELL ══════════════════════════════ -->
+  <div id="app" class="app-shell">
+
+    <!-- ── Sidebar ── -->
+    <nav class="sidebar" id="sidebar">
+      <div class="sidebar-top">
+        <button class="sidebar-trigger" onclick="toggleSidebar()" title="Toggle sidebar">☰</button>
+      </div>
+
+      <div class="sidebar-group">
+        <div class="sidebar-group-label">Global</div>
+        <button class="sidebar-nav-item active" data-page="dashboard" onclick="navigate('dashboard')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <rect x="3" y="3" width="7" height="7" />
+            <rect x="14" y="3" width="7" height="7" />
+            <rect x="3" y="14" width="7" height="7" />
+            <rect x="14" y="14" width="7" height="7" />
+          </svg>
+          <span class="sidebar-nav-label">Dashboard</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="leaderboard" onclick="navigate('leaderboard')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M8 21V8M12 21V3M16 21v-5" />
+          </svg>
+          <span class="sidebar-nav-label">Leaderboard</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="notifications" onclick="navigate('notifications')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+          </svg>
+          <span class="sidebar-nav-label">Notifications</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="profile" onclick="navigate('profile')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="8" r="4" />
+            <path d="M4 20c0-4 3.6-7 8-7s8 3 8 7" />
+          </svg>
+          <span class="sidebar-nav-label">Profile</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="settings" onclick="navigate('settings')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="3" />
+            <path
+              d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42" />
+          </svg>
+          <span class="sidebar-nav-label">Settings</span>
+        </button>
+        <button class="sidebar-nav-item" data-page="help" onclick="navigate('help')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <circle cx="12" cy="12" r="10" />
+            <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3M12 17h.01" />
+          </svg>
+          <span class="sidebar-nav-label">Help & Support</span>
+        </button>
+      </div>
+
+      <hr class="divider">
+
+      <div class="sidebar-group" id="role-nav">
+        <!-- injected by JS -->
+      </div>
+    </nav>
+
+    <!-- ── Main ── -->
+    <div class="main-area">
+
+      <!-- Header -->
+      <header>
+        <a class="logo" onclick="navigate('dashboard')" href="javascript:void(0)">
+          <div class="logo-icon">TF</div>
+          <span class="logo-text">TeamForge</span>
+        </a>
+        <div class="header-right">
+          <!-- Role switcher -->
+          <div class="dropdown">
+            <button class="role-btn collaborator" id="role-btn" onclick="toggleDropdown('role-dd')">
+              <span id="role-label">Collaborator</span> ▾
+            </button>
+            <div class="dropdown-menu" id="role-dd">
+              <div class="dropdown-label">Switch Role</div>
+              <button class="dropdown-item active" id="role-collab" onclick="setRole('collaborator')">
+                <span class="dot dot-info"></span> Collaborator
+                <span class="ml-auto" id="active-collab">Active</span>
+              </button>
+              <button class="dropdown-item" id="role-owner" onclick="setRole('project-owner')">
+                <span class="dot dot-primary"></span> Project Owner
+                <span class="ml-auto" id="active-owner" style="display:none">Active</span>
+              </button>
+              <button class="dropdown-item" id="role-mentor" onclick="tryMentor()">
+                <span id="mentor-icon">🔒</span> Mentor
+                <span class="ml-auto" id="active-mentor" style="display:none">Active</span>
+                <span class="ml-auto" id="mentor-status">Apply →</span>
+              </button>
+            </div>
+          </div>
+
+          <button id="admin-portal-btn" class="btn btn-outline btn-sm" style="display:none;margin-right:8px" onclick="openSuperuserAdmin()">Admin Portal</button>
+
+          <!-- Bell -->
+          <button class="icon-btn" onclick="navigate('notifications')">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
+            </svg>
+            <span class="notif-dot"></span>
+          </button>
+
+          <!-- User menu -->
+          <div class="dropdown">
+            <button class="avatar-btn" onclick="toggleDropdown('user-dd')">
+              <div class="avatar" id="header-avatar">AS</div>
+              <span class="avatar-name">Arjun Sharma</span>
+              <span style="font-size:.7rem;color:var(--muted-fg)">▾</span>
+            </button>
+            <div class="dropdown-menu" id="user-dd">
+              <div class="dropdown-header">
+                <p>Arjun Sharma</p>
+                <span id="user-role-label">Collaborator</span>
+              </div>
+              <button class="dropdown-item" onclick="navigate('profile');closeDropdowns()">Profile</button>
+              <button class="dropdown-item" onclick="navigate('settings');closeDropdowns()">Settings</button>
+              <button class="dropdown-item" onclick="navigate('help');closeDropdowns()">Help & Support</button>
+              <button class="dropdown-item danger"
+                onclick="logoutUser(); window.location.href='index.html'">Logout</button>
+            </div>
+          </div>
+        </div>
+      </header>
+
+      <!-- Content -->
+      <div class="content-area">
+
+        <!-- ═══════════ DASHBOARD ═══════════ -->
+        <div id="page-dashboard" class="page active">
+          <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px">
+            <div>
+              <h1>Dashboard</h1>
+              <p class="page-subtitle">Welcome back, Arjun Sharma! <span id="mentor-badge-header"
+                  style="display:none;color:var(--accent);font-weight:600;font-size:.8rem">⭐ Mentor</span></p>
+            </div>
+            <div id="mentor-dash-btns" style="display:none;display:flex;gap:8px">
+              <button class="btn btn-primary btn-sm" onclick="navigate('mentor-requests')">View Requests</button>
+              <button class="btn btn-outline btn-sm" onclick="navigate('mentored-projects')">My Projects</button>
+            </div>
+          </div>
+
+          <div class="stat-grid" id="stat-grid"></div>
+
+          <div class="two-col">
+            <div class="card">
+              <div class="card-title">Recent Activity</div>
+              <div class="activity-list" id="activity-list"></div>
+            </div>
+            <div class="card" id="second-card"></div>
+          </div>
+
+          <div class="card mt-3" id="third-card" style="margin-top:18px"></div>
+        </div>
+
+        <!-- ═══════════ PROJECTS ═══════════ -->
+        <div id="page-projects" class="page">
+          <h1>Projects</h1>
+          <p class="page-subtitle">Discover and join projects that match your skills.</p>
+          <div class="mt-3">
+            <input id="proj-search" class="input" placeholder="Search projects by title, owner, skill, or keyword" oninput="filterProjects()">
+          </div>
+<div id="proj-recommended">
+            <div class="font-semibold mb-3" style="font-size:1rem">Recommended For You</div>
+            <div class="two-col" id="proj-recommended-cards"></div>
+          </div>
+
+          <div class="mt-4">
+            <div class="flex items-center justify-between mb-3">
+              <div class="font-semibold" style="font-size:1rem" id="proj-section-label">All Projects</div>
+            </div>
+            <div class="three-col" id="proj-all-cards"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ LEADERBOARD ═══════════ -->
+        <div id="page-leaderboard" class="page">
+          <h1>Leaderboard</h1>
+          <p class="page-subtitle">See who's leading in XP and contributions. Click any user to view their profile.</p>
+
+          <div class="card mt-4">
+            <div class="tabs">
+              <button class="tab active" onclick="switchLeaderboard('weekly',this)">Weekly</button>
+              <button class="tab" onclick="switchLeaderboard('monthly',this)">Monthly</button>
+              <button class="tab" onclick="switchLeaderboard('alltime',this)">All Time</button>
+            </div>
+            <div class="overflow-x-auto">
+              <table id="leaderboard-table">
+                <thead>
+                  <tr>
+                    <th style="width:50px">Rank</th>
+                    <th>User</th>
+                    <th>XP</th>
+                    <th>Reputation</th>
+                    <th>Tasks</th>
+                    <th>Projects</th>
+                  </tr>
+                </thead>
+                <tbody id="leaderboard-body"></tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+
+        <!-- ═══════════ NOTIFICATIONS ═══════════ -->
+        <div id="page-notifications" class="page">
+          <h1>Notifications</h1>
+          <p class="page-subtitle">Stay updated on your projects and tasks.</p>
+
+          <div class="card mt-4" style="padding:0;overflow:hidden">
+            <div id="notif-list"></div>
+          </div>
+        </div>
+
+        <!-- ════════════════════════════════════════════
+     PROFILE PAGE — HTML
+     ════════════════════════════════════════════ -->
+
+        <!-- Page wrapper (replaces your original <div id="page-profile">) -->
+        <div id="page-profile" class="page">
+          <div id="profile-content"></div>
+        </div>
+
+        <!-- ── Archive List Modal ── -->
+        <div id="modal-archive" class="modal-overlay hidden" onclick="closeArchiveModal(event)">
+          <div class="modal-box">
+            <div class="modal-header">
+              <span class="modal-icon">📦</span>
+              <h3 class="modal-title">Archived Projects</h3>
+              <button class="modal-close" onclick="closeArchiveModal()">✕</button>
+            </div>
+            <div id="archive-list" class="modal-body"></div>
+          </div>
+        </div>
+
+        <!-- ── Project Report Modal ── -->
+        <div id="modal-report" class="modal-overlay hidden" onclick="closeReportModal(event)">
+          <div class="modal-box modal-box--wide">
+            <div class="modal-header">
+              <button class="modal-back-btn" onclick="backToArchive()">‹</button>
+              <span class="modal-icon">📄</span>
+              <h3 class="modal-title" id="report-modal-title">Project Report</h3>
+              <button class="modal-close" onclick="closeReportModal()">✕</button>
+            </div>
+            <div id="report-content" class="modal-body"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ SETTINGS ═══════════ -->
+        <div id="page-settings" class="page">
+          <h1>Settings</h1>
+          <p class="page-subtitle">Manage your account preferences and privacy.</p>
+
+          <!-- Profile Info -->
+          <div class="card mt-4">
+            <div class="section-header">
+              <div class="section-icon">👤</div>
+              <div>
+                <div class="section-title">Profile Information</div>
+                <div class="section-desc">Update your public profile details.</div>
+              </div>
+            </div>
+            <div class="form-grid">
+              <div class="input-group"><label class="label">Full Name</label><input id="settings-full-name"
+                  class="input" value="Arjun Sharma">
+              </div>
+              <div class="input-group"><label class="label">Username</label><input id="settings-username" class="input"
+                  value="arjunsharma">
+              </div>
+            </div>
+            <div class="input-group"><label class="label">Bio</label><input id="settings-bio" class="input"
+                value="Full-stack Developer · IIT Delhi"></div>
+            <div class="input-group"><label class="label">Phone Number</label><input id="settings-phone" class="input"
+                placeholder="9876543210"><div id="settings-phone-error" class="text-xs"
+                style="color:#b42318;margin-top:6px;display:none"></div></div>
+            <div class="input-group"><label class="label">LinkedIn Profile URL</label><input id="settings-linkedin"
+                class="input" placeholder="https://linkedin.com/in/yourprofile"></div>
+            <hr class="sep">
+            <div class="input-group">
+              <label class="label">My Skills</label>
+              <p class="text-xs text-muted mb-2">Add skills as tags. These appear on your profile and dashboard.</p>
+              <div class="flex gap-2 mb-3">
+                <input class="input" id="skill-input" placeholder="e.g. React, Python, Machine Learning" style="flex:1"
+                  onkeydown="if(event.key==='Enter')addSkill()">
+                <button class="btn btn-primary btn-sm" onclick="addSkill()">+ Add</button>
+              </div>
+              <div id="skills-container" style="display:flex;flex-wrap:wrap;gap:7px"></div>
+            </div>
+            <button class="btn btn-primary btn-sm mt-2" onclick="saveProfileSettings()">Save
+              Changes</button>
+          </div>
+
+          <!-- Notifications Settings -->
+          <div class="card mt-3">
+            <div class="section-header">
+              <div class="section-icon">🔔</div>
+              <div>
+                <div class="section-title">Notifications</div>
+                <div class="section-desc">Choose what updates you receive.</div>
+              </div>
+            </div>
+            <div id="notif-toggles"></div>
+            <button class="btn btn-primary btn-sm mt-2" onclick="saveNotificationSettings()">Save</button>
+          </div>
+
+          <!-- Privacy -->
+          <div class="card mt-3">
+            <div class="section-header">
+              <div class="section-icon">👁️</div>
+              <div>
+                <div class="section-title">Privacy</div>
+                <div class="section-desc">Control what others can see.</div>
+              </div>
+            </div>
+            <div id="privacy-toggles"></div>
+            <button class="btn btn-primary btn-sm mt-2" onclick="savePrivacySettings()">Save</button>
+          </div>
+
+          <!-- Appearance -->
+          <div class="card mt-3">
+            <div class="section-header">
+              <div class="section-icon">🎨</div>
+              <div>
+                <div class="section-title">Appearance</div>
+                <div class="section-desc">Customize your interface.</div>
+              </div>
+            </div>
+            <div class="input-group" style="max-width:240px">
+              <label class="label">Theme</label>
+              <select class="input" id="theme-select" onchange="applyTheme(this.value)">
+                <option value="light">Light</option>
+                <option value="dark">Dark</option>
+              </select>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="saveAppearanceSettings()">Save</button>
+          </div>
+
+          <!-- Danger Zone -->
+          <div class="card mt-3" style="border-color:rgba(239,68,68,.25)">
+            <div class="section-header">
+              <div class="section-icon" style="background:rgba(239,68,68,.1);color:var(--destructive)">🗑️</div>
+              <div>
+                <div class="section-title">Danger Zone</div>
+                <div class="section-desc">Irreversible account actions.</div>
+              </div>
+            </div>
+            <button class="btn btn-destructive btn-sm" onclick="showToast('Account deletion requested (demo)')">Delete
+              Account</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ HELP ═══════════ -->
+        <div id="page-help" class="page">
+          <h1>Help & Support</h1>
+          <p class="page-subtitle">Find answers or reach out to us.</p>
+<div id="faq-sections"></div>
+
+          <div class="card mt-3">
+            <div class="card-title">📩 Contact Support</div>
+            <div class="input-group"><label class="label">Category</label>
+              <select id="support-category" class="input">
+                <option>Bug Report</option>
+                <option>Feature Request</option>
+                <option>Account Issue</option>
+                <option>Other</option>
+              </select>
+            </div>
+            <div class="input-group"><label class="label">Message</label><textarea id="support-message" class="input"
+                rows="4" placeholder="Describe your issue..."></textarea></div>
+            <button class="btn btn-primary btn-sm" onclick="submitSupportRequest()">Send
+              Message</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ APPLIED PROJECTS ═══════════ -->
+        <div id="page-applied-projects" class="page">
+          <h1>Applied Projects</h1>
+          <p class="page-subtitle">Track the status of your project applications.</p>
+          <div class="card mt-4" style="padding:0;overflow:hidden">
+            <div
+              style="padding:14px 20px;border-bottom:1px solid var(--border);font-size:.83rem;font-weight:600;color:var(--muted-fg);display:grid;grid-template-columns:2fr 1fr 1fr 1fr">
+              <span>Project</span><span>Owner</span><span>Applied</span><span>Status</span>
+            </div>
+            <div id="applied-list"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ MY WORK ═══════════ -->
+        <div id="page-my-work" class="page">
+          <h1>My Work</h1>
+          <p class="page-subtitle">Projects where you are a collaborator.</p>
+          <div id="my-work-content"></div>
+        </div>
+
+        <!-- ── Contribution Summary Modal ── -->
+        <div id="modal-contribution-summary" class="modal-overlay" onclick="closeContributionSummary(event)">
+          <div class="modal-box">
+            <div class="modal-header">
+              <span class="modal-icon">🏆</span>
+              <h3 class="modal-title" id="contribution-summary-title">Your Contribution Summary</h3>
+              <button class="modal-close" onclick="closeContributionSummary()">✕</button>
+            </div>
+            <div id="contribution-summary-content" class="modal-body"></div>
+          </div>
+        </div>
+
+        <!-- ═══════════ CREATE PROJECT ═══════════ -->
+        <div id="page-create-project" class="page">
+          <h1>Create Project</h1>
+          <p class="page-subtitle">Start a new project and build your team.</p>
+          <div class="card mt-4" style="max-width:680px">
+            <div class="input-group"><label class="label">Project Title</label><input id="create-project-title"
+                class="input" placeholder="e.g. AI Campus Navigator"></div>
+            <div class="input-group"><label class="label">Description</label><textarea id="create-project-desc"
+                class="input" rows="3" placeholder="What is this project about?"></textarea></div>
+            <div class="input-group"><label class="label">Objectives</label><textarea id="create-project-objectives"
+                class="input" rows="2" placeholder="Key goals and deliverables..."></textarea></div>
+            <div class="form-grid">
+              <div class="input-group"><label class="label">Skills Required</label><input id="create-project-skills"
+                  class="input" placeholder="React, Python, Node.js..."></div>
+              <div class="input-group"><label class="label">Est. Duration</label><select id="create-project-duration"
+                  class="input">
+                  <option>1 month</option>
+                  <option>2 months</option>
+                  <option>3 months</option>
+                  <option>6 months</option>
+                </select></div>
+            </div>
+            <div class="form-grid">
+              <div class="input-group"><label class="label">Max Collaborators</label><input
+                  id="create-project-collaborators" class="input" type="number" value="5" min="1" max="20"></div>
+              <div class="input-group"><label class="label">Difficulty</label><select id="create-project-difficulty"
+                  class="input">
+                  <option>Beginner</option>
+                  <option>Intermediate</option>
+                  <option>Advanced</option>
+                </select></div>
+            </div>
+            <button class="btn btn-primary" onclick="createProject()">Create Project</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ MY PROJECTS ═══════════ -->
+        <div id="page-my-projects" class="page">
+          <h1>My Projects</h1>
+          <p class="page-subtitle">Projects you own and manage.</p>
+          <div class="three-col" id="my-projects-grid" style="margin-top:18px"></div>
+        </div>
+
+        <!-- ═══════════ PROJECT WORKSPACE ═══════════ -->
+        <div id="page-project-workspace" class="page">
+          <h1>Project Workspace</h1>
+          <p class="page-subtitle">Manage tasks, team and updates for the selected project.</p>
+          <div id="workspace-content" class="card" style="margin-top:16px;"></div>
+        </div>
+
+        <!-- ═══════════ MENTORS ═══════════ -->
+        <div id="page-mentors" class="page">
+          <h1>Mentors</h1>
+          <p class="page-subtitle">Connect with experienced mentors for your projects.</p>
+          <div class="three-col mt-3" id="mentors-grid"></div>
+        </div>
+
+        <!-- ═══════════ MENTOR APPLICATION ═══════════ -->
+        <div id="page-mentor-application" class="page">
+          <h1>Mentor Application</h1>
+          <p class="page-subtitle">Apply to become a mentor on TeamForge.</p>
+          <div class="card mt-4" style="max-width:560px">
+            <div
+              style="background:rgba(245,158,11,.08);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:.82rem;color:var(--warning)">
+              ⚠️ Mentor applications are reviewed by admins. Approval requires 4–5+ years of professional experience.
+            </div>
+            <div id="mentor-app-error"
+              style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:.82rem;color:var(--destructive)">
+            </div>
+            <div class="input-group"><label class="label">Full Name</label><input id="mentor-app-name" class="input"
+                value="Arjun Sharma">
+            </div>
+            <div class="input-group"><label class="label">LinkedIn Profile URL</label><input id="mentor-app-linkedin"
+                class="input" placeholder="https://linkedin.com/in/yourprofile"></div>
+            <div class="input-group"><label class="label">Area of Expertise</label><input id="mentor-app-expertise"
+                class="input" placeholder="e.g. Full-stack Development, Machine Learning..."></div>
+            <div class="input-group"><label class="label">Years of Experience</label><input id="mentor-app-years"
+                class="input" type="number" min="1" placeholder="5"></div>
+            <div class="input-group"><label class="label">Why do you want to mentor?</label><textarea
+                id="mentor-app-motivation" class="input" rows="3"
+                placeholder="Tell us about your motivation..."></textarea></div>
+            <button class="btn btn-primary" onclick="submitMentorApp()">Submit Application</button>
+          </div>
+        </div>
+
+        <!-- ═══════════ MENTOR REQUESTS ═══════════ -->
+        <div id="page-mentor-requests" class="page">
+          <h1>Mentor Requests</h1>
+          <p class="page-subtitle">Project owners requesting your mentorship.</p>
+          <div class="card mt-4" id="mentor-requests-content"></div>
+        </div>
+
+        <!-- ═══════════ MENTORED PROJECTS ═══════════ -->
+        <div id="page-mentored-projects" class="page">
+          <h1>Mentored Projects</h1>
+          <p class="page-subtitle">Projects you're currently mentoring.</p>
+          <div class="three-col mt-3" id="mentored-projects-grid"></div>
+        </div>
+
+      </div><!-- /content-area -->
+    </div><!-- /main-area -->
+  </div><!-- /app-shell -->
+
+  <!-- ══════════════════ ADMIN PORTAL ══════════════════ -->
+  <div id="admin-portal" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg)">
+
+    <!-- Admin Login -->
+    <div id="admin-login-screen" class="login-wrap">
+      <div class="login-card">
+        <div style="text-align:center;margin-bottom:20px">
+          <div
+            style="width:48px;height:48px;border-radius:10px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-fg);font-weight:700;font-size:1.1rem;margin:0 auto 10px">
+            TF</div>
+          <h2 style="font-size:1.1rem;font-weight:700">Portal Sign In</h2>
+          <p class="text-sm text-muted">Admin or Super User access</p>
+        </div>
+        <div id="admin-login-hint"
+          style="display:none;font-size:11px;color:var(--muted-fg);background:var(--secondary);border-radius:6px;padding:8px 10px;margin-bottom:10px;line-height:1.5">
+        </div>
+        <div class="input-group"><label class="label">Email</label><input class="input" id="admin-email"
+            placeholder="your@email.io"></div>
+        <div class="input-group"><label class="label">Password</label><input class="input" type="password"
+            id="admin-pass" placeholder="••••••••"></div>
+        <button class="btn btn-primary btn-full mt-2" onclick="adminLogin()">Sign In</button>
+        <button class="btn btn-outline btn-full mt-2" onclick="hideAdmin()">← Back to App</button>
+      </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="admin-dashboard-screen" class="admin-layout" style="display:none">
+      <div class="admin-sidebar">
+        <div class="admin-logo">
+          <div
+            style="width:28px;height:28px;border-radius:6px;background:var(--primary);display:flex;align-items:center;justify-content:center;color:var(--primary-fg);font-size:.7rem;font-weight:700">
+            TF</div>
+          <span>Portal</span>
+          <span class="admin-role-badge admin-badge">Admin</span>
+        </div>
+        <button class="admin-nav-item active" onclick="showAdminPage('admin-dash')">📊 Dashboard</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
+        <div class="su-only-nav" style="display:none">
+          <div class="admin-nav-divider">Super User</div>
+          <button class="admin-nav-item su-nav-item" onclick="showAdminPage('su-admins')">🔐 Manage Admins</button>
+          <button class="admin-nav-item su-nav-item" onclick="showAdminPage('su-config')">⚙️ Platform Config</button>
+        </div>
+        <div style="flex:1"></div>
+        <button class="admin-nav-item" onclick="exitAdmin()" style="color:var(--destructive)">← Exit Portal</button>
+      </div>
+      <div class="admin-content">
+        <div id="admin-dash" class="admin-page">
+          <div class="admin-dash-head">
+            <h1>Platform Overview</h1>
+            <p class="page-subtitle mt-1">Real-time snapshot of TeamForge activity.</p>
+          </div>
+
+          <div class="admin-dash-grid-top mt-3">
+            <div class="admin-kpi-card">
+              <div class="admin-kpi-row">
+                <div class="admin-kpi-icon info">👥</div>
+                <span class="admin-kpi-meta">6 active</span>
+              </div>
+              <div class="admin-kpi-value">8</div>
+              <div class="admin-kpi-label">Total Users</div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div class="admin-kpi-row">
+                <div class="admin-kpi-icon">📖</div>
+                <span class="admin-kpi-meta">Awaiting review</span>
+              </div>
+              <div class="admin-kpi-value">1</div>
+              <div class="admin-kpi-label">Pending Mentor Apps</div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div class="admin-kpi-row">
+                <div class="admin-kpi-icon">⚠️</div>
+                <span class="admin-kpi-meta">1 suspended</span>
+              </div>
+              <div class="admin-kpi-value">2</div>
+              <div class="admin-kpi-label">Flagged / Warned</div>
+            </div>
+
+            <div class="admin-kpi-card">
+              <div class="admin-kpi-row">
+                <div class="admin-kpi-icon">📜</div>
+              </div>
+              <div class="admin-kpi-value">10</div>
+              <div class="admin-kpi-label">Audit Events</div>
+            </div>
+          </div>
+
+          <div class="admin-dash-grid-actions mt-3">
+            <button class="admin-action-card" onclick="showAdminPage('admin-mentor-apps')">
+              <div class="admin-action-left">
+                <div class="admin-action-icon">📖</div>
+                <div>
+                  <div class="admin-action-title">Review Mentor Applications</div>
+                  <div class="admin-action-sub">1 pending</div>
+                </div>
+              </div>
+              <div class="admin-action-count">1</div>
+            </button>
+
+            <button class="admin-action-card" onclick="showAdminPage('admin-users')">
+              <div class="admin-action-left">
+                <div class="admin-action-icon">🛡️</div>
+                <div>
+                  <div class="admin-action-title">Manage Flagged Users</div>
+                  <div class="admin-action-sub">2 flagged</div>
+                </div>
+              </div>
+              <div class="admin-action-count">2</div>
+            </button>
+
+            <button class="admin-action-card" onclick="showAdminPage('admin-audit')">
+              <div class="admin-action-left">
+                <div class="admin-action-icon">📜</div>
+                <div>
+                  <div class="admin-action-title">View Full Audit Log</div>
+                  <div class="admin-action-sub">10 entries</div>
+                </div>
+              </div>
+              <div class="admin-action-count">10</div>
+            </button>
+          </div>
+
+          <div class="admin-dash-grid-bottom mt-3">
+            <div class="admin-panel">
+              <div class="admin-panel-title">↗ User Health</div>
+
+              <div class="admin-health-item">
+                <div class="admin-health-head"><span>Active</span><span>6 / 8</span></div>
+                <div class="admin-health-track">
+                  <div class="admin-health-fill success" style="width:75%"></div>
+                </div>
+              </div>
+
+              <div class="admin-health-item">
+                <div class="admin-health-head"><span>Warned</span><span>1 / 8</span></div>
+                <div class="admin-health-track">
+                  <div class="admin-health-fill warning" style="width:12.5%"></div>
+                </div>
+              </div>
+
+              <div class="admin-health-item">
+                <div class="admin-health-head"><span>Suspended</span><span>1 / 8</span></div>
+                <div class="admin-health-track">
+                  <div class="admin-health-fill danger" style="width:12.5%"></div>
+                </div>
+              </div>
+            </div>
+
+            <div class="admin-panel">
+              <div class="admin-panel-title">📜 Recent Events</div>
+              <div class="admin-events-list">
+                <div class="admin-event-row">
+                  <span class="admin-event-chip task">TASK</span>
+                  <div>
+                    <div class="admin-event-text">Task Approved · Set up project structure</div>
+                    <div class="admin-event-time">Mar 8, 2026 · 10:42 AM</div>
+                  </div>
+                </div>
+                <div class="admin-event-row">
+                  <span class="admin-event-chip mentor">MENTOR</span>
+                  <div>
+                    <div class="admin-event-text">Mentor App Submitted · Mentor Application #app-1</div>
+                    <div class="admin-event-time">Mar 8, 2026 · 09:15 AM</div>
+                  </div>
+                </div>
+                <div class="admin-event-row">
+                  <span class="admin-event-chip warning">WARNING</span>
+                  <div>
+                    <div class="admin-event-text">Warning Issued · Vikram Nair</div>
+                    <div class="admin-event-time">Mar 7, 2026 · 04:30 PM</div>
+                  </div>
+                </div>
+                <div class="admin-event-row">
+                  <span class="admin-event-chip xp">XP</span>
+                  <div>
+                    <div class="admin-event-text">XP Awarded · Rohan Mehta</div>
+                    <div class="admin-event-time">Mar 7, 2026 · 02:11 PM</div>
+                  </div>
+                </div>
+                <div class="admin-event-row">
+                  <span class="admin-event-chip mentor">MENTOR</span>
+                  <div>
+                    <div class="admin-event-text">Mentor App Approved · Priya Patel</div>
+                    <div class="admin-event-time">Mar 7, 2026 · 11:05 AM</div>
+                  </div>
+                </div>
+              </div>
+              <button class="admin-events-link" onclick="showAdminPage('admin-audit')">View full audit log →</button>
+            </div>
+          </div>
+        </div>
+
+        <div id="admin-users" class="admin-page" style="display:none">
+          <h1>User Management</h1>
+          <p class="page-subtitle mt-1">Monitor accounts, issue warnings, and manage suspensions.</p>
+
+          <div class="admin-users-toolbar mt-4">
+            <div class="admin-users-search-wrap">
+              <span class="admin-users-search-icon">⌕</span>
+              <input id="admin-users-search" class="admin-users-search" type="text"
+                placeholder="Search by name or university..." oninput="setAdminUsersSearch(this.value)" />
+            </div>
+            <div id="admin-users-filters" class="admin-users-filters"></div>
+          </div>
+
+          <div id="admin-users-list" class="admin-users-list mt-3"></div>
+        </div>
+
+        <div id="admin-user-profile" class="admin-page" style="display:none">
+          <div class="admin-profile-topbar">
+            <button class="btn btn-outline btn-sm" onclick="showAdminPage('admin-users')">← Back to Users</button>
+          </div>
+          <div id="admin-user-profile-content" class="mt-3"></div>
+        </div>
+
+        <div id="admin-projects" class="admin-page" style="display:none">
+          <h1>Projects</h1>
+          <p class="page-subtitle mt-1">View all projects on the platform</p>
+          <div class="card mt-4" style="padding:0;overflow:hidden">
+            <div id="admin-projects-list" class="overflow-x-auto"></div>
+          </div>
+        </div>
+
+        <div id="admin-mentor-apps" class="admin-page" style="display:none">
+          <h1>Mentor Applications</h1>
+          <p class="page-subtitle mt-1">Review and approve mentor applications</p>
+          <div class="card mt-4">
+            <div id="admin-mentor-list"></div>
+          </div>
+        </div>
+
+        <div id="admin-audit" class="admin-page" style="display:none">
+          <h1>Audit Log</h1>
+          <div class="admin-audit-head-row mt-1">
+            <p class="page-subtitle">Immutable record of all significant platform events.</p>
+            <span class="admin-audit-readonly">Read-only · Cannot be modified</span>
+          </div>
+
+          <div class="admin-audit-toolbar mt-3">
+            <div class="admin-audit-search-wrap">
+              <span class="admin-audit-search-icon">⌕</span>
+              <input id="admin-audit-search" class="admin-audit-search" type="text"
+                placeholder="Search events, actors, targets..." oninput="setAdminAuditSearch(this.value)" />
+            </div>
+            <div id="admin-audit-filters" class="admin-audit-filters"></div>
+          </div>
+
+          <div id="admin-audit-count" class="admin-audit-count mt-2"></div>
+
+          <div class="admin-audit-table-wrap mt-2">
+            <div id="audit-log-list"></div>
+          </div>
+        </div>
+
+        <!-- ═══ SUPER USER: Manage Admins ═══ -->
+        <div id="su-admins" class="admin-page" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <h1>Manage Admins <span class="su-page-badge">Super User Only</span></h1>
+              <p class="page-subtitle mt-1">Create, edit, suspend, or delete admin accounts and their permissions.</p>
+            </div>
+            <button class="btn btn-primary" onclick="suOpenAdminModal(null)">+ New Admin</button>
+          </div>
+          <div class="card mt-4" style="padding:0;overflow:hidden">
+            <div id="su-admins-list" class="overflow-x-auto"></div>
+          </div>
+        </div>
+
+        <!-- ═══ SUPER USER: Platform Config ═══ -->
+        <div id="su-config" class="admin-page" style="display:none">
+          <h1>Platform Configuration <span class="su-page-badge">Super User Only</span></h1>
+          <p class="page-subtitle mt-1">System-level settings that control platform behaviour for all users.</p>
+          <div id="su-config-content" class="mt-4"></div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Super User: Create / Edit Admin Modal -->
+  <div id="su-admin-modal"
+    style="display:none;position:fixed;inset:0;z-index:500;align-items:center;justify-content:center"></div>
+
+  <!-- Toast -->
+  <div id="toast"></div>
+
+  <script src="js/auth.js"></script>
+  <script src="js/store/state.js"></script>
+  <script src="js/store/data.js"></script>
+  <script src="js/utils/ui.js"></script>
+  <script src="js/features/Settings.js"></script>
+  <script src="js/features/Help_and_support.js"></script>
+  <script src="js/features/Profile.js"></script>
+  <script src="js/features/Leaderboard.js"></script>
+  <script src="js/features/Notifications.js"></script>
+  <script src="js/features/roles.js"></script>
+  <script src="js/features/superuser.js"></script>
+  <script src="js/features/Dashboard.js"></script>
+  <script src="js/core/router.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/features/review2-updates.js"></script>
+  <script>
+    // Allow direct admin access from landing page entry point.
+    (function () {
+      if (window.__openAdminOnLoad && typeof showAdmin === 'function') {
+        showAdmin();
+      }
+    })();
+  </script>
+</body>
+
+</html>
+

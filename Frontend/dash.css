@@ -1,4 +1,6 @@
-  
+/* ==========================================================
+   DESIGN TOKENS — CSS Custom Properties
+   ========================================================== */
 :root {
   /* Colors */
   --color-brand: #5f513f;
@@ -38,7 +40,9 @@
   --transition-medium: 300ms ease;
 }
 
-/*RESET & BASE */
+/* ==========================================================
+   RESET & BASE
+   ========================================================== */
 *,
 *::before,
 *::after {
@@ -81,7 +85,9 @@ a {
   color: inherit;
 }
 
-/*SHARED UTILITIES*/
+/* ==========================================================
+   SHARED UTILITIES
+   ========================================================== */
 .section-label {
   font-size: 0.75rem;
   font-weight: 700;
@@ -105,7 +111,9 @@ a {
   line-height: 1.7;
 }
 
-/*HEADER*/
+/* ==========================================================
+   HEADER
+   ========================================================== */
 .header {
   position: sticky;
   top: 0;
@@ -235,7 +243,7 @@ a {
     opacity var(--transition-base);
 }
 
-/* Hamburger X animation */
+/* Hamburger → X animation */
 .header__menu-toggle[aria-expanded="true"] .header__hamburger:nth-child(1) {
   transform: translateY(7px) rotate(45deg);
 }
@@ -279,7 +287,9 @@ a {
   margin-top: 1rem;
 }
 
-/* HERO */
+/* ==========================================================
+   HERO
+   ========================================================== */
 .hero {
   position: relative;
   min-height: 600px;
@@ -402,7 +412,9 @@ a {
   background-color: rgba(255, 255, 255, 0.2);
 }
 
-/* STATS */
+/* ==========================================================
+   STATS
+   ========================================================== */
 .stats {
   background-color: var(--color-gray-50);
   border-bottom: 1px solid var(--color-gray-200);
@@ -443,7 +455,9 @@ a {
   letter-spacing: 0.08em;
 }
 
-/* FEATURES*/
+/* ==========================================================
+   FEATURES
+   ========================================================== */
 .features {
   padding: var(--section-pad-y) 0;
   background-color: var(--color-white);
@@ -538,7 +552,9 @@ a {
   line-height: 1.7;
 }
 
-/*ROLES */
+/* ==========================================================
+   ROLES
+   ========================================================== */
 .roles {
   padding: var(--section-pad-y) 0;
   background-color: var(--color-gray-100);
@@ -603,7 +619,9 @@ a {
   line-height: 1.7;
 }
 
-/*PROCESS*/
+/* ==========================================================
+   PROCESS
+   ========================================================== */
 .process {
   padding: var(--section-pad-y) 0;
   background-color: var(--color-white);
@@ -672,7 +690,9 @@ a {
   line-height: 1.7;
 }
 
-/* GAMIFICATION */
+/* ==========================================================
+   GAMIFICATION
+   ========================================================== */
 .gamification {
   padding: var(--section-pad-y) 0;
   background-color: var(--bg-muted);
@@ -787,7 +807,9 @@ a {
   line-height: 1.6;
 }
 
-/* CTA  */
+/* ==========================================================
+   CTA
+   ========================================================== */
 .cta {
   padding: var(--section-pad-y) 0;
   background-color: var(--color-white);
@@ -833,7 +855,9 @@ a {
   background-color: var(--color-gray-800);
 }
 
-/* FOOTER*/
+/* ==========================================================
+   FOOTER
+   ========================================================== */
 .footer {
   background-color: var(--color-white);
   border-top: 1px solid var(--color-gray-200);
@@ -903,7 +927,9 @@ a {
   color: var(--color-gray-400);
 }
 
-/*ENTRANCE ANIMATIONS (triggered via JS IntersectionObserver)*/
+/* ==========================================================
+   ENTRANCE ANIMATIONS (triggered via JS IntersectionObserver)
+   ========================================================== */
 @keyframes fadeUp {
   from {
     opacity: 0;
@@ -958,7 +984,9 @@ a {
   animation-delay: 0.3s;
 }
 
-/*RESPONSIVE — TABLET  (≥ 768px) */
+/* ==========================================================
+   RESPONSIVE — TABLET  (≥ 768px)
+   ========================================================== */
 @media (min-width: 768px) {
   :root {
     --container-pad-x: 2rem;
@@ -1026,7 +1054,9 @@ a {
   }
 }
 
-/* RESPONSIVE — DESKTOP  (≥ 1024px) */
+/* ==========================================================
+   RESPONSIVE — DESKTOP  (≥ 1024px)
+   ========================================================== */
 @media (min-width: 1024px) {
   /* Features */
   .features__grid {
@@ -1034,7 +1064,9 @@ a {
   }
 }
 
-/*ROLE-BASED PORTAL — Shared badge + divider*/
+/* ═══════════════════════════════════════════════════════════
+   ROLE-BASED PORTAL — Shared badge + divider
+═══════════════════════════════════════════════════════════ */
 
 .admin-role-badge {
   display: inline-block;
@@ -1071,7 +1103,9 @@ a {
   border-left: 2px solid #f59e0b !important;
 }
 
-/* SUPER USER PAGE BADGE */
+/* ═══════════════════════════════════════════════════════════
+   SUPER USER PAGE BADGE
+═══════════════════════════════════════════════════════════ */
 
 .su-page-badge {
   display: inline-block;
@@ -1085,7 +1119,9 @@ a {
   vertical-align: middle;
 }
 
-/* SUPER USER TABLE */
+/* ═══════════════════════════════════════════════════════════
+   SUPER USER TABLE
+═══════════════════════════════════════════════════════════ */
 
 .su-table {
   width: 100%;
@@ -1148,9 +1184,9 @@ a {
   color: #fff;
 }
 
-/* 
+/* ═══════════════════════════════════════════════════════════
    SUPER USER PERMISSION TAGS
- */
+═══════════════════════════════════════════════════════════ */
 
 .su-perm-tags {
   display: flex;
@@ -1168,7 +1204,9 @@ a {
   white-space: nowrap;
 }
 
-/*   SUPER USER MODAL */
+/* ═══════════════════════════════════════════════════════════
+   SUPER USER MODAL
+═══════════════════════════════════════════════════════════ */
 
 .su-modal-backdrop {
   position: absolute;
@@ -1270,7 +1308,9 @@ a {
   cursor: pointer;
 }
 
-/* PLATFORM CONFIG */
+/* ═══════════════════════════════════════════════════════════
+   PLATFORM CONFIG
+═══════════════════════════════════════════════════════════ */
 
 .su-config-grid {
   display: grid;
