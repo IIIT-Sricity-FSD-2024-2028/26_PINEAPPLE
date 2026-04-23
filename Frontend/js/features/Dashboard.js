@@ -71,32 +71,20 @@ function renderDashboard() {
         })
         .filter(Boolean)
     : [];
-
-  const isMockUser = ["arjun.sharma@teamforge.io", "priya.patel@teamforge.io", "rohan.mehta@teamforge.io", "sneha.iyer@teamforge.io", "vikram.nair@teamforge.io", "ananya.reddy@teamforge.io", "kiran.bose@teamforge.io", "meera.pillai@teamforge.io"].includes(currentUserEmail.toLowerCase());
-
   const visibleProjects = PROJECTS.filter((project) => {
     const isOwner = project.owner === currentUserName;
     const isMember = Array.isArray(project.members)
       ? project.members.some((member) => member.name === currentUserName)
       : false;
-    
-    if (!isOwner && !isMember) return false;
-    const mockNames = ["Arjun Sharma", "Priya Patel", "Rohan Mehta", "Sneha Iyer", "Vikram Nair", "Ananya Reddy", "Kiran Bose", "Meera Pillai"];
-    if (mockNames.includes(project.owner) && !isMockUser) {
-      return false;
-    }
-    return true;
+    return isOwner || isMember;
   });
-
   const activeProjectCount = visibleProjects.filter((project) => !project.isCompleted).length;
   const pendingRequests = isMentor
     ? mentorRequests.filter((request) => request.status === "requested")
     : currentUserData.requests.filter((request) => request.status === "pending");
-
   const mentorAcceptedProjects = isMentor
     ? mentorRequests.filter((request) => request.status === "approved")
     : [];
-
   const mentorBadgesAwarded = isMentor && Array.isArray(PROJECTS)
     ? PROJECTS.reduce((count, project) => {
         const runtime =
@@ -119,12 +107,12 @@ function renderDashboard() {
     (notification) => notification.unread,
   );
 
-  const dashBtns = document.getElementById("mentor-dash-btns");
-  if (dashBtns) dashBtns.style.display = isMentor ? "flex" : "none";
-  
-  const mBadgeHeader = document.getElementById("mentor-badge-header");
-  if (mBadgeHeader) mBadgeHeader.style.display = isMentor ? "inline" : "none";
-
+  document.getElementById("mentor-dash-btns").style.display = isMentor
+    ? "flex"
+    : "none";
+  document.getElementById("mentor-badge-header").style.display = isMentor
+    ? "inline"
+    : "none";
 
   const stats = isMentor
     ? [
@@ -174,17 +162,7 @@ function renderDashboard() {
           icon: dashboardIcon("folder"),
           color: "info",
         },
-        {
-          label: "Completed Tasks",
-          value: String(
-            currentUserData.notifications.filter(
-              (n) => (n.status || "").toLowerCase() === "approved" || 
-                     (n.type || "").toUpperCase() === "TASK_APPROVED"
-            ).length
-          ),
-          icon: dashboardIcon("check"),
-          color: "success"
-        },
+        { label: "Completed Tasks", value: "24", icon: dashboardIcon("check"), color: "success" },
       ];
 
   document.getElementById("stat-grid").innerHTML = stats

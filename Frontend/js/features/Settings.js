@@ -110,7 +110,7 @@ function hydrateProfileData() {
   const userRecord = getCurrentSettingsUserRecord();
   const stored = userRecord?.profile || null;
   const base = STATE.userProfile || {};
-  const currentName = STATE.currentUser?.name || userRecord?.name || "TeamForge User";
+  const currentName = STATE.currentUser?.name || userRecord?.name || "Arjun Sharma";
   const merged = {
     fullName: String(stored?.fullName || base.fullName || currentName).trim() || currentName,
     username:
@@ -160,7 +160,7 @@ function applyProfileDataToSettingsForm() {
 
 function applyProfileIdentityToUI() {
   const profile = STATE.userProfile || hydrateProfileData();
-  const fullName = profile.fullName || "TeamForge User";
+  const fullName = profile.fullName || "Arjun Sharma";
 
   const avatarName = document.querySelector(".avatar-name");
   if (avatarName) avatarName.textContent = fullName;

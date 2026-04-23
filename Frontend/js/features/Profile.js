@@ -352,7 +352,7 @@ const OTHER_PROFILES = {
 const MENTORED_PROJECTS = [];
 
 function getOwnProfile() {
-  const fullName = String(STATE?.userProfile?.fullName || STATE?.currentUser?.name || "TeamForge User").trim() || "TeamForge User";
+  const fullName = String(STATE?.userProfile?.fullName || STATE?.currentUser?.name || "Arjun Sharma").trim() || "Arjun Sharma";
   const currentRecord =
     typeof getCurrentUserRecord === "function" ? getCurrentUserRecord() : null;
   const xpScore = Number(currentRecord?.profile?.xp ?? 0);
@@ -399,9 +399,8 @@ function getOwnProfile() {
     project: notification.desc || notification.message || "",
     time: notification.time || notification.timestamp || "Just now",
   }));
-  const approvedTasksCount = notifications.filter(
-    (n) => String(n.status || "").trim().toLowerCase() === "approved" ||
-           String(n.title || "").toLowerCase().includes("task approved")
+  const approvedTasks = notifications.filter(
+    (notification) => String(notification.status || "").trim().toLowerCase() === "approved",
   ).length;
   const avgXpPerTask =
     assignedTasks > 0 ? Math.round(xpScore / Math.max(assignedTasks, 1)) : 0;
@@ -417,7 +416,7 @@ function getOwnProfile() {
     xp: xpScore,
     rep: repScore,
     projects: projectList.length,
-    tasks: approvedTasksCount,
+    tasks: assignedTasks,
     skills: STATE.userSkills,
     hasMentorBadge: Boolean(currentRecord?.profile?.hasMentorBadge),
     projectList,
@@ -426,7 +425,7 @@ function getOwnProfile() {
       { label: "Avg XP / Task", value: String(avgXpPerTask) },
       {
         label: "Approval Rate",
-        value: assignedTasks > 0 ? `${Math.round((approvedTasksCount / assignedTasks) * 100)}%` : "0%",
+        value: assignedTasks > 0 ? `${Math.round((approvedTasks / assignedTasks) * 100)}%` : "0%",
       },
       { label: "Tasks on Time", value: assignedTasks > 0 ? "0%" : "0%" },
     ],

@@ -197,7 +197,11 @@ function renderRoleNav() {
           ]
         : [
             { page: "mentor-requests", icon: "📚", label: "Mentor Requests" },
-            { page: "mentored-projects", icon: "⭐", label: "Mentored Projects" },
+            {
+              page: "mentored-projects",
+              icon: "⭐",
+              label: "Mentored Projects",
+            },
           ];
 
   const label =
@@ -1862,24 +1866,7 @@ function filterProjects() {
 //   APPLIED PROJECTS
 // ══════════════════════════════════════════════
 function renderApplied() {
-  const currentUserName =
-    typeof getCurrentUserName === "function"
-      ? getCurrentUserName()
-      : STATE.currentUser?.name || "";
-  
-  const userApplied = APPLIED.filter(
-    (a) => String(a.user || "").trim().toLowerCase() === String(currentUserName).trim().toLowerCase()
-  );
-
-  const container = document.getElementById("applied-list");
-  if (!container) return;
-
-  if (userApplied.length === 0) {
-    container.innerHTML = '<div style="padding:40px;text-align:center;color:var(--muted-fg);font-style:italic">No project applications found.</div>';
-    return;
-  }
-
-  container.innerHTML = userApplied.map((a) => {
+  document.getElementById("applied-list").innerHTML = APPLIED.map((a) => {
     const cls =
       a.status === "Approved"
         ? "badge-success"

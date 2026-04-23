@@ -1209,7 +1209,7 @@
       );
     }
     if (item.requester) return false;
-    return false;
+    return currentUser === "Arjun Sharma";
   }
 
   function formatProjectStatus(project) {
@@ -3841,97 +3841,6 @@
                   `;
                 })
                 .join("")}
-        <div class="card-title">Project Chat</div>
-        <div class="workspace-chat-list">
-          ${messages
-            .map(
-              (message) => `
-                <div class="workspace-chat-bubble">
-                  <div class="workspace-chat-bubble__meta">${escapeHtml(message.sender)} · ${escapeHtml(message.time)}</div>
-                  <div>${escapeHtml(message.text)}</div>
-                </div>
-              `,
-            )
-            .join("")}
-        </div>
-        <div class="workspace-inline-form mt-3">
-          <input id="${inputId}" class="input" placeholder="Send a message to the team" onkeydown="if(event.key==='Enter'){event.preventDefault();${sendHandler}}" />
-          <button class="btn btn-primary" onclick="${sendHandler}">Send</button>
-        </div>
-      </div>
-    `;
-  }
-
-  function renderProjectWorkspace() {
-    refreshSharedReview2Runtime();
-    if (STATE.workspaceMode === "owned") {
-      renderOwnedProjectWorkspace();
-      return;
-    }
-    if (STATE.workspaceMode === "collaborator-project-preview") {
-      renderCollaboratorProjectPreview();
-      return;
-    }
-    const root = document.getElementById("page-project-workspace");
-    if (!root) return;
-    const fallbackPage =
-      STATE.workspaceBackPage ||
-      (STATE.role === "mentor" ? "mentored-projects" : "my-work");
-    if (!STATE.selectedProject) {
-      exitProjectWorkspace(fallbackPage);
-      return;
-    }
-    const project = PROJECTS.find((item) => item.id === STATE.selectedProject);
-    if (!project) {
-      exitProjectWorkspace(fallbackPage);
-      return;
-    }
-    const runtime = getProjectRuntime(project);
-    const tab = STATE.collaboratorWorkspaceTab || "overview";
-    const isMentorView = STATE.workspaceMode === "mentor-view";
-    const currentUser = getCurrentUserName();
-    const myTasks = runtime.tasks.filter((task) => task.assignee === currentUser);
-
-    let content = "";
-    if (tab === "tasks") {
-      content = `
-        <div class="card">
-          <table>
-            <thead>
-              <tr>
-                <th>Task</th>
-                <th>Assignee</th>
-                <th>Status</th>
-                <th>Difficulty</th>
-                <th>Proof</th>
-                <th>Due</th>
-                <th>${isMentorView ? "Mentor Access" : "Action"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${runtime.tasks
-                .map((task, index) => {
-                  const canAct = !isMentorView && task.assignee === currentUser;
-                  const action = isMentorView
-                    ? '<span class="text-xs text-muted">Read-only</span>'
-                    : task.status === "Open" && canAct
-                      ? `<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${index})">Start</button>`
-                      : task.status === "In Progress" && canAct
-                        ? `<button class="btn btn-outline btn-sm" onclick="openCollaboratorSubmitModal(${index})">Submit</button>`
-                        : '<span class="text-xs text-muted">No action</span>';
-                  return `
-                    <tr>
-                      <td>${escapeHtml(task.title)}</td>
-                      <td>${escapeHtml(task.assignee)}</td>
-                      <td>${collaboratorStatusPill(task.status)}</td>
-                      <td>${taskDifficultyPill(task.priority)}</td>
-                      <td>${taskProofLinkHtml(task, true)}</td>
-                      <td>${escapeHtml(task.due)}</td>
-                      <td>${action}</td>
-                    </tr>
-                  `;
-                })
-                .join("")}
             </tbody>
           </table>
         </div>
@@ -3985,16 +3894,8 @@
         </div>
         <div class="card">
           <div class="card-title">${isMentorView ? "Contribution History" : "My Workstream"}</div>
-          ${(() => {
-            const currentEmail = (typeof getCurrentUserEmail === "function" && getCurrentUserEmail()) || STATE.currentUser?.email || "";
-            const isMockUser = ["arjun.sharma@teamforge.io", "priya.patel@teamforge.io", "rohan.mehta@teamforge.io", "sneha.iyer@teamforge.io", "vikram.nair@teamforge.io", "ananya.reddy@teamforge.io", "kiran.bose@teamforge.io", "meera.pillai@teamforge.io"].includes(currentEmail.toLowerCase());
-            
-            const mockNames = ["Arjun Sharma", "Priya Patel", "Rohan Mehta", "Sneha Iyer", "Vikram Nair", "Ananya Reddy", "Kiran Bose", "Meera Pillai"];
-            if (mockNames.includes(project.owner) && !isMockUser) {
-              return '<p class="text-sm text-muted">No history entries yet.</p>';
-            }
-
-            return runtime.contributionHistory.length
+          ${
+            runtime.contributionHistory.length
               ? runtime.contributionHistory
                   .map(
                     (item) => `
@@ -4003,13 +3904,13 @@
                           <div class="font-semibold text-sm">${escapeHtml(item.title)}</div>
                           <div class="text-xs text-muted">${escapeHtml(item.summary)}</div>
                         </div>
-                        <span class="badge ${item.status === "Approved" ? "badge-success" : item.status === "In Review" ? "badge-warning" : "badge-secondary"}">${escapeHtml(item.status)}</span>
+                        <span class="badge ${item.status === "Approved" ? "badge-success" : "badge-warning"}">${escapeHtml(item.status)}</span>
                       </button>
                     `,
                   )
                   .join("")
-              : '<p class="text-sm text-muted">No history entries yet.</p>';
-          })()}
+              : '<p class="text-sm text-muted">No history entries yet.</p>'
+          }
         </div>
       `;
     }
@@ -4324,6 +4225,568 @@
     persistReview2Runtime();
     renderProjectWorkspace();
   }
+
+  function sendOwnedChatMessage() {
+    sendCollaboratorChatMessage();
+  }
+
+  function awardRecommendationBadge(projectId, userName) {
+    const project = PROJECTS.find((item) => item.id === projectId);
+    const runtime = getProjectRuntime(project);
+    if (!project || !runtime) return;
+    const mentor = getProjectMentor(project);
+    if (
+      STATE.workspaceMode !== "mentor-view" ||
+      !mentor ||
+      mentor.status !== "approved" ||
+      mentor.name !== getCurrentUserName()
+    ) {
+      showToast("Only the assigned mentor can grant recommendation badges", "error");
+      return;
+    }
+    if (runtime.recommendations.some((item) => item.userName === userName)) {
+      showToast("Recommendation badge already granted");
+      return;
+    }
+    runtime.recommendations.push({
+      userName,
+      note: "Recognized by mentor for strong collaboration and delivery.",
+    });
+    if (OTHER_PROFILES[userName]) {
+      OTHER_PROFILES[userName].hasMentorBadge = true;
+    }
+    if (
+      STATE.userProfile &&
+      String(STATE.userProfile.fullName || "").trim() === userName
+    ) {
+      STATE.review2 = STATE.review2 || {};
+      STATE.review2.selfMentorBadge = true;
+    }
+    const users =
+      typeof getStateUsersStore === "function" ? getStateUsersStore() : {};
+    const recipientRecord = getUserRecordByName(userName, users);
+    if (recipientRecord?.user) {
+      recipientRecord.user.profile = {
+        ...(recipientRecord.user.profile || {}),
+        hasMentorBadge: true,
+      };
+      pushUserNotification(recipientRecord.user, {
+        type: "MENTOR_BADGE",
+        message: `${getCurrentUserName()} assigned you a mentor recommendation badge in ${project.name}.`,
+        projectId: project.id,
+        from:
+          typeof getCurrentUserSessionEmail === "function"
+            ? getCurrentUserSessionEmail()
+            : "",
+        status: "awarded",
+        timestamp: getLiveTimestamp(),
+        icon: "⭐",
+        title: "Recommendation Badge Assigned",
+        desc: `${getCurrentUserName()} assigned you a mentor recommendation badge in ${project.name}.`,
+        time: getLiveTimestamp(),
+      });
+      saveStateUsersStore(users);
+    }
+    saveStoredRecommendations();
+    persistReview2Runtime();
+    if (typeof saveViewState === "function") saveViewState();
+    renderProjectWorkspace();
+    showToast(`Recommendation badge granted to ${userName}`);
+  }
+
+  function renderHelp() {
+    if (typeof baseRenderHelp === "function") {
+      baseRenderHelp();
+    }
+    const page = document.getElementById("page-help");
+    if (!page) return;
+    const supportCard = page.querySelector(".card.mt-3:last-of-type");
+    if (!supportCard) return;
+    supportCard.innerHTML = `
+      <div class="card-title">📩 Contact Support</div>
+      <div class="input-group"><label class="label">Category</label>
+        <select id="support-category" class="input">
+          <option>Bug Report</option>
+          <option>Feature Request</option>
+          <option>Account Issue</option>
+          <option>Report User</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <div class="input-group"><label class="label">Reported Username</label><input id="support-username" class="input" placeholder="Required only for Report User"></div>
+      <div class="input-group"><label class="label">Message</label><textarea id="support-message" class="input" rows="4" placeholder="Describe your issue..."></textarea></div>
+      <button class="btn btn-primary btn-sm" onclick="submitSupportRequest()">Send Message</button>
+    `;
+  }
+
+  function submitSupportRequest() {
+    const category = String(document.getElementById("support-category")?.value || "").trim();
+    const username = String(document.getElementById("support-username")?.value || "").trim();
+    const message = String(document.getElementById("support-message")?.value || "").trim();
+    if (!category) {
+      showToast("Select a support category", "error");
+      return;
+    }
+    if (category === "Report User") {
+      if (!username || username.length < 3) {
+        showToast("Enter the username you want to report", "error");
+        return;
+      }
+      if (!/^[a-zA-Z0-9._-]{3,30}$/.test(username)) {
+        showToast("Username must be 3-30 characters using letters, numbers, ., _, or -", "error");
+        return;
+      }
+    }
+    if (message.length < 20 || message.length > 1000) {
+      showToast("Support message must be between 20 and 1000 characters", "error");
+      return;
+    }
+    pushNotification({
+      roleScope: ["project-owner", "collaborator", "mentor"],
+      icon: "📨",
+      title: "Support Request Logged",
+      desc:
+        category === "Report User"
+          ? `Report created against @${username}. Our team will review it.`
+          : `Support request submitted under ${category}.`,
+    });
+    document.getElementById("support-username").value = "";
+    document.getElementById("support-message").value = "";
+    showToast(category === "Report User" ? "User report submitted" : "Support request submitted");
+  }
+
+  function renderNotifications() {
+    refreshSharedReview2Runtime();
+    if (typeof baseRenderNotifications === "function") {
+      baseRenderNotifications();
+    }
+    const list = document.getElementById("notif-list");
+    if (!list) return;
+    const normalizeUserKey = (value) =>
+      String(value || "")
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, "");
+    const currentUserKeys = new Set(
+      [
+        getCurrentUserName(),
+        STATE.userProfile?.fullName,
+        STATE.userProfile?.username,
+      ]
+        .map((value) => normalizeUserKey(value))
+        .filter(Boolean),
+    );    const inviteNotifications = "";
+    const extras = STATE.review2.notifications
+      .filter((item) => {
+        const scope = Array.isArray(item.roleScope)
+          ? item.roleScope
+          : ["collaborator", "project-owner", "mentor"];
+        return scope.includes(STATE.role);
+      })
+      .map(
+        (item) => `
+          <div class="notif-item${item.unread ? " unread" : ""}">
+            <div class="notif-icon">${item.icon}</div>
+            <div style="flex:1;min-width:0">
+              <div class="flex items-center gap-2">
+                <span class="font-semibold text-sm">${escapeHtml(item.title)}</span>
+                ${item.unread ? '<span style="width:7px;height:7px;border-radius:50%;background:var(--info);flex-shrink:0"></span>' : ""}
+              </div>
+              <p class="text-sm text-muted mt-1">${escapeHtml(item.desc)}</p>
+            </div>
+            <span class="text-xs text-muted" style="white-space:nowrap">${escapeHtml(item.time)}</span>
+          </div>
+          <div style="height:1px;background:var(--border)"></div>
+        `,
+      )
+      .join("");
+    if (inviteNotifications || extras) {
+      const inviteSection = "";
+      const updatesSection = extras
+        ? `
+            <div class="notif-section-label" style="padding:12px 16px 8px;font-size:0.78rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted-fg)">Notifications</div>
+            ${extras}
+          `
+        : "";
+      list.insertAdjacentHTML("afterbegin", `${inviteSection}${updatesSection}`);
+    }
+  }
+
+  function buildProfileHtml(profile, isPopup) {
+    const activeProjects = (profile.projectList || []).filter(
+      (project) => project.status !== "Completed",
+    );
+    const completedProjects = (profile.projectList || []).filter(
+      (project) => project.status === "Completed",
+    );
+    const mentorRecommendations = profile.recommendations || [];
+    const mentoredProjects = profile.mentoredProjects || [];
+    const showMentoredLock = mentoredProjects.length === 0;
+
+    return `
+      <div class="card">
+        <div class="profile-header">
+          <div class="profile-avatar">${escapeHtml(profile.initials)}</div>
+          <div class="profile-info">
+            <div class="profile-name">${escapeHtml(profile.name)}${profile.hasMentorBadge ? ` <span class="mentor-rec-badge">${profileIconSvg("mentor")}<span>Mentor Recommended</span></span>` : ""}</div>
+            <div class="profile-title">${escapeHtml(profile.title)} · ${escapeHtml(profile.uni)}</div>
+            <div class="profile-joined">Member since ${escapeHtml(profile.joined)}</div>
+            <div class="profile-bio">${escapeHtml(profile.bio)}</div>
+          </div>
+        </div>
+        <div class="profile-stats">
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("xp")}</span><div><div class="stat-pill-label">XP</div><div class="stat-pill-value">${Number(profile.xp || 0).toLocaleString()}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("reputation")}</span><div><div class="stat-pill-label">Reputation</div><div class="stat-pill-value">${profile.rep || 0}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("projects")}</span><div><div class="stat-pill-label">Projects</div><div class="stat-pill-value">${profile.projects || 0}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("tasks")}</span><div><div class="stat-pill-label">Tasks</div><div class="stat-pill-value">${profile.tasks || 0}</div></div></div>
+        </div>
+      </div>
+      <div class="profile-grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Active Projects</div>
+          ${
+            activeProjects.length
+              ? activeProjects
+                  .map(
+                    (project) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(project.name)}</div>
+                        <div class="proj-meta">${escapeHtml(project.role)} · ${escapeHtml(project.contribution || "")}</div>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No active projects.</p>'
+          }
+        </div>
+        <div class="card">
+          <div class="card-title">Skills</div>
+          ${skillsHTML(profile.skills || [])}
+        </div>
+      </div>
+      <div class="profile-grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Completed Projects</div>
+          ${
+            completedProjects.length
+              ? completedProjects
+                  .map(
+                    (project) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(project.name)}</div>
+                        <div class="proj-meta">${escapeHtml(project.role)} · ${escapeHtml(project.contribution || "")}</div>
+                        ${
+                          project.finalLink
+                            ? `<a class="workspace-link" href="${escapeHtml(project.finalLink)}" target="_blank" rel="noopener noreferrer">Final Link</a>`
+                            : ""
+                        }
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No completed projects available.</p>'
+          }
+        </div>
+        <div class="card">
+          <div class="card-title">Mentor Recommendations</div>
+          ${
+            mentorRecommendations.length
+              ? mentorRecommendations
+                  .map(
+                    (badge) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(badge.project)}</div>
+                        <div class="proj-meta">Recommended by ${escapeHtml(badge.mentor)} · ${escapeHtml(badge.note)}</div>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No recommendation badges yet.</p>'
+          }
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-title">Mentored Projects</div>
+        ${
+          mentoredProjects.length
+            ? mentoredProjects
+                .map(
+                  (project) => `
+                    <div class="proj-row">
+                      <div class="proj-name">${escapeHtml(project.name)}</div>
+                      <div class="proj-meta">Owner: ${escapeHtml(project.owner || "Project Owner")} · ${escapeHtml(project.status || project.completedAt || "Completed")}</div>
+                      <div class="proj-meta">${escapeHtml(project.contribution || "")}</div>
+                      ${
+                        project.finalLink
+                          ? `<a class="workspace-link" href="${escapeHtml(project.finalLink)}" target="_blank" rel="noopener noreferrer">Final Link</a>`
+                          : ""
+                      }
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="locked-block">${showMentoredLock ? "This section is locked or empty for users without active mentoring assignments." : "No mentored projects yet."}</div>`
+        }
+      </div>
+      ${
+        isPopup
+          ? ""
+          : `
+            <div class="card mt-3">
+              <div class="card-title">Recent Activity</div>
+              ${
+                (profile.activity || []).length
+                  ? profile.activity
+                      .map(
+                        (activity) => `
+                          <div class="activity-row">
+                            <div class="activity-icon-wrap">•</div>
+                            <div>
+                              <div class="activity-action">${escapeHtml(activity.action)}</div>
+                              <div class="activity-meta">${escapeHtml(activity.project)} · ${escapeHtml(activity.time)}</div>
+                            </div>
+                          </div>
+                        `,
+                      )
+                      .join("")
+                  : '<p class="skills-empty">No recent activity to show.</p>'
+              }
+            </div>
+          `
+      }
+    `;
+  }
+
+  function renderProfile(user) {
+    const root = document.getElementById("profile-content");
+    if (!root) return;
+    const name =
+      user && typeof user.name === "string" && user.name.trim()
+        ? user.name.trim()
+        : getCurrentUserName();
+    root.innerHTML = buildProfileHtml(findUserProfile(name), false);
+  }
+
+  function viewUserProfile(name) {
+    ensureOverlayMount();
+    const modal = document.getElementById("leaderboard-profile-modal");
+    const content = document.getElementById("leaderboard-profile-content");
+    const profile = findUserProfile(name);
+    if (!modal || !content) return;
+    content.innerHTML = buildProfileHtml(profile, true);
+    modal.classList.add("open");
+  }
+
+  function closeLeaderboardProfile(event) {
+    const modal = document.getElementById("leaderboard-profile-modal");
+    if (!modal) return;
+    if (event && event.target !== event.currentTarget) return;
+    modal.classList.remove("open");
+  }
+
+  function buildProfileHtml(profile, isPopup) {
+    const activeProjects = (profile.projectList || []).filter(
+      (project) => project.status !== "Completed",
+    );
+    const completedProjects = (profile.projectList || []).filter(
+      (project) => project.status === "Completed",
+    );
+    const mentorRecommendations = profile.recommendations || [];
+    const mentoredProjects = profile.mentoredProjects || [];
+    const showMentoredLock = mentoredProjects.length === 0;
+    const profileIconSvg = (name) =>
+      (
+        {
+          xp: '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M11.2 1.5 4.9 10h3.8L8.1 18.5l7-9h-4Z" fill="currentColor"/></svg>',
+          reputation:
+            '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m10 2.2 2.4 4.8 5.3.8-3.8 3.7.9 5.3-4.8-2.5-4.8 2.5.9-5.3-3.8-3.7 5.3-.8L10 2.2Z" fill="currentColor"/></svg>',
+          projects:
+            '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="M2.5 5.5a2 2 0 0 1 2-2h3.3l1.2 1.3H15.5a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2h-11a2 2 0 0 1-2-2v-8.3Z" fill="currentColor"/></svg>',
+          tasks:
+            '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m7.9 13.8-3.2-3.1 1.4-1.4L8 11l5.8-5.8 1.4 1.4-7.2 7.2Z" fill="currentColor"/></svg>',
+          mentor:
+            '<svg viewBox="0 0 20 20" aria-hidden="true" focusable="false"><path d="m10 2.4 2 4 4.4.6-3.2 3.1.8 4.4-4-2.1-4 2.1.8-4.4L3.6 7l4.4-.6 2-4Z" fill="currentColor"/></svg>',
+        }[name] || ""
+      );
+
+    return `
+      <div class="card">
+        <div class="profile-header">
+          <div class="profile-avatar">${escapeHtml(profile.initials)}</div>
+          <div class="profile-info">
+            <div class="profile-name">${escapeHtml(profile.name)}${profile.hasMentorBadge ? ` <span class="mentor-rec-badge">${profileIconSvg("mentor")}<span>Mentor Recommended</span></span>` : ""}</div>
+            <div class="profile-title">${escapeHtml(profile.title)} Â· ${escapeHtml(profile.uni)}</div>
+            <div class="profile-joined">Member since ${escapeHtml(profile.joined)}</div>
+            <div class="profile-bio">${escapeHtml(profile.bio)}</div>
+          </div>
+        </div>
+        <div class="profile-stats">
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("xp")}</span><div><div class="stat-pill-label">XP</div><div class="stat-pill-value">${Number(profile.xp || 0).toLocaleString()}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("reputation")}</span><div><div class="stat-pill-label">Reputation</div><div class="stat-pill-value">${profile.rep || 0}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("projects")}</span><div><div class="stat-pill-label">Projects</div><div class="stat-pill-value">${profile.projects || 0}</div></div></div>
+          <div class="stat-pill"><span class="stat-pill-icon" aria-hidden="true">${profileIconSvg("tasks")}</span><div><div class="stat-pill-label">Tasks</div><div class="stat-pill-value">${profile.tasks || 0}</div></div></div>
+        </div>
+      </div>
+      <div class="profile-grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Active Projects</div>
+          ${
+            activeProjects.length
+              ? activeProjects
+                  .map(
+                    (project) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(project.name)}</div>
+                        <div class="proj-meta">${escapeHtml(project.role)} Â· ${escapeHtml(project.contribution || "")}</div>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No active projects.</p>'
+          }
+        </div>
+        <div class="card">
+          <div class="card-title">Skills</div>
+          ${skillsHTML(profile.skills || [])}
+        </div>
+      </div>
+      <div class="profile-grid-2 mt-3">
+        <div class="card">
+          <div class="card-title">Completed Projects</div>
+          ${
+            completedProjects.length
+              ? completedProjects
+                  .map(
+                    (project) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(project.name)}</div>
+                        <div class="proj-meta">${escapeHtml(project.role)} Â· ${escapeHtml(project.contribution || "")}</div>
+                        ${
+                          project.finalLink
+                            ? `<a class="workspace-link" href="${escapeHtml(project.finalLink)}" target="_blank" rel="noopener noreferrer">Final Link â†—</a>`
+                            : ""
+                        }
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No completed projects available.</p>'
+          }
+        </div>
+        <div class="card">
+          <div class="card-title">Mentor Recommendations</div>
+          ${
+            mentorRecommendations.length
+              ? mentorRecommendations
+                  .map(
+                    (badge) => `
+                      <div class="proj-row">
+                        <div class="proj-name">${escapeHtml(badge.project)}</div>
+                        <div class="proj-meta">Recommended by ${escapeHtml(badge.mentor)} Â· ${escapeHtml(badge.note)}</div>
+                      </div>
+                    `,
+                  )
+                  .join("")
+              : '<p class="skills-empty">No recommendation badges yet.</p>'
+          }
+        </div>
+      </div>
+      <div class="card mt-3">
+        <div class="card-title">Mentored Projects</div>
+        ${
+          mentoredProjects.length
+            ? mentoredProjects
+                .map(
+                  (project) => `
+                    <div class="proj-row">
+                      <div class="proj-name">${escapeHtml(project.name)}</div>
+                      <div class="proj-meta">Owner: ${escapeHtml(project.owner || "Project Owner")} Â· ${escapeHtml(project.status || project.completedAt || "Completed")}</div>
+                      <div class="proj-meta">${escapeHtml(project.contribution || "")}</div>
+                      ${
+                        project.finalLink
+                          ? `<a class="workspace-link" href="${escapeHtml(project.finalLink)}" target="_blank" rel="noopener noreferrer">Final Link â†—</a>`
+                          : ""
+                      }
+                    </div>
+                  `,
+                )
+                .join("")
+            : `<div class="locked-block">${showMentoredLock ? "This section is locked or empty for users without active mentoring assignments." : "No mentored projects yet."}</div>`
+        }
+      </div>
+      ${
+        isPopup
+          ? ""
+          : `
+            <div class="card mt-3">
+              <div class="card-title">Recent Activity</div>
+              ${
+                (profile.activity || []).length
+                  ? profile.activity
+                      .map(
+                        (activity) => `
+                          <div class="activity-row">
+                            <div class="activity-icon-wrap">â€¢</div>
+                            <div>
+                              <div class="activity-action">${escapeHtml(activity.action)}</div>
+                              <div class="activity-meta">${escapeHtml(activity.project)} Â· ${escapeHtml(activity.time)}</div>
+                            </div>
+                          </div>
+                        `,
+                      )
+                      .join("")
+                  : '<p class="skills-empty">No recent activity.</p>'
+              }
+            </div>
+          `
+      }
+    `;
+  }
+
+  function renderDashboard() {
+    refreshSharedReview2Runtime();
+    if (typeof baseRenderDashboard === "function") {
+      baseRenderDashboard();
+    }
+    if (STATE.role === "mentor") return;
+    const currentUser = getCurrentUserName();
+    const card = document.getElementById("third-card");
+    if (!card) return;
+    const historyRows = PROJECTS.filter((project) => {
+      const isOwner = project.owner === currentUser;
+      const isMember = (project.members || []).some((member) => member.name === currentUser);
+      return isOwner || isMember;
+    })
+      .slice(0, 5)
+      .map((project) => {
+        const runtime = getProjectRuntime(project);
+        const latestEntry =
+          runtime.contributionHistory.find((item) => item.by === currentUser) ||
+          runtime.contributionHistory[0] || {
+            summary: project.desc || "Open workspace to view project details.",
+            status: project.isCompleted ? "Approved" : "Open",
+          };
+        return `
+          <tr class="clickable-row" onclick="openProjectFromHistory('${project.id}')">
+            <td>${escapeHtml(project.name)}</td>
+            <td class="text-muted">${escapeHtml(latestEntry.summary)}</td>
+            <td><span class="text-xs text-info">🔗 Open workspace</span></td>
+            <td><span class="badge ${latestEntry.status === "Approved" ? "badge-success" : latestEntry.status === "In Review" ? "badge-warning" : "badge-secondary"}">${escapeHtml(latestEntry.status)}</span></td>
+          </tr>
+        `;
+      })
+      .join("");
+    card.innerHTML = `
+      <div class="card-title">Contribution History</div>
+      <div class="overflow-x-auto">
+        <table>
+          <thead><tr><th>Project</th><th>Contribution</th><th>Access</th><th>Status</th></tr></thead>
+          <tbody>${historyRows || '<tr><td colspan="4" class="text-sm text-muted">No contribution history available yet.</td></tr>'}</tbody>
+        </table>
+      </div>
+    `;
+  }
+
+  function openOwnedSummary(projectId) {
     renderContributionSummary(projectId);
   }
 
