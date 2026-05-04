@@ -1,0 +1,13 @@
+{
+  "name": "teamforge-monorepo",
+  "version": "1.0.0",
+  "private": true,
+  "workspaces": [
+    "front-end",
+    "back-end"
+  ],
+  "scripts": {
+    "start:backend": "npm --workspace back-end run start:dev",
+    "build:backend": "npm --workspace back-end run build"
+  }
+}
