@@ -1,8 +1,0 @@
-node_modules/
-.DS_Store
-*.log
-.env
-.env.local
-dist/
-build/
-26_PINEAPPLE-main/
