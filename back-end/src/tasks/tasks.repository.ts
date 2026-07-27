@@ -52,6 +52,10 @@ export class TasksRepository {
     return this.tasks.filter((task) => task.projectId === projectId);
   }
 
+  findAll(): Task[] {
+    return this.tasks;
+  }
+
   findById(id: string): Task | undefined {
     return this.tasks.find((task) => task.id === id);
   }

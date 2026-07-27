@@ -3322,7 +3322,7 @@
     renderProjectWorkspace();
   }
 
-  function createOwnedTask() {
+  async function createOwnedTask() {
     const project = PROJECTS.find((item) => item.id === STATE.selectedProject);
     const runtime = getProjectRuntime(project);
     if (!project || !runtime) return;
@@ -3338,6 +3338,20 @@
     if (!due) {
       showToast("Deadline is required", "error");
       return;
+    }
+    try {
+      if (window.tasksApi) {
+        await window.tasksApi.create({
+          projectId: project.id,
+          title,
+          description,
+          assignedTo: assignee === "Unassigned" ? "" : assignee,
+          due,
+          priority
+        });
+      }
+    } catch (error) {
+      console.warn("Backend unavailable for tasks, falling back to local state.", error);
     }
     const newTask = {
       id: `${project.id}-task-${Date.now()}`,
@@ -4226,7 +4240,7 @@
     `;
   }
 
-  function startCollaboratorTask(taskIndex) {
+  async function startCollaboratorTask(taskIndex) {
     const project = PROJECTS.find((item) => item.id === STATE.selectedProject);
     const runtime = getProjectRuntime(project);
     if (!project || !runtime) return;
@@ -4239,6 +4253,13 @@
     if (task.assignee !== getCurrentUserName()) {
       showToast("Only the assigned collaborator can start this task", "error");
       return;
+    }
+    try {
+      if (window.tasksApi && task.id && !task.id.includes("task-")) {
+        await window.tasksApi.update(task.id, { status: "In Progress" });
+      }
+    } catch (error) {
+      console.warn("Backend unavailable, falling back to local task state.");
     }
     task.status = "In Progress";
     if (typeof saveViewState === "function") saveViewState();
@@ -4393,7 +4414,7 @@
     showToast(`${task.title} deleted`);
   }
 
-  function submitCollaboratorProof() {
+  async function submitCollaboratorProof() {
     const project = PROJECTS.find((item) => item.id === STATE.selectedProject);
     const runtime = getProjectRuntime(project);
     const index = Number(STATE.collaboratorProofTaskIndex);
@@ -4418,6 +4439,13 @@
     if (!isValidWebUrl(link)) {
       showToast("Please enter a valid proof link", "error");
       return;
+    }
+    try {
+      if (window.tasksApi && task.id && !task.id.includes("task-")) {
+        await window.tasksApi.update(task.id, { status: "In Review" });
+      }
+    } catch (error) {
+      console.warn("Backend unavailable, falling back to local task state.");
     }
     task.status = "In Review";
     task.proofLink = link;
@@ -4608,10 +4636,10 @@
     showToast(category === "Report User" ? "User report submitted" : "Support request submitted");
   }
 
-  function renderNotifications() {
+  async function renderNotifications() {
     refreshSharedReview2Runtime();
     if (typeof baseRenderNotifications === "function") {
-      baseRenderNotifications();
+      await baseRenderNotifications();
     }
     const list = document.getElementById("notif-list");
     if (!list) return;

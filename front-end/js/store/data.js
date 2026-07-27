@@ -280,6 +280,68 @@ function addProjectToData(projectInput) {
   }
   return newProject;
 }
+
+// BACKEND SYNC FUNCTIONS (with localStorage fallback)
+async function syncProjectsFromBackend() {
+  try {
+    if (!window.projectsApi) return;
+    const backendProjects = await window.projectsApi.list();
+    if (backendProjects && Array.isArray(backendProjects)) {
+      const mappedProjects = backendProjects.map(p => ({
+        id: p.id,
+        name: p.title || p.name,
+        desc: p.description || p.desc,
+        skills: p.requiredSkills || p.skills || [],
+        progress: p.status === 'Completed' ? 100 : (p.status === 'In Progress' ? 50 : 0),
+        collaborators: Array.isArray(p.members) ? Math.max(p.members.length, 1) : 1,
+        owner: p.ownerId || p.owner || "Unknown",
+        members: Array.isArray(p.members) ? p.members.map(m => ({ 
+          name: m.name || "Unknown", 
+          initials: getInitialsFromName(m.name || "Unknown"), 
+          role: m.role || "Member" 
+        })) : [{ name: p.ownerId || "Owner", initials: getInitialsFromName(p.ownerId || "O"), role: "Owner" }],
+        isUserCreated: true,
+        duration: p.duration,
+        difficulty: p.difficulty,
+        status: p.status
+      })).map(normalizeProject);
+      
+      const backendIds = new Set(mappedProjects.map(p => p.id));
+      const remainingMockProjects = PROJECTS.filter(p => !backendIds.has(p.id));
+      
+      PROJECTS.length = 0; 
+      PROJECTS.push(...mappedProjects, ...remainingMockProjects);
+      saveCreatedProjects(); 
+    }
+  } catch (error) {
+    console.warn("Backend unavailable for projects, using localStorage fallback.", error);
+  }
+}
+
+async function syncLeaderboardFromBackend() {
+  try {
+    if (!window.leaderboardApi) return;
+    const backendLeaderboard = await window.leaderboardApi.getLeaderboard();
+    if (backendLeaderboard && Array.isArray(backendLeaderboard) && backendLeaderboard.length > 0) {
+      LEADERBOARD.alltime = backendLeaderboard.map(entry => ({
+        rank: entry.rank || 0,
+        user: entry.user || entry.userId || "Unknown",
+        initials: entry.initials || getInitialsFromName(entry.user || "Unknown"),
+        xp: entry.xp || 0,
+        rep: entry.rep || 0,
+        tasks: entry.tasks || 0,
+        projects: entry.projects || 0
+      }));
+    }
+  } catch (error) {
+    console.warn("Backend unavailable for leaderboard, using mock data fallback.", error);
+  }
+}
+
+// Expose sync functions globally so app.js can call them on load
+window.syncProjectsFromBackend = syncProjectsFromBackend;
+window.syncLeaderboardFromBackend = syncLeaderboardFromBackend;
+
 const LEADERBOARD = {
   weekly: [
     {

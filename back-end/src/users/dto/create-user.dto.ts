@@ -13,6 +13,8 @@ export enum UserStatus {
   Active = 'Active',
   Suspended = 'Suspended',
   Warned = 'Warned',
+  Flagged = 'Flagged',
+  Banned = 'Banned',
 }
 
 export class CreateUserDto {

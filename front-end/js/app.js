@@ -89,7 +89,7 @@
   }
 });
 
-function init() {
+async function init() {
   try {
     const currentEmail = typeof localStorage !== "undefined" ? localStorage.getItem("currentUser") : null;
     if (currentEmail && typeof reinitializeStateForUser === "function") {
@@ -108,6 +108,15 @@ function init() {
     }
     
     console.log("Starting init pipeline");
+    
+    // Sync fresh data from backend (with localStorage fallback)
+    if (typeof window.syncProjectsFromBackend === "function") {
+      await window.syncProjectsFromBackend();
+    }
+    if (typeof window.syncLeaderboardFromBackend === "function") {
+      await window.syncLeaderboardFromBackend();
+    }
+
     initializeMentorStatus();
     console.log("Passed initializeMentorStatus");
     renderSuperuserAdminButton();
@@ -139,3 +148,4 @@ function init() {
 }
 
 init();
+

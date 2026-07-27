@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const backendBaseUrl =
+    typeof window.getTeamforgeApiBaseUrl === "function"
+      ? window.getTeamforgeApiBaseUrl()
+      : "http://localhost:3000";
+
   const EMAIL_RE =
     /^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,}$/;
   const USERNAME_RE = /^[a-zA-Z0-9._-]{3,30}$/;
@@ -242,24 +247,27 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // ── Backend Integration: Fetch backend user ID on login ──
         try {
-          fetch("http://localhost:3000/users")
-            .then((res) => (res.ok ? res.json() : []))
-            .then((users) => {
-              const match = Array.isArray(users)
-                ? users.find(
-                    (u) =>
-                      String(u.email || "").toLowerCase() ===
-                      String(result.email || "").toLowerCase(),
-                  )
-                : null;
-              if (match && match.id) {
-                localStorage.setItem("teamforge.backendUserId", match.id);
-                console.log("✅ Backend user ID resolved:", match.id);
-              }
-            })
-            .catch((err) =>
-              console.warn("Backend unreachable for user lookup:", err.message),
-            );
+          if (window.usersApi) {
+            window.usersApi.list()
+              .then((users) => {
+                const match = Array.isArray(users)
+                  ? users.find(
+                      (u) =>
+                        String(u.email || "").toLowerCase() ===
+                        String(result.email || "").toLowerCase(),
+                    )
+                  : null;
+                if (match && match.id) {
+                  localStorage.setItem("teamforge.backendUserId", match.id);
+                  console.log("✅ Backend user ID resolved:", match.id);
+                }
+              })
+              .catch((err) =>
+                console.warn("Backend unreachable for user lookup:", err.message),
+              );
+          } else {
+            console.warn("apiClient not loaded");
+          }
         } catch (e) {
           console.warn("Backend user lookup error:", e);
         }
@@ -364,24 +372,24 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // ── Backend Integration: Create user in NestJS ──
       try {
-        fetch("http://localhost:3000/users", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
+        if (window.usersApi) {
+          const payload = {
             name: signupResult.user?.name || username,
             email: signupResult.email,
             role: "Collaborator",
             skills: [],
-          }),
-        })
-          .then((res) => (res.ok ? res.json() : null))
-          .then((data) => {
-            if (data && data.id) {
-              localStorage.setItem("teamforge.backendUserId", data.id);
-              console.log("✅ User synced to backend with ID:", data.id);
-            }
-          })
-          .catch((err) => console.warn("Backend unreachable for user sync:", err.message));
+          };
+          window.usersApi.create(payload, "Collaborator")
+            .then((data) => {
+              if (data && data.id) {
+                localStorage.setItem("teamforge.backendUserId", data.id);
+                console.log("✅ User synced to backend with ID:", data.id);
+              }
+            })
+            .catch((err) => console.warn("Backend unreachable for user sync:", err.message));
+        } else {
+          console.warn("apiClient not loaded");
+        }
       } catch (e) {
         console.warn("Backend user sync error:", e);
       }

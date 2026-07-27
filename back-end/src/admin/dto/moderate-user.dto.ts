@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsIn, IsString } from 'class-validator';
+import { IsEnum } from 'class-validator';
+import { UserStatus } from '../../users/dto/create-user.dto';
 
 export class ModerateUserDto {
   @ApiProperty({
     description: 'New moderation status for the user',
-    enum: ['active', 'suspended', 'flagged', 'banned'],
+    enum: UserStatus,
   })
-  @IsString()
-  @IsIn(['active', 'suspended', 'flagged', 'banned'])
-  status!: 'active' | 'suspended' | 'flagged' | 'banned';
+  @IsEnum(UserStatus)
+  status!: UserStatus;
 }

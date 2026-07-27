@@ -1,6 +1,11 @@
 // ══════════════════════════════════════════════
 //   INITIALIZATION: Load mentor approval on init
 // ══════════════════════════════════════════════
+const backendBaseUrl =
+  typeof window.getTeamforgeApiBaseUrl === "function"
+    ? window.getTeamforgeApiBaseUrl()
+    : "http://localhost:3000";
+
 function initializeMentorStatus() {
   // Ensure applications are seeded
   ensureMentorApplicationsSeeded();
@@ -2426,7 +2431,7 @@ function createProject() {
     duration: duration,
   };
   try {
-    fetch("http://localhost:3000/projects", {
+    fetch(`${backendBaseUrl}/projects`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -2690,7 +2695,7 @@ function inviteOwnedTaskMember() {
   showToast(`Invite sent to ${email}`);
 }
 
-function createOwnedTask() {
+async function createOwnedTask() {
   const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
   if (!project) {
     showToast("Project not found", "error");
@@ -2765,6 +2770,21 @@ function createOwnedTask() {
   ) {
     showToast("Selected assignee is not in project members", "error");
     return;
+  }
+
+  try {
+    if (window.tasksApi) {
+      await window.tasksApi.create({
+        projectId: project.id,
+        title: taskName,
+        description,
+        assignedTo: assignee === "Unassigned" ? "" : assignee,
+        due,
+        priority
+      });
+    }
+  } catch (error) {
+    console.warn("Backend unavailable for tasks, falling back to local state.", error);
   }
 
   runtime.tasks.unshift({
@@ -3387,7 +3407,7 @@ function collaboratorStatusPill(status) {
   return '<span class="badge badge-secondary">Open</span>';
 }
 
-function startCollaboratorTask(taskIndex) {
+async function startCollaboratorTask(taskIndex) {
   const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
   if (!project) return;
 
@@ -3395,9 +3415,18 @@ function startCollaboratorTask(taskIndex) {
   const idx = Number(taskIndex);
   if (!Number.isInteger(idx) || idx < 0 || idx >= data.tasks.length) return;
 
-  data.tasks[idx].status = "In Progress";
-  data.tasks[idx].action = "Submit";
-  showToast(`Started: ${data.tasks[idx].title}`);
+  const task = data.tasks[idx];
+  try {
+    if (window.tasksApi && task.id) {
+      await window.tasksApi.update(task.id, { status: "In Progress" });
+    }
+  } catch (error) {
+    console.warn("Backend unavailable, falling back to local task state.");
+  }
+
+  task.status = "In Progress";
+  task.action = "Submit";
+  showToast(`Started: ${task.title}`);
   STATE.collaboratorWorkspaceTab = "tasks";
   renderProjectWorkspace();
 }
@@ -3428,7 +3457,7 @@ function updateCollaboratorProofLink(value) {
   STATE.collaboratorProofLink = value;
 }
 
-function submitCollaboratorProof() {
+async function submitCollaboratorProof() {
   const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
   if (!project) return;
 
@@ -3450,15 +3479,24 @@ function submitCollaboratorProof() {
     return;
   }
 
-  data.tasks[idx].proofLink = proofLink;
-  data.tasks[idx].status = "In Review";
-  data.tasks[idx].action = "In Review";
+  const task = data.tasks[idx];
+  try {
+    if (window.tasksApi && task.id) {
+      await window.tasksApi.update(task.id, { status: "In Review" });
+    }
+  } catch (error) {
+    console.warn("Backend unavailable, falling back to local task state.");
+  }
+
+  task.proofLink = proofLink;
+  task.status = "In Review";
+  task.action = "In Review";
 
   STATE.collaboratorProofModalOpen = false;
   STATE.collaboratorProofTaskIndex = null;
   STATE.collaboratorProofLink = "";
 
-  showToast(`Submitted for review: ${data.tasks[idx].title}`);
+  showToast(`Submitted for review: ${task.title}`);
   renderProjectWorkspace();
 }
 
