@@ -31,7 +31,7 @@ export class LeaderboardController {
   constructor(private readonly leaderboardService: LeaderboardService) {}
 
   @Get()
-  @Roles('admin', 'user')
+  @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get leaderboard rankings' })
   @ApiQuery({
     name: 'period',
@@ -58,7 +58,7 @@ export class LeaderboardController {
   }
 
   @Get(':userId')
-  @Roles('admin', 'user')
+  @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get a specific user\'s leaderboard ranking' })
   @ApiParam({
     name: 'userId',
@@ -81,8 +81,8 @@ export class LeaderboardController {
   })
   getUserRank(
     @Param('userId') userId: string,
-    @Query('period') period: LeaderboardPeriod = 'alltime',
-  ): LeaderboardEntryDto | null {
+    @Query('period') period?: LeaderboardPeriod,
+  ): any {
     return this.leaderboardService.getUserRank(userId, period);
   }
 }

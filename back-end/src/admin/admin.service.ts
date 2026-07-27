@@ -2,13 +2,14 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { ProjectsService } from '../projects/projects.service';
 import { TasksService } from '../tasks/tasks.service';
 import { UsersService } from '../users/users.service';
-import { UserEntity } from '../users/entities/user.entity';
-import { ProjectEntity } from '../projects/entities/project.entity';
-import { TaskEntity } from '../tasks/entities/task.entity';
+
+
+
 import { ModerateUserDto } from './dto/moderate-user.dto';
 import { WarnUserDto } from './dto/warn-user.dto';
 import { AdminStatsEntity } from './entities/admin-stats.entity';
 import { AuditLogEntry } from './entities/audit-log-entry.entity';
+import { UserStatus } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class AdminService {
@@ -25,8 +26,8 @@ export class AdminService {
   }
 
   updateUserStatus(id: string, payload: ModerateUserDto, performedBy = 'admin') {
-    const allowedStatuses = ['active', 'suspended', 'flagged', 'banned'] as const;
-    if (!allowedStatuses.includes(payload.status)) {
+    const allowedStatuses = [UserStatus.Active, UserStatus.Suspended, UserStatus.Flagged, UserStatus.Banned];
+    if (!allowedStatuses.includes(payload.status as any)) {
       throw new BadRequestException(`Invalid status: ${payload.status}`);
     }
 
@@ -43,43 +44,44 @@ export class AdminService {
   }
 
   flagUser(id: string, performedBy = 'admin') {
-    const updatedUser = this.usersService.update(id, { status: 'flagged' });
+    const updatedUser = this.usersService.update(id, { status: UserStatus.Flagged });
     this.logAudit({
       action: 'flag-user',
       entityType: 'user',
       entityId: id,
       performedBy,
-      details: { status: 'flagged' },
+      details: { status: UserStatus.Flagged },
     });
     return updatedUser;
   }
 
   suspendUser(id: string, performedBy = 'admin') {
-    const updatedUser = this.usersService.update(id, { status: 'suspended' });
+    const updatedUser = this.usersService.update(id, { status: UserStatus.Suspended });
     this.logAudit({
       action: 'suspend-user',
       entityType: 'user',
       entityId: id,
       performedBy,
-      details: { status: 'suspended' },
+      details: { status: UserStatus.Suspended },
     });
     return updatedUser;
   }
 
   warnUser(id: string, payload: WarnUserDto, performedBy = 'admin') {
-    const user = this.usersService.findOne(id);
+    const user = this.usersService.findById(id);
     const warningRecord = {
       reason: payload.reason,
       issuedBy: performedBy,
       issuedAt: new Date().toISOString(),
     };
-    const warnings = Array.isArray(user.data?.warnings) ? user.data.warnings : [];
+    const userData = (user as any).data || {};
+    const warnings = Array.isArray(userData.warnings) ? userData.warnings : [];
     const updatedData = {
-      ...user.data,
+      ...userData,
       warnings: [...warnings, warningRecord],
     };
 
-    const updatedUser = this.usersService.update(id, { data: updatedData });
+    const updatedUser = this.usersService.update(id, { data: updatedData } as any);
     this.logAudit({
       action: 'warn-user',
       entityType: 'user',
@@ -97,20 +99,20 @@ export class AdminService {
 
     const stats: AdminStatsEntity = {
       totalUsers: users.length,
-      activeUsers: users.filter((user: UserEntity) => user.status === 'active').length,
-      suspendedUsers: users.filter((user: UserEntity) => user.status === 'suspended').length,
-      flaggedUsers: users.filter((user: UserEntity) => user.status === 'flagged').length,
-      bannedUsers: users.filter((user: UserEntity) => user.status === 'banned').length,
+      activeUsers: users.filter((user: any) => user.status === UserStatus.Active).length,
+      suspendedUsers: users.filter((user: any) => user.status === UserStatus.Suspended).length,
+      flaggedUsers: users.filter((user: any) => user.status === UserStatus.Flagged).length,
+      bannedUsers: users.filter((user: any) => user.status === UserStatus.Banned).length,
       totalProjects: projects.length,
-      openProjects: projects.filter((project: ProjectEntity) => project.status === 'open').length,
-      inProgressProjects: projects.filter((project: ProjectEntity) => project.status === 'in-progress').length,
-      completedProjects: projects.filter((project: ProjectEntity) => project.status === 'completed').length,
-      cancelledProjects: projects.filter((project: ProjectEntity) => project.status === 'cancelled').length,
+      openProjects: projects.filter((project: any) => project.status === 'open').length,
+      inProgressProjects: projects.filter((project: any) => project.status === 'in-progress').length,
+      completedProjects: projects.filter((project: any) => project.status === 'completed').length,
+      cancelledProjects: projects.filter((project: any) => project.status === 'cancelled').length,
       totalTasks: tasks.length,
-      pendingTasks: tasks.filter((task: TaskEntity) => task.status === 'pending').length,
-      inProgressTasks: tasks.filter((task: TaskEntity) => task.status === 'in-progress').length,
-      submittedTasks: tasks.filter((task: TaskEntity) => task.status === 'submitted').length,
-      approvedTasks: tasks.filter((task: TaskEntity) => task.status === 'approved').length,
+      pendingTasks: tasks.filter((task: any) => task.status === 'pending').length,
+      inProgressTasks: tasks.filter((task: any) => task.status === 'in-progress').length,
+      submittedTasks: tasks.filter((task: any) => task.status === 'submitted').length,
+      approvedTasks: tasks.filter((task: any) => task.status === 'approved').length,
     };
 
     return stats;

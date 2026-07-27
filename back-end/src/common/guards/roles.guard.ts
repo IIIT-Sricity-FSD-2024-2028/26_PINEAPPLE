@@ -74,9 +74,24 @@ export class RolesGuard implements CanActivate {
     // ──────────────────────────────────────────────────────────────
     // 4. Check if role is authorized
     // ──────────────────────────────────────────────────────────────
-    const isAuthorized = requiredRoles.some(
-      (role) => role.toLowerCase() === userRole,
-    );
+    // Super User role overrides all other role requirements
+    if (userRole === 'super user' || userRole === 'superuser') {
+      this.logger.debug(`Authorization granted for Super User`);
+      return true;
+    }
+
+    const roleAliases: Record<string, string[]> = {
+      'admin': ['administrator', 'admin'],
+      'user': ['collaborator', 'project owner', 'mentor', 'administrator', 'user'],
+      'superuser': ['super user', 'superuser'],
+      'portal_admin': ['administrator', 'portal admin', 'portal_admin']
+    };
+
+    const isAuthorized = requiredRoles.some((requiredRole) => {
+      const lowerReq = requiredRole.toLowerCase();
+      const validRoles = roleAliases[lowerReq] || [lowerReq];
+      return validRoles.includes(userRole);
+    });
 
     if (!isAuthorized) {
       this.logger.warn(

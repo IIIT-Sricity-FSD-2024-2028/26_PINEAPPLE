@@ -413,7 +413,7 @@ function applyTheme(val, saveToStorage = false) {
   }
 }
 
-function saveProfileSettings() {
+async function saveProfileSettings() {
   const fullNameInput = document.getElementById("settings-full-name");
   const usernameInput = document.getElementById("settings-username");
   const bioInput = document.getElementById("settings-bio");
@@ -481,6 +481,25 @@ function saveProfileSettings() {
       showToast("LinkedIn URL must be on linkedin.com");
       return;
     }
+  }
+
+  try {
+    if (window.usersApi) {
+      const backendUserId = localStorage.getItem("teamforge.backendUserId");
+      if (backendUserId) {
+        await window.usersApi.update(backendUserId, {
+          name: fullName,
+          profile: {
+            username,
+            bio,
+            phone,
+            linkedin
+          }
+        });
+      }
+    }
+  } catch (error) {
+    console.warn("Backend unavailable for profile update, falling back to local state.", error);
   }
 
   STATE.userProfile = {

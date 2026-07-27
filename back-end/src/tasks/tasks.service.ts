@@ -15,6 +15,10 @@ export class TasksService {
     return this.tasksRepository.findAllByProjectId(projectId);
   }
 
+  findAll(): Task[] {
+    return this.tasksRepository.findAll();
+  }
+
   findById(id: string): Task {
     const task = this.tasksRepository.findById(id);
     if (!task) {
