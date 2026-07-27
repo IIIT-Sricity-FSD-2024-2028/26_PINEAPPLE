@@ -1,27 +1,55 @@
-const API_BASE_URL = 'http://localhost:3000/api';
+type BackendRole =
+  | 'Collaborator'
+  | 'Project Owner'
+  | 'Mentor'
+  | 'Administrator'
+  | 'Super User';
 
-interface ApiClientOptions {
-  role: 'admin' | 'user';
+function resolveApiBaseUrl(): string {
+  const configuredBase =
+    typeof window !== 'undefined' && typeof (window as any).TEAMFORGE_API_BASE_URL === 'string'
+      ? (window as any).TEAMFORGE_API_BASE_URL
+      : '';
+  const storedBase =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('teamforge.apiBaseUrl') || ''
+      : '';
+  const rawBase = configuredBase || storedBase || 'http://localhost:3000';
+  return String(rawBase).replace(/\/+$/, '');
 }
 
-const defaultHeaders = (role: ApiClientOptions['role']) => ({
+const API_BASE_URL = resolveApiBaseUrl();
+
+interface ApiClientOptions {
+  role: BackendRole;
+  userId?: string;
+  userEmail?: string;
+}
+
+const defaultHeaders = (
+  role: ApiClientOptions['role'],
+  userId?: string,
+  userEmail?: string,
+) => ({
   'Content-Type': 'application/json',
   'x-user-role': role,
+  ...(userId ? { 'x-user-id': userId } : {}),
+  ...(userEmail ? { 'x-user-email': userEmail } : {}),
 });
 
 export async function apiRequest<T>(
   path: string,
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE',
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE',
   body: unknown = null,
   options: ApiClientOptions,
 ): Promise<T> {
   const url = `${API_BASE_URL}${path}`;
   const config: RequestInit = {
     method,
-    headers: defaultHeaders(options.role),
+    headers: defaultHeaders(options.role, options.userId, options.userEmail),
   };
 
-  if (body && (method === 'POST' || method === 'PUT')) {
+  if (body && (method === 'POST' || method === 'PUT' || method === 'PATCH')) {
     config.body = JSON.stringify(body);
   }
 
@@ -78,23 +106,33 @@ export async function apiRequest<T>(
 }
 
 // Get current user role from localStorage or default to 'user'
-export function getCurrentUserRole(): 'admin' | 'user' {
+export function getCurrentUserRole(): BackendRole {
   try {
-    // You can implement logic to get role from localStorage or state
-    // For now, default to 'user'
-    return 'user';
+    if (sessionStorage.getItem('teamforge.isSuperUser') === 'true') {
+      return 'Super User';
+    }
+    if (typeof (window as any).STATE !== 'undefined') {
+      return (window as any).STATE.portalRole || (window as any).STATE.role || 'Collaborator';
+    }
+    return 'Collaborator';
   } catch {
-    return 'user';
+    return 'Collaborator';
   }
 }
 
 export const usersApi = {
   list: (role?: ApiClientOptions['role']) => apiRequest('/users', 'GET', null, { role: role || getCurrentUserRole() }),
   get: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/users/${id}`, 'GET', null, { role: role || getCurrentUserRole() }),
-  create: (payload: { name: string; email: string; role: 'admin' | 'user' }, role?: ApiClientOptions['role']) =>
+  create: (
+    payload: { name: string; email: string; role: BackendRole },
+    role?: ApiClientOptions['role'],
+  ) =>
     apiRequest('/users', 'POST', payload, { role: role || getCurrentUserRole() }),
-  update: (id: string, payload: Partial<{ name: string; email: string; role: 'admin' | 'user' }>, role?: ApiClientOptions['role']) =>
-    apiRequest(`/users/${id}`, 'PUT', payload, { role: role || getCurrentUserRole() }),
+  update: (
+    id: string,
+    payload: Partial<{ name: string; email: string; role: BackendRole }>,
+    role?: ApiClientOptions['role'],
+  ) => apiRequest(`/users/${id}`, 'PATCH', payload, { role: role || getCurrentUserRole() }),
   remove: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/users/${id}`, 'DELETE', null, { role: role || getCurrentUserRole() }),
 };
 
@@ -108,24 +146,27 @@ export const projectsApi = {
     return apiRequest(`/projects${query ? `?${query}` : ''}`, 'GET', null, { role: role || getCurrentUserRole() });
   },
   get: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/projects/${id}`, 'GET', null, { role: role || getCurrentUserRole() }),
-  create: (payload: any, role?: ApiClientOptions['role']) => apiRequest('/projects', 'POST', payload, { role: role || getCurrentUserRole() }),
-  update: (id: string, payload: any, role?: ApiClientOptions['role']) => apiRequest(`/projects/${id}`, 'PUT', payload, { role: role || getCurrentUserRole() }),
+  create: (payload: any, role?: ApiClientOptions['role'], userId?: string) =>
+    apiRequest('/projects', 'POST', payload, {
+      role: role || getCurrentUserRole(),
+      userId: userId || localStorage.getItem('teamforge.backendUserId') || '',
+    }),
+  update: (id: string, payload: any, role?: ApiClientOptions['role']) =>
+    apiRequest(`/projects/${id}`, 'PATCH', payload, { role: role || getCurrentUserRole() }),
   remove: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/projects/${id}`, 'DELETE', null, { role: role || getCurrentUserRole() }),
 };
 
 export const tasksApi = {
   list: (params?: { projectId?: string; assigneeId?: string; status?: string; priority?: string }, role?: ApiClientOptions['role']) => {
-    const queryParams = new URLSearchParams();
-    if (params?.projectId) queryParams.append('projectId', params.projectId);
-    if (params?.assigneeId) queryParams.append('assigneeId', params.assigneeId);
-    if (params?.status) queryParams.append('status', params.status);
-    if (params?.priority) queryParams.append('priority', params.priority);
-    const query = queryParams.toString();
-    return apiRequest(`/tasks${query ? `?${query}` : ''}`, 'GET', null, { role: role || getCurrentUserRole() });
+    if (!params?.projectId) {
+      throw new Error('projectId is required to list tasks.');
+    }
+    return apiRequest(`/tasks/project/${params.projectId}`, 'GET', null, { role: role || getCurrentUserRole() });
   },
   get: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/tasks/${id}`, 'GET', null, { role: role || getCurrentUserRole() }),
   create: (payload: any, role?: ApiClientOptions['role']) => apiRequest('/tasks', 'POST', payload, { role: role || getCurrentUserRole() }),
-  update: (id: string, payload: any, role?: ApiClientOptions['role']) => apiRequest(`/tasks/${id}`, 'PUT', payload, { role: role || getCurrentUserRole() }),
+  update: (id: string, payload: any, role?: ApiClientOptions['role']) =>
+    apiRequest(`/tasks/${id}`, 'PATCH', payload, { role: role || getCurrentUserRole() }),
   remove: (id: string, role?: ApiClientOptions['role']) => apiRequest(`/tasks/${id}`, 'DELETE', null, { role: role || getCurrentUserRole() }),
 };
 

@@ -1,6 +1,11 @@
 // ══════════════════════════════════════════════
 //   INITIALIZATION: Load mentor approval on init
 // ══════════════════════════════════════════════
+const backendBaseUrl =
+  typeof window.getTeamforgeApiBaseUrl === "function"
+    ? window.getTeamforgeApiBaseUrl()
+    : "http://localhost:3000";
+
 function initializeMentorStatus() {
   // Ensure applications are seeded
   ensureMentorApplicationsSeeded();
@@ -2426,7 +2431,7 @@ function createProject() {
     duration: duration,
   };
   try {
-    fetch("http://localhost:3000/projects", {
+    fetch(`${backendBaseUrl}/projects`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

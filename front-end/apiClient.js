@@ -1,4 +1,17 @@
-const API_BASE_URL = "http://localhost:3000/api";
+function resolveApiBaseUrl() {
+  const configuredBase =
+    typeof window !== "undefined" && typeof window.TEAMFORGE_API_BASE_URL === "string"
+      ? window.TEAMFORGE_API_BASE_URL
+      : "";
+  const storedBase =
+    typeof localStorage !== "undefined"
+      ? localStorage.getItem("teamforge.apiBaseUrl") || ""
+      : "";
+  const rawBase = configuredBase || storedBase || "http://localhost:3000";
+  return String(rawBase).replace(/\/+$/, "");
+}
+
+const API_BASE_URL = resolveApiBaseUrl();
 
 const defaultHeaders = (role, userId, userEmail) => ({
   "Content-Type": "application/json",
@@ -72,14 +85,18 @@ async function apiRequest(path, method, body = null, options = {}) {
   }
 }
 
-// Get current user role from localStorage or default to 'user'
+// Get current user role in backend-compatible format
 function getCurrentUserRole() {
   try {
-    // You can implement logic to get role from localStorage or state
-    // For now, default to 'user'
-    return "user";
+    if (sessionStorage.getItem("teamforge.isSuperUser") === "true") {
+      return "Super User";
+    }
+    if (typeof STATE !== "undefined") {
+      return STATE.portalRole || STATE.role || "Collaborator";
+    }
+    return "Collaborator";
   } catch {
-    return "user";
+    return "Collaborator";
   }
 }
 
@@ -95,7 +112,7 @@ const usersApi = {
       role: role || getCurrentUserRole(),
     }),
   update: (id, payload, role) =>
-    apiRequest(`/users/${id}`, "PUT", payload, {
+    apiRequest(`/users/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
     }),
   remove: (id, role) =>
@@ -119,12 +136,17 @@ const projectsApi = {
     apiRequest(`/projects/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  create: (payload, role) =>
+  create: (payload, role, userId) =>
     apiRequest("/projects", "POST", payload, {
       role: role || getCurrentUserRole(),
+      userId:
+        userId ||
+        (typeof localStorage !== "undefined"
+          ? localStorage.getItem("teamforge.backendUserId") || ""
+          : ""),
     }),
   update: (id, payload, role) =>
-    apiRequest(`/projects/${id}`, "PUT", payload, {
+    apiRequest(`/projects/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
     }),
   remove: (id, role) =>
@@ -135,13 +157,10 @@ const projectsApi = {
 
 const tasksApi = {
   list: (params, role) => {
-    const queryParams = new URLSearchParams();
-    if (params?.projectId) queryParams.append("projectId", params.projectId);
-    if (params?.assigneeId) queryParams.append("assigneeId", params.assigneeId);
-    if (params?.status) queryParams.append("status", params.status);
-    if (params?.priority) queryParams.append("priority", params.priority);
-    const query = queryParams.toString();
-    return apiRequest(`/tasks${query ? `?${query}` : ""}`, "GET", null, {
+    if (!params?.projectId) {
+      throw new Error("projectId is required to list tasks.");
+    }
+    return apiRequest(`/tasks/project/${params.projectId}`, "GET", null, {
       role: role || getCurrentUserRole(),
     });
   },
@@ -154,7 +173,7 @@ const tasksApi = {
       role: role || getCurrentUserRole(),
     }),
   update: (id, payload, role) =>
-    apiRequest(`/tasks/${id}`, "PUT", payload, {
+    apiRequest(`/tasks/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
     }),
   remove: (id, role) =>

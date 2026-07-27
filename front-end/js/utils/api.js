@@ -3,7 +3,28 @@
  * Make sure this file is included via <script> tag before your feature scripts.
  */
 
-const API_BASE_URL = 'http://localhost:3000'; // Default NestJS port
+function resolveApiBaseUrl() {
+  const configuredBase =
+    typeof window !== 'undefined' && typeof window.TEAMFORGE_API_BASE_URL === 'string'
+      ? window.TEAMFORGE_API_BASE_URL
+      : '';
+
+  const storedBase =
+    typeof localStorage !== 'undefined'
+      ? localStorage.getItem('teamforge.apiBaseUrl') || ''
+      : '';
+
+  const rawBase = configuredBase || storedBase || 'http://localhost:3000';
+  return String(rawBase).replace(/\/+$/, '');
+}
+
+function getTeamforgeApiBaseUrl() {
+  return resolveApiBaseUrl();
+}
+
+if (typeof window !== 'undefined') {
+  window.getTeamforgeApiBaseUrl = getTeamforgeApiBaseUrl;
+}
 
 /**
  * Resolves the current user's role from the frontend state.
@@ -30,7 +51,7 @@ function getCurrentUserRole() {
  * @param {RequestInit} options - Fetch options (method, body, etc.)
  */
 async function apiFetch(endpoint, options = {}) {
-  const url = `${API_BASE_URL}${endpoint}`;
+  const url = `${getTeamforgeApiBaseUrl()}${endpoint}`;
   const method = options.method || 'GET';
   
   // Set up headers with JSON default

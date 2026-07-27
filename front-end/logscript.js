@@ -1,4 +1,9 @@
 document.addEventListener("DOMContentLoaded", () => {
+  const backendBaseUrl =
+    typeof window.getTeamforgeApiBaseUrl === "function"
+      ? window.getTeamforgeApiBaseUrl()
+      : "http://localhost:3000";
+
   const EMAIL_RE =
     /^[a-zA-Z0-9._%+-]{1,64}@[a-zA-Z0-9.-]{1,255}\.[a-zA-Z]{2,}$/;
   const USERNAME_RE = /^[a-zA-Z0-9._-]{3,30}$/;
@@ -242,7 +247,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
         // ── Backend Integration: Fetch backend user ID on login ──
         try {
-          fetch("http://localhost:3000/users")
+          fetch(`${backendBaseUrl}/users`)
             .then((res) => (res.ok ? res.json() : []))
             .then((users) => {
               const match = Array.isArray(users)
@@ -364,7 +369,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       // ── Backend Integration: Create user in NestJS ──
       try {
-        fetch("http://localhost:3000/users", {
+        fetch(`${backendBaseUrl}/users`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
