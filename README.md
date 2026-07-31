@@ -59,4 +59,4 @@ Students/Freshers often struggle to find meaningful project collaboration opport
 
 - **Frontend:** JavaScript / TypeScript, HTML, CSS
 - **Backend:** Node.js
-- **Database:** (fill in — e.g., MongoDB
+- **Database:** (fill in — e.g., MongoDB / PostgreSQL / MySQL)
