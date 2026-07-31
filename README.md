@@ -1,4 +1,4 @@
-# 26_PINEAPPLE
+<img width="1342" height="403" alt="image" src="https://github.com/user-attachments/assets/e8e35478-0df6-4765-a522-3073853fc89f" /># 26_PINEAPPLE
 
 # Project Collaboration Platform
 
@@ -55,4 +55,7 @@ Students/Freshers often struggle to find meaningful project collaboration opport
 
 ---
 
+## Tech Stack
+
+- **Frontend:** JavaScript / TypeScript, HTML, CSS
 
