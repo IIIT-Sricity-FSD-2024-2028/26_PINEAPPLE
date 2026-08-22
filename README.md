@@ -44,7 +44,7 @@ Students/Freshers often struggle to find meaningful project collaboration opport
  3. **Request Management:** Review mentorship requests from project owners and accept or decline them.
  4. **Student Recognition & Badge Assignment:** Identify skilled students and award achievement badges to recognize their abilities.
 
-*Note: The mentor does not evaluate, approve, or rate projects.*
+*Note: The mentor **does not** evaluate, approve, or rate projects.*
 
 ---
 

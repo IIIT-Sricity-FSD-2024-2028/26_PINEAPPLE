@@ -28,9 +28,18 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
-    const hasRole = requiredRoles.some(
-      (role) => role.toLowerCase() === userRole.toLowerCase()
-    );
+    const roleAliases: Record<string, string[]> = {
+      'admin': ['administrator', 'admin'],
+      'user': ['collaborator', 'project owner', 'mentor', 'administrator', 'user'],
+      'superuser': ['super user', 'superuser'],
+      'portal_admin': ['administrator', 'portal admin', 'portal_admin']
+    };
+
+    const hasRole = requiredRoles.some((requiredRole) => {
+      const lowerReq = requiredRole.toLowerCase();
+      const validRoles = roleAliases[lowerReq] || [lowerReq];
+      return validRoles.includes(userRole.toLowerCase());
+    });
 
     if (!hasRole) {
       throw new ForbiddenException('You do not have the required permissions to access this resource.');

@@ -1,4 +1,4 @@
-function renderNotifications() {
+async function renderNotifications() {
   const list = document.getElementById("notif-list");
   if (!list) return;
 
@@ -10,11 +10,52 @@ function renderNotifications() {
       .replace(/\"/g, "&quot;")
       .replace(/'/g, "&#39;");
 
+  let requestsData = [];
+  let notificationsData = [];
+  const backendUserId = localStorage.getItem("teamforge.backendUserId");
+
+  try {
+    if (window.joinRequestsApi && backendUserId) {
+      const backendRequests = await window.joinRequestsApi.list({ userId: backendUserId });
+      if (backendRequests && Array.isArray(backendRequests)) {
+        requestsData = backendRequests.map(r => ({
+          from: r.userId || "Someone",
+          projectId: r.projectId,
+          projectName: r.projectId, // Using ID as name fallback
+          status: r.status ? r.status.toLowerCase() : "pending",
+          time: r.createdAt || "Just now"
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn("Backend unavailable for join requests, using fallback.", e);
+  }
+
+  try {
+    if (window.notificationsApi && backendUserId) {
+      const backendNotifs = await window.notificationsApi.list({ userId: backendUserId });
+      if (backendNotifs && Array.isArray(backendNotifs)) {
+        notificationsData = backendNotifs.map(n => ({
+          icon: "🔔",
+          title: n.title || "Notification",
+          desc: n.message || "",
+          unread: !n.isRead,
+          time: n.createdAt || "Just now"
+        }));
+      }
+    }
+  } catch (e) {
+    console.warn("Backend unavailable for notifications, using fallback.", e);
+  }
+
   const currentUserData =
     (typeof getCurrentUserData === "function" && getCurrentUserData()) ||
     { projects: [], requests: [], notifications: [] };
 
-  const requestItems = (currentUserData.requests || []).map(
+  if (!requestsData.length && currentUserData.requests) requestsData = currentUserData.requests;
+  if (!notificationsData.length && currentUserData.notifications) notificationsData = currentUserData.notifications;
+
+  const requestItems = requestsData.map(
     (request) => `
       <div class="notif-item${request.status === "pending" ? " unread" : ""}">
         <div class="notif-icon">🤝</div>
@@ -32,7 +73,7 @@ function renderNotifications() {
     `,
   );
 
-  const notificationItems = (currentUserData.notifications || []).map(
+  const notificationItems = notificationsData.map(
     (notification) => {
       const iconText = escapeNotificationsHtml(notification.icon || "🔔");
       const titleText = escapeNotificationsHtml(notification.title || notification.type || "Notification");

@@ -2,6 +2,12 @@ import { ApiProperty } from '@nestjs/swagger';
 
 export class LeaderboardEntryDto {
   @ApiProperty({
+    description: 'User ID',
+    example: 'c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12',
+  })
+  userId?: string;
+
+  @ApiProperty({
     description: 'User ranking position',
     example: 1,
   })

@@ -8,8 +8,7 @@ function renderPageByName(page) {
   const renders = {
     dashboard: () => window.renderDashboard?.(),
     projects: () => window.renderProjects?.(),
-    leaderboard: () =>
-      window.switchLeaderboard?.("weekly", document.querySelector(".tab")),
+    leaderboard: () => window.switchLeaderboard?.("weekly", document.querySelector(".tab")),
     notifications: () => window.renderNotifications?.(),
     profile: () => window.renderProfile?.(null),
     settings: () => window.renderSettings?.(),

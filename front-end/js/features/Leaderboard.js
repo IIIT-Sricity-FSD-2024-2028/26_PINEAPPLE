@@ -53,14 +53,38 @@ function escapeLeaderboardHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
-function switchLeaderboard(period, btn) {
+async function switchLeaderboard(period, btn) {
   if (btn) {
     document
       .querySelectorAll("#page-leaderboard .tab")
       .forEach((t) => t.classList.remove("active"));
     btn.classList.add("active");
   }
-  const data = buildLeaderboardRows(period || "weekly");
+  
+  const selectedPeriod = period || "weekly";
+  let data;
+  
+  try {
+    if (window.leaderboardApi) {
+      const backendLeaderboard = await window.leaderboardApi.getLeaderboard({ period: selectedPeriod });
+      if (backendLeaderboard && Array.isArray(backendLeaderboard)) {
+        LEADERBOARD[selectedPeriod] = backendLeaderboard.map(entry => ({
+          rank: entry.rank || 0,
+          user: entry.user || entry.userId || "Unknown",
+          initials: entry.initials || getInitialsFromName(entry.user || "Unknown"),
+          xp: entry.xp || 0,
+          rep: entry.rep || 0,
+          tasks: entry.tasks || 0,
+          projects: entry.projects || 0
+        }));
+      }
+    }
+  } catch (error) {
+    console.warn("Backend unavailable for leaderboard, using fallback data.");
+  }
+  
+  data = buildLeaderboardRows(selectedPeriod);
+  
   const rankIcon = (r) =>
     r === 1 ? "🏆" : r === 2 ? "🥈" : r === 3 ? "🥉" : r;
   const rankColor = (r) =>

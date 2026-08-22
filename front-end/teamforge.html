@@ -836,13 +836,27 @@
   <script src="js/auth.js"></script>
   <script src="js/store/state.js"></script>
   <script src="js/store/data.js"></script>
+  <script src="apiClient.js"></script>
   <script src="js/utils/ui.js"></script>
   <script src="js/features/Settings.js"></script>
   <script src="js/features/Help_and_support.js"></script>
   <script src="js/features/Profile.js"></script>
   <script src="js/features/Leaderboard.js"></script>
   <script src="js/features/Notifications.js"></script>
-  <script src="js/features/roles.js"></script>
+  <!-- roles.js split into feature files — load order matters (utils → core → features) -->
+  <script src="js/features/roles/utils.js"></script>
+  <script src="js/features/roles/role-core.js"></script>
+  <script src="js/features/roles/admin-portal.js"></script>
+  <script src="js/features/roles/admin-users.js"></script>
+  <script src="js/features/roles/admin-projects.js"></script>
+  <script src="js/features/roles/admin-mentor-apps.js"></script>
+  <script src="js/features/roles/admin-audit.js"></script>
+  <script src="js/features/roles/mentors.js"></script>
+  <script src="js/features/roles/projects.js"></script>
+  <script src="js/features/roles/owned-projects.js"></script>
+  <script src="js/features/roles/owned-workspace.js"></script>
+  <script src="js/features/roles/collaborator-workspace.js"></script>
+  <script src="js/features/roles/my-work.js"></script>
   <script src="js/features/superuser.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
@@ -859,4 +873,3 @@
 </body>
 
 </html>
-
