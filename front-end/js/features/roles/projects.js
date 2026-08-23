@@ -33,6 +33,11 @@ function projectCardHTML(p, clickHandler = "openWorkspace", sourcePage = null) {
       <div class="progress-container">
         <div class="progress-fill" style="width: ${p.progress}%;"></div>
       </div>
+      ${sourcePage === "mentored-projects" ? `
+        <div style="margin-top: 12px; border-top: 1px solid var(--border); padding-top: 12px;">
+          <button class="btn btn-outline btn-sm btn-full" onclick="event.stopPropagation(); openMentorResourceModal('${encodeURIComponent(p.name)}', '${p.id}')">Upload Resource</button>
+        </div>
+      ` : ""}
     </div>
   </div>`;
 }

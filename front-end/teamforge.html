@@ -295,6 +295,17 @@
                 <div class="section-desc">Update your public profile details.</div>
               </div>
             </div>
+            <div class="input-group">
+              <label class="label">Avatar Upload</label>
+              <div style="display:flex; gap: 10px; align-items: center;">
+                <img id="settings-avatar-preview" src="" style="display:none; width:48px; height:48px; border-radius:50%; object-fit:cover; border:1px solid var(--border);">
+                <div id="settings-avatar-initials" style="width:48px; height:48px; border-radius:50%; background:var(--primary); color:var(--primary-fg); display:flex; align-items:center; justify-content:center; font-weight:700;">TF</div>
+                <div>
+                  <input type="file" id="settings-avatar-file" class="input" accept="image/*">
+                  <p class="text-xs text-muted mt-1">Select an image (max 2MB) to set as your profile avatar.</p>
+                </div>
+              </div>
+            </div>
             <div class="form-grid">
               <div class="input-group"><label class="label">Full Name</label><input id="settings-full-name"
                   class="input" value="Arjun Sharma">
@@ -541,6 +552,46 @@
       </div><!-- /content-area -->
     </div><!-- /main-area -->
   </div><!-- /app-shell -->
+
+  <!-- Task Proof Modal -->
+  <div id="modal-task-proof" class="modal-overlay" onclick="closeTaskProofModal(event)">
+    <div class="modal-content" style="max-width: 400px; text-align: left;">
+      <h3 style="margin-bottom: 8px;">Submit Task Proof</h3>
+      <p class="text-sm text-muted" style="margin-bottom: 16px;">Upload evidence for <strong id="task-proof-title"></strong> to mark it complete.</p>
+      
+      <div class="input-group">
+        <label class="label">Proof File (Image, PDF, ZIP — max 5MB)</label>
+        <input type="file" id="task-proof-file" class="input" accept="image/*,application/pdf,.zip">
+      </div>
+      
+      <input type="hidden" id="task-proof-id">
+      
+      <div style="display:flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+        <button class="btn btn-outline btn-sm" onclick="closeTaskProofModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="submitTaskProof()">Upload & Complete</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Mentor Resource Modal -->
+  <div id="modal-mentor-resource" class="modal-overlay" onclick="closeMentorResourceModal(event)">
+    <div class="modal-content" style="max-width: 400px; text-align: left;">
+      <h3 style="margin-bottom: 8px;">Upload Learning Resource</h3>
+      <p class="text-sm text-muted" style="margin-bottom: 16px;">Share a document or image with <strong id="mentor-resource-project"></strong>.</p>
+      
+      <div class="input-group">
+        <label class="label">Resource File (Max 10MB)</label>
+        <input type="file" id="mentor-resource-file" class="input" accept="image/*,application/pdf,.zip,.doc,.docx,.txt,.md">
+      </div>
+      
+      <input type="hidden" id="mentor-resource-project-id">
+      
+      <div style="display:flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
+        <button class="btn btn-outline btn-sm" onclick="closeMentorResourceModal()">Cancel</button>
+        <button class="btn btn-primary btn-sm" onclick="submitMentorResource()">Upload Resource</button>
+      </div>
+    </div>
+  </div>
 
   <!-- ══════════════════ ADMIN PORTAL ══════════════════ -->
   <div id="admin-portal" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg)">

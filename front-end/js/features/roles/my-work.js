@@ -159,7 +159,9 @@ function renderMyWork() {
                   <td style="padding:10px 0">
                     <span class="badge ${t.status === "In Review" ? "badge-warning" : t.status === "In Progress" ? "badge-info" : "badge-secondary"}">${t.status}</span>
                   </td>
-                  <td style="padding:10px 0;font-size:0.9rem;color:var(--muted-fg)">${t.assigned === currentUser ? "Awaiting review" : "—"}</td>
+                  <td style="padding:10px 0;font-size:0.9rem;color:var(--muted-fg)">
+                    ${t.assigned === currentUser && t.status !== "In Review" ? `<button class="btn btn-primary btn-sm" onclick="openTaskProofModal('${encodeURIComponent(t.title)}', 'task-fake-id-${Math.random().toString(36).substring(7)}')">Submit Proof</button>` : t.assigned === currentUser ? "Awaiting review" : "—"}
+                  </td>
                 </tr>
               `,
                 )
@@ -360,4 +362,63 @@ function closeContributionSummary(e) {
   if (!modal) return;
   if (e && e.target !== modal) return;
   modal.classList.remove("open");
+}
+
+function openTaskProofModal(encodedTitle, taskId) {
+  const modal = document.getElementById("modal-task-proof");
+  const titleEl = document.getElementById("task-proof-title");
+  const idEl = document.getElementById("task-proof-id");
+  const fileInput = document.getElementById("task-proof-file");
+  
+  if (!modal || !titleEl || !idEl || !fileInput) return;
+  
+  titleEl.textContent = decodeURIComponent(encodedTitle);
+  idEl.value = taskId;
+  fileInput.value = "";
+  modal.classList.add("open");
+}
+
+function closeTaskProofModal(e) {
+  const modal = document.getElementById("modal-task-proof");
+  if (!modal) return;
+  if (e && e.target !== modal) return;
+  modal.classList.remove("open");
+}
+
+async function submitTaskProof() {
+  const fileInput = document.getElementById("task-proof-file");
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    showToast("Please select a file to upload as proof.", "error");
+    return;
+  }
+  
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  try {
+    const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
+    const response = await fetch("http://localhost:3000/uploads/task-proof", {
+      method: "POST",
+      headers: {
+        "x-user-id": backendUserId
+      },
+      body: formData
+    });
+    
+    if (response.ok) {
+      showToast("Task proof uploaded successfully. Task completed!", "success");
+      closeTaskProofModal();
+      // Wait for a second and then re-render to simulate state change
+      setTimeout(() => {
+        renderMyWork();
+      }, 1000);
+    } else {
+      const err = await response.json();
+      showToast("Proof upload failed: " + (err.message || "Unknown error"), "error");
+    }
+  } catch (e) {
+    console.warn("Task proof upload failed", e);
+    showToast("Task proof upload failed. Server unavailable.", "error");
+  }
 }

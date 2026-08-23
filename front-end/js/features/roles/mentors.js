@@ -110,3 +110,62 @@ function renderMentoredProjects() {
     .join("");
   bindProjectCardClicks();
 }
+
+// ══════════════════════════════════════════════
+//   MENTOR RESOURCE UPLOAD
+// ══════════════════════════════════════════════
+
+function openMentorResourceModal(projectName, projectId) {
+  const modal = document.getElementById("modal-mentor-resource");
+  const titleEl = document.getElementById("mentor-resource-project");
+  const idEl = document.getElementById("mentor-resource-project-id");
+  const fileInput = document.getElementById("mentor-resource-file");
+  
+  if (!modal || !titleEl || !idEl || !fileInput) return;
+  
+  titleEl.textContent = decodeURIComponent(projectName);
+  idEl.value = projectId;
+  fileInput.value = "";
+  modal.classList.add("open");
+}
+
+function closeMentorResourceModal(e) {
+  const modal = document.getElementById("modal-mentor-resource");
+  if (!modal) return;
+  if (e && e.target !== modal) return;
+  modal.classList.remove("open");
+}
+
+async function submitMentorResource() {
+  const fileInput = document.getElementById("mentor-resource-file");
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    showToast("Please select a file to upload as a resource.", "error");
+    return;
+  }
+  
+  const file = fileInput.files[0];
+  const formData = new FormData();
+  formData.append("file", file);
+  
+  try {
+    const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
+    const response = await fetch("http://localhost:3000/uploads/resource", {
+      method: "POST",
+      headers: {
+        "x-user-id": backendUserId
+      },
+      body: formData
+    });
+    
+    if (response.ok) {
+      showToast("Resource shared successfully!", "success");
+      closeMentorResourceModal();
+    } else {
+      const err = await response.json();
+      showToast("Resource upload failed: " + (err.message || "Unknown error"), "error");
+    }
+  } catch (e) {
+    console.warn("Resource upload failed", e);
+    showToast("Resource upload failed. Server unavailable.", "error");
+  }
+}

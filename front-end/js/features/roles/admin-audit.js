@@ -78,8 +78,56 @@ function getAuditTypeClass(type) {
   return "system";
 }
 
+let ADMIN_SERVER_LOGS = [];
+
+async function fetchServerLogs() {
+  try {
+    const headers = { "x-user-role": "Administrator" };
+    const [reqRes, errRes] = await Promise.all([
+      fetch("http://localhost:3000/logs/requests", { headers }),
+      fetch("http://localhost:3000/logs/errors", { headers })
+    ]);
+    
+    let reqLogs = [], errLogs = [];
+    if (reqRes.ok) reqLogs = await reqRes.json();
+    if (errRes.ok) errLogs = await errRes.json();
+    
+    const combined = [];
+    
+    reqLogs.forEach(log => {
+      combined.push({
+        id: log.correlationId || Math.random().toString(),
+        type: "request",
+        event: `${log.method} ${log.url}`,
+        actor: log.ip || "Client",
+        target: `Status ${log.statusCode}`,
+        details: `Time: ${log.responseTime}ms`,
+        timestamp: log.timestamp
+      });
+    });
+    
+    errLogs.forEach(log => {
+      combined.push({
+        id: log.correlationId || Math.random().toString(),
+        type: "error",
+        event: `ERROR ${log.method || ""} ${log.url || ""}`,
+        actor: "System",
+        target: log.error || "Unknown Error",
+        details: log.stack ? log.stack.split("\\n")[0] : "-",
+        timestamp: log.timestamp
+      });
+    });
+    
+    // Sort descending by timestamp
+    combined.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+    ADMIN_SERVER_LOGS = combined;
+  } catch (e) {
+    console.warn("Could not fetch server logs", e);
+  }
+}
+
 function getFilteredAuditEntries() {
-  const allEntries = buildAuditLogEntries();
+  const allEntries = ADMIN_SERVER_LOGS;
   const query = ADMIN_AUDIT_UI_STATE.query.trim().toLowerCase();
 
   return allEntries.filter((entry) => {
@@ -98,29 +146,26 @@ function getFilteredAuditEntries() {
   });
 }
 
-function renderAuditLog() {
+async function renderAuditLog() {
   const listEl = document.getElementById("audit-log-list");
   const filtersEl = document.getElementById("admin-audit-filters");
   const countEl = document.getElementById("admin-audit-count");
   const searchEl = document.getElementById("admin-audit-search");
+  
   if (!listEl || !filtersEl || !countEl) return;
 
   if (searchEl && searchEl.value !== ADMIN_AUDIT_UI_STATE.query) {
     searchEl.value = ADMIN_AUDIT_UI_STATE.query;
   }
+  
+  if (ADMIN_SERVER_LOGS.length === 0) {
+    listEl.innerHTML = '<div class="admin-users-empty">Loading server logs...</div>';
+    await fetchServerLogs();
+  }
 
   const entries = getFilteredAuditEntries();
-  const allEntries = buildAuditLogEntries();
-  const filters = [
-    "all",
-    "task",
-    "xp",
-    "reputation",
-    "warning",
-    "suspension",
-    "mentor",
-    "system",
-  ];
+  const allEntries = ADMIN_SERVER_LOGS;
+  const filters = ["all", "request", "error"];
 
   filtersEl.innerHTML = filters
     .map((filter) => {
@@ -130,17 +175,17 @@ function renderAuditLog() {
           : allEntries.filter((entry) => entry.type === filter).length;
       return `
         <button class="admin-audit-filter-chip${ADMIN_AUDIT_UI_STATE.filter === filter ? " active" : ""}" onclick="setAdminAuditFilter('${filter}')">
-          ${getAuditTypeLabel(filter)}${filter === "all" ? ` (${count})` : ""}
+          ${filter.toUpperCase()}${filter === "all" ? ` (${count})` : ""}
         </button>
       `;
     })
     .join("");
 
-  countEl.textContent = `${entries.length} event${entries.length === 1 ? "" : "s"} shown`;
+  countEl.innerHTML = `${entries.length} event${entries.length === 1 ? "" : "s"} shown &nbsp; <button onclick="refreshAuditLogs()" style="cursor:pointer;background:none;border:none;color:var(--primary);text-decoration:underline;">Refresh</button>`;
 
   if (!entries.length) {
     listEl.innerHTML =
-      '<div class="admin-users-empty">No audit events found for this filter.</div>';
+      '<div class="admin-users-empty">No server logs found.</div>';
     return;
   }
 
@@ -160,7 +205,7 @@ function renderAuditLog() {
           .map(
             (entry) => `
           <tr>
-            <td><span class="admin-audit-type ${getAuditTypeClass(entry.type)}">${getAuditTypeLabel(entry.type).toUpperCase()}</span></td>
+            <td><span class="admin-audit-type ${entry.type === 'error' ? 'suspension' : 'system'}">${entry.type.toUpperCase()}</span></td>
             <td>
               <div class="admin-audit-event">${escapeHtml(entry.event)}</div>
               <div class="admin-audit-time">${escapeHtml(entry.timestamp)}</div>
@@ -175,4 +220,9 @@ function renderAuditLog() {
       </tbody>
     </table>
   `;
+}
+
+async function refreshAuditLogs() {
+  ADMIN_SERVER_LOGS = [];
+  await renderAuditLog();
 }
