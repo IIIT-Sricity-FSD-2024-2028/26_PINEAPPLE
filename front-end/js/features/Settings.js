@@ -212,7 +212,25 @@ function applyProfileIdentityToUI() {
 
   const avatar = document.getElementById("header-avatar");
   if (avatar) {
-    avatar.textContent = getSettingsInitials(displayName);
+    if (profile.avatarUrl) {
+      avatar.innerHTML = `<img src="http://localhost:3000${profile.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+    } else {
+      avatar.textContent = getSettingsInitials(displayName);
+    }
+  }
+
+  const settingsPreview = document.getElementById("settings-avatar-preview");
+  const settingsInitials = document.getElementById("settings-avatar-initials");
+  if (settingsPreview && settingsInitials) {
+    if (profile.avatarUrl) {
+      settingsPreview.src = `http://localhost:3000${profile.avatarUrl}`;
+      settingsPreview.style.display = "block";
+      settingsInitials.style.display = "none";
+    } else {
+      settingsPreview.style.display = "none";
+      settingsInitials.style.display = "flex";
+      settingsInitials.textContent = getSettingsInitials(displayName);
+    }
   }
 
   const dashboardSubtitle = document.querySelector("#page-dashboard .page-subtitle");
@@ -519,6 +537,36 @@ async function saveProfileSettings() {
     saveUserRuntime();
   }
   applyProfileIdentityToUI();
+
+  const avatarInput = document.getElementById("settings-avatar-file");
+  if (avatarInput && avatarInput.files && avatarInput.files[0]) {
+    const file = avatarInput.files[0];
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
+      const response = await fetch("http://localhost:3000/uploads/avatar", {
+        method: "POST",
+        headers: {
+          "x-user-id": backendUserId
+        },
+        body: formData
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        STATE.userProfile.avatarUrl = data.file.url;
+        applyProfileIdentityToUI();
+      } else {
+        const err = await response.json();
+        showToast("Avatar upload failed: " + (err.message || "Unknown error"), "error");
+      }
+    } catch (e) {
+      console.warn("Avatar upload failed", e);
+      showToast("Avatar upload failed. Server unavailable.", "error");
+    }
+  }
 
   if (typeof renderProfile === "function") {
     const activeProfilePage = document.getElementById("page-profile");

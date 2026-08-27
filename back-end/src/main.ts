@@ -2,6 +2,9 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { AppModule } from './app.module';
+import { HttpExceptionFilter } from './common/filters/http-exception.filter';
+import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware';
+import { LogManagerService } from './core/services/log-manager.service';
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -47,7 +50,12 @@ async function bootstrap() {
     }),
   );
 
-  // 3. Initialize Swagger API Documentation
+  // 3. Register Global Exception Filter (Error Handling Middleware)
+  //    Catches all HttpExceptions and unhandled errors, logs them to files
+  const logManager = app.get(LogManagerService);
+  app.useGlobalFilters(new HttpExceptionFilter(logManager));
+
+  // 4. Initialize Swagger API Documentation
   const config = new DocumentBuilder()
     .setTitle('TeamForge API')
     .setDescription('The Student Project Collaboration Platform REST API')
@@ -56,8 +64,23 @@ async function bootstrap() {
   const document = SwaggerModule.createDocument(app, config);
   SwaggerModule.setup('api', app, document); // Exposed at http://localhost:<PORT>/api
 
+  // 5. Register Express-level error handler (safety net for uncaught errors)
+  const expressApp = app.getHttpAdapter().getInstance();
+  expressApp.use(ErrorLoggerMiddleware.getExpressErrorHandler());
+
   await app.listen(port);
   console.log(`🚀 Backend is running on: http://localhost:${port}`);
   console.log(`📚 Swagger documentation is available at: http://localhost:${port}/api`);
+  console.log(`📁 Logs directory: ./logs/ (flushed every 30 seconds)`);
+  console.log(`📤 Uploads directory: ./uploads/`);
+  console.log('');
+  console.log('🔒 Middleware active:');
+  console.log('   ✅ Security Headers (all routes)');
+  console.log('   ✅ Structured Request Logger (all routes)');
+  console.log('   ✅ XSS Input Sanitizer (POST/PATCH/PUT routes)');
+  console.log('   ✅ Rate Limiter (sensitive routes)');
+  console.log('   ✅ File Upload via Multer (/uploads/*)');
+  console.log('   ✅ Global Exception Filter');
+  console.log('   ✅ Express Error Handler');
 }
 bootstrap();

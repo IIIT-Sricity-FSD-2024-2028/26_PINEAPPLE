@@ -1,8 +1,0 @@
-[2026-07-27T15:51:17.882Z] GET /leaderboard?period=weekly 200 2 - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:51:20.858Z] GET /projects 304 undefined - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:51:20.988Z] GET /leaderboard 200 2 - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:51:21.046Z] GET /leaderboard?period=weekly 304 undefined - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:52:05.097Z] POST /tasks 403 116 - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 Body: {"projectId":"10","title":"api","description":"conect to perfect api","assignedTo":"","due":"apr 12","priority":"Medium"}
-[2026-07-27T15:54:06.658Z] GET /projects 304 undefined - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:54:06.795Z] GET /leaderboard 304 undefined - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
-[2026-07-27T15:54:06.854Z] GET /leaderboard?period=weekly 304 undefined - Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36 ::1 
