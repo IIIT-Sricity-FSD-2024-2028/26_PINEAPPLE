@@ -2203,6 +2203,389 @@
     renderProjectWorkspace();
   }
 
+  // ── Kanban helpers ────────────────────────────────────────────────────────
+  const KANBAN_COLUMNS = [
+    { key: "todo",     label: "To Do",       statuses: ["Open", "To Do", "Todo"],          canonical: "Open" },
+    { key: "progress", label: "In Progress", statuses: ["In Progress"],                    canonical: "In Progress" },
+    { key: "review",   label: "In Review",   statuses: ["In Review", "submitted"],         canonical: "In Review" },
+    { key: "done",     label: "Done",        statuses: ["Approved", "Done", "Completed"],  canonical: "Approved" },
+  ];
+  function kanbanBucketFor(status) {
+    for (const col of KANBAN_COLUMNS) if (col.statuses.includes(status)) return col.key;
+    return "todo";
+  }
+  function kanbanInitials(name) {
+    if (!name || name === "Unassigned") return "?";
+    return String(name).split(/\s+/).filter(Boolean).map(s => s[0]).slice(0, 2).join("").toUpperCase();
+  }
+
+  function renderOwnedKanbanBoard(project, runtime) {
+    const grouped = KANBAN_COLUMNS.reduce((a, c) => (a[c.key] = [], a), {});
+    runtime.tasks.forEach((t, index) => grouped[kanbanBucketFor(t.status)].push({ task: t, index }));
+
+    return `
+      <div class="kanban-board">
+        ${KANBAN_COLUMNS.map(col => `
+          <div class="kanban-column" data-status="${col.key}"
+               ondragover="onKanbanDragOver(event)"
+               ondragleave="onKanbanDragLeave(event)"
+               ondrop="onKanbanDrop(event, '${col.key}')">
+            <div class="kanban-header">
+              <span>${col.label}</span>
+              <span class="count">${grouped[col.key].length}</span>
+            </div>
+            <div class="kanban-list">
+              ${grouped[col.key].map(({ task, index }) => renderOwnedKanbanCard(project, runtime, task, index)).join("") ||
+                `<div class="kanban-empty">Drop tasks here</div>`}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderOwnedKanbanCard(project, runtime, task, index) {
+    const assignee = task.assignee && task.assignee !== "Unassigned" ? task.assignee : "";
+    return `
+      <div class="kanban-card"
+           draggable="true"
+           data-index="${index}"
+           ondragstart="onKanbanDragStart(event, ${index})"
+           ondragend="onKanbanDragEnd(event)"
+           onclick="openOwnedTaskDetail(${index})">
+        <div class="kanban-card-header">
+          <div class="kanban-card-title">${escapeHtml(task.title)}</div>
+          ${taskDifficultyPill(task.priority)}
+        </div>
+        ${task.description ? `<div class="kanban-card-desc">${escapeHtml(task.description)}</div>` : ""}
+        <div class="kanban-card-footer">
+          <div class="kanban-card-assignee" title="${escapeHtml(assignee || "Unassigned")}">
+            <span class="kanban-avatar">${escapeHtml(kanbanInitials(task.assignee))}</span>
+            <span>${escapeHtml(assignee || "Unassigned")}</span>
+          </div>
+          <div class="kanban-card-due">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            <span>${escapeHtml(task.due || "No date")}</span>
+          </div>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderOwnedTaskDetailPanel(project, runtime) {
+    const idx = STATE.ownedTaskDetailIndex;
+    const isOpen = idx != null && runtime.tasks[idx];
+    const task = isOpen ? runtime.tasks[idx] : null;
+    let actions = "";
+    if (task) {
+      const canReview = task.status === "In Review" || task.status === "submitted";
+      const isAssignedToMe = task.assignee === getCurrentUserName();
+      const canStart = task.status === "Open" && isAssignedToMe;
+      const canSubmit = task.status === "In Progress" && isAssignedToMe;
+      const buttons = [];
+      if (canReview) {
+        buttons.push(`<button class="btn btn-primary btn-sm" onclick="approveOwnedTask(${idx});closeOwnedTaskDetail()">Approve</button>`);
+        buttons.push(`<button class="btn btn-outline btn-sm" onclick="rejectOwnedTask(${idx});closeOwnedTaskDetail()">Reject</button>`);
+      }
+      if (canStart) buttons.push(`<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${idx});closeOwnedTaskDetail()">Start Work</button>`);
+      if (canSubmit) buttons.push(`<button class="btn btn-primary btn-sm" onclick="openCollaboratorSubmitModal(${idx});closeOwnedTaskDetail()">Submit Proof</button>`);
+      if (task.proofLink) buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
+      buttons.push(`<button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${idx});closeOwnedTaskDetail()">Delete</button>`);
+      actions = buttons.join(" ");
+    }
+    return `
+      <div id="owned-task-detail-overlay" class="task-detail-overlay ${isOpen ? "open" : ""}" onclick="closeOwnedTaskDetail(event)"></div>
+      <div id="owned-task-detail-panel" class="task-detail-panel ${isOpen ? "open" : ""}">
+        ${!task ? "" : `
+          <div class="task-detail-header">
+            <div>
+              <div class="task-detail-title">${escapeHtml(task.title)}</div>
+              <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                ${collaboratorStatusPill(task.status)}
+                ${taskDifficultyPill(task.priority)}
+              </div>
+            </div>
+            <button class="task-detail-close" onclick="closeOwnedTaskDetail()" aria-label="Close">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="task-detail-section">
+            <div class="task-detail-label">Move to</div>
+            <div style="display:flex;gap:6px;flex-wrap:wrap">
+              ${KANBAN_COLUMNS.map(c => `
+                <button class="tab ${kanbanBucketFor(task.status) === c.key ? "active" : ""}" onclick="moveOwnedTask(${idx}, '${c.canonical}')">${c.label}</button>
+              `).join("")}
+            </div>
+          </div>
+          <div class="task-detail-section">
+            <div class="task-detail-label">Assignee</div>
+            <div class="task-detail-value">${escapeHtml(task.assignee || "Unassigned")}</div>
+          </div>
+          <div class="task-detail-section">
+            <div class="task-detail-label">Due date</div>
+            <div class="task-detail-value">${escapeHtml(task.due || "No date")}</div>
+          </div>
+          ${task.description ? `
+            <div class="task-detail-section">
+              <div class="task-detail-label">Description</div>
+              <div class="task-detail-value">${escapeHtml(task.description)}</div>
+            </div>` : ""}
+          <div class="task-detail-section">
+            <div class="task-detail-label">Actions</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">${actions}</div>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function openOwnedTaskDetail(taskIndex) {
+    STATE.ownedTaskDetailIndex = taskIndex;
+    renderProjectWorkspace();
+  }
+  function closeOwnedTaskDetail(event) {
+    if (event && event.target && event.currentTarget && event.target !== event.currentTarget) return;
+    STATE.ownedTaskDetailIndex = null;
+    renderProjectWorkspace();
+  }
+  function moveOwnedTask(taskIndex, newStatus) {
+    const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
+    if (!project) return;
+    const runtime = (typeof getProjectRuntime === "function") ? getProjectRuntime(project) : null;
+    if (!runtime || !runtime.tasks || !runtime.tasks[taskIndex]) return;
+    const task = runtime.tasks[taskIndex];
+    const prev = task.status;
+    if (prev === newStatus) return;
+    task.status = newStatus;
+    if (typeof saveRuntimeState === "function") saveRuntimeState();
+    // Best-effort backend sync – silently ignored when backend is unreachable.
+    try {
+      if (window.tasksApi && task.id && typeof window.tasksApi.updateStatus === "function") {
+        window.tasksApi.updateStatus(task.id, { status: newStatus }).catch(() => {});
+      }
+    } catch (_) {}
+    showToast(`Moved "${task.title}" to ${newStatus}`);
+    renderProjectWorkspace();
+  }
+  function onKanbanDragStart(event, taskIndex) {
+    try {
+      event.dataTransfer.effectAllowed = "move";
+      event.dataTransfer.setData("text/plain", String(taskIndex));
+    } catch (e) {}
+    event.currentTarget && event.currentTarget.classList.add("dragging");
+  }
+  function onKanbanDragEnd(event) {
+    event.currentTarget && event.currentTarget.classList.remove("dragging");
+    document.querySelectorAll(".kanban-column.drag-over").forEach(el => el.classList.remove("drag-over"));
+  }
+  function onKanbanDragOver(event) {
+    event.preventDefault();
+    try { event.dataTransfer.dropEffect = "move"; } catch (e) {}
+    const col = event.currentTarget;
+    if (col && !col.classList.contains("drag-over")) col.classList.add("drag-over");
+  }
+  function onKanbanDragLeave(event) {
+    const col = event.currentTarget;
+    if (col && !col.contains(event.relatedTarget)) col.classList.remove("drag-over");
+  }
+  function onKanbanDrop(event, colKey) {
+    event.preventDefault();
+    const col = event.currentTarget;
+    col && col.classList.remove("drag-over");
+    const raw = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+    const idx = parseInt(raw, 10);
+    if (Number.isNaN(idx)) return;
+    const map = { todo: "Open", progress: "In Progress", review: "In Review", done: "Approved" };
+    moveOwnedTask(idx, map[colKey] || "Open");
+  }
+  window.openOwnedTaskDetail = openOwnedTaskDetail;
+  window.closeOwnedTaskDetail = closeOwnedTaskDetail;
+  window.moveOwnedTask = moveOwnedTask;
+  window.onKanbanDragStart = onKanbanDragStart;
+  window.onKanbanDragEnd = onKanbanDragEnd;
+  window.onKanbanDragOver = onKanbanDragOver;
+  window.onKanbanDragLeave = onKanbanDragLeave;
+  window.onKanbanDrop = onKanbanDrop;
+
+  // ── Collaborator / Mentor kanban board (respects role permissions) ──────
+  function renderCollabKanbanBoard(project, runtime, isMentorView, currentUser) {
+    const grouped = KANBAN_COLUMNS.reduce((a, c) => (a[c.key] = [], a), {});
+    runtime.tasks.forEach((t, index) => grouped[kanbanBucketFor(t.status)].push({ task: t, index }));
+
+    return `
+      <div class="kanban-board">
+        ${KANBAN_COLUMNS.map(col => `
+          <div class="kanban-column" data-status="${col.key}"
+               ondragover="onCollabKanbanDragOver(event)"
+               ondragleave="onCollabKanbanDragLeave(event)"
+               ondrop="onCollabKanbanDrop(event, '${col.key}')">
+            <div class="kanban-header">
+              <span>${col.label}</span>
+              <span class="count">${grouped[col.key].length}</span>
+            </div>
+            <div class="kanban-list">
+              ${grouped[col.key].map(({ task, index }) => {
+                const isMine = !isMentorView && task.assignee === currentUser;
+                const draggable = isMine;
+                return `
+                  <div class="kanban-card ${!isMine ? "kanban-card--readonly" : ""}"
+                       ${draggable ? `draggable="true" ondragstart="onCollabKanbanDragStart(event, ${index})" ondragend="onCollabKanbanDragEnd(event)"` : ""}
+                       data-index="${index}"
+                       onclick="openCollabTaskDetail(${index})">
+                    <div class="kanban-card-header">
+                      <div class="kanban-card-title">${escapeHtml(task.title)}</div>
+                      ${taskDifficultyPill(task.priority)}
+                    </div>
+                    ${task.description ? `<div class="kanban-card-desc">${escapeHtml(task.description)}</div>` : ""}
+                    <div class="kanban-card-footer">
+                      <div class="kanban-card-assignee" title="${escapeHtml(task.assignee || "Unassigned")}">
+                        <span class="kanban-avatar">${escapeHtml(kanbanInitials(task.assignee))}</span>
+                        <span>${escapeHtml(task.assignee || "Unassigned")}${isMine ? " · you" : ""}</span>
+                      </div>
+                      <div class="kanban-card-due">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span>${escapeHtml(task.due || "No date")}</span>
+                      </div>
+                    </div>
+                  </div>
+                `;
+              }).join("") || `<div class="kanban-empty">${isMentorView ? "No tasks in this column" : "Nothing here"}</div>`}
+            </div>
+          </div>
+        `).join("")}
+      </div>
+    `;
+  }
+
+  function renderCollabTaskDetailPanel(project, runtime, isMentorView, currentUser) {
+    const idx = STATE.collabTaskDetailIndex;
+    const isOpen = idx != null && runtime.tasks[idx];
+    const task = isOpen ? runtime.tasks[idx] : null;
+    let actions = "";
+    if (task) {
+      const isMine = !isMentorView && task.assignee === currentUser;
+      const buttons = [];
+      if (isMine && task.status === "Open")        buttons.push(`<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${idx});closeCollabTaskDetail()">Start Work</button>`);
+      if (isMine && task.status === "In Progress") buttons.push(`<button class="btn btn-primary btn-sm" onclick="openCollaboratorSubmitModal(${idx});closeCollabTaskDetail()">Submit Proof</button>`);
+      if (task.proofLink)                          buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
+      actions = buttons.join(" ") || `<span class="text-xs text-muted">${isMentorView ? "Read-only view" : "No actions available"}</span>`;
+    }
+    return `
+      <div class="task-detail-overlay ${isOpen ? "open" : ""}" onclick="closeCollabTaskDetail(event)"></div>
+      <div class="task-detail-panel ${isOpen ? "open" : ""}">
+        ${!task ? "" : `
+          <div class="task-detail-header">
+            <div>
+              <div class="task-detail-title">${escapeHtml(task.title)}</div>
+              <div style="margin-top:6px;display:flex;gap:6px;flex-wrap:wrap">
+                ${collaboratorStatusPill(task.status)}
+                ${taskDifficultyPill(task.priority)}
+              </div>
+            </div>
+            <button class="task-detail-close" onclick="closeCollabTaskDetail()" aria-label="Close">
+              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+          </div>
+          <div class="task-detail-section">
+            <div class="task-detail-label">Assignee</div>
+            <div class="task-detail-value">${escapeHtml(task.assignee || "Unassigned")}</div>
+          </div>
+          <div class="task-detail-section">
+            <div class="task-detail-label">Due date</div>
+            <div class="task-detail-value">${escapeHtml(task.due || "No date")}</div>
+          </div>
+          ${task.description ? `
+            <div class="task-detail-section">
+              <div class="task-detail-label">Description</div>
+              <div class="task-detail-value">${escapeHtml(task.description)}</div>
+            </div>` : ""}
+          <div class="task-detail-section">
+            <div class="task-detail-label">Actions</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">${actions}</div>
+          </div>
+        `}
+      </div>
+    `;
+  }
+
+  function openCollabTaskDetail(idx)  { STATE.collabTaskDetailIndex = idx; renderProjectWorkspace(); }
+  function closeCollabTaskDetail(ev) {
+    if (ev && ev.target && ev.currentTarget && ev.target !== ev.currentTarget) return;
+    STATE.collabTaskDetailIndex = null; renderProjectWorkspace();
+  }
+  function onCollabKanbanDragStart(event, taskIndex) {
+    try { event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setData("text/plain", String(taskIndex)); } catch (e) {}
+    event.currentTarget && event.currentTarget.classList.add("dragging");
+  }
+  function onCollabKanbanDragEnd(event) {
+    event.currentTarget && event.currentTarget.classList.remove("dragging");
+    document.querySelectorAll(".kanban-column.drag-over").forEach(el => el.classList.remove("drag-over"));
+  }
+  function onCollabKanbanDragOver(event) {
+    event.preventDefault();
+    try { event.dataTransfer.dropEffect = "move"; } catch (e) {}
+    const col = event.currentTarget;
+    if (col && !col.classList.contains("drag-over")) col.classList.add("drag-over");
+  }
+  function onCollabKanbanDragLeave(event) {
+    const col = event.currentTarget;
+    if (col && !col.contains(event.relatedTarget)) col.classList.remove("drag-over");
+  }
+  function onCollabKanbanDrop(event, colKey) {
+    event.preventDefault();
+    const col = event.currentTarget;
+    col && col.classList.remove("drag-over");
+    const raw = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+    const idx = parseInt(raw, 10);
+    if (Number.isNaN(idx)) return;
+
+    const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
+    if (!project) return;
+    const runtime = (typeof getProjectRuntime === "function") ? getProjectRuntime(project) : null;
+    if (!runtime || !runtime.tasks || !runtime.tasks[idx]) return;
+    const task = runtime.tasks[idx];
+    const currentUser = getCurrentUserName();
+    if (task.assignee !== currentUser) { showToast("You can only move your own tasks", "error"); return; }
+
+    // Collaborator allowed transitions: Open ↔ In Progress, In Progress → In Review (via submit modal)
+    const syncBackend = (statusValue) => {
+      try {
+        if (window.tasksApi && task.id && typeof window.tasksApi.updateStatus === "function") {
+          window.tasksApi.updateStatus(task.id, { status: statusValue }).catch(() => {});
+        }
+      } catch (_) {}
+    };
+    if (colKey === "todo") {
+      task.status = "Open";
+      if (typeof saveRuntimeState === "function") saveRuntimeState();
+      syncBackend("Open");
+      showToast(`Moved "${task.title}" back to To Do`);
+      renderProjectWorkspace();
+    } else if (colKey === "progress") {
+      if (task.status === "Open") { startCollaboratorTask(idx); syncBackend("In Progress"); }
+      else {
+        task.status = "In Progress";
+        if (typeof saveRuntimeState === "function") saveRuntimeState();
+        syncBackend("In Progress");
+        showToast(`Moved "${task.title}" to In Progress`);
+        renderProjectWorkspace();
+      }
+    } else if (colKey === "review") {
+      if (task.status === "In Progress") { openCollaboratorSubmitModal(idx); }
+      else { showToast("Start the task before submitting for review", "error"); }
+    } else if (colKey === "done") {
+      showToast("Only the project owner can approve tasks", "error");
+    }
+  }
+
+  window.openCollabTaskDetail = openCollabTaskDetail;
+  window.closeCollabTaskDetail = closeCollabTaskDetail;
+  window.onCollabKanbanDragStart = onCollabKanbanDragStart;
+  window.onCollabKanbanDragEnd = onCollabKanbanDragEnd;
+  window.onCollabKanbanDragOver = onCollabKanbanDragOver;
+  window.onCollabKanbanDragLeave = onCollabKanbanDragLeave;
+  window.onCollabKanbanDrop = onCollabKanbanDrop;
+
   function runtimeJoinableMembers(project) {
     const members = Array.isArray(project.members) ? project.members : [];
     const uniqueMembers = members.filter(
@@ -2284,82 +2667,18 @@
       return `
         <div class="card">
           <div class="workspace-card__top">
-            <div class="card-title" style="margin:0">Task Board</div>
-            <button class="btn btn-primary btn-sm" onclick="openOwnedTaskModal()">Create Task</button>
+            <div>
+              <div class="card-title" style="margin:0">Task Board</div>
+              <div class="page-subtitle" style="font-size:.82rem;margin-top:2px">Drag cards between columns to update status</div>
+            </div>
+            <button class="btn btn-primary btn-sm" onclick="openOwnedTaskModal()">＋ Create Task</button>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Task</th>
-                <th>Assignee</th>
-                <th>Status</th>
-                <th>Difficulty</th>
-                <th>Proof</th>
-                <th>Due</th>
-                <th>Action</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${runtime.tasks
-                .map((task, index) => {
-                  const canReview = task.status === "In Review" || task.status === "submitted";
-                  const isAssignedToMe = task.assignee === getCurrentUserName();
-                  const canStart = task.status === "Open" && isAssignedToMe;
-                  const canSubmit = task.status === "In Progress" && isAssignedToMe;
 
-                  let actionHtml = "";
-                  if (canReview) {
-                    actionHtml = `
-                      <div class="workspace-card__actions">
-                        <button class="btn btn-primary btn-sm" onclick="approveOwnedTask(${index})">Approve</button>
-                        <button class="btn btn-outline btn-sm" onclick="rejectOwnedTask(${index})">Reject</button>
-                        <button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${index})">Delete</button>
-                        ${
-                          task.proofLink
-                            ? `<a class="btn btn-ghost btn-sm" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">View Proof</a>`
-                            : ""
-                        }
-                      </div>
-                    `;
-                  } else if (canStart) {
-                    actionHtml = `<div class="workspace-card__actions"><button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${index})">Start Work</button><button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${index})">Delete</button></div>`;
-                  } else if (canSubmit) {
-                    actionHtml = `<div class="workspace-card__actions"><button class="btn btn-primary btn-sm" onclick="openCollaboratorSubmitModal(${index})">Submit Proof</button><button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${index})">Delete</button></div>`;
-                  } else {
-                    actionHtml = task.proofLink
-                      ? `<a class="workspace-link" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">Proof Link ↗</a>`
-                      : '<span class="text-xs text-muted">No action</span>';
-                  }
-                  if (!canReview && !canStart && !canSubmit) {
-                    actionHtml = `<div class="workspace-card__actions">${actionHtml}<button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${index})">Delete</button></div>`;
-                  }
-                  return `
-                    <tr>
-                      <td>${escapeHtml(task.title)}</td>
-                      <td>
-                        ${
-                          (!task.assignee || task.assignee === "Unassigned")
-                            ? `<select class="input input-sm" style="max-width: 140px; padding: 4px;" onchange="assignTaskFromDropdown('${project.id}', ${index}, this.value)">
-                                 <option value="">Assign to...</option>
-                                 <option value="${escapeHtml(project.owner)}">${escapeHtml(project.owner)} (Owner)</option>
-                                 ${runtimeJoinableMembers(project).map((member) => `<option value="${escapeHtml(member.name)}">${escapeHtml(member.name)}</option>`).join("")}
-                               </select>`
-                            : escapeHtml(task.assignee)
-                        }
-                      </td>
-                      <td>${collaboratorStatusPill(task.status)}</td>
-                      <td>${taskDifficultyPill(task.priority)}</td>
-                      <td>${taskProofLinkHtml(task, true)}</td>
-                      <td>${escapeHtml(task.due)}</td>
-                      <td>${actionHtml}</td>
-                    </tr>
-                  `;
-                })
-                .join("")}
-            </tbody>
-          </table>
+          ${renderOwnedKanbanBoard(project, runtime)}
+
           ${publishBox}
         </div>
+        ${renderOwnedTaskDetailPanel(project, runtime)}
         ${renderOwnedTaskModal(project, runtime)}
         ${typeof renderCollaboratorSubmitModal === 'function' ? renderCollaboratorSubmitModal(runtime) : ""}
       `;
@@ -3830,6 +4149,28 @@
       runtimeHtml
         ? runtimeHtml
         : '<div class="card"><p class="text-sm text-muted">No mentored projects yet.</p></div>';
+<<<<<<< HEAD
+=======
+
+    // Inject "Upload Resource" button into each mentored project card
+    if (runtimeItems.length && typeof openMentorResourceModal === "function") {
+      runtimeItems.forEach((project) => {
+        const cardEl =
+          root.querySelector(`[data-project-id="${project.id}"], [data-id="${project.id}"]`) ||
+          Array.from(root.querySelectorAll(".card")).find((el) =>
+            el.textContent.includes(project.name)
+          );
+        if (!cardEl) return;
+        const encodedName = encodeURIComponent(project.name);
+        const btn = document.createElement("button");
+        btn.className = "btn btn-outline btn-sm btn-full";
+        btn.style.marginTop = "8px";
+        btn.textContent = "📎 Upload Resource";
+        btn.onclick = () => openMentorResourceModal(encodedName, project.id);
+        cardEl.appendChild(btn);
+      });
+    }
+>>>>>>> a0912d5 (v-8)
   }
 
   function applyToPreviewProject(projectId) {
@@ -4073,45 +4414,17 @@
     if (tab === "tasks") {
       content = `
         <div class="card">
-          <table>
-            <thead>
-              <tr>
-                <th>Task</th>
-                <th>Assignee</th>
-                <th>Status</th>
-                <th>Difficulty</th>
-                <th>Proof</th>
-                <th>Due</th>
-                <th>${isMentorView ? "Mentor Access" : "Action"}</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${runtime.tasks
-                .map((task, index) => {
-                  const canAct = !isMentorView && task.assignee === currentUser;
-                  const action = isMentorView
-                    ? '<span class="text-xs text-muted">Read-only</span>'
-                    : task.status === "Open" && canAct
-                      ? `<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${index})">Start</button>`
-                      : task.status === "In Progress" && canAct
-                        ? `<button class="btn btn-outline btn-sm" onclick="openCollaboratorSubmitModal(${index})">Submit</button>`
-                        : '<span class="text-xs text-muted">No action</span>';
-                  return `
-                    <tr>
-                      <td>${escapeHtml(task.title)}</td>
-                      <td>${escapeHtml(task.assignee)}</td>
-                      <td>${collaboratorStatusPill(task.status)}</td>
-                      <td>${taskDifficultyPill(task.priority)}</td>
-                      <td>${taskProofLinkHtml(task, true)}</td>
-                      <td>${escapeHtml(task.due)}</td>
-                      <td>${action}</td>
-                    </tr>
-                  `;
-                })
-                .join("")}
-            </tbody>
-          </table>
+          <div class="workspace-card__top">
+            <div>
+              <div class="card-title" style="margin:0">Task Board</div>
+              <div class="page-subtitle" style="font-size:.82rem;margin-top:2px">
+                ${isMentorView ? "Read-only view of the project workflow" : "Drag your assigned cards to update status"}
+              </div>
+            </div>
+          </div>
+          ${renderCollabKanbanBoard(project, runtime, isMentorView, currentUser)}
         </div>
+        ${renderCollabTaskDetailPanel(project, runtime, isMentorView, currentUser)}
       `;
     } else if (tab === "members") {
       content = `
@@ -4232,7 +4545,18 @@
           </div>
           <div class="modal-body">
             <div class="text-sm text-muted" style="margin-bottom:10px">${task ? escapeHtml(task.title) : "Selected task"}</div>
+<<<<<<< HEAD
             <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
+=======
+            <div class="input-group" style="margin-bottom:10px">
+              <label class="label">Attach File <span style="font-weight:400;color:var(--muted-fg)">(optional — image, PDF, ZIP, max 5 MB)</span></label>
+              <input id="collab-proof-file" class="input" type="file" accept="image/*,application/pdf,.zip,.doc,.docx" />
+            </div>
+            <div class="input-group" style="margin-bottom:0">
+              <label class="label">Or paste a proof link <span style="font-weight:400;color:var(--muted-fg)">(optional)</span></label>
+              <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
+            </div>
+>>>>>>> a0912d5 (v-8)
             <button class="btn btn-primary btn-full mt-3" onclick="submitCollaboratorProof()">Submit For Review</button>
           </div>
         </div>
@@ -4419,11 +4743,14 @@
     const runtime = getProjectRuntime(project);
     const index = Number(STATE.collaboratorProofTaskIndex);
     const task = runtime?.tasks[index];
+<<<<<<< HEAD
     const link = String(
       STATE.collaboratorProofLink ||
         document.getElementById("collab-proof-link")?.value ||
         "",
     ).trim();
+=======
+>>>>>>> a0912d5 (v-8)
     if (!task) {
       showToast("Task not found", "error");
       return;
@@ -4436,10 +4763,60 @@
       showToast("Only the assigned collaborator can submit this task", "error");
       return;
     }
+<<<<<<< HEAD
     if (!isValidWebUrl(link)) {
       showToast("Please enter a valid proof link", "error");
       return;
     }
+=======
+
+    const fileInput = document.getElementById("collab-proof-file");
+    const hasFile = fileInput && fileInput.files && fileInput.files[0];
+    let link = String(
+      STATE.collaboratorProofLink ||
+        document.getElementById("collab-proof-link")?.value ||
+        "",
+    ).trim();
+
+    // --- Try file upload first ---
+    if (hasFile) {
+      const file = fileInput.files[0];
+      const formData = new FormData();
+      formData.append("file", file);
+      try {
+        const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
+        const response = await fetch("http://localhost:3000/uploads/task-proof", {
+          method: "POST",
+          headers: { "x-user-id": backendUserId },
+          body: formData,
+        });
+        if (response.ok) {
+          const data = await response.json();
+          link = "http://localhost:3000" + data.file.url;
+          showToast("File uploaded successfully", "success");
+        } else {
+          const err = await response.json().catch(() => ({}));
+          showToast("File upload failed: " + (err.message || "Unknown error"), "error");
+          return;
+        }
+      } catch (e) {
+        console.warn("Task proof upload failed, using link fallback", e);
+        showToast("Server unavailable — please paste a proof link instead", "error");
+        return;
+      }
+    }
+
+    // --- Validate link (must have file-derived link OR manually entered URL) ---
+    if (!link) {
+      showToast("Please attach a file or enter a valid proof link", "error");
+      return;
+    }
+    if (!hasFile && !isValidWebUrl(link)) {
+      showToast("Please enter a valid proof link", "error");
+      return;
+    }
+
+>>>>>>> a0912d5 (v-8)
     try {
       if (window.tasksApi && task.id && !task.id.includes("task-")) {
         await window.tasksApi.update(task.id, { status: "In Review" });

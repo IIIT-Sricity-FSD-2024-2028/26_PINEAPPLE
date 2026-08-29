@@ -5,3 +5,6 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .env
+logs/
+uploads/
+backend-requests.log
