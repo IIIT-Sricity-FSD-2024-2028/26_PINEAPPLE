@@ -99,9 +99,6 @@ function createFileFilter(allowedMimes: string[]) {
 }
 
 // ──────────────────────────────────────────────────────────────
-<<<<<<< HEAD
-// Pre-configured Multer Instances
-=======
 // MulterOptions — used by NestJS FileInterceptor
 // ──────────────────────────────────────────────────────────────
 
@@ -137,44 +134,19 @@ export const resourceUploadOptions = {
 
 // ──────────────────────────────────────────────────────────────
 // Pre-configured Multer Instances (for non-NestJS use)
->>>>>>> a0912d5 (v-8)
 // ──────────────────────────────────────────────────────────────
 
 /**
  * Avatar upload — images only, max 2 MB.
  */
-<<<<<<< HEAD
-export const avatarUpload = multer({
-  storage,
-  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
-  fileFilter: createFileFilter(IMAGE_MIMES),
-});
-=======
 export const avatarUpload = multer(avatarUploadOptions);
->>>>>>> a0912d5 (v-8)
 
 /**
  * Task proof upload — images, PDFs, ZIPs — max 5 MB.
  */
-<<<<<<< HEAD
-export const taskProofUpload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
-  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
-});
-=======
 export const taskProofUpload = multer(taskProofUploadOptions);
->>>>>>> a0912d5 (v-8)
 
 /**
  * Resource upload — documents, images, archives — max 10 MB.
  */
-<<<<<<< HEAD
-export const resourceUpload = multer({
-  storage,
-  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
-});
-=======
 export const resourceUpload = multer(resourceUploadOptions);
->>>>>>> a0912d5 (v-8)
