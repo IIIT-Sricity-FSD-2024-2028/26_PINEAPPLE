@@ -634,8 +634,15 @@
         <button class="admin-nav-item active" onclick="showAdminPage('admin-dash')">📊 Dashboard</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
-        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">🎓 Mentor Applications</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
+        
+        <div class="finance-only-nav" style="display:none">
+          <div class="admin-nav-divider">Monetization</div>
+          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-organizations')">🏢 Organizations</button>
+          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-finance')">💰 Finance Console</button>
+        </div>
+        
         <div class="su-only-nav" style="display:none">
           <div class="admin-nav-divider">Super User</div>
           <button class="admin-nav-item su-nav-item" onclick="showAdminPage('su-admins')">🔐 Manage Admins</button>
@@ -855,8 +862,12 @@
           </div>
         </div>
 
-        <!-- ═══ SUPER USER: Manage Admins ═══ -->
-        <div id="su-admins" class="admin-page" style="display:none">
+          <div id="admin-finance" class="admin-page" style="display:none"></div>
+          
+          <div id="admin-organizations" class="admin-page" style="display:none"></div>
+          
+          <!-- 👑 SUPER USER: Manage Admins 👑 -->
+          <div id="su-admins" class="admin-page" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
               <h1>Manage Admins <span class="su-page-badge">Super User Only</span></h1>
@@ -911,6 +922,8 @@
   <script src="js/features/roles/owned-workspace.js"></script>
   <script src="js/features/roles/collaborator-workspace.js"></script>
   <script src="js/features/roles/my-work.js"></script>
+  <script src="js/features/roles/admin-finance.js"></script>
+  <script src="js/features/roles/admin-organizations.js"></script>
   <script src="js/features/superuser.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
