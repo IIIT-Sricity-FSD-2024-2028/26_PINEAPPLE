@@ -55,6 +55,7 @@ export class RolesGuard implements CanActivate {
     });
 
     if (!hasRole) {
+      console.error(`[RolesGuard] 403 Forbidden. requiredRoles: ${JSON.stringify(requiredRoles)}, userRole: ${userRole}`);
       throw new ForbiddenException('You do not have the required permissions to access this resource.');
     }
 
