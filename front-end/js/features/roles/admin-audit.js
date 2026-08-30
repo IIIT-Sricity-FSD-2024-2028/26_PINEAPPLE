@@ -89,10 +89,6 @@ async function fetchServerLogs() {
     ]);
     
     let reqLogs = [], errLogs = [];
-<<<<<<< HEAD
-    if (reqRes.ok) reqLogs = await reqRes.json();
-    if (errRes.ok) errLogs = await errRes.json();
-=======
     if (reqRes.ok) {
       const reqData = await reqRes.json();
       // Backend returns { count, logs } envelope — unwrap the array
@@ -103,7 +99,6 @@ async function fetchServerLogs() {
       // Backend returns { count, logs } envelope — unwrap the array
       errLogs = Array.isArray(errData) ? errData : (Array.isArray(errData.logs) ? errData.logs : []);
     }
->>>>>>> a0912d5 (v-8)
     
     const combined = [];
     

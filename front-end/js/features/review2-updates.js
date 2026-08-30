@@ -4149,9 +4149,6 @@
       runtimeHtml
         ? runtimeHtml
         : '<div class="card"><p class="text-sm text-muted">No mentored projects yet.</p></div>';
-<<<<<<< HEAD
-=======
-
     // Inject "Upload Resource" button into each mentored project card
     if (runtimeItems.length && typeof openMentorResourceModal === "function") {
       runtimeItems.forEach((project) => {
@@ -4170,7 +4167,6 @@
         cardEl.appendChild(btn);
       });
     }
->>>>>>> a0912d5 (v-8)
   }
 
   function applyToPreviewProject(projectId) {
@@ -4545,9 +4541,6 @@
           </div>
           <div class="modal-body">
             <div class="text-sm text-muted" style="margin-bottom:10px">${task ? escapeHtml(task.title) : "Selected task"}</div>
-<<<<<<< HEAD
-            <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
-=======
             <div class="input-group" style="margin-bottom:10px">
               <label class="label">Attach File <span style="font-weight:400;color:var(--muted-fg)">(optional — image, PDF, ZIP, max 5 MB)</span></label>
               <input id="collab-proof-file" class="input" type="file" accept="image/*,application/pdf,.zip,.doc,.docx" />
@@ -4556,7 +4549,6 @@
               <label class="label">Or paste a proof link <span style="font-weight:400;color:var(--muted-fg)">(optional)</span></label>
               <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
             </div>
->>>>>>> a0912d5 (v-8)
             <button class="btn btn-primary btn-full mt-3" onclick="submitCollaboratorProof()">Submit For Review</button>
           </div>
         </div>
@@ -4743,14 +4735,6 @@
     const runtime = getProjectRuntime(project);
     const index = Number(STATE.collaboratorProofTaskIndex);
     const task = runtime?.tasks[index];
-<<<<<<< HEAD
-    const link = String(
-      STATE.collaboratorProofLink ||
-        document.getElementById("collab-proof-link")?.value ||
-        "",
-    ).trim();
-=======
->>>>>>> a0912d5 (v-8)
     if (!task) {
       showToast("Task not found", "error");
       return;
@@ -4763,12 +4747,6 @@
       showToast("Only the assigned collaborator can submit this task", "error");
       return;
     }
-<<<<<<< HEAD
-    if (!isValidWebUrl(link)) {
-      showToast("Please enter a valid proof link", "error");
-      return;
-    }
-=======
 
     const fileInput = document.getElementById("collab-proof-file");
     const hasFile = fileInput && fileInput.files && fileInput.files[0];
