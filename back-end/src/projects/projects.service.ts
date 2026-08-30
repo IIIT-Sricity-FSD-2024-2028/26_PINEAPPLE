@@ -7,6 +7,11 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 export class ProjectsService {
   constructor(private readonly projectsRepository: ProjectsRepository) {}
 
+  async getSponsoredProjects() {
+    // Logic to retrieve projects with an active sponsorship_id
+    return [];
+  }
+
   findAll(): Project[] {
     return this.projectsRepository.findAll();
   }

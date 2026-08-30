@@ -28,11 +28,24 @@ export class RolesGuard implements CanActivate {
       return true;
     }
 
+    // Extended logic for ADMIN_ROLE_ASSIGNMENT scopes
+    const adminScope = request.headers['x-admin-scope'];
+    if (adminScope) {
+      if (adminScope.toLowerCase() === 'super_admin') {
+        return true; // super_admin satisfies every check
+      }
+      // If the route specifically asks for an admin scope
+      const hasScope = requiredRoles.some(role => role.toLowerCase() === adminScope.toLowerCase());
+      if (hasScope) return true;
+    }
+
     const roleAliases: Record<string, string[]> = {
       'admin': ['administrator', 'admin'],
       'user': ['collaborator', 'project owner', 'mentor', 'administrator', 'user'],
       'superuser': ['super user', 'superuser'],
-      'portal_admin': ['administrator', 'portal admin', 'portal_admin']
+      'portal_admin': ['administrator', 'portal admin', 'portal_admin'],
+      // Map legacy admin to moderation_admin for backwards compatibility if needed
+      'moderation_admin': ['administrator', 'admin', 'moderation_admin']
     };
 
     const hasRole = requiredRoles.some((requiredRole) => {
@@ -42,6 +55,7 @@ export class RolesGuard implements CanActivate {
     });
 
     if (!hasRole) {
+      console.error(`[RolesGuard] 403 Forbidden. requiredRoles: ${JSON.stringify(requiredRoles)}, userRole: ${userRole}`);
       throw new ForbiddenException('You do not have the required permissions to access this resource.');
     }
 

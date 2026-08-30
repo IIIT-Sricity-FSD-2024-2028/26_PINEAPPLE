@@ -1,18 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
-<<<<<<< HEAD
-=======
 import { NestExpressApplication } from '@nestjs/platform-express';
->>>>>>> a0912d5 (v-8)
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware';
 import { LogManagerService } from './core/services/log-manager.service';
-<<<<<<< HEAD
-=======
 import * as path from 'path';
->>>>>>> a0912d5 (v-8)
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -31,13 +25,11 @@ function parseCorsOrigins(rawOrigins: string | undefined): string[] {
 }
 
 async function bootstrap() {
-<<<<<<< HEAD
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const port = parsePort(process.env.PORT);
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
-=======
-  const app = await NestFactory.create<NestExpressApplication>(AppModule);
+  const app = await NestFactory.create(AppModule);
   const port = parsePort(process.env.PORT);
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
@@ -45,7 +37,6 @@ async function bootstrap() {
   const uploadsDir = path.join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
->>>>>>> a0912d5 (v-8)
   // 1. Enable CORS for frontend integration
   app.enableCors({
     origin: (origin, callback) => {
@@ -57,7 +48,7 @@ async function bootstrap() {
       callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email'],
+    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email', 'x-admin-scope'],
   });
 
   // 2. Enable Global Validation Pipe for strict DTO enforcement

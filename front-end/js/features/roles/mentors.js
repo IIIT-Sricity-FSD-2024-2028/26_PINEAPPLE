@@ -105,12 +105,10 @@ function renderMentorRequests() {
 // ══════════════════════════════════════════════
 function renderMentoredProjects() {
   const mentored = PROJECTS.filter((_, i) => i === 2 || i === 4);
-<<<<<<< HEAD
   document.getElementById("mentored-projects-grid").innerHTML = mentored
     .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
     .join("");
   bindProjectCardClicks();
-=======
   const grid = document.getElementById("mentored-projects-grid");
   grid.innerHTML = mentored
     .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
@@ -135,7 +133,6 @@ function renderMentoredProjects() {
     uploadBtn.onclick = () => openMentorResourceModal(encodedName, p.id);
     cardEl.appendChild(uploadBtn);
   });
->>>>>>> a0912d5 (v-8)
 }
 
 // ══════════════════════════════════════════════
