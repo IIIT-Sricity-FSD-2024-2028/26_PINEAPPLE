@@ -105,10 +105,30 @@ function renderMentorRequests() {
 // ══════════════════════════════════════════════
 function renderMentoredProjects() {
   const mentored = PROJECTS.filter((_, i) => i === 2 || i === 4);
-  document.getElementById("mentored-projects-grid").innerHTML = mentored
+  const grid = document.getElementById("mentored-projects-grid");
+  grid.innerHTML = mentored
     .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
     .join("");
   bindProjectCardClicks();
+
+  // Inject "Upload Resource" button into each rendered project card
+  mentored.forEach((p) => {
+    // Find the card element — projectCardHTML uses data-project-id or data-id attributes
+    const cardEl = grid.querySelector(
+      `[data-project-id="${p.id}"], [data-id="${p.id}"]`
+    ) || Array.from(grid.querySelectorAll(".card")).find(
+      (el) => el.textContent.includes(p.name)
+    );
+    if (!cardEl) return;
+
+    const encodedName = encodeURIComponent(p.name);
+    const uploadBtn = document.createElement("button");
+    uploadBtn.className = "btn btn-outline btn-sm btn-full";
+    uploadBtn.style.marginTop = "8px";
+    uploadBtn.textContent = "📎 Upload Resource";
+    uploadBtn.onclick = () => openMentorResourceModal(encodedName, p.id);
+    cardEl.appendChild(uploadBtn);
+  });
 }
 
 // ══════════════════════════════════════════════

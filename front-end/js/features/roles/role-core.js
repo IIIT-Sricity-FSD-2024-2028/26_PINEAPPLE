@@ -37,10 +37,8 @@ function initializeMentorStatus() {
         ...(currentUsers[currentEmail].profile || {}),
         mentorUnlocked: true,
       };
-      currentUsers[currentEmail].role = "mentor";
       saveStateUsersStore(currentUsers);
     }
-    STATE.role = "mentor";
   }
 
   // Check if current user has an approved mentor application
@@ -64,7 +62,7 @@ function initializeMentorStatus() {
           ...(currentUsers[currentEmail].profile || {}),
           mentorUnlocked: true,
         };
-        currentUsers[currentEmail].role = "mentor";
+
         saveStateUsersStore(currentUsers);
       }
       console.log(
@@ -107,6 +105,16 @@ function initializeMentorStatus() {
 // ══════════════════════════════════════════════
 function setRole(role) {
   STATE.role = normalizeRoleName(role);
+  const currentEmail =
+    typeof getCurrentUserSessionEmail === "function"
+      ? getCurrentUserSessionEmail()
+      : "";
+  const users =
+    typeof getStateUsersStore === "function" ? getStateUsersStore() : {};
+  if (currentEmail && users[currentEmail]) {
+    users[currentEmail].role = STATE.role;
+    saveStateUsersStore(users);
+  }
   closeDropdowns();
   updateRoleUI();
   if (typeof saveViewState === "function") saveViewState();

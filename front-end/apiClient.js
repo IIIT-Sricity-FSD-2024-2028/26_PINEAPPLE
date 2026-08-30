@@ -176,6 +176,12 @@ const tasksApi = {
     apiRequest(`/tasks/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
     }),
+  // Kanban-friendly status transition. Accepts { status } or { column }.
+  // Falls back gracefully if the backend is unreachable (frontend catches).
+  updateStatus: (id, payload, role) =>
+    apiRequest(`/tasks/${id}/status`, "PATCH", payload, {
+      role: role || getCurrentUserRole(),
+    }),
   remove: (id, role) =>
     apiRequest(`/tasks/${id}`, "DELETE", null, {
       role: role || getCurrentUserRole(),

@@ -21,6 +21,15 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PortalAdminsModule } from './portal-admins/portal-admins.module';
 import { SupportModule } from './support/support.module';
 
+// New Monetization & Enterprise Modules
+import { OrganizationsModule } from './organizations/organizations.module';
+import { TeamsModule } from './teams/teams.module';
+import { BillingModule } from './billing/billing.module';
+import { EscrowModule } from './escrow/escrow.module';
+import { PayoutsModule } from './payouts/payouts.module';
+import { SponsorshipsModule } from './sponsorships/sponsorships.module';
+import { AnalyticsModule } from './analytics/analytics.module';
+import { BroadcastModule } from './broadcast/broadcast.module';
 // Middleware imports:
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
 import { SecurityMiddleware } from './core/middleware/security.middleware';
@@ -45,6 +54,14 @@ import { SanitizerMiddleware } from './core/middleware/sanitizer.middleware';
     NotificationsModule,
     PortalAdminsModule,
     SupportModule,
+    OrganizationsModule,
+    TeamsModule,
+    BillingModule,
+    EscrowModule,
+    PayoutsModule,
+    SponsorshipsModule,
+    AnalyticsModule,
+    BroadcastModule,
   ],
   controllers: [AppController],
   providers: [

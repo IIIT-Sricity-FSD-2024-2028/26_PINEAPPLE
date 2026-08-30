@@ -5,9 +5,12 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>TeamForge</title>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap"
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap"
     rel="stylesheet">
   <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="theme.css">
 </head>
 
 <body>
@@ -631,8 +634,15 @@
         <button class="admin-nav-item active" onclick="showAdminPage('admin-dash')">📊 Dashboard</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
-        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">🎓 Mentor Applications</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
+        
+        <div class="finance-only-nav" style="display:none">
+          <div class="admin-nav-divider">Monetization</div>
+          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-organizations')">🏢 Organizations</button>
+          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-finance')">💰 Finance Console</button>
+        </div>
+        
         <div class="su-only-nav" style="display:none">
           <div class="admin-nav-divider">Super User</div>
           <button class="admin-nav-item su-nav-item" onclick="showAdminPage('su-admins')">🔐 Manage Admins</button>
@@ -852,8 +862,12 @@
           </div>
         </div>
 
-        <!-- ═══ SUPER USER: Manage Admins ═══ -->
-        <div id="su-admins" class="admin-page" style="display:none">
+          <div id="admin-finance" class="admin-page" style="display:none"></div>
+          
+          <div id="admin-organizations" class="admin-page" style="display:none"></div>
+          
+          <!-- 👑 SUPER USER: Manage Admins 👑 -->
+          <div id="su-admins" class="admin-page" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
               <h1>Manage Admins <span class="su-page-badge">Super User Only</span></h1>
@@ -908,6 +922,8 @@
   <script src="js/features/roles/owned-workspace.js"></script>
   <script src="js/features/roles/collaborator-workspace.js"></script>
   <script src="js/features/roles/my-work.js"></script>
+  <script src="js/features/roles/admin-finance.js?v=2"></script>
+  <script src="js/features/roles/admin-organizations.js?v=2"></script>
   <script src="js/features/superuser.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>

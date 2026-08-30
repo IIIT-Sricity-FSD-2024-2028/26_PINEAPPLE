@@ -1,8 +1,40 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { TasksRepository, Task } from './tasks.repository';
 import { CreateTaskDto, TaskStatus } from './dto/create-task.dto';
 import { UpdateTaskDto } from './dto/update-task.dto';
+import { UpdateTaskStatusDto, KanbanColumnKey } from './dto/update-task-status.dto';
 import { GamificationService } from '../gamification/gamification.service';
+
+/**
+ * Maps a Kanban column key to the canonical TaskStatus.
+ * Kept in the service (not the DTO) so the mapping stays a
+ * single source of truth for the whole app.
+ */
+const COLUMN_TO_STATUS: Record<KanbanColumnKey, TaskStatus> = {
+  todo: TaskStatus.ToDo,
+  progress: TaskStatus.InProgress,
+  review: TaskStatus.InReview,
+  done: TaskStatus.Completed,
+};
+
+/**
+ * Aliases accepted by the API so both the current
+ * front-end vocabulary ('Open', 'Approved', ...) and the
+ * canonical enum values keep working side-by-side.
+ * Comparisons are case-insensitive.
+ */
+const STATUS_ALIASES: Record<string, TaskStatus> = {
+  'to do': TaskStatus.ToDo,
+  todo: TaskStatus.ToDo,
+  open: TaskStatus.ToDo,
+  'in progress': TaskStatus.InProgress,
+  'in-progress': TaskStatus.InProgress,
+  'in review': TaskStatus.InReview,
+  submitted: TaskStatus.InReview,
+  completed: TaskStatus.Completed,
+  done: TaskStatus.Completed,
+  approved: TaskStatus.Completed,
+};
 
 @Injectable()
 export class TasksService {
@@ -48,7 +80,7 @@ export class TasksService {
       existingTask.status !== TaskStatus.Completed
     ) {
       const targetAssigneeId = updatedTask.assigneeId || existingTask.assigneeId;
-      
+
       if (targetAssigneeId) {
         this.gamificationService.awardXp(
           targetAssigneeId,
@@ -59,6 +91,40 @@ export class TasksService {
     }
 
     return updatedTask;
+  }
+
+  /**
+   * Kanban-friendly status update. Accepts either a Kanban `column`
+   * key or a `status` string (aliases allowed). Delegates the actual
+   * persistence & XP handling to {@link update} so gamification
+   * behaviour and audit trails stay identical.
+   *
+   * @throws BadRequestException when neither `status` nor `column` are provided,
+   *         or when the provided value is not recognisable.
+   */
+  updateStatus(id: string, payload: UpdateTaskStatusDto): Task {
+    const normalised = this.normaliseIncomingStatus(payload);
+    return this.update(id, { status: normalised } as UpdateTaskDto);
+  }
+
+  private normaliseIncomingStatus(payload: UpdateTaskStatusDto): TaskStatus {
+    if (payload?.column) {
+      const mapped = COLUMN_TO_STATUS[payload.column];
+      if (mapped) return mapped;
+    }
+    if (payload?.status) {
+      const key = payload.status.trim().toLowerCase();
+      const mapped = STATUS_ALIASES[key];
+      if (mapped) return mapped;
+      // Also accept the raw enum values.
+      const rawMatch = Object.values(TaskStatus).find(
+        (value) => value.toLowerCase() === key,
+      );
+      if (rawMatch) return rawMatch as TaskStatus;
+    }
+    throw new BadRequestException(
+      'Provide a valid `status` or Kanban `column` value.',
+    );
   }
 
   delete(id: string): void {

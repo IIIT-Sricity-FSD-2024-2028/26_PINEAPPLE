@@ -1,10 +1,12 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
+import { NestExpressApplication } from '@nestjs/platform-express';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware';
 import { LogManagerService } from './core/services/log-manager.service';
+import * as path from 'path';
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -23,9 +25,13 @@ function parseCorsOrigins(rawOrigins: string | undefined): string[] {
 }
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const port = parsePort(process.env.PORT);
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+
+  // 0. Serve uploaded files as static assets at /uploads/*
+  const uploadsDir = path.join(process.cwd(), 'uploads');
+  app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
   // 1. Enable CORS for frontend integration
   app.enableCors({
@@ -38,7 +44,7 @@ async function bootstrap() {
       callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email'],
+    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email', 'x-admin-scope'],
   });
 
   // 2. Enable Global Validation Pipe for strict DTO enforcement

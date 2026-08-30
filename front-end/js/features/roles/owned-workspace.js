@@ -133,6 +133,60 @@ function closeOwnedTaskModal(event) {
   renderOwnedProjectWorkspace();
 }
 
+// ── Kanban drag & drop + slide-over task detail ─────────────────────────────
+function onKanbanDragStart(event, taskIndex) {
+  try {
+    event.dataTransfer.effectAllowed = "move";
+    event.dataTransfer.setData("text/plain", String(taskIndex));
+  } catch (e) {}
+  event.currentTarget && event.currentTarget.classList.add("dragging");
+}
+function onKanbanDragEnd(event) {
+  event.currentTarget && event.currentTarget.classList.remove("dragging");
+  document.querySelectorAll(".kanban-column.drag-over").forEach(el => el.classList.remove("drag-over"));
+}
+function onKanbanDragOver(event) {
+  event.preventDefault();
+  try { event.dataTransfer.dropEffect = "move"; } catch (e) {}
+  const col = event.currentTarget;
+  if (col && !col.classList.contains("drag-over")) col.classList.add("drag-over");
+}
+function onKanbanDragLeave(event) {
+  const col = event.currentTarget;
+  if (col && !col.contains(event.relatedTarget)) col.classList.remove("drag-over");
+}
+function onKanbanDrop(event, colKey) {
+  event.preventDefault();
+  const col = event.currentTarget;
+  col && col.classList.remove("drag-over");
+  const raw = event.dataTransfer ? event.dataTransfer.getData("text/plain") : "";
+  const idx = parseInt(raw, 10);
+  if (Number.isNaN(idx)) return;
+  const statusForKey = { todo: "Open", progress: "In Progress", review: "In Review", done: "Approved" };
+  moveOwnedTask(idx, statusForKey[colKey] || "Open");
+}
+function moveOwnedTask(taskIndex, newStatus) {
+  const project = PROJECTS.find((p) => p.id === STATE.selectedProject);
+  if (!project) return;
+  const data = getOwnedWorkspaceDataset(project);
+  const runtime = getOwnedProjectRuntimeState(project, data.members, data.tasks);
+  if (!runtime.tasks[taskIndex]) return;
+  const prev = runtime.tasks[taskIndex].status;
+  if (prev === newStatus) return;
+  runtime.tasks[taskIndex].status = newStatus;
+  showToast(`Moved "${runtime.tasks[taskIndex].title}" to ${newStatus}`);
+  renderOwnedProjectWorkspace();
+}
+function openOwnedTaskDetail(taskIndex) {
+  STATE.ownedTaskDetailIndex = taskIndex;
+  renderOwnedProjectWorkspace();
+}
+function closeOwnedTaskDetail(event) {
+  if (event && event.target && event.currentTarget && event.target !== event.currentTarget) return;
+  STATE.ownedTaskDetailIndex = null;
+  renderOwnedProjectWorkspace();
+}
+
 function getOwnedProjectRuntimeState(project, seedMembers, seedTasks) {
   if (!STATE.ownedProjectData || typeof STATE.ownedProjectData !== "object") {
     STATE.ownedProjectData = {};
@@ -425,48 +479,117 @@ function getOwnedWorkspaceDataset(project) {
 
 function renderOwnedWorkspaceTabContent(project, data, tab) {
   if (tab === "tasks") {
+    const KANBAN_COLUMNS = [
+      { key: "todo",     label: "To Do",       statuses: ["Open", "To Do", "Todo"] },
+      { key: "progress", label: "In Progress", statuses: ["In Progress"] },
+      { key: "review",   label: "In Review",   statuses: ["In Review"] },
+      { key: "done",     label: "Done",        statuses: ["Approved", "Done", "Completed"] },
+    ];
+    const priorityBadge = (p) => {
+      const cls = p === "High" ? "badge-warning" : p === "Low" ? "badge-secondary" : "badge-info";
+      return `<span class="badge ${cls}">${p || "Medium"}</span>`;
+    };
+    const initialsOf = (name) => {
+      if (!name || name === "Unassigned") return "?";
+      return name.split(" ").map(s => s[0]).slice(0, 2).join("").toUpperCase();
+    };
+    const bucketFor = (status) => {
+      for (const col of KANBAN_COLUMNS) if (col.statuses.includes(status)) return col.key;
+      return "todo";
+    };
+    const grouped = KANBAN_COLUMNS.reduce((acc, c) => (acc[c.key] = [], acc), {});
+    data.tasks.forEach((t, index) => grouped[bucketFor(t.status)].push({ ...t, __index: index }));
+
     return `
       <div class="card">
         <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px;flex-wrap:wrap">
-          <div class="card-title" style="margin:0">Task Management</div>
+          <div>
+            <div class="card-title" style="margin:0">Task Board</div>
+            <div class="page-subtitle" style="font-size:.82rem;margin-top:2px">Drag cards between columns to update status</div>
+          </div>
           <button class="btn btn-primary" onclick="openOwnedTaskModal()">＋ Create Task</button>
         </div>
-        <table>
-          <thead>
-            <tr>
-              <th>Task</th>
-              <th>Status</th>
-              <th>Priority</th>
-              <th>Assignee</th>
-              <th>Due</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${data.tasks
-              .map(
-                (t) => `
-              <tr>
-                <td>${t.title}</td>
-                <td>
-                  <span class="badge ${
-                    t.status === "Approved"
-                      ? "badge-success"
-                      : t.status === "In Review"
-                        ? "badge-warning"
-                        : t.status === "In Progress"
-                          ? "badge-info"
-                          : "badge-secondary"
-                  }">${t.status}</span>
-                </td>
-                <td>${t.priority || "Medium"}</td>
-                <td>${t.assignee}</td>
-                <td>${t.due}</td>
-              </tr>
-            `,
-              )
-              .join("")}
-          </tbody>
-        </table>
+
+        <div class="kanban-board">
+          ${KANBAN_COLUMNS.map(col => `
+            <div class="kanban-column" data-status="${col.key}"
+                 ondragover="onKanbanDragOver(event)"
+                 ondragleave="onKanbanDragLeave(event)"
+                 ondrop="onKanbanDrop(event, '${col.key}')">
+              <div class="kanban-header">
+                <span>${col.label}</span>
+                <span class="count">${grouped[col.key].length}</span>
+              </div>
+              <div class="kanban-list">
+                ${grouped[col.key].map(t => `
+                  <div class="kanban-card"
+                       draggable="true"
+                       data-index="${t.__index}"
+                       ondragstart="onKanbanDragStart(event, ${t.__index})"
+                       ondragend="onKanbanDragEnd(event)"
+                       onclick="openOwnedTaskDetail(${t.__index})">
+                    <div class="kanban-card-header">
+                      <div class="kanban-card-title">${escapeHtml(t.title)}</div>
+                      ${priorityBadge(t.priority)}
+                    </div>
+                    ${t.description ? `<div class="kanban-card-desc">${escapeHtml(t.description)}</div>` : ""}
+                    <div class="kanban-card-footer">
+                      <div class="kanban-card-assignee" title="${escapeHtml(t.assignee || "Unassigned")}">
+                        <span class="kanban-avatar">${initialsOf(t.assignee)}</span>
+                        <span>${escapeHtml(t.assignee || "Unassigned")}</span>
+                      </div>
+                      <div class="kanban-card-due">
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        <span>${escapeHtml(t.due || "No date")}</span>
+                      </div>
+                    </div>
+                  </div>
+                `).join("") || `<div class="kanban-empty">Drop tasks here</div>`}
+              </div>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div id="owned-task-detail-overlay" class="task-detail-overlay ${STATE.ownedTaskDetailIndex != null ? "open" : ""}" onclick="closeOwnedTaskDetail(event)"></div>
+      <div id="owned-task-detail-panel" class="task-detail-panel ${STATE.ownedTaskDetailIndex != null ? "open" : ""}">
+        ${(() => {
+          if (STATE.ownedTaskDetailIndex == null) return "";
+          const t = data.tasks[STATE.ownedTaskDetailIndex];
+          if (!t) return "";
+          return `
+            <div class="task-detail-header">
+              <div>
+                <div class="task-detail-title">${escapeHtml(t.title)}</div>
+                <div style="margin-top:6px">${priorityBadge(t.priority)}</div>
+              </div>
+              <button class="task-detail-close" onclick="closeOwnedTaskDetail()" aria-label="Close">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+              </button>
+            </div>
+            <div class="task-detail-section">
+              <div class="task-detail-label">Status</div>
+              <div style="display:flex;gap:6px;flex-wrap:wrap">
+                ${KANBAN_COLUMNS.map(c => `
+                  <button class="tab ${bucketFor(t.status) === c.key ? "active" : ""}" onclick="moveOwnedTask(${STATE.ownedTaskDetailIndex}, '${c.statuses[0]}')">${c.label}</button>
+                `).join("")}
+              </div>
+            </div>
+            <div class="task-detail-section">
+              <div class="task-detail-label">Assignee</div>
+              <div class="task-detail-value">${escapeHtml(t.assignee || "Unassigned")}</div>
+            </div>
+            <div class="task-detail-section">
+              <div class="task-detail-label">Due date</div>
+              <div class="task-detail-value">${escapeHtml(t.due || "No date")}</div>
+            </div>
+            ${t.description ? `
+              <div class="task-detail-section">
+                <div class="task-detail-label">Description</div>
+                <div class="task-detail-value">${escapeHtml(t.description)}</div>
+              </div>` : ""}
+          `;
+        })()}
       </div>
 
       <div id="owned-task-modal" class="modal-overlay ${STATE.ownedTaskModalOpen ? "open" : ""}" onclick="closeOwnedTaskModal(event)">

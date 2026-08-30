@@ -31,6 +31,7 @@ export class LeaderboardController {
   constructor(private readonly leaderboardService: LeaderboardService) {}
 
   @Get()
+  @Roles('user', 'admin')
   @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get leaderboard rankings' })
   @ApiQuery({
@@ -58,6 +59,7 @@ export class LeaderboardController {
   }
 
   @Get(':userId')
+  @Roles('user', 'admin')
   @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get a specific user\'s leaderboard ranking' })
   @ApiParam({

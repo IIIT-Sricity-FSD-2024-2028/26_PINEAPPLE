@@ -55,4 +55,9 @@ Students/Freshers often struggle to find meaningful project collaboration opport
 
 ---
 
+## Tech Stack
 
+- **Frontend:** JavaScript / TypeScript, HTML, CSS
+- **Backend:** Node.js
+- **Database:** (fill in — e.g., MongoDB / PostgreSQL / MySQL)
+- **Docs:** SRS.pdf, ERdiagram.pdf, DB_Schema.pdf, Figma
