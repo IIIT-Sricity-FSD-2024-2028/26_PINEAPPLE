@@ -18,17 +18,27 @@ const FINANCE_UI_STATE = {
 async function fetchFinanceData() {
   try {
     const headers = { "x-user-role": "Administrator" };
-    // Fetch data from scaffolded backend modules
     const responses = await Promise.all([
-      fetch("http://localhost:3000/billing", { headers }).catch(() => null),
+      fetch("http://localhost:3000/billing/metrics", { headers }).catch(() => null),
       fetch("http://localhost:3000/escrow", { headers }).catch(() => null),
       fetch("http://localhost:3000/payouts", { headers }).catch(() => null)
     ]);
     
-    // Fallbacks since backend modules are currently scaffolds
-    FINANCE_UI_STATE.billingLogs = responses[0] && responses[0].ok ? await responses[0].json() : [];
-    FINANCE_UI_STATE.escrowLogs = responses[1] && responses[1].ok ? await responses[1].json() : [];
-    FINANCE_UI_STATE.payouts = responses[2] && responses[2].ok ? await responses[2].json() : [];
+    if (responses[0] && responses[0].ok) {
+      const data = await responses[0].json();
+      FINANCE_UI_STATE.metrics.mrr = data.mrr;
+      FINANCE_UI_STATE.metrics.activeOrgs = data.activeOrgs;
+    }
+    if (responses[1] && responses[1].ok) {
+      const data = await responses[1].json();
+      FINANCE_UI_STATE.metrics.escrowTotal = data.totalHeld;
+      FINANCE_UI_STATE.escrowLogs = data.records;
+    }
+    if (responses[2] && responses[2].ok) {
+      const data = await responses[2].json();
+      FINANCE_UI_STATE.metrics.payoutsMonth = data.totalMonth;
+      FINANCE_UI_STATE.payouts = data.records;
+    }
   } catch (e) {
     console.warn("Could not fetch finance data", e);
   }
@@ -89,19 +99,59 @@ async function renderAdminFinance() {
       </div>
     `;
   } else if (FINANCE_UI_STATE.tab === "escrow") {
+    let escrowHtml = '<div class="admin-users-empty mt-3">All escrows are in good standing.</div>';
+    if (FINANCE_UI_STATE.escrowLogs && FINANCE_UI_STATE.escrowLogs.length > 0) {
+      escrowHtml = `
+        <table class="admin-audit-table mt-3">
+          <thead>
+            <tr><th>Project</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            ${FINANCE_UI_STATE.escrowLogs.map(e => `
+              <tr>
+                <td>${escapeHtml(e.project)}</td>
+                <td>$${e.amount}</td>
+                <td><span class="admin-audit-type ${e.status === 'Held' ? 'warning' : 'success'}">${e.status}</span></td>
+                <td>${e.date}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
     tabContent = `
       <div class="card mt-3">
         <h3>Escrow & Disputes</h3>
         <p class="text-sm text-muted">Monitor held funds and resolve payout disputes.</p>
-        <div class="admin-users-empty mt-3">All escrows are in good standing.</div>
+        ${escrowHtml}
       </div>
     `;
   } else if (FINANCE_UI_STATE.tab === "payouts") {
+    let payoutsHtml = '<div class="admin-users-empty mt-3">No pending payouts.</div>';
+    if (FINANCE_UI_STATE.payouts && FINANCE_UI_STATE.payouts.length > 0) {
+      payoutsHtml = `
+        <table class="admin-audit-table mt-3">
+          <thead>
+            <tr><th>Collaborator</th><th>Amount</th><th>Status</th><th>Date</th></tr>
+          </thead>
+          <tbody>
+            ${FINANCE_UI_STATE.payouts.map(p => `
+              <tr>
+                <td>${escapeHtml(p.collaborator)}</td>
+                <td>$${p.amount}</td>
+                <td><span class="admin-audit-type ${p.status === 'Completed' ? 'success' : 'system'}">${p.status}</span></td>
+                <td>${p.date}</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      `;
+    }
     tabContent = `
       <div class="card mt-3">
         <h3>Collaborator Payouts</h3>
         <p class="text-sm text-muted">Approve and process scheduled payouts for completed tasks.</p>
-        <div class="admin-users-empty mt-3">No pending payouts.</div>
+        ${payoutsHtml}
       </div>
     `;
   }

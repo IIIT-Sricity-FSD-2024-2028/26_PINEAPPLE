@@ -1,32 +1,28 @@
-import { Controller, Get, Post, Body, Param, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, UseGuards } from '@nestjs/common';
 import { OrganizationsService } from './organizations.service';
-import { RolesGuard } from '../core/guards/roles.guard';
 import { Roles } from '../core/decorators/roles.decorator';
+import { RolesGuard } from '../core/guards/roles.guard';
 
-@Controller('orgs')
+@Controller('organizations')
 @UseGuards(RolesGuard)
 export class OrganizationsController {
   constructor(private readonly organizationsService: OrganizationsService) {}
 
-  @Post()
-  create(@Body() createOrganizationDto: any) {
-    return this.organizationsService.create(createOrganizationDto);
-  }
-
   @Get()
-  @Roles('super_admin', 'org_success_manager')
-  findAll() {
+  @Roles('Administrator') // Ensure only admins can access this data
+  async getOrganizations() {
     return this.organizationsService.findAll();
   }
 
-  @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.organizationsService.findOne(+id);
+  @Post()
+  @Roles('Administrator')
+  async createOrganization(@Body() payload: any) {
+    return this.organizationsService.create(payload);
   }
 
-  @Post(':id/members')
-  @Roles('org_admin', 'super_admin')
-  addMember(@Param('id') id: string, @Body() memberDto: any) {
-    return this.organizationsService.addMember(+id, memberDto);
+  @Patch(':id/status')
+  @Roles('Administrator')
+  async updateOrganizationStatus(@Param('id') id: string, @Body('status') status: string) {
+    return this.organizationsService.updateStatus(id, status);
   }
 }

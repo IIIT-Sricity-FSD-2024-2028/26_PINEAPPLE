@@ -14,12 +14,7 @@ async function fetchOrgsData() {
     if (res && res.ok) {
       ORG_UI_STATE.orgs = await res.json();
     } else {
-      // Mock Data since backend is scaffolded
-      ORG_UI_STATE.orgs = [
-        { id: "org-1", name: "Acme Corp", tier: "Enterprise", members: 120, status: "Active" },
-        { id: "org-2", name: "Global Tech", tier: "Pro", members: 45, status: "Active" },
-        { id: "org-3", name: "Startup Inc", tier: "Starter", members: 8, status: "Suspended" }
-      ];
+      ORG_UI_STATE.orgs = [];
     }
   } catch (e) {
     console.warn("Could not fetch orgs data", e);
