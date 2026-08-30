@@ -4541,6 +4541,7 @@
           </div>
           <div class="modal-body">
             <div class="text-sm text-muted" style="margin-bottom:10px">${task ? escapeHtml(task.title) : "Selected task"}</div>
+            <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
             <div class="input-group" style="margin-bottom:10px">
               <label class="label">Attach File <span style="font-weight:400;color:var(--muted-fg)">(optional — image, PDF, ZIP, max 5 MB)</span></label>
               <input id="collab-proof-file" class="input" type="file" accept="image/*,application/pdf,.zip,.doc,.docx" />
@@ -4735,6 +4736,11 @@
     const runtime = getProjectRuntime(project);
     const index = Number(STATE.collaboratorProofTaskIndex);
     const task = runtime?.tasks[index];
+    const link = String(
+      STATE.collaboratorProofLink ||
+        document.getElementById("collab-proof-link")?.value ||
+        "",
+    ).trim();
     if (!task) {
       showToast("Task not found", "error");
       return;
@@ -4793,8 +4799,11 @@
       showToast("Please enter a valid proof link", "error");
       return;
     }
+    if (!isValidWebUrl(link)) {
+      showToast("Please enter a valid proof link", "error");
+      return;
+    }
 
->>>>>>> a0912d5 (v-8)
     try {
       if (window.tasksApi && task.id && !task.id.includes("task-")) {
         await window.tasksApi.update(task.id, { status: "In Review" });

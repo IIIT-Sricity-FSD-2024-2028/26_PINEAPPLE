@@ -105,6 +105,10 @@ function renderMentorRequests() {
 // ══════════════════════════════════════════════
 function renderMentoredProjects() {
   const mentored = PROJECTS.filter((_, i) => i === 2 || i === 4);
+  document.getElementById("mentored-projects-grid").innerHTML = mentored
+    .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
+    .join("");
+  bindProjectCardClicks();
   const grid = document.getElementById("mentored-projects-grid");
   grid.innerHTML = mentored
     .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))

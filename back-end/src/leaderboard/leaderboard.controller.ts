@@ -32,6 +32,7 @@ export class LeaderboardController {
 
   @Get()
   @Roles('user', 'admin')
+  @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get leaderboard rankings' })
   @ApiQuery({
     name: 'period',
@@ -59,6 +60,7 @@ export class LeaderboardController {
 
   @Get(':userId')
   @Roles('user', 'admin')
+  @Roles('Collaborator', 'Project Owner', 'Mentor', 'Administrator')
   @ApiOperation({ summary: 'Get a specific user\'s leaderboard ranking' })
   @ApiParam({
     name: 'userId',

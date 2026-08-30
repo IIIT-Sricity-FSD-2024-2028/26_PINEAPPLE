@@ -29,6 +29,10 @@ async function bootstrap() {
   const port = parsePort(process.env.PORT);
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
+  const app = await NestFactory.create(AppModule);
+  const port = parsePort(process.env.PORT);
+  const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
+
   // 0. Serve uploaded files as static assets at /uploads/*
   const uploadsDir = path.join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });

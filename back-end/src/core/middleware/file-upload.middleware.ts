@@ -99,6 +99,7 @@ function createFileFilter(allowedMimes: string[]) {
 }
 
 // ──────────────────────────────────────────────────────────────
+// Pre-configured Multer Instances
 // MulterOptions — used by NestJS FileInterceptor
 // ──────────────────────────────────────────────────────────────
 
@@ -140,13 +141,28 @@ export const resourceUploadOptions = {
  * Avatar upload — images only, max 2 MB.
  */
 export const avatarUpload = multer(avatarUploadOptions);
+export const avatarUpload = multer({
+  storage,
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: createFileFilter(IMAGE_MIMES),
+});
 
 /**
  * Task proof upload — images, PDFs, ZIPs — max 5 MB.
  */
 export const taskProofUpload = multer(taskProofUploadOptions);
+export const taskProofUpload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
+});
 
 /**
  * Resource upload — documents, images, archives — max 10 MB.
  */
 export const resourceUpload = multer(resourceUploadOptions);
+export const resourceUpload = multer({
+  storage,
+  limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
+  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
+});

@@ -89,6 +89,8 @@ async function fetchServerLogs() {
     ]);
     
     let reqLogs = [], errLogs = [];
+    if (reqRes.ok) reqLogs = await reqRes.json();
+    if (errRes.ok) errLogs = await errRes.json();
     if (reqRes.ok) {
       const reqData = await reqRes.json();
       // Backend returns { count, logs } envelope — unwrap the array
