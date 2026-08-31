@@ -160,7 +160,27 @@ async function submitMentorResource() {
     });
     
     if (response.ok) {
-      showToast("Resource shared successfully!", "success");
+      const data = await response.json();
+      // Backend returns: { message, filename, url } where url = "/uploads/filename"
+      const resourceUrl = data.url || data.path || (data.filename ? `/uploads/${data.filename}` : null);
+      const projectId = document.getElementById("mentor-resource-project-id")?.value;
+
+      // Post the resource as a project message so it's visible to the team
+      if (projectId && resourceUrl && window.communicationsApi) {
+        try {
+          await window.communicationsApi?.create?.({
+            projectId,
+            senderId: backendUserId,
+            content: `📎 Mentor shared a resource: ${file.name}`,
+            attachmentUrl: resourceUrl,
+            type: "resource"
+          }, getCurrentUserRole ? getCurrentUserRole() : "Collaborator");
+        } catch (apiErr) {
+          console.warn("Resource message post failed (backend may be offline):", apiErr.message);
+        }
+      }
+
+      showToast(`Resource "${file.name}" shared successfully!`, "success");
       closeMentorResourceModal();
     } else {
       const err = await response.json();

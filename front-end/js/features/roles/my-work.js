@@ -409,12 +409,29 @@ async function submitTaskProof() {
     });
     
     if (response.ok) {
-      showToast("Task proof uploaded successfully. Task completed!", "success");
+      const data = await response.json();
+      // Backend returns: { message, filename, url } where url = "/uploads/filename"
+      const proofUrl = data.url || data.path || (data.filename ? `/uploads/${data.filename}` : null);
+
+      // Update the task status to "submitted" (InReview) on the backend
+      const taskId = document.getElementById("task-proof-id")?.value;
+      if (taskId && window.tasksApi) {
+        try {
+          await window.tasksApi.update(taskId, {
+            status: "submitted",
+            ...(proofUrl ? { proofUrl } : {})
+          }, getCurrentUserRole ? getCurrentUserRole() : "Collaborator");
+        } catch (apiErr) {
+          console.warn("Task status update failed (backend may be offline):", apiErr.message);
+        }
+      }
+
+      showToast("Task proof uploaded. Status set to Submitted!", "success");
       closeTaskProofModal();
       // Wait for a second and then re-render to simulate state change
       setTimeout(() => {
         renderMyWork();
-      }, 1000);
+      }, 500);
     } else {
       const err = await response.json();
       showToast("Proof upload failed: " + (err.message || "Unknown error"), "error");

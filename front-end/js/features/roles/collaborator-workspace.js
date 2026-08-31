@@ -354,21 +354,56 @@ async function submitCollaboratorProof() {
     return;
   }
 
-  const input = document.getElementById("collab-proof-link");
-  const proofLink = (input?.value || STATE.collaboratorProofLink || "").trim();
-  if (!proofLink) {
-    showToast("Proof link is required", "error");
-    return;
-  }
-  if (!isValidWebUrl(proofLink)) {
-    showToast("Please enter a valid proof link", "error");
-    return;
+  const task = data.tasks[idx];
+  let proofLink = "";
+
+  // Priority 1: file upload
+  const fileInput = document.getElementById("collab-proof-file");
+  const file = fileInput?.files?.[0];
+
+  if (file) {
+    const formData = new FormData();
+    formData.append("file", file);
+    try {
+      const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
+      const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+      const res = await fetch(`${apiBase}/uploads/task-proof`, {
+        method: "POST",
+        headers: {
+          "x-user-id": backendUserId,
+          "x-user-role": typeof getCurrentUserRole === "function" ? getCurrentUserRole() : "Collaborator"
+        },
+        body: formData
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        showToast("File upload failed: " + (err.message || "Unknown error"), "error");
+        return;
+      }
+      const uploadData = await res.json();
+      // Backend returns: { message, filename, url }
+      proofLink = uploadData.url || uploadData.path || (uploadData.filename ? `/uploads/${uploadData.filename}` : "");
+    } catch (e) {
+      showToast("File upload failed. Server unavailable.", "error");
+      return;
+    }
+  } else {
+    // Priority 2: typed URL
+    const input = document.getElementById("collab-proof-link");
+    proofLink = (input?.value || STATE.collaboratorProofLink || "").trim();
+    if (!proofLink) {
+      showToast("Please upload a file or paste a proof link", "error");
+      return;
+    }
+    if (!isValidWebUrl(proofLink)) {
+      showToast("Please enter a valid proof link", "error");
+      return;
+    }
   }
 
-  const task = data.tasks[idx];
   try {
     if (window.tasksApi && task.id) {
-      await window.tasksApi.update(task.id, { status: "In Review" });
+      await window.tasksApi.update(task.id, { status: "In Review", proofLink });
     }
   } catch (error) {
     console.warn("Backend unavailable, falling back to local task state.");
@@ -684,13 +719,25 @@ function renderProjectWorkspace() {
             <div>
               <h3 class="modal-title" style="margin-bottom:2px">Submit Proof of Work</h3>
               <div style="font-size:0.95rem;color:var(--muted-fg)">
-                Paste a link to your proof (GitHub PR, Figma, Google Doc, etc.) before submitting for review.
+                Upload a file <strong>or</strong> paste a link to your proof (GitHub PR, Figma, Google Doc, etc.)
               </div>
             </div>
             <button class="modal-close" onclick="closeCollaboratorSubmitModal()">✕</button>
           </div>
           <div class="modal-body" style="padding-top:0">
             <div style="font-size:0.85rem;color:var(--muted-fg);margin-bottom:8px">${proofTask ? proofTask.title : "Selected task"}</div>
+            <label style="font-size:0.82rem;color:var(--muted-fg);display:block;margin-bottom:4px">Upload file (Image, PDF, ZIP — max 5MB)</label>
+            <input
+              id="collab-proof-file"
+              type="file"
+              accept="image/*,application/pdf,.zip,.doc,.docx"
+              style="width:100%;padding:8px;border:1px dashed var(--border);border-radius:10px;background:var(--secondary);margin-bottom:12px;font-size:0.9rem"
+            />
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;color:var(--muted-fg);font-size:0.82rem">
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+              <span>or paste a link</span>
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
             <input
               id="collab-proof-link"
               type="url"

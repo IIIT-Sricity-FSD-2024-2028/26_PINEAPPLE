@@ -177,7 +177,8 @@ async function hackUploadIdCard(file) {
   });
   if (!res.ok) throw new Error("ID card upload failed");
   const data = await res.json();
-  return data.path || data.file?.url || data.filename;
+  // Backend returns: { message, filename, url } where url = "/uploads/filename"
+  return data.url || data.path || (data.filename ? `/uploads/${data.filename}` : "no-id-provided");
 }
 
 async function hackSubmitRegistration(hackathonId) {

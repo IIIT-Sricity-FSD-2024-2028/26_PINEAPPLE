@@ -4523,6 +4523,18 @@
           </div>
           <div class="modal-body">
             <div class="text-sm text-muted" style="margin-bottom:10px">${task ? escapeHtml(task.title) : "Selected task"}</div>
+            <label style="font-size:0.82rem;color:var(--muted-fg);display:block;margin-bottom:4px">Upload file (Image, PDF, ZIP — max 5MB)</label>
+            <input
+              id="collab-proof-file"
+              type="file"
+              accept="image/*,application/pdf,.zip,.doc,.docx"
+              style="width:100%;padding:8px;border:1px dashed var(--border);border-radius:10px;background:var(--secondary);margin-bottom:12px;font-size:0.9rem"
+            />
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;color:var(--muted-fg);font-size:0.82rem">
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+              <span>or paste a link</span>
+              <div style="flex:1;height:1px;background:var(--border)"></div>
+            </div>
             <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
             <button class="btn btn-primary btn-full mt-3" onclick="submitCollaboratorProof()">Submit For Review</button>
           </div>
