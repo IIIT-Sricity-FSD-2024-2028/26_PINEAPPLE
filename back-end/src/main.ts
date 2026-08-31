@@ -2,42 +2,15 @@ import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import { NestExpressApplication } from '@nestjs/platform-express';
+import * as path from 'path';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware';
 import { LogManagerService } from './core/services/log-manager.service';
-import * as path from 'path';
-import * as net from 'net';
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
   return Number.isInteger(parsed) && parsed > 0 ? parsed : 3000;
-}
-
-function getAvailablePort(startPort: number, maxAttempts = 20): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const tryPort = (port: number, remaining: number) => {
-      const tester = net.createServer();
-
-      tester.once('error', (err: NodeJS.ErrnoException) => {
-        if (err.code === 'EADDRINUSE' && remaining > 0) {
-          tryPort(port + 1, remaining - 1);
-          return;
-        }
-
-        reject(err);
-      });
-
-      tester.once('listening', () => {
-        tester.once('close', () => resolve(port));
-        tester.close();
-      });
-
-      tester.listen(port);
-    };
-
-    tryPort(startPort, maxAttempts);
-  });
 }
 
 function parseCorsOrigins(rawOrigins: string | undefined): string[] {
@@ -53,15 +26,10 @@ function parseCorsOrigins(rawOrigins: string | undefined): string[] {
 
 async function bootstrap() {
   const app = await NestFactory.create<NestExpressApplication>(AppModule);
-  const requestedPort = parsePort(process.env.PORT);
-  const port = await getAvailablePort(requestedPort);
+  const port = parsePort(process.env.PORT);
   const allowedOrigins = parseCorsOrigins(process.env.CORS_ORIGINS);
 
-  if (port !== requestedPort) {
-    console.warn(`⚠️ Port ${requestedPort} is busy. Falling back to ${port}.`);
-  }
-
-  // 0. Serve uploaded files as static assets at /uploads/*
+  // 0. Serve uploaded files at /uploads/<filename>
   const uploadsDir = path.join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
 
@@ -76,7 +44,7 @@ async function bootstrap() {
       callback(new Error(`CORS blocked for origin: ${origin}`), false);
     },
     methods: ['GET', 'HEAD', 'PUT', 'PATCH', 'POST', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email', 'x-admin-scope'],
+    allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email'],
   });
 
   // 2. Enable Global Validation Pipe for strict DTO enforcement

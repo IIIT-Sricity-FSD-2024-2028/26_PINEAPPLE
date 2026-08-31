@@ -21,15 +21,14 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { PortalAdminsModule } from './portal-admins/portal-admins.module';
 import { SupportModule } from './support/support.module';
 
-// New Monetization & Enterprise Modules
+// Hackathon revenue-model modules:
 import { OrganizationsModule } from './organizations/organizations.module';
-import { TeamsModule } from './teams/teams.module';
-import { BillingModule } from './billing/billing.module';
 import { EscrowModule } from './escrow/escrow.module';
 import { PayoutsModule } from './payouts/payouts.module';
-import { SponsorshipsModule } from './sponsorships/sponsorships.module';
-import { AnalyticsModule } from './analytics/analytics.module';
-import { BroadcastModule } from './broadcast/broadcast.module';
+import { TeamsModule } from './teams/teams.module';
+import { TeamInvitationsModule } from './team-invitations/team-invitations.module';
+import { HackathonRegistrationsModule } from './hackathon-registrations/hackathon-registrations.module';
+import { HackathonsModule } from './hackathons/hackathons.module';
 
 // Middleware imports:
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
@@ -56,13 +55,12 @@ import { SanitizerMiddleware } from './core/middleware/sanitizer.middleware';
     PortalAdminsModule,
     SupportModule,
     OrganizationsModule,
-    TeamsModule,
-    BillingModule,
     EscrowModule,
     PayoutsModule,
-    SponsorshipsModule,
-    AnalyticsModule,
-    BroadcastModule,
+    TeamsModule,
+    TeamInvitationsModule,
+    HackathonRegistrationsModule,
+    HackathonsModule,
   ],
   controllers: [AppController],
   providers: [
@@ -128,6 +126,13 @@ export class AppModule implements NestModule {
         { path: 'notifications/*', method: RequestMethod.PUT },
         { path: 'admin/*', method: RequestMethod.PATCH },
         { path: 'admin/*', method: RequestMethod.PUT },
+        { path: 'organizations', method: RequestMethod.POST },
+        { path: 'hackathons', method: RequestMethod.POST },
+        { path: 'hackathons/*', method: RequestMethod.POST },
+        { path: 'teams', method: RequestMethod.POST },
+        { path: 'team-invitations', method: RequestMethod.POST },
+        { path: 'team-invitations/*', method: RequestMethod.POST },
+        { path: 'hackathon-registrations/*', method: RequestMethod.POST },
       );
 
     // ──────────────────────────────────────────────────────────
@@ -152,6 +157,10 @@ export class AppModule implements NestModule {
         { path: 'uploads/*', method: RequestMethod.ALL },
         { path: 'governance', method: RequestMethod.ALL },
         { path: 'governance/*', method: RequestMethod.ALL },
+        { path: 'hackathons', method: RequestMethod.ALL },
+        { path: 'hackathons/*', method: RequestMethod.ALL },
+        { path: 'organizations', method: RequestMethod.ALL },
+        { path: 'organizations/*', method: RequestMethod.ALL },
       );
   }
 }

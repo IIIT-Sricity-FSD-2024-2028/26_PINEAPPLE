@@ -1,32 +1,30 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
+import { randomUUID } from 'crypto';
+import { TransactionEntity } from './entities/transaction.entity';
 
+// Single ledger of every money movement triggered by the hackathon flow —
+// prize releases, refunds. Kept intentionally minimal (no mentor-marketplace
+// commission logic here — out of scope for the hackathon feature).
 @Injectable()
 export class PayoutsService {
-  private payouts = [
-    { id: 'po-1', collaborator: 'Alice', amount: 800, status: 'Completed', date: '2023-10-05' },
-    { id: 'po-2', collaborator: 'Bob', amount: 1200, status: 'Pending', date: '2023-10-25' },
-    { id: 'po-3', collaborator: 'Charlie', amount: 450, status: 'Pending', date: '2023-10-26' },
-  ];
+  private transactions: TransactionEntity[] = [];
 
-  async findAll() {
-    const totalMonth = this.payouts
-      .filter(p => p.status === 'Completed')
-      .reduce((acc, curr) => acc + curr.amount, 0);
-
-    return {
-      totalMonth: `$${totalMonth.toLocaleString()}`,
-      records: this.payouts,
+  recordTransaction(input: { payerId: string; payeeId?: string; amount: number; type: string }): TransactionEntity {
+    const txn: TransactionEntity = {
+      id: randomUUID(),
+      payerId: input.payerId,
+      payeeId: input.payeeId,
+      amount: input.amount,
+      currency: 'INR',
+      type: input.type,
+      status: 'completed',
+      createdAt: new Date().toISOString(),
     };
+    this.transactions.push(txn);
+    return txn;
   }
 
-  async processPayout(taskId: string, userId: string, amount: number) {
-    return { payoutId: 'po-new', status: 'PROCESSED' };
-  }
-
-  async approvePayout(id: string) {
-    const payout = this.payouts.find(p => p.id === id);
-    if (!payout) throw new NotFoundException('Payout not found');
-    payout.status = 'Completed';
-    return payout;
+  findAll(payeeId?: string): TransactionEntity[] {
+    return payeeId ? this.transactions.filter((t) => t.payeeId === payeeId) : [...this.transactions];
   }
 }

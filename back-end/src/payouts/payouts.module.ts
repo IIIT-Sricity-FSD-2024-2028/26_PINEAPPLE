@@ -1,9 +1,9 @@
 import { Module } from '@nestjs/common';
 import { PayoutsService } from './payouts.service';
-import { ScheduleModule } from '@nestjs/schedule';
+import { PayoutsController } from './payouts.controller';
 
 @Module({
-  imports: [ScheduleModule.forRoot()],
+  controllers: [PayoutsController],
   providers: [PayoutsService],
   exports: [PayoutsService],
 })

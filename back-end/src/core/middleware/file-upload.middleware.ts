@@ -100,54 +100,34 @@ function createFileFilter(allowedMimes: string[]) {
 
 // ──────────────────────────────────────────────────────────────
 // Pre-configured Multer Instances
-// MulterOptions — used by NestJS FileInterceptor
 // ──────────────────────────────────────────────────────────────
 
 /**
- * Avatar upload options — images only, max 2 MB.
- * Use with @UseInterceptors(FileInterceptor('file', avatarUploadOptions))
+ * Avatar upload — images only, max 2 MB.
  */
 export const avatarUploadOptions = {
   storage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
   fileFilter: createFileFilter(IMAGE_MIMES),
 };
+export const avatarUpload = multer(avatarUploadOptions);
 
 /**
- * Task proof upload options — images, PDFs, ZIPs — max 5 MB.
- * Use with @UseInterceptors(FileInterceptor('file', taskProofUploadOptions))
+ * Task proof upload — images, PDFs, ZIPs — max 5 MB.
  */
 export const taskProofUploadOptions = {
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
   fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
 };
+export const taskProofUpload = multer(taskProofUploadOptions);
 
 /**
- * Resource upload options — documents, images, archives — max 10 MB.
- * Use with @UseInterceptors(FileInterceptor('file', resourceUploadOptions))
+ * Resource upload — documents, images, archives — max 10 MB.
  */
 export const resourceUploadOptions = {
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
   fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
 };
-
-// ──────────────────────────────────────────────────────────────
-// Pre-configured Multer Instances (for non-NestJS use)
-// ──────────────────────────────────────────────────────────────
-
-/**
- * Avatar upload — images only, max 2 MB.
- */
-export const avatarUpload = multer(avatarUploadOptions);
-
-/**
- * Task proof upload — images, PDFs, ZIPs — max 5 MB.
- */
-export const taskProofUpload = multer(taskProofUploadOptions);
-
-/**
- * Resource upload — documents, images, archives — max 10 MB.
- */
 export const resourceUpload = multer(resourceUploadOptions);

@@ -4149,24 +4149,6 @@
       runtimeHtml
         ? runtimeHtml
         : '<div class="card"><p class="text-sm text-muted">No mentored projects yet.</p></div>';
-    // Inject "Upload Resource" button into each mentored project card
-    if (runtimeItems.length && typeof openMentorResourceModal === "function") {
-      runtimeItems.forEach((project) => {
-        const cardEl =
-          root.querySelector(`[data-project-id="${project.id}"], [data-id="${project.id}"]`) ||
-          Array.from(root.querySelectorAll(".card")).find((el) =>
-            el.textContent.includes(project.name)
-          );
-        if (!cardEl) return;
-        const encodedName = encodeURIComponent(project.name);
-        const btn = document.createElement("button");
-        btn.className = "btn btn-outline btn-sm btn-full";
-        btn.style.marginTop = "8px";
-        btn.textContent = "📎 Upload Resource";
-        btn.onclick = () => openMentorResourceModal(encodedName, project.id);
-        cardEl.appendChild(btn);
-      });
-    }
   }
 
   function applyToPreviewProject(projectId) {
@@ -4542,14 +4524,6 @@
           <div class="modal-body">
             <div class="text-sm text-muted" style="margin-bottom:10px">${task ? escapeHtml(task.title) : "Selected task"}</div>
             <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
-            <div class="input-group" style="margin-bottom:10px">
-              <label class="label">Attach File <span style="font-weight:400;color:var(--muted-fg)">(optional — image, PDF, ZIP, max 5 MB)</span></label>
-              <input id="collab-proof-file" class="input" type="file" accept="image/*,application/pdf,.zip,.doc,.docx" />
-            </div>
-            <div class="input-group" style="margin-bottom:0">
-              <label class="label">Or paste a proof link <span style="font-weight:400;color:var(--muted-fg)">(optional)</span></label>
-              <input id="collab-proof-link" class="input" type="url" placeholder="https://proof-link" value="${escapeHtml(STATE.collaboratorProofLink || "")}" oninput="updateCollaboratorProofLink(this.value)" />
-            </div>
             <button class="btn btn-primary btn-full mt-3" onclick="submitCollaboratorProof()">Submit For Review</button>
           </div>
         </div>
@@ -4753,57 +4727,10 @@
       showToast("Only the assigned collaborator can submit this task", "error");
       return;
     }
-
-    const fileInput = document.getElementById("collab-proof-file");
-    const hasFile = fileInput && fileInput.files && fileInput.files[0];
-    let link = String(
-      STATE.collaboratorProofLink ||
-        document.getElementById("collab-proof-link")?.value ||
-        "",
-    ).trim();
-
-    // --- Try file upload first ---
-    if (hasFile) {
-      const file = fileInput.files[0];
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
-        const response = await fetch("http://localhost:3000/uploads/task-proof", {
-          method: "POST",
-          headers: { "x-user-id": backendUserId },
-          body: formData,
-        });
-        if (response.ok) {
-          const data = await response.json();
-          link = "http://localhost:3000" + data.file.url;
-          showToast("File uploaded successfully", "success");
-        } else {
-          const err = await response.json().catch(() => ({}));
-          showToast("File upload failed: " + (err.message || "Unknown error"), "error");
-          return;
-        }
-      } catch (e) {
-        console.warn("Task proof upload failed, using link fallback", e);
-        showToast("Server unavailable — please paste a proof link instead", "error");
-        return;
-      }
-    }
-
-    // --- Validate link (must have file-derived link OR manually entered URL) ---
-    if (!link) {
-      showToast("Please attach a file or enter a valid proof link", "error");
-      return;
-    }
-    if (!hasFile && !isValidWebUrl(link)) {
-      showToast("Please enter a valid proof link", "error");
-      return;
-    }
     if (!isValidWebUrl(link)) {
       showToast("Please enter a valid proof link", "error");
       return;
     }
-
     try {
       if (window.tasksApi && task.id && !task.id.includes("task-")) {
         await window.tasksApi.update(task.id, { status: "In Review" });

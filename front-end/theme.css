@@ -264,7 +264,6 @@ h4 { font-family: var(--tf-font-brand); font-weight: 600; font-size: 1rem; }
 /* Header (glass) */
 header {
   height: 60px;
-  z-index: 20;
   background: var(--tf-glass-strong);
   -webkit-backdrop-filter: blur(var(--tf-glass-blur-lg)) saturate(160%);
   backdrop-filter: blur(var(--tf-glass-blur-lg)) saturate(160%);

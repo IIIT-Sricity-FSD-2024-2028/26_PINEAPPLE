@@ -16,7 +16,7 @@ export class Notification {
   @ApiProperty({
     description: 'Type of notification',
     example: 'PROJECT_INVITATION',
-    enum: ['PROJECT_INVITATION', 'APPLICATION_APPROVED', 'TASK_APPROVED', 'MENTOR_REQUEST', 'NEW_MESSAGE', 'PROJECT_UPDATE'],
+    enum: ['PROJECT_INVITATION', 'APPLICATION_APPROVED', 'TASK_APPROVED', 'MENTOR_REQUEST', 'NEW_MESSAGE', 'PROJECT_UPDATE', 'HACKATHON_WIN', 'TEAM_INVITATION'],
   })
   type!: string;
 

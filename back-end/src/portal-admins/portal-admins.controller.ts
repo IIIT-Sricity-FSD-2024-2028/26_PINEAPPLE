@@ -39,10 +39,10 @@ export class PortalAdminsController {
   constructor(private readonly portalAdminsService: PortalAdminsService) {}
 
   @Get()
-  @Roles('org_admin')
-  @ApiOperation({ summary: 'List all members of this organization' })
-  @ApiOkResponse({ description: 'List of members returned successfully.' })
-  @ApiForbiddenResponse({ description: 'Forbidden - org_admin role required' })
+  @Roles('superuser', 'portal_admin')
+  @ApiOperation({ summary: 'List all portal admin accounts' })
+  @ApiOkResponse({ description: 'List of portal admins returned successfully.', type: [PortalAdminEntity] })
+  @ApiForbiddenResponse({ description: 'Forbidden - superuser or portal_admin role required' })
   list() {
     return this.portalAdminsService.findAll();
   }

@@ -59,6 +59,13 @@
           </svg>
           <span class="sidebar-nav-label">Leaderboard</span>
         </button>
+        <button class="sidebar-nav-item" data-page="hackathons" onclick="navigate('hackathons')">
+          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v6a6 6 0 0 1-12 0V4Z" />
+            <path d="M12 16v4M9 20h6" />
+          </svg>
+          <span class="sidebar-nav-label">Hackathons</span>
+        </button>
         <button class="sidebar-nav-item" data-page="notifications" onclick="navigate('notifications')">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
@@ -238,6 +245,13 @@
               </table>
             </div>
           </div>
+        </div>
+
+        <!-- ═══════════ HACKATHONS ═══════════ -->
+        <div id="page-hackathons" class="page">
+          <h1>Hackathons</h1>
+          <p class="page-subtitle">Browse and join hackathons, or host your own.</p>
+          <div id="hackathons-content" class="mt-4"></div>
         </div>
 
         <!-- ═══════════ NOTIFICATIONS ═══════════ -->
@@ -634,15 +648,8 @@
         <button class="admin-nav-item active" onclick="showAdminPage('admin-dash')">📊 Dashboard</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
-        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">🎓 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
-        
-        <div class="finance-only-nav" style="display:none">
-          <div class="admin-nav-divider">Monetization</div>
-          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-organizations')">🏢 Organizations</button>
-          <button class="admin-nav-item finance-nav-item" onclick="showAdminPage('admin-finance')">💰 Finance Console</button>
-        </div>
-        
         <div class="su-only-nav" style="display:none">
           <div class="admin-nav-divider">Super User</div>
           <button class="admin-nav-item su-nav-item" onclick="showAdminPage('su-admins')">🔐 Manage Admins</button>
@@ -862,12 +869,8 @@
           </div>
         </div>
 
-          <div id="admin-finance" class="admin-page" style="display:none"></div>
-          
-          <div id="admin-organizations" class="admin-page" style="display:none"></div>
-          
-          <!-- 👑 SUPER USER: Manage Admins 👑 -->
-          <div id="su-admins" class="admin-page" style="display:none">
+        <!-- ═══ SUPER USER: Manage Admins ═══ -->
+        <div id="su-admins" class="admin-page" style="display:none">
           <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
             <div>
               <h1>Manage Admins <span class="su-page-badge">Super User Only</span></h1>
@@ -922,9 +925,8 @@
   <script src="js/features/roles/owned-workspace.js"></script>
   <script src="js/features/roles/collaborator-workspace.js"></script>
   <script src="js/features/roles/my-work.js"></script>
-  <script src="js/features/roles/admin-finance.js?v=2"></script>
-  <script src="js/features/roles/admin-organizations.js?v=2"></script>
   <script src="js/features/superuser.js"></script>
+  <script src="js/features/hackathons.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
   <script src="js/app.js"></script>

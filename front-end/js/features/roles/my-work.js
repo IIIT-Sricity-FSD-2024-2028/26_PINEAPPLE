@@ -398,10 +398,12 @@ async function submitTaskProof() {
   
   try {
     const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
-    const response = await fetch("http://localhost:3000/uploads/task-proof", {
+    const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+    const response = await fetch(`${apiBase}/uploads/task-proof`, {
       method: "POST",
       headers: {
-        "x-user-id": backendUserId
+        "x-user-id": backendUserId,
+        "x-user-role": getCurrentUserRole ? getCurrentUserRole() : "Collaborator"
       },
       body: formData
     });

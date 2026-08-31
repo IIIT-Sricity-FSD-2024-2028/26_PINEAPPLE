@@ -546,17 +546,20 @@ async function saveProfileSettings() {
 
     try {
       const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
-      const response = await fetch("http://localhost:3000/uploads/avatar", {
+      const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+      const response = await fetch(`${apiBase}/uploads/avatar`, {
         method: "POST",
         headers: {
-          "x-user-id": backendUserId
+          "x-user-id": backendUserId,
+          "x-user-role": getCurrentUserRole ? getCurrentUserRole() : "Collaborator"
         },
         body: formData
       });
 
       if (response.ok) {
         const data = await response.json();
-        STATE.userProfile.avatarUrl = data.file.url;
+        const avatarUrl = data.file?.url || data.path || data.filename;
+        STATE.userProfile.avatarUrl = avatarUrl;
         applyProfileIdentityToUI();
       } else {
         const err = await response.json();

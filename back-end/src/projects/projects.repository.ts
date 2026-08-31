@@ -11,6 +11,10 @@ export interface Project {
   requiredSkills: string[];
   duration: string;
   status: ProjectStatus;
+  // Hackathon linkage (nullable — an ordinary project is unaffected).
+  // Section 6.1: PROJECT gains sponsorship_id + team support via nullable FKs.
+  hackathonId?: string;
+  teamId?: string;
 }
 
 @Injectable()
@@ -54,6 +58,10 @@ export class ProjectsRepository {
     return this.projects.filter((project) => project.ownerId === ownerId);
   }
 
+  findByHackathonId(hackathonId: string): Project[] {
+    return this.projects.filter((project) => project.hackathonId === hackathonId);
+  }
+
   create(ownerId: string, createProjectDto: CreateProjectDto, status: ProjectStatus): Project {
     const newProject: Project = {
       id: `proj-${Date.now()}`,
@@ -63,6 +71,53 @@ export class ProjectsRepository {
     };
     this.projects.push(newProject);
     return newProject;
+  }
+
+  // Creates a hackathon team's backing project — same shape as an ordinary
+  // project, just pre-linked to its hackathon/team so the existing
+  // workspace UI (owned-workspace.js / collaborator-workspace.js) and the
+  // existing tasks/ module (keyed by projectId) work completely unmodified.
+  createForTeam(params: {
+    ownerId: string;
+    title: string;
+    description: string;
+    hackathonId: string;
+    teamId: string;
+  }): Project {
+    const newProject: Project = {
+      id: `proj-${Date.now()}`,
+      ownerId: params.ownerId,
+      title: params.title,
+      description: params.description,
+      difficulty: ProjectDifficulty.Medium,
+      requiredSkills: [],
+      duration: '',
+      status: ProjectStatus.Open,
+      hackathonId: params.hackathonId,
+      teamId: params.teamId,
+    };
+    this.projects.push(newProject);
+    return newProject;
+  }
+
+  // Team lead → Project Owner handoff (the literal "submit" action). Not
+  // exposed via UpdateProjectDto since ownerId must never be client-settable
+  // on an ordinary project update — only through this explicit transfer.
+  transferOwnership(id: string, newOwnerId: string, status: ProjectStatus): Project | undefined {
+    const index = this.projects.findIndex((project) => project.id === id);
+    if (index === -1) return undefined;
+    this.projects[index] = { ...this.projects[index], ownerId: newOwnerId, status };
+    return this.projects[index];
+  }
+
+  // Hackathon submission: the team lead is already the Project Owner from
+  // the moment the team's workspace was created (createForTeam), so this is
+  // a pure status flip, not an ownership change.
+  setStatus(id: string, status: ProjectStatus): Project | undefined {
+    const index = this.projects.findIndex((project) => project.id === id);
+    if (index === -1) return undefined;
+    this.projects[index] = { ...this.projects[index], status };
+    return this.projects[index];
   }
 
   update(id: string, updateProjectDto: UpdateProjectDto): Project | undefined {

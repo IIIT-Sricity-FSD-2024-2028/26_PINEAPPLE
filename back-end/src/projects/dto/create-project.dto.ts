@@ -11,6 +11,7 @@ export enum ProjectStatus {
   Open = 'Open',
   InProgress = 'In Progress',
   Completed = 'Completed',
+  Submitted = 'Submitted', // Hackathon team-project handed in for host judging
 }
 
 export class CreateProjectDto {

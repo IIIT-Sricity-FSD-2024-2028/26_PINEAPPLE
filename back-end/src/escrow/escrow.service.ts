@@ -1,30 +1,43 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
+import { BaseService } from '../common/abstracts/base.service';
+import { EscrowAccountEntity } from './entities/escrow-account.entity';
+import { FundEscrowDto } from './dto/fund-escrow.dto';
 
+// Escrow lifecycle: funded -> released | refunded | disputed.
+// A hackathon's prize pool is funded here the instant the host creates and
+// publishes the hackathon; funds only move (release/refund) via an explicit
+// TRANSACTION recorded by the caller (payouts/), never a silent balance edit.
 @Injectable()
-export class EscrowService {
-  private escrows = [
-    { id: 'esc-1', project: 'AI Chatbot', amount: 5000, status: 'Held', date: '2023-10-01' },
-    { id: 'esc-2', project: 'Mobile App Refactor', amount: 3200, status: 'Held', date: '2023-10-15' },
-    { id: 'esc-3', project: 'Security Audit', amount: 4200, status: 'Held', date: '2023-10-20' },
-  ];
-
-  async findAll() {
-    return {
-      totalHeld: `$${this.escrows.filter(e => e.status === 'Held').reduce((acc, curr) => acc + curr.amount, 0).toLocaleString()}`,
-      records: this.escrows,
-    };
+export class EscrowService extends BaseService<EscrowAccountEntity> {
+  fund(dto: FundEscrowDto): EscrowAccountEntity {
+    return super.create({
+      sourceType: dto.sourceType,
+      sourceId: dto.sourceId,
+      heldAmount: dto.amount,
+      currency: dto.currency ?? 'INR',
+      status: 'funded',
+      fundedAt: new Date().toISOString(),
+      releaseCondition: dto.releaseCondition,
+    });
   }
 
-  async holdFunds(taskId: string, amount: number) {
-    return { escrowId: 'esc-new', status: 'HELD' };
-  }
-
-  async releaseFunds(escrowId: string) {
-    const escrow = this.escrows.find(e => e.id === escrowId);
-    if (!escrow) {
-      throw new NotFoundException('Escrow record not found');
+  release(id: string): EscrowAccountEntity {
+    const escrow = this.findOne(id);
+    if (escrow.status !== 'funded' && escrow.status !== 'disputed') {
+      throw new BadRequestException(`Escrow ${id} cannot be released from status '${escrow.status}'`);
     }
-    escrow.status = 'Released';
-    return escrow;
+    return super.update(id, { status: 'released', releasedAt: new Date().toISOString() });
+  }
+
+  refund(id: string): EscrowAccountEntity {
+    const escrow = this.findOne(id);
+    if (escrow.status !== 'funded' && escrow.status !== 'disputed') {
+      throw new BadRequestException(`Escrow ${id} cannot be refunded from status '${escrow.status}'`);
+    }
+    return super.update(id, { status: 'refunded', releasedAt: new Date().toISOString() });
+  }
+
+  findBySource(sourceType: string, sourceId: string): EscrowAccountEntity | undefined {
+    return this.items.find((e) => e.sourceType === sourceType && e.sourceId === sourceId);
   }
 }

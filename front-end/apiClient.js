@@ -100,6 +100,16 @@ function getCurrentUserRole() {
   }
 }
 
+// Get current backend numeric user ID (distinct from the email-keyed local
+// session — see teamforge.backendUserId, set at login/registration).
+function getCurrentUserId() {
+  try {
+    return (typeof localStorage !== "undefined" && localStorage.getItem("teamforge.backendUserId")) || "1";
+  } catch {
+    return "1";
+  }
+}
+
 const usersApi = {
   list: (role) =>
     apiRequest("/users", "GET", null, { role: role || getCurrentUserRole() }),
@@ -448,6 +458,77 @@ const leaderboardApi = {
   },
 };
 
+// ──────────────────────────────────────────────────────────────
+// Hackathon revenue-model APIs
+// ──────────────────────────────────────────────────────────────
+
+const organizationsApi = {
+  list: (role) => apiRequest("/organizations", "GET", null, { role: role || getCurrentUserRole() }),
+  get: (id, role) => apiRequest(`/organizations/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
+  create: (payload, role) => apiRequest("/organizations", "POST", payload, { role: role || getCurrentUserRole() }),
+  myMemberships: (userId, role) =>
+    apiRequest(`/organizations/user/${userId}/memberships`, "GET", null, { role: role || getCurrentUserRole() }),
+};
+
+const hackathonsApi = {
+  search: (query, role) =>
+    apiRequest(`/hackathons${query ? `?search=${encodeURIComponent(query)}` : ""}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
+  get: (id, role) => apiRequest(`/hackathons/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
+  byOrg: (orgId, role) => apiRequest(`/hackathons/host/${orgId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  create: (payload, role) => apiRequest("/hackathons", "POST", payload, { role: role || getCurrentUserRole() }),
+  registerLead: (id, payload, role) =>
+    apiRequest(`/hackathons/${id}/register-lead`, "POST", payload, { role: role || getCurrentUserRole() }),
+  start: (id, requesterId, role) =>
+    apiRequest(`/hackathons/${id}/start`, "POST", { requesterId }, { role: role || getCurrentUserRole() }),
+  scoreTeam: (id, teamId, payload, role) =>
+    apiRequest(`/hackathons/${id}/teams/${teamId}/score`, "POST", payload, { role: role || getCurrentUserRole() }),
+  close: (id, closedBy, role) =>
+    apiRequest(`/hackathons/${id}/close`, "POST", { closedBy }, { role: role || getCurrentUserRole() }),
+  cancel: (id, requesterId, role) =>
+    apiRequest(`/hackathons/${id}/cancel`, "POST", { requesterId }, { role: role || getCurrentUserRole() }),
+};
+
+const teamsApi = {
+  list: (hackathonId, role) =>
+    apiRequest(`/teams${hackathonId ? `?hackathonId=${hackathonId}` : ""}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
+  leaderboard: (hackathonId, role) =>
+    apiRequest(`/teams/leaderboard?hackathonId=${hackathonId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  get: (id, role) => apiRequest(`/teams/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
+  members: (id, role) => apiRequest(`/teams/${id}/members`, "GET", null, { role: role || getCurrentUserRole() }),
+};
+
+const teamInvitationsApi = {
+  forUser: (userId, role) =>
+    apiRequest(`/team-invitations?userId=${userId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  forTeam: (teamId, role) =>
+    apiRequest(`/team-invitations?teamId=${teamId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  invite: (payload, role) => apiRequest("/team-invitations", "POST", payload, { role: role || getCurrentUserRole() }),
+  accept: (id, payload, role) =>
+    apiRequest(`/team-invitations/${id}/accept`, "POST", payload, { role: role || getCurrentUserRole() }),
+  decline: (id, role) => apiRequest(`/team-invitations/${id}/decline`, "POST", null, { role: role || getCurrentUserRole() }),
+};
+
+const hackathonRegistrationsApi = {
+  pending: (role) => apiRequest("/hackathon-registrations/pending", "GET", null, { role: role || getCurrentUserRole() }),
+  byHackathon: (hackathonId, role) =>
+    apiRequest(`/hackathon-registrations?hackathonId=${hackathonId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  verify: (id, verifiedBy, role) =>
+    apiRequest(`/hackathon-registrations/${id}/verify`, "POST", { verifiedBy }, { role: role || getCurrentUserRole() }),
+  reject: (id, verifiedBy, reason, role) =>
+    apiRequest(`/hackathon-registrations/${id}/reject`, "POST", { verifiedBy, reason }, { role: role || getCurrentUserRole() }),
+};
+
+const hackathonPayoutsApi = {
+  transactions: (payeeId, role) =>
+    apiRequest(`/payouts/transactions${payeeId ? `?payeeId=${payeeId}` : ""}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
+};
+
 // Expose APIs globally for frontend use
 window.usersApi = usersApi;
 window.projectsApi = projectsApi;
@@ -461,3 +542,10 @@ window.portalAdminsApi = portalAdminsApi;
 window.notificationsApi = notificationsApi;
 window.leaderboardApi = leaderboardApi;
 window.getCurrentUserRole = getCurrentUserRole;
+window.getCurrentUserId = getCurrentUserId;
+window.organizationsApi = organizationsApi;
+window.hackathonsApi = hackathonsApi;
+window.teamsApi = teamsApi;
+window.teamInvitationsApi = teamInvitationsApi;
+window.hackathonRegistrationsApi = hackathonRegistrationsApi;
+window.hackathonPayoutsApi = hackathonPayoutsApi;

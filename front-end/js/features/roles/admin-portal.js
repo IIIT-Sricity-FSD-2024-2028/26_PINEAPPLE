@@ -67,7 +67,7 @@ function openSuperuserAdmin() {
 
 function getCurrentPortalPermissions() {
   if (STATE.portalRole === "superuser") {
-    return ["users", "projects", "mentor_apps", "audit", "admins", "config", "finance", "organizations"];
+    return ["users", "projects", "mentor_apps", "audit", "admins", "config"];
   }
   if (STATE.portalRole !== "admin") {
     return [];
@@ -113,18 +113,11 @@ function renderPortalSidebar() {
     el.style.display = isSU ? "" : "none";
   });
 
-  const canSeeFinance = permissions.includes("finance") || permissions.includes("organizations");
-  sidebar.querySelectorAll(".finance-only-nav").forEach((el) => {
-    el.style.display = canSeeFinance ? "" : "none";
-  });
-
   const permissionMap = {
     "admin-users": "users",
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
     "admin-audit": "audit",
-    "admin-finance": "finance",
-    "admin-organizations": "organizations",
     "admin-su-admins": "admins",
     "admin-su-config": "config",
   };
@@ -233,8 +226,6 @@ function showAdminPage(id) {
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
     "admin-audit": "audit",
-    "admin-finance": "finance",
-    "admin-organizations": "organizations",
     "admin-su-admins": "admins",
     "admin-su-config": "config",
   };
@@ -259,12 +250,6 @@ function showAdminPage(id) {
   }
   if (id === "admin-mentor-apps") {
     renderAdminMentorApps();
-  }
-  if (id === "admin-finance") {
-    renderAdminFinance();
-  }
-  if (id === "admin-organizations") {
-    renderAdminOrganizations();
   }
   document
     .querySelectorAll(".admin-nav-item")

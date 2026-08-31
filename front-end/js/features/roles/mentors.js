@@ -109,30 +109,6 @@ function renderMentoredProjects() {
     .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
     .join("");
   bindProjectCardClicks();
-  const grid = document.getElementById("mentored-projects-grid");
-  grid.innerHTML = mentored
-    .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
-    .join("");
-  bindProjectCardClicks();
-
-  // Inject "Upload Resource" button into each rendered project card
-  mentored.forEach((p) => {
-    // Find the card element — projectCardHTML uses data-project-id or data-id attributes
-    const cardEl = grid.querySelector(
-      `[data-project-id="${p.id}"], [data-id="${p.id}"]`
-    ) || Array.from(grid.querySelectorAll(".card")).find(
-      (el) => el.textContent.includes(p.name)
-    );
-    if (!cardEl) return;
-
-    const encodedName = encodeURIComponent(p.name);
-    const uploadBtn = document.createElement("button");
-    uploadBtn.className = "btn btn-outline btn-sm btn-full";
-    uploadBtn.style.marginTop = "8px";
-    uploadBtn.textContent = "📎 Upload Resource";
-    uploadBtn.onclick = () => openMentorResourceModal(encodedName, p.id);
-    cardEl.appendChild(uploadBtn);
-  });
 }
 
 // ══════════════════════════════════════════════
@@ -173,10 +149,12 @@ async function submitMentorResource() {
   
   try {
     const backendUserId = localStorage.getItem("teamforge.backendUserId") || "1";
-    const response = await fetch("http://localhost:3000/uploads/resource", {
+    const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+    const response = await fetch(`${apiBase}/uploads/resource`, {
       method: "POST",
       headers: {
-        "x-user-id": backendUserId
+        "x-user-id": backendUserId,
+        "x-user-role": getCurrentUserRole ? getCurrentUserRole() : "Collaborator"
       },
       body: formData
     });
