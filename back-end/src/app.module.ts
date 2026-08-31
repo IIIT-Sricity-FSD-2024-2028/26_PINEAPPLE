@@ -35,10 +35,12 @@ import { LoggerMiddleware } from './core/middleware/logger.middleware';
 import { SecurityMiddleware } from './core/middleware/security.middleware';
 import { RateLimiterMiddleware } from './core/middleware/rate-limiter.middleware';
 import { SanitizerMiddleware } from './core/middleware/sanitizer.middleware';
+import { UploadsModule } from './uploads/uploads.module';
 
 @Module({
   imports: [
     CoreModule,
+    UploadsModule,
     UsersModule,
     GamificationModule,
     ProjectsModule,
