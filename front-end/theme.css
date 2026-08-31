@@ -163,7 +163,7 @@ body::after {
 }
 
 /* Content sits above the background layers */
-#app, .app-shell, .content-area, header, .sidebar, .modal, .modal-overlay {
+#app, .app-shell, .content-area, .sidebar, .modal, .modal-overlay {
   position: relative;
   z-index: 1;
 }
@@ -263,6 +263,8 @@ h4 { font-family: var(--tf-font-brand); font-weight: 600; font-size: 1rem; }
 
 /* Header (glass) */
 header {
+  position: relative;
+  z-index: 100;
   height: 60px;
   background: var(--tf-glass-strong);
   -webkit-backdrop-filter: blur(var(--tf-glass-blur-lg)) saturate(160%);
@@ -443,6 +445,7 @@ input[type="search"], input[type="number"], textarea, select {
   border: 1px solid var(--tf-glass-border);
   box-shadow: var(--tf-shadow-lg);
   min-width: 220px;
+  z-index: 1000;
 }
 .dropdown-item {
   border-radius: 8px;

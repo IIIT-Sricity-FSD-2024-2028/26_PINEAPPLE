@@ -77,6 +77,8 @@ body {
 
 /* ── Header ── */
 header {
+  position: relative;
+  z-index: 100;
   height: 56px;
   border-bottom: 1px solid var(--border);
   background: var(--card);
@@ -233,6 +235,7 @@ header {
 /* Dropdowns */
 .dropdown {
   position: relative;
+  z-index: 100;
 }
 .dropdown-menu {
   position: absolute;
@@ -243,7 +246,7 @@ header {
   border-radius: var(--radius);
   box-shadow: var(--shadow-hover);
   min-width: 200px;
-  z-index: 200;
+  z-index: 1000;
   display: none;
   overflow: hidden;
 }
@@ -4620,7 +4623,7 @@ a {
 
 
 /* --------------------------------------------------------------
-   SUPERUSER REGISTRY � Modern Admin Management UI
+   SUPERUSER REGISTRY � Modern Admin Management UI
    -------------------------------------------------------------- */
 
 /* Modal & Backdrop */
