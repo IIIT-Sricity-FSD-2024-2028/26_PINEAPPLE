@@ -89,8 +89,15 @@ async function fetchServerLogs() {
     ]);
     
     let reqLogs = [], errLogs = [];
-    if (reqRes.ok) reqLogs = await reqRes.json();
-    if (errRes.ok) errLogs = await errRes.json();
+    // Backend returns { count, logs: [...] } — extract the .logs array
+    if (reqRes.ok) {
+      const data = await reqRes.json();
+      reqLogs = Array.isArray(data) ? data : (data.logs || []);
+    }
+    if (errRes.ok) {
+      const data = await errRes.json();
+      errLogs = Array.isArray(data) ? data : (data.logs || []);
+    }
     
     const combined = [];
     
@@ -101,7 +108,7 @@ async function fetchServerLogs() {
         event: `${log.method} ${log.url}`,
         actor: log.ip || "Client",
         target: `Status ${log.statusCode}`,
-        details: `Time: ${log.responseTime}ms`,
+        details: `Time: ${log.responseTime}ms | User: ${log.userId || "anon"}`,
         timestamp: log.timestamp
       });
     });
@@ -112,8 +119,8 @@ async function fetchServerLogs() {
         type: "error",
         event: `ERROR ${log.method || ""} ${log.url || ""}`,
         actor: "System",
-        target: log.error || "Unknown Error",
-        details: log.stack ? log.stack.split("\\n")[0] : "-",
+        target: `Status ${log.statusCode || "500"}`,
+        details: log.message || "-",
         timestamp: log.timestamp
       });
     });
@@ -161,6 +168,8 @@ async function renderAuditLog() {
   if (ADMIN_SERVER_LOGS.length === 0) {
     listEl.innerHTML = '<div class="admin-users-empty">Loading server logs...</div>';
     await fetchServerLogs();
+    // Re-render now that we have data
+    return renderAuditLog();
   }
 
   const entries = getFilteredAuditEntries();

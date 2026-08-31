@@ -7,7 +7,6 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
 import { SecurityMiddleware } from './middleware/security.middleware';
 import { RateLimiterMiddleware } from './middleware/rate-limiter.middleware';
 import { SanitizerMiddleware } from './middleware/sanitizer.middleware';
-import { UploadsModule } from './uploads/uploads.module';
 
 /**
  * CoreModule — Global Module for Cross-Cutting Concerns
@@ -18,13 +17,11 @@ import { UploadsModule } from './uploads/uploads.module';
  *  - LogViewerController: Admin API to view recent logs
  *  - Middleware providers: Logger, Security, RateLimiter, Sanitizer
  *  - ScheduleModule: Enables @Interval for periodic log flushing
- *  - UploadsModule: File upload endpoints
  */
 @Global()
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    UploadsModule,
   ],
   controllers: [LogViewerController],
   providers: [
