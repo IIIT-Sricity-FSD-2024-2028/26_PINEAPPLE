@@ -29,6 +29,9 @@ import { TeamsModule } from './teams/teams.module';
 import { TeamInvitationsModule } from './team-invitations/team-invitations.module';
 import { HackathonRegistrationsModule } from './hackathon-registrations/hackathon-registrations.module';
 import { HackathonsModule } from './hackathons/hackathons.module';
+import { PromotionsModule } from './promotions/promotions.module';
+import { MentorMarketplaceModule } from './mentor-marketplace/mentor-marketplace.module';
+
 
 // Middleware imports:
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
@@ -63,6 +66,8 @@ import { UploadsModule } from './uploads/uploads.module';
     TeamInvitationsModule,
     HackathonRegistrationsModule,
     HackathonsModule,
+    PromotionsModule,
+    MentorMarketplaceModule,
   ],
   controllers: [AppController],
   providers: [

@@ -1,0 +1,1261 @@
+// ══════════════════════════════════════════════════════════════
+//  hackathons.js — 🏆 Hackathons Discovery & Revenue Model
+//
+//  Tabs: Browse (search + list + filters), My Hackathons (teams/invites/workspace),
+//  Host (create + manage + revenue), Organizer Dashboard (analytics + promotion plans).
+//  
+//  Revenue Model:
+//  - Sponsored Hackathons: Featured placement (₹2,999-₹14,999)
+//  - Premium Organizer Listing: Custom branding + analytics
+//  - Recruiter Access: Talent discovery from hackathon teams
+//
+//  Talks to hackathons/, teams/, team-invitations/, hackathon-registrations/,
+//  organizations/, payouts/, and promotions/ backend modules via apiClient.js.
+// ══════════════════════════════════════════════════════════════
+
+function hackEscapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  })[c]);
+}
+
+// ═══════════════════════════════════════════════════════════════
+// DEMO DATA: Realistic hackathons with variety
+// ═══════════════════════════════════════════════════════════════
+
+const DEMO_HACKATHONS = [
+  {
+    id: "demo-1", name: "AI Innovation Challenge 2025",
+    organizer: "XYZ Technologies", logo: "🤖",
+    description: "Build innovative AI-powered solutions for real-world problems using state-of-the-art language models.",
+    mode: "Online", location: null, theme: "AI, Machine Learning, GenAI",
+    teamSize: "2–4", prizePool: 200000, regDeadline: "2025-09-15", eventDate: "2025-09-22 to 2025-09-24",
+    status: "RegistrationOpen", eligibility: "Students worldwide", technologies: ["Python", "TensorFlow", "GPT"],
+    featured: true, sponsored: true, promotionPlan: "Premium Promotion", views: 12450, registrations: 1284, teamMatches: 347
+  },
+  {
+    id: "demo-2", name: "Web Dev Masters",
+    organizer: "CodeCraft Inc", logo: "🌐",
+    description: "Create stunning web applications with modern frameworks. Build the next generation web.",
+    mode: "Hybrid", location: "Bangalore, India", theme: "Web Development, React, Node.js",
+    teamSize: "2–5", prizePool: 150000, regDeadline: "2025-09-20", eventDate: "2025-09-27 to 2025-09-29",
+    status: "RegistrationOpen", eligibility: "Students aged 18+", technologies: ["React", "Node.js", "MongoDB"],
+    featured: true, sponsored: false, promotionPlan: "Featured Hackathon", views: 8920, registrations: 892, teamMatches: 156
+  },
+  {
+    id: "demo-3", name: "Cybersecurity Sprint",
+    organizer: "SecureHub Labs", logo: "🔐",
+    description: "Identify vulnerabilities and build secure applications. Defend the digital frontier.",
+    mode: "Online", location: null, theme: "Cybersecurity, Bug Bounty",
+    teamSize: "1–3", prizePool: 100000, regDeadline: "2025-09-10", eventDate: "2025-09-17 to 2025-09-19",
+    status: "RegistrationOpen", eligibility: "Beginner Friendly", technologies: ["Python", "Bash", "Docker"],
+    featured: false, sponsored: false, promotionPlan: null, views: 3450, registrations: 256, teamMatches: 89
+  },
+  {
+    id: "demo-4", name: "FinTech Revolution",
+    organizer: "PayFlow Systems", logo: "💰",
+    description: "Design financial solutions that solve real economic challenges. Build the future of payments.",
+    mode: "Offline", location: "Mumbai, India", theme: "FinTech, Blockchain, Payment Systems",
+    teamSize: "3–5", prizePool: 300000, regDeadline: "2025-08-30", eventDate: "2025-09-15 to 2025-09-17",
+    status: "Ongoing", eligibility: "Engineers & Finance enthusiasts", technologies: ["Solidity", "JavaScript", "PostgreSQL"],
+    featured: true, sponsored: true, promotionPlan: "Basic Promotion", views: 15680, registrations: 1456, teamMatches: 512
+  },
+  {
+    id: "demo-5", name: "Cloud Native Hackathon",
+    organizer: "CloudOps Global", logo: "☁️",
+    description: "Build scalable, containerized applications on modern cloud platforms.",
+    mode: "Online", location: null, theme: "Cloud, Kubernetes, DevOps",
+    teamSize: "2–4", prizePool: 120000, regDeadline: "2025-09-25", eventDate: "2025-10-01 to 2025-10-03",
+    status: "RegistrationOpen", eligibility: "Intermediate developers", technologies: ["Docker", "Kubernetes", "AWS"],
+    featured: false, sponsored: false, promotionPlan: null, views: 4200, registrations: 340, teamMatches: 120
+  },
+  {
+    id: "demo-6", name: "Gaming Engine Jam",
+    organizer: "PlayStudio Creative", logo: "🎮",
+    description: "Create engaging games with Godot or Unity. Show off your creativity and coding skills.",
+    mode: "Hybrid", location: "Delhi, India", theme: "Gaming, 3D Graphics, Game Dev",
+    teamSize: "3–6", prizePool: 180000, regDeadline: "2025-09-18", eventDate: "2025-09-25 to 2025-09-27",
+    status: "RegistrationOpen", eligibility: "All levels welcome", technologies: ["Unity", "Godot", "C#"],
+    featured: false, sponsored: false, promotionPlan: null, views: 6700, registrations: 567, teamMatches: 234
+  },
+  {
+    id: "demo-7", name: "Green Tech Hackathon",
+    organizer: "EcoTech Foundation", logo: "🌱",
+    description: "Build solutions for environmental challenges. Use tech to make a positive climate impact.",
+    mode: "Online", location: null, theme: "Climate, Sustainability, GreenTech",
+    teamSize: "2–5", prizePool: 250000, regDeadline: "2025-10-05", eventDate: "2025-10-12 to 2025-10-14",
+    status: "RegistrationOpen", eligibility: "Open to all", technologies: ["Python", "Data Science", "React"],
+    featured: true, sponsored: false, promotionPlan: "Featured Hackathon", views: 9800, registrations: 778, teamMatches: 290
+  },
+  {
+    id: "demo-8", name: "Mobile App Blitz",
+    organizer: "MobileDev Studios", logo: "📱",
+    description: "Rapid development of iOS and Android applications. Test your mobile development skills.",
+    mode: "Online", location: null, theme: "Mobile, iOS, Android, Flutter",
+    teamSize: "2–3", prizePool: 90000, regDeadline: "2025-09-22", eventDate: "2025-09-29 to 2025-10-01",
+    status: "RegistrationOpen", eligibility: "Beginner Friendly", technologies: ["Flutter", "Swift", "Kotlin"],
+    featured: false, sponsored: false, promotionPlan: null, views: 2800, registrations: 189, teamMatches: 65
+  },
+];
+
+// Promotion plan definitions
+const PROMOTION_PLANS = [
+  {
+    id: "plan-basic", name: "Basic Promotion", price: 2999,
+    duration: "7 days", features: ["Standard visibility", "Search results listing", "Email to ~500 students"],
+    visibilityBoost: "Standard"
+  },
+  {
+    id: "plan-featured", name: "Featured Hackathon", price: 7999,
+    duration: "14 days", features: ["Featured on homepage banner", "Priority in search", "Email to ~2000 students", "Social media promotion"],
+    visibilityBoost: "High"
+  },
+  {
+    id: "plan-premium", name: "Premium Promotion", price: 14999,
+    duration: "30 days", features: ["Homepage featured banner", "All filters priority", "Email to ~5000+ students", "Social media + webinar", "1-on-1 support", "Custom branding"],
+    visibilityBoost: "Maximum"
+  },
+];
+
+const HACK_STATE = {
+  tab: "browse",
+  searchQuery: "",
+  filterMode: "all", // all, online, offline, hybrid
+  filterDate: "all", // all, upcoming, ongoing
+  filterDifficulty: "all", // all, beginner, intermediate
+  hostStep: 1,
+  showDetailModal: false,
+  selectedHackathonId: null,
+  useLocalData: true, // Use demo data when backend isn't available
+};
+
+function hackSetTab(tab) {
+  HACK_STATE.tab = tab;
+  renderHackathons();
+}
+
+async function renderHackathons() {
+  const root = document.getElementById("hackathons-content");
+  if (!root) return;
+
+  const isAdmin =
+    (typeof isSuperUser === "function" && isSuperUser()) ||
+    ["administrator", "admin", "super user", "superuser"].includes(String(getCurrentUserRole()).toLowerCase());
+
+  // Add admin revenue tab if user is super admin
+  const adminTab = isAdmin ? `<button class="tab ${HACK_STATE.tab === "organizer-dashboard" ? "active" : ""}" onclick="hackSetTab('organizer-dashboard')">💰 Organizer Dashboard</button>` : '';
+
+  root.innerHTML = `
+    <div class="tabs" style="margin-bottom:20px">
+      <button class="tab ${HACK_STATE.tab === "browse" ? "active" : ""}" onclick="hackSetTab('browse')">🔍 Discover</button>
+      <button class="tab ${HACK_STATE.tab === "mine" ? "active" : ""}" onclick="hackSetTab('mine')">👥 My Hackathons</button>
+      <button class="tab ${HACK_STATE.tab === "host" ? "active" : ""}" onclick="hackSetTab('host')">🏢 Host</button>
+      ${adminTab}
+    </div>
+    <div id="hack-tab-body">Loading…</div>
+  `;
+
+  try {
+    switch (HACK_STATE.tab) {
+      case "browse":
+        await hackRenderBrowse();
+        break;
+      case "mine":
+        await hackRenderMine();
+        break;
+      case "host":
+        await hackRenderHost();
+        break;
+      case "organizer-dashboard":
+        await hackRenderOrganizerDashboard();
+        break;
+      default:
+        await hackRenderBrowse();
+        break;
+    }
+  } catch (err) {
+    const body = document.getElementById("hack-tab-body");
+    if (body) body.innerHTML = `<p style="color:var(--destructive)">Failed to load: ${hackEscapeHtml(err.message || String(err))}</p>`;
+  }
+}
+
+function hackCard(innerHtml) {
+  return `<div class="card mt-3" style="padding:16px">${innerHtml}</div>`;
+}
+
+// ════════════════════════════════════════════════════════════════
+// BROWSE TAB: Discovery with search, filters, and revenue model
+// ════════════════════════════════════════════════════════════════
+
+async function hackRenderBrowse() {
+  const body = document.getElementById("hack-tab-body");
+  
+  // Try to fetch from backend, fall back to demo data
+  let hackathons = [];
+  try {
+    hackathons = await hackathonsApi.search(HACK_STATE.searchQuery);
+  } catch (err) {
+    hackathons = [...DEMO_HACKATHONS];
+  }
+  
+  // Filter hackathons based on filters
+  hackathons = hackathons.filter(h => {
+    const matchesSearch = !HACK_STATE.searchQuery || 
+      h.name.toLowerCase().includes(HACK_STATE.searchQuery.toLowerCase()) ||
+      h.description.toLowerCase().includes(HACK_STATE.searchQuery.toLowerCase()) ||
+      (h.theme && h.theme.toLowerCase().includes(HACK_STATE.searchQuery.toLowerCase()));
+    
+    const matchesMode = HACK_STATE.filterMode === "all" || h.mode.toLowerCase() === HACK_STATE.filterMode.toLowerCase();
+    
+    const matchesDate = HACK_STATE.filterDate === "all" || 
+      (HACK_STATE.filterDate === "upcoming" && h.status === "RegistrationOpen") ||
+      (HACK_STATE.filterDate === "ongoing" && h.status === "Ongoing");
+    
+    return matchesSearch && matchesMode && matchesDate;
+  });
+  
+  // Sort: sponsored first, then featured, then by date
+  hackathons.sort((a, b) => {
+    if (a.sponsored !== b.sponsored) return a.sponsored ? -1 : 1;
+    if (a.featured !== b.featured) return a.featured ? -1 : 1;
+    return new Date(b.regDeadline) - new Date(a.regDeadline);
+  });
+
+  body.innerHTML = `
+    <div style="background:var(--secondary);padding:20px;border-radius:8px;margin-bottom:20px">
+      <h2 style="margin-top:0;margin-bottom:4px">🏆 Discover Hackathons</h2>
+      <p class="page-subtitle" style="margin:0;margin-bottom:16px">Find hackathons, build teams, and turn ideas into projects.</p>
+      
+      <div style="display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;align-items:center">
+        <input class="input" id="hack-search-input" placeholder="Search by name, theme, or technology…"
+          value="${hackEscapeHtml(HACK_STATE.searchQuery)}" style="flex:1;min-width:200px" onkeydown="if(event.key==='Enter') hackDoSearch()">
+        <button class="btn btn-primary" onclick="hackDoSearch()">Search</button>
+      </div>
+
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <select class="input" id="hack-filter-mode" style="flex:1;min-width:120px" onchange="hackSetFilterMode(this.value)">
+          <option value="all">📍 All Modes</option>
+          <option value="online">🌐 Online</option>
+          <option value="offline">🏢 Offline</option>
+          <option value="hybrid">🔄 Hybrid</option>
+        </select>
+        
+        <select class="input" id="hack-filter-date" style="flex:1;min-width:120px" onchange="hackSetFilterDate(this.value)">
+          <option value="all">📅 All Dates</option>
+          <option value="upcoming">⏰ Upcoming</option>
+          <option value="ongoing">▶️ Ongoing</option>
+        </select>
+
+        <button class="btn btn-outline" onclick="hackClearFilters()" style="flex:0">Clear Filters</button>
+      </div>
+    </div>
+
+    <div id="hack-featured-section" style="margin-bottom:24px"></div>
+
+    <div id="hack-browse-list">
+      ${
+        hackathons.length === 0
+          ? `<div class="card" style="padding:40px;text-align:center"><p class="page-subtitle">No hackathons match your filters. Try adjusting your search.</p></div>`
+          : hackathons
+              .map((h) => hackRenderHackathonCard(h))
+              .join("")
+      }
+    </div>
+
+    <div style="margin-top:32px;padding:16px;background:var(--secondary);border-radius:8px">
+      <h4 style="margin-top:0">💼 For Organizers</h4>
+      <p class="page-subtitle">Want to host a hackathon? TeamForge helps you reach thousands of students. <strong>Featured hackathons get 3x more registrations.</strong></p>
+      <button class="btn btn-primary" onclick="hackSetTab('host')">Start Hosting →</button>
+    </div>
+  `;
+  
+  // Update filter select values
+  document.getElementById("hack-filter-mode").value = HACK_STATE.filterMode;
+  document.getElementById("hack-filter-date").value = HACK_STATE.filterDate;
+  
+  // Render featured section if there are sponsored hackathons
+  const sponsored = hackathons.filter(h => h.sponsored);
+  if (sponsored.length > 0) {
+    const featuredHtml = `
+      <div style="background:linear-gradient(135deg, #667eea 0%, #764ba2 100%);padding:24px;border-radius:8px;color:white;margin-bottom:20px">
+        <h3 style="margin-top:0;color:white">⭐ Featured & Sponsored Hackathons</h3>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(300px, 1fr));gap:16px">
+          ${sponsored.map(h => hackRenderFeaturedCard(h)).join("")}
+        </div>
+      </div>
+    `;
+    document.getElementById("hack-featured-section").innerHTML = featuredHtml;
+  }
+}
+
+function hackRenderHackathonCard(h) {
+  const statusColor = h.status === "RegistrationOpen" ? "var(--success)" : h.status === "Ongoing" ? "var(--primary)" : "var(--muted-fg)";
+  const statusIcon = h.status === "RegistrationOpen" ? "🟢" : h.status === "Ongoing" ? "▶️" : "⏸️";
+  
+  let badges = '';
+  if (h.sponsored) badges += '<span class="badge" style="background:#fbbf24;color:#000;margin-right:6px">💰 Sponsored</span>';
+  if (h.featured) badges += '<span class="badge" style="background:#06b6d4;color:#fff;margin-right:6px">⭐ Featured</span>';
+  
+  return `
+    <div class="card" style="padding:16px;cursor:pointer;transition:box-shadow 0.2s" onmouseover="this.style.boxShadow='0 8px 16px rgba(0,0,0,0.1)'" onmouseout="this.style.boxShadow='none'" onclick="hackOpenDetail('${h.id}')">
+      <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:12px">
+        <div style="font-size:2rem">${h.logo || '🏆'}</div>
+        <div style="text-align:right">${badges}</div>
+      </div>
+      <h4 style="margin:0;margin-bottom:6px">${hackEscapeHtml(h.name)}</h4>
+      <p style="margin:0;font-size:0.85rem;color:var(--muted-fg);margin-bottom:8px">${hackEscapeHtml(h.organizer)}</p>
+      <p style="margin:0;margin-bottom:12px;font-size:0.9rem">${hackEscapeHtml(h.description.substring(0, 100))}...</p>
+      
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.85rem;margin-bottom:12px">
+        <div>💰 ₹${(h.prizePool || 0).toLocaleString()}</div>
+        <div>👥 ${h.teamSize}</div>
+        <div>🌐 ${h.mode}</div>
+        <div>${statusIcon} <span style="color:${statusColor}">${h.status.replace(/([A-Z])/g, ' $1').trim()}</span></div>
+      </div>
+      
+      <div style="border-top:1px solid var(--border);padding-top:8px;font-size:0.8rem;color:var(--muted-fg)">
+        <span>📅 Register: ${h.regDeadline}</span> • <span>👁️ ${h.views || 0} views</span>
+      </div>
+    </div>
+  `;
+}
+
+function hackRenderFeaturedCard(h) {
+  return `
+    <div style="background:rgba(255,255,255,0.1);padding:16px;border-radius:6px;cursor:pointer;border:2px solid rgba(255,255,255,0.3);transition:all 0.2s" onmouseover="this.style.background='rgba(255,255,255,0.2)'" onmouseout="this.style.background='rgba(255,255,255,0.1)'" onclick="hackOpenDetail('${h.id}')">
+      <h4 style="margin:0;margin-bottom:8px">${hackEscapeHtml(h.name)}</h4>
+      <p style="margin:0;margin-bottom:8px;font-size:0.9rem">🏆 ₹${(h.prizePool || 0).toLocaleString()}</p>
+      <p style="margin:0;margin-bottom:12px;font-size:0.85rem;opacity:0.9">${hackEscapeHtml(h.organizer)}</p>
+      <button style="background:white;color:#667eea;border:none;padding:6px 12px;border-radius:4px;font-weight:600;cursor:pointer" onclick="hackOpenDetail('${h.id}'); return false">View Details →</button>
+    </div>
+  `;
+}
+
+function hackDoSearch() {
+  HACK_STATE.searchQuery = document.getElementById("hack-search-input")?.value.trim() || "";
+  hackRenderBrowse();
+}
+
+function hackSetFilterMode(mode) {
+  HACK_STATE.filterMode = mode;
+  hackRenderBrowse();
+}
+
+function hackSetFilterDate(date) {
+  HACK_STATE.filterDate = date;
+  hackRenderBrowse();
+}
+
+function hackClearFilters() {
+  HACK_STATE.searchQuery = "";
+  HACK_STATE.filterMode = "all";
+  HACK_STATE.filterDate = "all";
+  hackRenderBrowse();
+}
+
+// ════════════════════════════════════════════════════════════════
+// DETAIL PAGE: Full hackathon information with action buttons
+// ════════════════════════════════════════════════════════════════
+
+async function hackOpenDetail(hackathonId) {
+  const body = document.getElementById("hack-tab-body");
+  
+  // Try to fetch from backend, fall back to demo data
+  let h = DEMO_HACKATHONS.find(x => x.id === hackathonId);
+  if (!h) {
+    try {
+      h = await hackathonsApi.get(hackathonId);
+    } catch (err) {
+      showToast("Hackathon not found", "error");
+      return;
+    }
+  }
+
+  body.innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="hackRenderBrowse()" style="margin-bottom:16px">&larr; Back to Browse</button>
+    
+    ${hackCard(`
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:20px;align-items:start">
+        <div>
+          <div style="font-size:3rem;margin-bottom:12px">${h.logo || '🏆'}</div>
+          <h1 style="margin:0;margin-bottom:4px">${hackEscapeHtml(h.name)}</h1>
+          <p style="margin:0;margin-bottom:16px;color:var(--muted-fg);font-size:1.1rem">${hackEscapeHtml(h.organizer)}</p>
+          
+          <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+            ${h.sponsored ? '<span class="badge" style="background:#fbbf24;color:#000">💰 Sponsored</span>' : ''}
+            ${h.featured ? '<span class="badge" style="background:#06b6d4;color:#fff">⭐ Featured</span>' : ''}
+            <span class="badge">${h.status.replace(/([A-Z])/g, ' $1').trim()}</span>
+          </div>
+          
+          <p style="font-size:1.05rem;line-height:1.6">${hackEscapeHtml(h.description)}</p>
+        </div>
+        
+        <div style="background:var(--secondary);padding:20px;border-radius:8px">
+          <h3 style="margin-top:0">Quick Info</h3>
+          <div style="display:flex;flex-direction:column;gap:12px;font-size:0.95rem">
+            <div><strong>🏆 Prize Pool</strong><br>₹${(h.prizePool || 0).toLocaleString()}</div>
+            <div><strong>👥 Team Size</strong><br>${h.teamSize} members</div>
+            <div><strong>🌐 Mode</strong><br>${h.mode}${h.location ? ` • ${h.location}` : ''}</div>
+            <div><strong>📅 Registration Deadline</strong><br>${h.regDeadline}</div>
+            <div><strong>📍 Event Date</strong><br>${h.eventDate}</div>
+            <div><strong>🎯 Eligibility</strong><br>${h.eligibility}</div>
+          </div>
+          
+          ${h.status === "RegistrationOpen" || h.status === "Ongoing" ? `
+            <button class="btn btn-primary" style="width:100%;margin-top:16px" onclick="hackShowTeamForm('${h.id}')">📝 Register / Join Team</button>
+          ` : `
+            <p class="page-subtitle" style="margin-top:16px">Registration is currently closed.</p>
+          `}
+        </div>
+      </div>
+    `)}
+    
+    ${hackCard(`
+      <h3 style="margin-top:0">📋 Overview</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:16px">
+        <div>
+          <h4 style="margin-top:0;color:var(--primary)">Theme & Technologies</h4>
+          <p>${h.theme ? hackEscapeHtml(h.theme) : 'Not specified'}</p>
+          ${h.technologies ? `<div style="display:flex;gap:6px;flex-wrap:wrap">${h.technologies.map(t => `<span class="badge" style="background:var(--primary);color:#fff">${hackEscapeHtml(t)}</span>`).join('')}</div>` : ''}
+        </div>
+        <div>
+          <h4 style="margin-top:0;color:var(--success)">Participation Metrics</h4>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;font-size:0.9rem">
+            <div>👁️ <strong>${(h.views || 0).toLocaleString()}</strong> views</div>
+            <div>📝 <strong>${(h.registrations || 0).toLocaleString()}</strong> registrations</div>
+            <div>👥 <strong>${(h.teamMatches || 0).toLocaleString()}</strong> team matches</div>
+          </div>
+        </div>
+      </div>
+    `)}
+    
+    ${hackCard(`
+      <h3 style="margin-top:0">🏅 Prize Distribution</h3>
+      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px">
+        <div style="background:var(--secondary);padding:16px;border-radius:6px;text-align:center">
+          <div style="font-size:1.8rem">🥇</div>
+          <div style="font-weight:600;color:var(--gold)">1st Prize</div>
+          <div style="font-size:1.2rem;margin-top:8px">₹${Math.round((h.prizePool || 0) * 0.5).toLocaleString()}</div>
+        </div>
+        <div style="background:var(--secondary);padding:16px;border-radius:6px;text-align:center">
+          <div style="font-size:1.8rem">🥈</div>
+          <div style="font-weight:600;color:var(--silver)">2nd Prize</div>
+          <div style="font-size:1.2rem;margin-top:8px">₹${Math.round((h.prizePool || 0) * 0.3).toLocaleString()}</div>
+        </div>
+        <div style="background:var(--secondary);padding:16px;border-radius:6px;text-align:center">
+          <div style="font-size:1.8rem">🥉</div>
+          <div style="font-weight:600;color:var(--bronze)">3rd Prize</div>
+          <div style="font-size:1.2rem;margin-top:8px">₹${Math.round((h.prizePool || 0) * 0.2).toLocaleString()}</div>
+        </div>
+      </div>
+    `)}
+    
+    ${hackCard(`
+      <h3 style="margin-top:0">🤝 Find Your Team</h3>
+      <p class="page-subtitle">Join or create a team and connect with the right teammates.</p>
+      <button class="btn btn-primary" onclick="hackShowFindTeammates('${h.id}')">🔍 Find Teammates for This Hackathon</button>
+      <button class="btn btn-outline" style="margin-left:8px" onclick="hackShowCreateTeam('${h.id}')">✨ Create New Team</button>
+    `)}
+    
+    ${hackCard(`
+      <h3 style="margin-top:0">📞 Contact Organizer</h3>
+      <p class="page-subtitle">Have questions? Get in touch with ${hackEscapeHtml(h.organizer)}.</p>
+      <p style="margin:12px 0"><strong>Email:</strong> hackathon@${h.organizer.toLowerCase().replace(/\\s+/g, '')} .com</p>
+      <button class="btn btn-outline">Contact Organizer</button>
+    `)}
+  `;
+}
+
+function hackShowTeamForm(hackathonId) {
+  showToast("Team registration/joining feature coming soon. Please use the 'Host' tab if you're creating a hackathon.", "info");
+}
+
+function hackShowFindTeammates(hackathonId) {
+  showToast("Teammate finder integration coming soon! This will connect you with the TeamForge team matching feature.", "info");
+}
+
+function hackShowCreateTeam(hackathonId) {
+  showToast("Team creation feature coming soon! You'll be able to create teams directly from here.", "info");
+}
+              </div>
+            </div>
+            <span class="badge">${hackEscapeHtml(h.status.replace(/_/g, " "))}</span>
+          </div>
+        </div>`,
+              )
+              .join("")
+      }
+    </div>
+  `;
+}
+
+function hackDoSearch() {
+  HACK_STATE.searchQuery = document.getElementById("hack-search-input")?.value.trim() || "";
+  hackRenderBrowse();
+}
+
+// ---- Detail + Register -------------------------------------------------------
+async function hackOpenDetail(hackathonId) {
+  const body = document.getElementById("hack-tab-body");
+  const h = await hackathonsApi.get(hackathonId);
+
+  body.innerHTML = `
+    <button class="btn btn-outline btn-sm" onclick="hackRenderBrowse()">&larr; Back to Browse</button>
+    ${hackCard(`
+      <h2 style="margin-top:0">${hackEscapeHtml(h.name)}</h2>
+      <p>${hackEscapeHtml(h.description)}</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin:16px 0">
+        <div><strong>Prize Pool</strong><br>₹${h.prizes?.totalPool?.toLocaleString()}</div>
+        <div><strong>Team Size</strong><br>${h.teamSizeLimits?.min} - ${h.teamSizeLimits?.max} members</div>
+        <div><strong>Eligibility</strong><br>${hackEscapeHtml(h.eligibility)}</div>
+        <div><strong>Registration Deadline</strong><br>${new Date(h.dates?.registrationClose).toLocaleString()}</div>
+        <div><strong>Status</strong><br><span class="badge">${hackEscapeHtml(h.status.replace(/_/g, " "))}</span></div>
+        ${h.theme ? `<div><strong>Theme</strong><br>${hackEscapeHtml(h.theme)}</div>` : ""}
+      </div>
+      ${
+        h.status === "RegistrationOpen" || h.status === "Published"
+          ? `<button class="btn btn-primary" onclick="hackShowRegisterForm('${h.id}')">Register as Team Lead</button>`
+          : `<p class="page-subtitle">Registration is not open for this hackathon.</p>`
+      }
+      <div id="hack-register-form"></div>
+    `)}
+  `;
+}
+
+function hackShowRegisterForm(hackathonId) {
+  const container = document.getElementById("hack-register-form");
+  container.innerHTML = `
+    <div class="card mt-3" style="padding:16px">
+      <h4 style="margin-top:0">Register as Team Lead</h4>
+      <p class="page-subtitle" style="margin-bottom:12px">Enter your team details and upload your Student ID card. An administrator will verify your ID card before your team appears in the hackathon.</p>
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:440px">
+        <input class="input" id="hack-reg-teamname" placeholder="Team Name (e.g. CodeWizards)">
+        <input class="input" id="hack-reg-college" placeholder="College / University Name">
+        <input class="input" id="hack-reg-studentid" placeholder="Student ID / Roll No">
+        
+        <label style="font-size:13px;font-weight:600;margin-top:4px">Upload Student ID Card Image / PDF:</label>
+        <input type="file" class="input" id="hack-reg-idcard" accept="image/*,.pdf">
+        
+        <button class="btn btn-primary mt-2" style="width:fit-content" onclick="hackSubmitRegistration('${hackathonId}')">Submit Team &amp; ID Card</button>
+      </div>
+    </div>
+  `;
+}
+
+async function hackUploadIdCard(file) {
+  if (!file) return "no-id-provided";
+  const formData = new FormData();
+  formData.append("file", file);
+  const backendUserId = (typeof localStorage !== "undefined" && localStorage.getItem("teamforge.backendUserId")) || "1";
+  const res = await fetch(`${resolveApiBaseUrl()}/uploads/resource`, {
+    method: "POST",
+    headers: {
+      "x-user-id": backendUserId,
+      "x-user-role": typeof getCurrentUserRole === "function" ? getCurrentUserRole() : "Collaborator"
+    },
+    body: formData
+  });
+  if (!res.ok) throw new Error("ID card upload failed");
+  const data = await res.json();
+  return data.url || data.path || (data.filename ? `/uploads/${data.filename}` : "no-id-provided");
+}
+
+async function hackSubmitRegistration(hackathonId) {
+  const teamName = document.getElementById("hack-reg-teamname")?.value.trim();
+  const college = document.getElementById("hack-reg-college")?.value.trim();
+  const studentId = document.getElementById("hack-reg-studentid")?.value.trim();
+  const fileInput = document.getElementById("hack-reg-idcard");
+
+  if (!teamName || !college || !studentId) {
+    showToast("Please fill in all team and student details");
+    return;
+  }
+
+  if (!fileInput || !fileInput.files || !fileInput.files[0]) {
+    showToast("Please select your Student ID card image");
+    return;
+  }
+
+  try {
+    showToast("Uploading ID card...");
+    const idCardImage = await hackUploadIdCard(fileInput.files[0]);
+    const userId = getCurrentUserId();
+    
+    await hackathonsApi.registerLead(hackathonId, {
+      userId,
+      teamName,
+      college,
+      studentId,
+      idCardImage
+    });
+    
+    showToast("Team registered! Awaiting admin ID approval.", "success");
+    hackSetTab("mine");
+  } catch (err) {
+    showToast(err.message || "Registration failed", "error");
+  }
+}
+
+// ---- My Hackathons (teams, invites, workspace) -------------------------------
+async function hackRenderMine() {
+  const body = document.getElementById("hack-tab-body");
+  const userId = getCurrentUserId();
+
+  const [invites, allHackathons] = await Promise.all([
+    teamInvitationsApi.forUser(userId),
+    hackathonsApi.search(),
+  ]);
+
+  const myTeamsPerHackathon = [];
+  for (const h of allHackathons) {
+    const hackTeams = await teamsApi.list(h.id);
+    for (const t of hackTeams) {
+      const members = await teamsApi.members(t.id);
+      if (members.some((m) => m.userId === userId) || t.leadUserId === userId) {
+        myTeamsPerHackathon.push({ hackathon: h, team: t, isLead: t.leadUserId === userId });
+      }
+    }
+  }
+
+  const pendingInvites = invites.filter((i) => i.status === "pending");
+
+  body.innerHTML = `
+    ${
+      pendingInvites.length > 0
+        ? hackCard(`
+      <h4 style="margin-top:0">Pending Team Invitations</h4>
+      ${pendingInvites
+        .map(
+          (inv) => `
+        <div class="card mt-2" style="padding:12px">
+          <p>You've been invited to join a team.</p>
+          <button class="btn btn-primary btn-sm" onclick="hackConfirmAccept('${inv.id}')">Accept Invitation</button>
+          <button class="btn btn-outline btn-sm" onclick="hackDeclineInvite('${inv.id}')">Decline</button>
+        </div>`,
+        )
+        .join("")}
+    `)
+        : ""
+    }
+    ${
+      myTeamsPerHackathon.length === 0
+        ? `<p class="page-subtitle mt-3">You haven't registered for any hackathons yet — check the Browse tab.</p>`
+        : myTeamsPerHackathon
+            .map(
+              ({ hackathon, team, isLead }) => {
+                const isPendingApproval = team.status === "VerificationPending";
+                const isRejected = team.status === "Rejected";
+
+                let statusBadge = "";
+                if (isPendingApproval) {
+                  statusBadge = '<span class="badge" style="background:#f59e0b;color:#000">⏳ Awaiting Admin ID Approval</span>';
+                } else if (isRejected) {
+                  statusBadge = '<span class="badge" style="background:var(--destructive);color:#fff">❌ ID Rejected</span>';
+                } else {
+                  statusBadge = '<span class="badge" style="background:var(--success);color:#fff">✅ Registered</span>';
+                }
+
+                return `
+      ${hackCard(`
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <h4 style="margin:0">${hackEscapeHtml(hackathon.name)} — Team "${hackEscapeHtml(team.name)}"</h4>
+            <p class="page-subtitle" style="margin:4px 0">${isLead ? "You are the Team Lead" : "Team Member"} &middot; Hackathon status: ${hackEscapeHtml(hackathon.status.replace(/_/g, " "))}</p>
+          </div>
+          <div>${statusBadge}</div>
+        </div>
+
+        ${isPendingApproval ? `
+          <div style="margin-top:10px;padding:10px;background:var(--secondary);border-radius:6px;font-size:0.85rem">
+            <strong>ID Verification in Progress:</strong> Your ID card is currently being reviewed by an admin. Once approved, your team will be confirmed and visible to the host.
+          </div>
+        ` : ''}
+
+        ${isRejected ? `
+          <div style="margin-top:10px;padding:10px;background:rgba(239,68,68,0.1);border-radius:6px;color:var(--destructive);font-size:0.85rem">
+            <strong>Rejection Reason:</strong> ${hackEscapeHtml(team.rejectionReason || 'Please reach out to support.')}
+          </div>
+        ` : ''}
+
+        ${!isPendingApproval && !isRejected ? `
+          <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap">
+            ${
+              team.projectId
+                ? `<button class="btn btn-primary btn-sm" onclick="hackOpenTeamWorkspace('${team.projectId}')">Open Workspace</button>`
+                : `<span class="page-subtitle">Workspace opens once the host starts the hackathon.</span>`
+            }
+            ${
+              isLead && !team.projectId
+                ? `<button class="btn btn-outline btn-sm" onclick="hackShowInviteForm('${team.id}')">Invite Teammate</button>`
+                : ""
+            }
+            ${
+              isLead && team.projectId && hackathon.status === "Ongoing" && team.status !== "Submitted"
+                ? `<button class="btn btn-primary btn-sm" onclick="hackShowSubmitForm('${team.id}')">Submit Project</button>`
+                : ""
+            }
+          </div>
+          <div id="hack-invite-form-${team.id}"></div>
+          <div id="hack-submit-form-${team.id}"></div>
+        ` : ''}
+      `)}
+    `;
+              }
+            )
+            .join("")
+    }
+  `;
+}
+
+async function hackConfirmAccept(inviteId) {
+  try {
+    await teamInvitationsApi.accept(inviteId, {});
+    showToast("Joined the team!");
+    hackRenderMine();
+  } catch (err) {
+    showToast(err.message || "Failed to accept invitation", "error");
+  }
+}
+
+async function hackDeclineInvite(inviteId) {
+  try {
+    await teamInvitationsApi.decline(inviteId);
+    showToast("Invitation declined");
+    hackRenderMine();
+  } catch (err) {
+    showToast(err.message || "Failed to decline", "error");
+  }
+}
+
+function hackShowInviteForm(teamId) {
+  const container = document.getElementById(`hack-invite-form-${teamId}`);
+  container.innerHTML = `
+    <div class="mt-2" style="position:relative">
+      <div style="display:flex;gap:8px">
+        <input class="input" style="flex:1" id="hack-invite-username-${teamId}" placeholder="Start typing teammate's name or email..." autocomplete="off">
+        <button class="btn btn-primary btn-sm" id="hack-invite-btn-${teamId}" onclick="hackSendInvite('${teamId}')" data-selected-id="">Send Invite</button>
+      </div>
+      <div id="hack-invite-results-${teamId}" style="display:none;position:absolute;top:100%;left:0;right:0;background:var(--bg);border:1px solid var(--border);border-radius:4px;max-height:200px;overflow-y:auto;z-index:50;box-shadow:0 4px 12px rgba(0,0,0,0.1)">
+      </div>
+    </div>
+  `;
+  
+  const input = document.getElementById(`hack-invite-username-${teamId}`);
+  const results = document.getElementById(`hack-invite-results-${teamId}`);
+  const btn = document.getElementById(`hack-invite-btn-${teamId}`);
+  
+  let debounceTimeout;
+  
+  input.addEventListener("input", (e) => {
+    const val = e.target.value.trim().toLowerCase();
+    btn.dataset.selectedId = ""; // Clear selection if typing
+    
+    clearTimeout(debounceTimeout);
+    if (!val) {
+      results.style.display = "none";
+      return;
+    }
+    
+    debounceTimeout = setTimeout(async () => {
+      try {
+        const users = await window.usersApi.list();
+        const matches = users.filter(u => 
+          (u.name || "").toLowerCase().includes(val) || 
+          (u.email || "").toLowerCase().includes(val) ||
+          (u.profile?.username || "").toLowerCase().includes(val)
+        );
+        
+        if (matches.length === 0) {
+          results.innerHTML = '<div style="padding:8px 12px;color:var(--muted-fg);font-size:0.9rem">No matching users found</div>';
+        } else {
+          results.innerHTML = matches.map(u => `
+            <div class="hack-invite-option" style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--border);display:flex;flex-direction:column"
+                 onclick="document.getElementById('hack-invite-username-${teamId}').value = '${escapeHtml(u.name)}'; 
+                          document.getElementById('hack-invite-btn-${teamId}').dataset.selectedId = '${u.id}';
+                          document.getElementById('hack-invite-results-${teamId}').style.display = 'none';">
+              <div style="font-weight:600;color:var(--fg)">${escapeHtml(u.name)}</div>
+              <div style="font-size:0.8rem;color:var(--muted-fg)">${escapeHtml(u.email)}</div>
+            </div>
+          `).join('');
+        }
+        results.style.display = "block";
+      } catch (err) {
+        console.error("Failed to fetch users for autocomplete", err);
+      }
+    }, 300);
+  });
+  
+  // Close dropdown on click outside
+  document.addEventListener("click", function closeAutocomplete(e) {
+    if (!container.contains(e.target)) {
+      results.style.display = "none";
+      document.removeEventListener("click", closeAutocomplete);
+    }
+  });
+}
+
+async function hackSendInvite(teamId) {
+  const btn = document.getElementById(`hack-invite-btn-${teamId}`);
+  const invitedUserId = btn.dataset.selectedId;
+  
+  if (!invitedUserId) {
+    showToast("Please select a user from the suggestions dropdown");
+    return;
+  }
+  
+  try {
+    await teamInvitationsApi.invite({ teamId, invitedUserId, invitedBy: getCurrentUserId() });
+    showToast("Invitation sent");
+    document.getElementById(`hack-invite-username-${teamId}`).value = "";
+    btn.dataset.selectedId = "";
+    hackRenderMine();
+  } catch (err) {
+    showToast(err.message || "Failed to send invite", "error");
+  }
+}
+
+async function hackOpenTeamWorkspace(projectId) {
+  if (typeof syncProjectsFromBackend === "function") {
+    await syncProjectsFromBackend();
+  }
+  if (typeof openWorkspace === "function") {
+    openWorkspace(projectId, "hackathons");
+  }
+}
+
+// ---- Student KYC ---------------------------------------------------------------
+async function hackRenderMyKyc() {
+  const body = document.getElementById("hack-tab-body");
+  const userId = getCurrentUserId();
+  
+  let kycStatus = null;
+  try {
+    kycStatus = await hackathonRegistrationsApi.getStatus(userId);
+  } catch (err) {
+    kycStatus = { status: "NotSubmitted" };
+  }
+
+  if (kycStatus.status === "Verified") {
+    body.innerHTML = hackCard(`
+      <h3 style="color:var(--success)">✅ KYC Verified</h3>
+      <p class="page-subtitle">Your student identity has been verified. You can now register or join hackathon teams.</p>
+    `);
+    return;
+  }
+  
+  if (kycStatus.status === "Pending") {
+    body.innerHTML = hackCard(`
+      <h3 style="color:var(--warning)">⏳ Verification Pending</h3>
+      <p class="page-subtitle">Your KYC documents are under review by an administrator.</p>
+    `);
+    return;
+  }
+
+  body.innerHTML = `
+    ${hackCard(`
+      <h4 style="margin-top:0">Student KYC Verification</h4>
+      <p class="page-subtitle" style="margin-bottom:12px">You must complete KYC before participating in any hackathons. ${kycStatus.status === "Rejected" ? `<br><span style="color:var(--destructive)">Your previous submission was rejected: ${kycStatus.adminNote || 'No reason provided'}</span>` : ''}</p>
+      
+      <div style="display:flex;flex-direction:column;gap:10px;max-width:400px">
+        <input class="input" id="hack-kyc-college" placeholder="College name">
+        <input class="input" id="hack-kyc-course" placeholder="Course/Degree (e.g. B.Tech)">
+        <input class="input" id="hack-kyc-year" type="number" min="1" max="5" placeholder="Year of Study (1-5)">
+        <input class="input" id="hack-kyc-age" type="number" min="13" placeholder="Age">
+        <input class="input" id="hack-kyc-studentid" placeholder="Student ID/Roll No">
+        
+        <label style="font-size:14px;margin-top:8px">Upload ID Card Image:</label>
+        <input class="input" id="hack-kyc-idcard" type="file" accept="image/*,.pdf">
+        
+        <button class="btn btn-primary mt-2" onclick="hackSubmitKyc()">Submit for Verification</button>
+      </div>
+    `)}
+  `;
+}
+
+async function hackSubmitKyc() {
+  const college = document.getElementById("hack-kyc-college").value.trim();
+  const course = document.getElementById("hack-kyc-course").value.trim();
+  const year = Number(document.getElementById("hack-kyc-year").value);
+  const age = Number(document.getElementById("hack-kyc-age").value);
+  const studentId = document.getElementById("hack-kyc-studentid").value.trim();
+  const fileInput = document.getElementById("hack-kyc-idcard");
+
+  if (!college || !course || !year || !age || !studentId) {
+    showToast("All fields are required");
+    return;
+  }
+
+  if (!fileInput.files?.[0]) {
+    showToast("Please upload your ID card image");
+    return;
+  }
+
+  try {
+    showToast("Uploading ID card...");
+    const idCardImage = await hackUploadIdCard(fileInput.files[0]);
+    await hackathonRegistrationsApi.submitVerification({ 
+      userId: getCurrentUserId(),
+      college, age, course, year, studentId, idCardImage 
+    });
+    showToast("KYC submitted successfully!");
+    hackSetTab("my-kyc");
+  } catch (err) {
+    showToast(err.message || "Failed to submit KYC", "error");
+  }
+}
+
+function hackShowSubmitForm(teamId) {
+  const container = document.getElementById(`hack-submit-form-${teamId}`);
+  container.innerHTML = `
+    <div class="mt-2" style="display:flex;flex-direction:column;gap:8px;max-width:400px">
+      <input class="input" id="hack-submit-repo-${teamId}" placeholder="Repository URL (GitHub/GitLab)">
+      <input class="input" id="hack-submit-demo-${teamId}" placeholder="Live Demo URL (optional)">
+      <input class="input" id="hack-submit-presentation-${teamId}" placeholder="Presentation/Video URL (optional)">
+      <button class="btn btn-primary btn-sm" style="width:fit-content" onclick="hackSubmitProject('${teamId}')">Submit for Judging</button>
+    </div>
+  `;
+}
+
+async function hackSubmitProject(teamId) {
+  const repoUrl = document.getElementById(`hack-submit-repo-${teamId}`).value.trim();
+  const demoUrl = document.getElementById(`hack-submit-demo-${teamId}`).value.trim();
+  const presentationUrl = document.getElementById(`hack-submit-presentation-${teamId}`).value.trim();
+
+  if (!repoUrl) {
+    showToast("Repository URL is required");
+    return;
+  }
+
+  if (!confirm("Submit this project for host judging? You won't be able to make further changes.")) return;
+  
+  try {
+    await teamsApi.submitProject(teamId, {
+      submittedBy: getCurrentUserId(),
+      repoUrl,
+      demoUrl,
+      presentationUrl
+    });
+    showToast("Project submitted for judging!");
+    hackRenderMine();
+  } catch (err) {
+    showToast(err.message || "Failed to submit project", "error");
+  }
+}
+
+// ---- Host: create + manage hackathons ----------------------------------------
+async function hackRenderHost() {
+  const body = document.getElementById("hack-tab-body");
+  const userId = getCurrentUserId();
+  const memberships = await organizationsApi.myMemberships(userId);
+  const adminOrgIds = memberships.filter((m) => m.orgRole === "org_admin").map((m) => m.orgId);
+
+  if (adminOrgIds.length === 0) {
+    body.innerHTML = `
+      ${hackCard(`
+        <h4 style="margin-top:0">Become a Host</h4>
+        <p class="page-subtitle">Register your organization to host hackathons.</p>
+        <div style="display:flex;flex-direction:column;gap:8px;max-width:420px">
+          <input class="input" id="hack-org-name" placeholder="Organization name">
+          <input class="input" id="hack-org-domain" placeholder="Domain, e.g. acme.com">
+          <input class="input" id="hack-org-email" placeholder="Contact email">
+          <button class="btn btn-primary" style="width:fit-content" onclick="hackRegisterOrg()">Register Organization</button>
+        </div>
+      `)}
+    `;
+    return;
+  }
+
+  const orgId = adminOrgIds[0];
+  const myHackathons = await hackathonsApi.byOrg(orgId);
+
+  body.innerHTML = `
+    ${hackCard(`
+      <h3 style="margin-top:0;margin-bottom:16px">Host a Hackathon</h3>
+      <div id="hack-host-form-container">
+        
+        <div id="hack-step-1" style="display:block">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h4 style="margin:0">Step 1: Details</h4>
+            <span class="badge">1 / 3</span>
+          </div>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <input class="input" id="hack-new-title" placeholder="Hackathon Title">
+            <textarea class="input" id="hack-new-desc" placeholder="Description" rows="2"></textarea>
+            <input class="input" id="hack-new-theme" placeholder="Theme/tags (optional)">
+            <button class="btn btn-primary mt-2" style="align-self:flex-end" onclick="hackSetHostStep(2)">Next: Settings</button>
+          </div>
+        </div>
+
+        <div id="hack-step-2" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h4 style="margin:0">Step 2: Settings</h4>
+            <span class="badge">2 / 3</span>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <input class="input" id="hack-new-eligibility" placeholder="Eligibility criteria" style="grid-column:span 2">
+            <input class="input" id="hack-new-teamsize-min" type="number" min="1" placeholder="Min team size">
+            <input class="input" id="hack-new-teamsize-max" type="number" min="1" placeholder="Max team size">
+            <input class="input" id="hack-new-deadline" type="datetime-local" placeholder="Registration deadline">
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:16px">
+            <button class="btn btn-outline" onclick="hackSetHostStep(1)">Back</button>
+            <button class="btn btn-primary" onclick="hackSetHostStep(3)">Next: Escrow Funding</button>
+          </div>
+        </div>
+
+        <div id="hack-step-3" style="display:none">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px">
+            <h4 style="margin:0">Step 3: Escrow Funding</h4>
+            <span class="badge">3 / 3</span>
+          </div>
+          <p class="page-subtitle">The prize pool is locked in a smart escrow contract. It will be distributed automatically to the winners when you close the hackathon.</p>
+          <div style="display:flex;flex-direction:column;gap:10px">
+            <input class="input" id="hack-new-prize" type="number" min="1" placeholder="Total Prize Pool (₹)">
+            <div style="padding:12px;border:1px dashed var(--border-color);border-radius:6px;background:var(--bg-secondary)">
+              <p style="margin:0;font-size:.85rem;color:var(--muted-fg)">Estimated platform fee: 2%</p>
+              <p style="margin:4px 0 0;font-weight:600">Total to fund: <span id="hack-est-total">₹0</span></p>
+            </div>
+          </div>
+          <div style="display:flex;justify-content:space-between;margin-top:16px">
+            <button class="btn btn-outline" onclick="hackSetHostStep(2)">Back</button>
+            <button class="btn btn-primary" onclick="hackCreateHackathon('${orgId}')">Fund &amp; Publish</button>
+          </div>
+        </div>
+        
+      </div>
+    `)}
+    <div class="mt-3">
+      <h3 style="margin-bottom:16px">My Hackathons</h3>
+      ${
+        myHackathons.length === 0
+          ? `<p class="page-subtitle">You haven't hosted any hackathons yet.</p>`
+          : (await Promise.all(myHackathons.map((h) => hackRenderHostHackathon(h)))).join("")
+      }
+    </div>
+  `;
+
+  const prizeInput = document.getElementById("hack-new-prize");
+  const totalDisplay = document.getElementById("hack-est-total");
+  if (prizeInput && totalDisplay) {
+    prizeInput.addEventListener("input", (e) => {
+      const val = Number(e.target.value) || 0;
+      totalDisplay.innerText = "₹" + (val * 1.02).toLocaleString();
+    });
+  }
+}
+
+function hackSetHostStep(step) {
+  for (let i = 1; i <= 3; i++) {
+    const el = document.getElementById(`hack-step-${i}`);
+    if (el) el.style.display = i === step ? "block" : "none";
+  }
+}
+
+async function hackRegisterOrg() {
+  const name = document.getElementById("hack-org-name").value.trim();
+  const domain = document.getElementById("hack-org-domain").value.trim();
+  const contactEmail = document.getElementById("hack-org-email").value.trim();
+  if (!name || !domain || !contactEmail) {
+    showToast("All fields are required");
+    return;
+  }
+  try {
+    await organizationsApi.create({ name, domain, contactEmail, orgAdminUserId: getCurrentUserId() });
+    showToast("Organization registered — you can now host hackathons");
+    hackRenderHost();
+  } catch (err) {
+    showToast(err.message || "Failed to register organization", "error");
+  }
+}
+
+async function hackCreateHackathon(orgId) {
+  const title = document.getElementById("hack-new-title").value.trim();
+  const description = document.getElementById("hack-new-desc").value.trim();
+  const theme = document.getElementById("hack-new-theme").value.trim();
+  const eligibilityCriteria = document.getElementById("hack-new-eligibility").value.trim();
+  const teamSizeMin = Number(document.getElementById("hack-new-teamsize-min").value);
+  const teamSizeMax = Number(document.getElementById("hack-new-teamsize-max").value);
+  const prizePool = Number(document.getElementById("hack-new-prize").value);
+  const registrationDeadline = document.getElementById("hack-new-deadline").value;
+
+  if (!title || !description || !eligibilityCriteria || !teamSizeMin || !teamSizeMax || !prizePool || !registrationDeadline) {
+    showToast("All fields except theme are required");
+    return;
+  }
+
+  try {
+    const dates = new Date(registrationDeadline);
+    const eventStart = new Date(dates.getTime() + 86400000).toISOString(); // +1 day
+    const eventEnd = new Date(dates.getTime() + 3 * 86400000).toISOString(); // +3 days
+    
+    await hackathonsApi.create({
+      orgId,
+      name: title,
+      description,
+      theme: theme || undefined,
+      eligibility: eligibilityCriteria,
+      minTeamSize: teamSizeMin,
+      maxTeamSize: teamSizeMax,
+      totalPrizePool: prizePool,
+      registrationClose: dates.toISOString(),
+      eventStart,
+      eventEnd,
+    });
+    showToast(`Hackathon created — ₹${prizePool.toLocaleString()} funded into escrow`);
+    hackRenderHost();
+  } catch (err) {
+    showToast(err.message || "Failed to create hackathon", "error");
+  }
+}
+
+async function hackRenderHostHackathon(h) {
+  const allTeams = await teamsApi.list(h.id);
+  const teams = allTeams.filter(t => t.status !== "VerificationPending" && t.status !== "Rejected");
+  const leaderboard = await teamsApi.leaderboard(h.id);
+
+  return hackCard(`
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h4 style="margin:0">${hackEscapeHtml(h.name)}</h4>
+      <span class="badge">${hackEscapeHtml(h.status.replace(/_/g, " "))}</span>
+    </div>
+    <p class="page-subtitle">₹${h.prizes?.totalPool?.toLocaleString()} prize pool &middot; ${teams.length} verified team(s) participating</p>
+    ${
+      h.status === "RegistrationOpen" || h.status === "Published"
+        ? `<button class="btn btn-primary btn-sm" onclick="hackStartHackathon('${h.id}')" ${teams.length === 0 ? "disabled title='No verified teams yet'" : ""}>Start Hackathon (creates team workspaces)</button>`
+        : ""
+    }
+    ${
+      h.status === "Ongoing" || h.status === "Judging"
+        ? `
+      <table style="width:100%;margin-top:10px;border-collapse:collapse">
+        <thead><tr><th style="text-align:left;padding:6px">Team</th><th style="text-align:left;padding:6px">Project Status</th><th style="text-align:left;padding:6px">Score</th><th></th></tr></thead>
+        <tbody>
+          ${teams
+            .map(
+              (t) => `
+            <tr>
+              <td style="padding:6px">${hackEscapeHtml(t.name)}</td>
+              <td style="padding:6px">
+                ${t.status === "Submitted" || t.status === "Judged" ? 
+                  `Submitted:<br><a href="${hackEscapeHtml(t.submission?.repoUrl)}" target="_blank">Repo</a> 
+                   ${t.submission?.demoUrl ? `| <a href="${hackEscapeHtml(t.submission.demoUrl)}" target="_blank">Demo</a>` : ''} 
+                   ${t.submission?.presentationUrl ? `| <a href="${hackEscapeHtml(t.submission.presentationUrl)}" target="_blank">Video</a>` : ''}` 
+                  : (t.projectId ? "Workspace active" : "—")}
+              </td>
+              <td style="padding:6px">${t.score !== undefined ? `${t.score}/10` : "Not scored"}</td>
+              <td style="padding:6px">
+                <input class="input" style="width:60px;display:inline-block" type="number" min="1" max="10" id="hack-score-input-${t.id}" placeholder="1-10">
+                <button class="btn btn-outline btn-sm" onclick="hackScoreTeam('${h.id}','${t.id}')">Score</button>
+              </td>
+            </tr>`,
+            )
+            .join("")}
+        </tbody>
+      </table>
+      <button class="btn btn-primary mt-2" onclick="hackCloseHackathon('${h.id}')" ${leaderboard.length === 0 ? "disabled title='Score at least one team first'" : ""}>
+        Close Hackathon &amp; Pay Top 3
+      </button>
+    `
+        : ""
+    }
+    ${
+      h.status === "Closed"
+        ? `<p class="page-subtitle">Closed. Winning teams: ${(h.prizes?.distributions || []).length}</p>`
+        : ""
+    }
+  `);
+}
+
+async function hackStartHackathon(hackathonId) {
+  try {
+    await hackathonsApi.start(hackathonId, getCurrentUserId());
+    showToast("Hackathon started — team workspaces created");
+    hackRenderHost();
+  } catch (err) {
+    showToast(err.message || "Failed to start hackathon", "error");
+  }
+}
+
+async function hackScoreTeam(hackathonId, teamId) {
+  const scoreInput = document.getElementById(`hack-score-input-${teamId}`);
+  const score = Number(scoreInput?.value);
+  if (!score || score < 1 || score > 10) {
+    showToast("Enter a score between 1 and 10");
+    return;
+  }
+  try {
+    await hackathonsApi.scoreTeam(hackathonId, teamId, { scoredBy: getCurrentUserId(), score });
+    showToast("Score recorded — leaderboard updated");
+    hackRenderHost();
+  } catch (err) {
+    showToast(err.message || "Failed to score team", "error");
+  }
+}
+
+async function hackCloseHackathon(hackathonId) {
+  if (!confirm("Close this hackathon? The top 3 scored teams will be paid from escrow and notified. This cannot be undone.")) return;
+  try {
+    await hackathonsApi.close(hackathonId, getCurrentUserId());
+    showToast("Hackathon closed — top 3 teams paid and notified");
+    hackRenderHost();
+  } catch (err) {
+    showToast(err.message || "Failed to close hackathon", "error");
+  }
+}
+
+// ---- Verify KYC (Platform Admin) ---------------------------------------------
+async function hackRenderVerify() {
+  const body = document.getElementById("hack-tab-body");
+  const pending = await hackathonRegistrationsApi.pending();
+
+  body.innerHTML = `
+    ${
+      pending.length === 0
+        ? `<p class="page-subtitle">No pending KYC registrations.</p>`
+        : pending
+            .map(
+              (r) => `
+      ${hackCard(`
+        <div style="display:flex;justify-content:space-between;align-items:start">
+          <div>
+            <h4 style="margin:0">${hackEscapeHtml(r.fullName)} <span class="page-subtitle">(${hackEscapeHtml(r.role)})</span></h4>
+            <p class="page-subtitle" style="margin:4px 0">${hackEscapeHtml(r.collegeName)} &middot; Age ${r.age}</p>
+            <p style="margin:4px 0"><a href="${hackEscapeHtml(r.idCardImageRef)}" target="_blank" rel="noopener">View ID Card</a></p>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn btn-primary btn-sm" onclick="hackVerifyRegistration('${r.id}')">Verify</button>
+            <button class="btn btn-outline btn-sm" onclick="hackRejectRegistration('${r.id}')">Reject</button>
+          </div>
+        </div>
+      `)}
+    `,
+            )
+            .join("")
+    }
+  `;
+}
+
+async function hackVerifyRegistration(id) {
+  try {
+    await hackathonRegistrationsApi.verify(id, getCurrentUserId());
+    showToast("Registration verified");
+    hackRenderVerify();
+  } catch (err) {
+    showToast(err.message || "Failed to verify", "error");
+  }
+}
+
+async function hackRejectRegistration(id) {
+  const reason = prompt("Reason for rejection (optional):") || undefined;
+  try {
+    await hackathonRegistrationsApi.reject(id, getCurrentUserId(), reason);
+    showToast("Registration rejected");
+    hackRenderVerify();
+  } catch (err) {
+    showToast(err.message || "Failed to reject", "error");
+  }
+}

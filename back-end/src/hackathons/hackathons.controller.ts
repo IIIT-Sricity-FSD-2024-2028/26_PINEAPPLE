@@ -26,6 +26,13 @@ export class HackathonsController {
     return this.hackathonsService.findByOrg(orgId);
   }
 
+  @Get('user/:userId')
+  @Roles('user')
+  @ApiOperation({ summary: 'Hackathons where the user has a registered team (My Hackathons)' })
+  findByUser(@Param('userId') userId: string) {
+    return this.hackathonsService.findByUser(userId);
+  }
+
   @Get(':id')
   @Roles('user')
   @ApiOperation({ summary: 'Hackathon detail — description, eligibility, team size, prize, dates' })
@@ -38,7 +45,7 @@ export class HackathonsController {
   @ApiOperation({ summary: 'Host creates a hackathon and funds the prize pool into escrow' })
   @ApiBody({ type: CreateHackathonDto })
   create(@Body() dto: CreateHackathonDto) {
-    return this.hackathonsService.create(dto);
+    return this.hackathonsService.createHackathon(dto);
   }
 
   @Post(':id/register-lead')

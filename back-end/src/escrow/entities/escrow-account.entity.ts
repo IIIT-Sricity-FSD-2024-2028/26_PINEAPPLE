@@ -1,15 +1,29 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export type EscrowStatus = 'funded' | 'released' | 'refunded' | 'disputed';
+export enum EscrowState {
+  Created = 'Created',
+  PaymentPending = 'PaymentPending',
+  Funded = 'Funded',
+  Locked = 'Locked',
+  Disputed = 'Disputed',
+  ReadyForDistribution = 'ReadyForDistribution',
+  Distributed = 'Distributed',
+  Refunded = 'Refunded'
+}
 
 export class EscrowAccountEntity {
   @ApiProperty() id!: string;
-  @ApiProperty({ description: 'What funded this escrow, e.g. "hackathon"' }) sourceType!: string;
-  @ApiProperty({ description: 'ID of the hackathon (or other) row this escrow backs' }) sourceId!: string;
-  @ApiProperty() heldAmount!: number;
-  @ApiProperty({ default: 'INR' }) currency!: string;
-  @ApiProperty({ enum: ['funded', 'released', 'refunded', 'disputed'] }) status!: EscrowStatus;
-  @ApiProperty() fundedAt!: string;
-  @ApiProperty({ description: 'What must happen before funds move' }) releaseCondition!: string;
-  @ApiPropertyOptional() releasedAt?: string;
+  @ApiPropertyOptional({ description: 'Hackathon ID (if hackathon escrow)' }) hackathonId?: string;
+  @ApiPropertyOptional({ description: 'Mentor session ID (if mentor-marketplace escrow)' }) mentorSessionId?: string;
+  @ApiProperty() prizeAmount!: number;
+  @ApiProperty() platformFee!: number;
+  @ApiProperty() gatewayFee!: number;
+  @ApiProperty() totalFunded!: number;
+  
+  @ApiProperty({ enum: EscrowState }) status!: EscrowState;
+  
+  @ApiProperty() createdAt!: string;
+  @ApiPropertyOptional() fundedAt?: string;
+  @ApiPropertyOptional() distributedAt?: string;
 }
+

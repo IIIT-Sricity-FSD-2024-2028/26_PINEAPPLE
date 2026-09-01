@@ -3933,25 +3933,44 @@
   }
 
   function acceptMentorRequest(projectId) {
-    if (typeof projectId === "number") {
-      const request = MENTOR_REQUESTS[projectId];
-      if (!request) return;
-      const linkedProject = PROJECTS.find(
-        (item) =>
-          item.id === String(request.projectId || "").trim() ||
-          (item.name === request.project && item.owner === request.owner),
-      );
-      if (linkedProject) {
-        acceptMentorRequest(linkedProject.id);
+    let targetProjectId = projectId;
+    const allShared = loadSharedMentorRequests();
+    const sharedRequest = allShared.find(item => item.id === projectId);
+    if (sharedRequest) {
+      targetProjectId = sharedRequest.projectId;
+      const updatedShared = allShared.map((item) => {
+        if (item.id === projectId) {
+          return {
+            ...item,
+            status: "approved",
+            approvedOn: getLiveTimestamp(),
+          };
+        }
+        return item;
+      });
+      saveSharedMentorRequests(updatedShared);
+    }
+
+    if (typeof targetProjectId === "number" || (typeof targetProjectId === "string" && !isNaN(Number(targetProjectId)) && !PROJECTS.some(p => p.id === String(targetProjectId)))) {
+      const request = MENTOR_REQUESTS[Number(targetProjectId)];
+      if (request) {
+        const linkedProject = PROJECTS.find(
+          (item) =>
+            item.id === String(request.projectId || "").trim() ||
+            (item.name === request.project && item.owner === request.owner),
+        );
+        if (linkedProject) {
+          acceptMentorRequest(linkedProject.id);
+          return;
+        }
+        request.status = "Accepted";
+        renderMentorRequests();
+        renderMentoredProjects();
+        showToast(`Mentorship request accepted for ${request.project}`);
         return;
       }
-      request.status = "Accepted";
-      renderMentorRequests();
-      renderMentoredProjects();
-      showToast(`Mentorship request accepted for ${request.project}`);
-      return;
     }
-    const project = PROJECTS.find((item) => item.id === projectId);
+    const project = PROJECTS.find((item) => item.id === String(targetProjectId) || item.id === targetProjectId);
     const runtime = getProjectRuntime(project);
     if (!project || !runtime) return;
     if (!runtime.mentorRequest) {

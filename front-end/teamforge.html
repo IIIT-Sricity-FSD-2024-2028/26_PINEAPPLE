@@ -59,13 +59,7 @@
           </svg>
           <span class="sidebar-nav-label">Leaderboard</span>
         </button>
-        <button class="sidebar-nav-item" data-page="hackathons" onclick="navigate('hackathons')">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v6a6 6 0 0 1-12 0V4Z" />
-            <path d="M12 16v4M9 20h6" />
-          </svg>
-          <span class="sidebar-nav-label">Hackathons</span>
-        </button>
+
         <button class="sidebar-nav-item" data-page="notifications" onclick="navigate('notifications')">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
@@ -150,12 +144,12 @@
           <div class="dropdown">
             <button class="avatar-btn" onclick="toggleDropdown('user-dd')">
               <div class="avatar" id="header-avatar">AS</div>
-              <span class="avatar-name">Arjun Sharma</span>
+              <span class="avatar-name">TeamForge User</span>
               <span style="font-size:.7rem;color:var(--muted-fg)">▾</span>
             </button>
             <div class="dropdown-menu" id="user-dd">
               <div class="dropdown-header">
-                <p>Arjun Sharma</p>
+                <p>TeamForge User</p>
                 <span id="user-role-label">Collaborator</span>
               </div>
               <button class="dropdown-item" onclick="navigate('profile');closeDropdowns()">Profile</button>
@@ -176,7 +170,7 @@
           <div class="flex items-center justify-between" style="flex-wrap:wrap;gap:10px">
             <div>
               <h1>Dashboard</h1>
-              <p class="page-subtitle">Welcome back, Arjun Sharma! <span id="mentor-badge-header"
+              <p class="page-subtitle">Welcome back, TeamForge User! <span id="mentor-badge-header"
                   style="display:none;color:var(--accent);font-weight:600;font-size:.8rem">⭐ Mentor</span></p>
             </div>
             <div id="mentor-dash-btns" style="display:none;display:flex;gap:8px">
@@ -247,11 +241,11 @@
           </div>
         </div>
 
-        <!-- ═══════════ HACKATHONS ═══════════ -->
-        <div id="page-hackathons" class="page">
-          <h1>Hackathons</h1>
-          <p class="page-subtitle">Browse and join hackathons, or host your own.</p>
-          <div id="hackathons-content" class="mt-4"></div>
+        <!-- ═══════════ MENTORS MARKETPLACE ═══════════ -->
+        <div id="page-mentors-market" class="page">
+          <h1>Mentorship Marketplace</h1>
+          <p class="page-subtitle">Book a verified mentor, pay securely — get paid after successful completion.</p>
+          <div id="mentors-market-content" class="mt-4"></div>
         </div>
 
         <!-- ═══════════ NOTIFICATIONS ═══════════ -->
@@ -325,10 +319,10 @@
             </div>
             <div class="form-grid">
               <div class="input-group"><label class="label">Full Name</label><input id="settings-full-name"
-                  class="input" value="Arjun Sharma">
+                  class="input" value="">
               </div>
               <div class="input-group"><label class="label">Username</label><input id="settings-username" class="input"
-                  value="arjunsharma">
+                  value="">
               </div>
             </div>
             <div class="input-group"><label class="label">Bio</label><input id="settings-bio" class="input"
@@ -537,7 +531,7 @@
               style="display:none;background:rgba(239,68,68,.1);border:1px solid rgba(239,68,68,.3);border-radius:8px;padding:12px 14px;margin-bottom:18px;font-size:.82rem;color:var(--destructive)">
             </div>
             <div class="input-group"><label class="label">Full Name</label><input id="mentor-app-name" class="input"
-                value="Arjun Sharma">
+                value="">
             </div>
             <div class="input-group"><label class="label">LinkedIn Profile URL</label><input id="mentor-app-linkedin"
                 class="input" placeholder="https://linkedin.com/in/yourprofile"></div>
@@ -649,6 +643,8 @@
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-kyc'); renderAdminKyc()">🪪 Team ID Approvals <span id="kyc-badge" style="background:var(--destructive);color:#fff;border-radius:10px;padding:1px 6px;font-size:0.72rem;margin-left:4px;display:none"></span></button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-revenue'); renderAdminRevenue()">💰 Revenue</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
         <div class="su-only-nav" style="display:none">
           <div class="admin-nav-divider">Super User</div>
@@ -846,6 +842,38 @@
           </div>
         </div>
 
+        <!-- ═══ TEAM ID & REGISTRATION APPROVALS ═══ -->
+        <div id="admin-kyc" class="admin-page" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <h1>Team ID &amp; Registration Approvals</h1>
+              <p class="page-subtitle mt-1">Review student ID documents uploaded by team leads. Approving a team confirms it and makes it visible to the hackathon host.</p>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="renderAdminKyc()">🔄 Refresh</button>
+          </div>
+          <div class="tabs mt-4">
+            <button class="tab active" id="kyc-tab-pending" onclick="setKycAdminTab('pending')">⏳ Pending Review</button>
+            <button class="tab" id="kyc-tab-verified" onclick="setKycAdminTab('verified')">✅ Verified</button>
+            <button class="tab" id="kyc-tab-rejected" onclick="setKycAdminTab('rejected')">❌ Rejected</button>
+          </div>
+          <div id="admin-kyc-list" class="mt-3"></div>
+        </div>
+
+
+
+        <!-- ═══ REVENUE MANAGEMENT ═══ -->
+        <div id="admin-revenue" class="admin-page" style="display:none">
+          <h1>Revenue & Finance</h1>
+          <p class="page-subtitle mt-1">Platform revenue from hackathon fees, escrow commissions, and prize payouts.</p>
+          <div class="tabs mt-4">
+            <button class="tab active" id="rev-tab-overview" onclick="setRevenueTab('overview')">📊 Overview</button>
+            <button class="tab" id="rev-tab-escrow" onclick="setRevenueTab('escrow')">🔒 Escrow</button>
+            <button class="tab" id="rev-tab-payouts" onclick="setRevenueTab('payouts')">💸 Payouts</button>
+            <button class="tab" id="rev-tab-pricing" onclick="setRevenueTab('pricing')">🏷️ Pricing Tiers</button>
+          </div>
+          <div id="admin-revenue-content" class="mt-3"></div>
+        </div>
+
         <div id="admin-audit" class="admin-page" style="display:none">
           <h1>Audit Log</h1>
           <div class="admin-audit-head-row mt-1">
@@ -926,7 +954,10 @@
   <script src="js/features/roles/collaborator-workspace.js"></script>
   <script src="js/features/roles/my-work.js"></script>
   <script src="js/features/superuser.js"></script>
-  <script src="js/features/hackathons.js"></script>
+  <script src="js/features/mentors-market.js"></script>
+  <script src="js/features/roles/admin-kyc.js"></script>
+
+  <script src="js/features/roles/admin-revenue.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
   <script src="js/app.js"></script>

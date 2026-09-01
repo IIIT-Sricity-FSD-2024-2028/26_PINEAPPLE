@@ -260,6 +260,46 @@ document.addEventListener("DOMContentLoaded", () => {
                 if (match && match.id) {
                   localStorage.setItem("teamforge.backendUserId", match.id);
                   console.log("✅ Backend user ID resolved:", match.id);
+
+                  // Sync the backend role to local store so the UI reflects the correct role
+                  if (match.role) {
+                    const roleMap = {
+                      Administrator: "administrator",
+                      Mentor: "mentor",
+                      Collaborator: "collaborator",
+                      "Project Owner": "project-owner",
+                      "Super User": "superuser",
+                    };
+                    const normalizedRole = roleMap[match.role] || String(match.role).trim().toLowerCase();
+                    try {
+                      const storedUsers = JSON.parse(localStorage.getItem("users") || "{}");
+                      const userEmail = String(result.email || "").trim().toLowerCase();
+                      if (storedUsers[userEmail]) {
+                        storedUsers[userEmail].role = normalizedRole;
+                        localStorage.setItem("users", JSON.stringify(storedUsers));
+                      }
+                      if (typeof STATE !== "undefined") {
+                        STATE.role = normalizedRole;
+                      }
+                      console.log("✅ Role synced from backend:", normalizedRole);
+                    } catch (syncErr) {
+                      console.warn("Role sync failed:", syncErr);
+                    }
+                  }
+                } else {
+                  // User exists locally but not in backend (likely due to backend restart). Re-sync!
+                  const payload = {
+                    name: result.user?.name || result.email.split('@')[0],
+                    email: result.email,
+                    role: result.user?.role === "administrator" ? "Administrator" : "Collaborator",
+                    skills: []
+                  };
+                  window.usersApi.create(payload, "Collaborator").then(data => {
+                    if (data && data.id) {
+                      localStorage.setItem("teamforge.backendUserId", data.id);
+                      console.log("✅ User re-synced to backend with ID:", data.id);
+                    }
+                  }).catch(e => console.warn("Failed to re-sync user:", e));
                 }
               })
               .catch((err) =>

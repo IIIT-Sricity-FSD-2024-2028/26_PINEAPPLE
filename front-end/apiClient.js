@@ -477,6 +477,7 @@ const hackathonsApi = {
     }),
   get: (id, role) => apiRequest(`/hackathons/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
   byOrg: (orgId, role) => apiRequest(`/hackathons/host/${orgId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  byUser: (userId, role) => apiRequest(`/hackathons/user/${userId}`, "GET", null, { role: role || getCurrentUserRole() }),
   create: (payload, role) => apiRequest("/hackathons", "POST", payload, { role: role || getCurrentUserRole() }),
   registerLead: (id, payload, role) =>
     apiRequest(`/hackathons/${id}/register-lead`, "POST", payload, { role: role || getCurrentUserRole() }),
@@ -495,10 +496,17 @@ const teamsApi = {
     apiRequest(`/teams${hackathonId ? `?hackathonId=${hackathonId}` : ""}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
+  pendingApprovals: (role) =>
+    apiRequest("/teams/pending-approvals", "GET", null, { role: role || getCurrentUserRole() }),
+  approve: (id, verifiedBy, role) =>
+    apiRequest(`/teams/${id}/approve`, "POST", { verifiedBy }, { role: role || getCurrentUserRole() }),
+  reject: (id, verifiedBy, reason, role) =>
+    apiRequest(`/teams/${id}/reject`, "POST", { verifiedBy, reason }, { role: role || getCurrentUserRole() }),
   leaderboard: (hackathonId, role) =>
     apiRequest(`/teams/leaderboard?hackathonId=${hackathonId}`, "GET", null, { role: role || getCurrentUserRole() }),
   get: (id, role) => apiRequest(`/teams/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
   members: (id, role) => apiRequest(`/teams/${id}/members`, "GET", null, { role: role || getCurrentUserRole() }),
+  submitProject: (id, payload, role) => apiRequest(`/teams/${id}/submit`, "POST", payload, { role: role || getCurrentUserRole() }),
 };
 
 const teamInvitationsApi = {
@@ -513,13 +521,18 @@ const teamInvitationsApi = {
 };
 
 const hackathonRegistrationsApi = {
+  submitVerification: (payload, role) => apiRequest("/hackathon-registrations/verify-student", "POST", payload, { role: role || getCurrentUserRole() }),
   pending: (role) => apiRequest("/hackathon-registrations/pending", "GET", null, { role: role || getCurrentUserRole() }),
-  byHackathon: (hackathonId, role) =>
-    apiRequest(`/hackathon-registrations?hackathonId=${hackathonId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  getStatus: (userId, role) => apiRequest(`/hackathon-registrations/status/${userId}`, "GET", null, { role: role || getCurrentUserRole() }),
   verify: (id, verifiedBy, role) =>
     apiRequest(`/hackathon-registrations/${id}/verify`, "POST", { verifiedBy }, { role: role || getCurrentUserRole() }),
   reject: (id, verifiedBy, reason, role) =>
     apiRequest(`/hackathon-registrations/${id}/reject`, "POST", { verifiedBy, reason }, { role: role || getCurrentUserRole() }),
+};
+
+const escrowApi = {
+  getAll: (role) => apiRequest("/escrow", "GET", null, { role: role || getCurrentUserRole() }),
+  getById: (id, role) => apiRequest(`/escrow/${id}`, "GET", null, { role: role || getCurrentUserRole() })
 };
 
 const hackathonPayoutsApi = {
@@ -527,6 +540,48 @@ const hackathonPayoutsApi = {
     apiRequest(`/payouts/transactions${payeeId ? `?payeeId=${payeeId}` : ""}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
+};
+
+const promotionsApi = {
+  getPlans: (role) =>
+    apiRequest("/promotions/plans", "GET", null, { role: role || getCurrentUserRole() }),
+  createPlan: (payload, role) =>
+    apiRequest("/promotions/plans", "POST", payload, { role: role || getCurrentUserRole() }),
+  purchasePromotion: (payload, role) =>
+    apiRequest("/promotions/purchase", "POST", payload, { role: role || getCurrentUserRole() }),
+  getActivePromotions: (role) =>
+    apiRequest("/promotions/active", "GET", null, { role: role || getCurrentUserRole() }),
+  getActivePromotion: (hackathonId, role) =>
+    apiRequest(`/promotions/hackathon/${hackathonId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  getAnalytics: (promotionId, role) =>
+    apiRequest(`/promotions/analytics/${promotionId}`, "GET", null, { role: role || getCurrentUserRole() }),
+  getOrganizerRevenueSummary: (organizerId, role) =>
+    apiRequest(`/promotions/organizer/${organizerId}/summary`, "GET", null, { role: role || getCurrentUserRole() }),
+};
+
+// ── Mentor Marketplace API ────────────────────────────────────────────────────
+const mentorMarketApi = {
+  // Browse / profile
+  listMentors: (params = {}, role) => {
+    const qs = new URLSearchParams();
+    Object.entries(params).forEach(([k, v]) => { if (v !== undefined && v !== "" && v !== null) qs.set(k, v); });
+    const q = qs.toString();
+    return apiRequest(`/mentor-marketplace/mentors${q ? "?" + q : ""}`, "GET", null, { role: role || getCurrentUserRole() });
+  },
+  getMentor: (id, role) => apiRequest(`/mentor-marketplace/mentors/${id}`, "GET", null, { role: role || getCurrentUserRole() }),
+  createProfile: (payload, role) => apiRequest("/mentor-marketplace/mentors/profile", "POST", payload, { role: role || getCurrentUserRole() }),
+  updateAvailability: (isAvailable, role) => apiRequest("/mentor-marketplace/mentors/availability", "PATCH", { isAvailable }, { role: role || getCurrentUserRole() }),
+
+  // Sessions
+  bookSession: (payload, role) => apiRequest("/mentor-marketplace/sessions/book", "POST", payload, { role: role || getCurrentUserRole() }),
+  mySessions: (role) => apiRequest("/mentor-marketplace/sessions/mine", "GET", null, { role: role || getCurrentUserRole() }),
+  mentorSessions: (role) => apiRequest("/mentor-marketplace/sessions/mentor-view", "GET", null, { role: role || getCurrentUserRole() }),
+  allSessions: (role) => apiRequest("/mentor-marketplace/sessions", "GET", null, { role: role || getCurrentUserRole() }),
+  adminStats: (role) => apiRequest("/mentor-marketplace/sessions/admin-stats", "GET", null, { role: role || getCurrentUserRole() }),
+  startSession: (id, role) => apiRequest(`/mentor-marketplace/sessions/${id}/start`, "POST", {}, { role: role || getCurrentUserRole() }),
+  completeSession: (id, role) => apiRequest(`/mentor-marketplace/sessions/${id}/complete`, "POST", {}, { role: role || getCurrentUserRole() }),
+  cancelSession: (id, role) => apiRequest(`/mentor-marketplace/sessions/${id}/cancel`, "POST", {}, { role: role || getCurrentUserRole() }),
+  submitReview: (sessionId, payload, role) => apiRequest(`/mentor-marketplace/sessions/${sessionId}/review`, "POST", payload, { role: role || getCurrentUserRole() }),
 };
 
 // Expose APIs globally for frontend use
@@ -547,5 +602,8 @@ window.organizationsApi = organizationsApi;
 window.hackathonsApi = hackathonsApi;
 window.teamsApi = teamsApi;
 window.teamInvitationsApi = teamInvitationsApi;
-window.hackathonRegistrationsApi = hackathonRegistrationsApi;
+window.escrowApi = escrowApi;
 window.hackathonPayoutsApi = hackathonPayoutsApi;
+window.hackathonRegistrationsApi = hackathonRegistrationsApi;
+window.promotionsApi = promotionsApi;
+window.mentorMarketApi = mentorMarketApi;

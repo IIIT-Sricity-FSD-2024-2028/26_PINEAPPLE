@@ -4,7 +4,7 @@
 const MENTOR_REQUESTS = [
   {
     project: "AI Study Planner",
-    owner: "Arjun Sharma",
+    owner: "Alice Smith",
     skills: ["React", "ML"],
     members: 3,
     status: "Pending",
@@ -25,20 +25,91 @@ const MENTOR_REQUESTS = [
   },
 ];
 
-function acceptMentorRequest(index) {
-  const request = MENTOR_REQUESTS[index];
-  if (!request) return;
-  request.status = "Accepted";
-  showToast(`Mentorship request accepted for ${request.project}`);
+function acceptMentorRequest(idOrIndex, isDynamic) {
+  if (isDynamic) {
+    const raw = localStorage.getItem("teamforge.sharedMentorRequests");
+    if (raw) {
+      const sharedRequests = JSON.parse(raw);
+      const req = sharedRequests.find(r => r.id === idOrIndex);
+      if (req) {
+        req.status = "approved";
+        req.approvedOn = new Date().toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+        localStorage.setItem("teamforge.sharedMentorRequests", JSON.stringify(sharedRequests));
+        
+        if (typeof PROJECTS !== "undefined") {
+          const proj = PROJECTS.find(p => p.id === req.projectId);
+          if (proj) {
+            if (proj.runtime && proj.runtime.mentorRequest) {
+              proj.runtime.mentorRequest.status = "approved";
+              proj.runtime.mentorRequest.approvedOn = req.approvedOn;
+            }
+            if (!Array.isArray(proj.members)) proj.members = [];
+            if (!proj.members.some(m => m.name === req.mentorName || (m.email && m.email === req.mentorEmail))) {
+              const mentorInitials = req.mentorName ? req.mentorName.split(" ").slice(0, 2).map(n => n[0].toUpperCase()).join("") : "M";
+              const newMember = {
+                name: req.mentorName,
+                role: "Mentor",
+                email: req.mentorEmail,
+                initials: mentorInitials
+              };
+              proj.members.push(newMember);
+              
+              // Persist to user record so the owner sees it upon reload
+              if (req.ownerEmail) {
+                 try {
+                   const usersStore = JSON.parse(localStorage.getItem("users") || "{}");
+                   const ownerRecord = usersStore[req.ownerEmail];
+                   if (ownerRecord && ownerRecord.data && Array.isArray(ownerRecord.data.projects)) {
+                     const ownerProj = ownerRecord.data.projects.find(p => p.id === req.projectId);
+                     if (ownerProj) {
+                       if (!Array.isArray(ownerProj.members)) ownerProj.members = [];
+                       ownerProj.members.push(newMember);
+                       localStorage.setItem("users", JSON.stringify(usersStore));
+                     }
+                   }
+                 } catch(e) { console.warn("Failed to persist mentor to owner record", e); }
+              }
+            }
+          }
+        }
+        showToast(`Mentorship request accepted for ${req.projectName}`);
+      }
+    }
+  } else {
+    const request = MENTOR_REQUESTS[idOrIndex];
+    if (!request) return;
+    request.status = "Accepted";
+    showToast(`Mentorship request accepted for ${request.project}`);
+  }
   renderMentorRequests();
-  renderMentoredProjects();
+  if (typeof renderMentoredProjects === "function") renderMentoredProjects();
 }
 
-function declineMentorRequest(index) {
-  const request = MENTOR_REQUESTS[index];
-  if (!request) return;
-  request.status = "Declined";
-  showToast(`Mentorship request declined for ${request.project}`);
+function declineMentorRequest(idOrIndex, isDynamic) {
+  if (isDynamic) {
+    const raw = localStorage.getItem("teamforge.sharedMentorRequests");
+    if (raw) {
+      const sharedRequests = JSON.parse(raw);
+      const req = sharedRequests.find(r => r.id === idOrIndex);
+      if (req) {
+        req.status = "rejected";
+        localStorage.setItem("teamforge.sharedMentorRequests", JSON.stringify(sharedRequests));
+        
+        if (typeof PROJECTS !== "undefined") {
+          const proj = PROJECTS.find(p => p.id === req.projectId);
+          if (proj && proj.runtime && proj.runtime.mentorRequest) {
+            proj.runtime.mentorRequest.status = "rejected";
+          }
+        }
+        showToast(`Mentorship request declined for ${req.projectName}`);
+      }
+    }
+  } else {
+    const request = MENTOR_REQUESTS[idOrIndex];
+    if (!request) return;
+    request.status = "Declined";
+    showToast(`Mentorship request declined for ${request.project}`);
+  }
   renderMentorRequests();
 }
 
@@ -65,14 +136,39 @@ function renderMentors() {
   `,
   ).join("");
 }
+
 // ══════════════════════════════════════════════
 //   MENTOR REQUESTS (mentor role)
 // ══════════════════════════════════════════════
 function renderMentorRequests() {
+  const currentEmail = typeof getCurrentUserSessionEmail === "function" ? getCurrentUserSessionEmail() : "";
+  const currentName = typeof getCurrentUserName === "function" ? getCurrentUserName() : "";
+  
+  const raw = localStorage.getItem("teamforge.sharedMentorRequests");
+  const sharedRequests = raw ? JSON.parse(raw) : [];
+  
+  const myDynamicRequests = sharedRequests
+    .filter(req => req.mentorEmail === currentEmail || req.mentorName === currentName)
+    .map(req => ({
+      id: req.id,
+      projectId: req.projectId,
+      project: req.projectName,
+      owner: req.ownerName,
+      skills: [],
+      members: 1,
+      status: req.status === "requested" ? "Pending" : req.status === "approved" ? "Accepted" : req.status === "rejected" ? "Declined" : "Pending",
+      isDynamic: true
+    }));
+
+  let allRequests = [...myDynamicRequests];
+  if (allRequests.length === 0) {
+    allRequests = [...MENTOR_REQUESTS];
+  }
+  
   document.getElementById("mentor-requests-content").innerHTML = `
     <div class="space-y-3">
-      ${MENTOR_REQUESTS.map(
-        (r) => `
+      ${allRequests.length === 0 ? '<div class="text-muted text-sm">No mentor requests pending.</div>' : allRequests.map(
+        (r, idx) => `
         <div class="pending-row">
           <div>
             <div class="font-semibold text-sm">${r.project}</div>
@@ -85,8 +181,8 @@ function renderMentorRequests() {
             ${
               r.status === "Pending"
                 ? `
-              <button class="btn btn-primary btn-sm" onclick="acceptMentorRequest(${MENTOR_REQUESTS.indexOf(r)})">Accept</button>
-              <button class="btn btn-outline btn-sm" onclick="declineMentorRequest(${MENTOR_REQUESTS.indexOf(r)})">Decline</button>
+              <button class="btn btn-primary btn-sm" onclick="acceptMentorRequest('${r.isDynamic ? r.id : idx}', ${r.isDynamic ? 'true' : 'false'})">Accept</button>
+              <button class="btn btn-outline btn-sm" onclick="declineMentorRequest('${r.isDynamic ? r.id : idx}', ${r.isDynamic ? 'true' : 'false'})">Decline</button>
             `
                 : r.status === "Accepted"
                   ? `<span class="badge badge-success">Accepted</span>`
@@ -104,10 +200,22 @@ function renderMentorRequests() {
 //   MENTORED PROJECTS
 // ══════════════════════════════════════════════
 function renderMentoredProjects() {
-  const mentored = PROJECTS.filter((_, i) => i === 2 || i === 4);
-  document.getElementById("mentored-projects-grid").innerHTML = mentored
-    .map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects"))
-    .join("");
+  const currentEmail = typeof getCurrentUserSessionEmail === "function" ? getCurrentUserSessionEmail() : "";
+  const currentName = typeof getCurrentUserName === "function" ? getCurrentUserName() : "";
+  
+  const raw = localStorage.getItem("teamforge.sharedMentorRequests");
+  const sharedRequests = raw ? JSON.parse(raw) : [];
+  
+  const dynamicMentoredProjectIds = sharedRequests
+    .filter(req => (req.mentorEmail === currentEmail || req.mentorName === currentName) && req.status === "approved")
+    .map(req => req.projectId);
+
+  let mentored = PROJECTS.filter(p => dynamicMentoredProjectIds.includes(p.id));
+
+  document.getElementById("mentored-projects-grid").innerHTML = mentored.length
+    ? mentored.map((p) => projectCardHTML(p, "openWorkspace", "mentored-projects")).join("")
+    : '<div class="text-muted text-sm">You are not mentoring any projects yet.</div>';
+    
   bindProjectCardClicks();
 }
 

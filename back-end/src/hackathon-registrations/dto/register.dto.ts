@@ -1,24 +1,21 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsInt, IsOptional, IsString, Min } from 'class-validator';
 
-export class RegisterParticipantDto {
-  @ApiProperty() @IsString() hackathonId!: string;
+export class SubmitVerificationDto {
   @ApiProperty() @IsString() userId!: string;
-  @ApiProperty() @IsString() teamId!: string;
-  @ApiProperty({ enum: ['lead', 'member'] }) @IsString() role!: 'lead' | 'member';
-  @ApiProperty() @IsString() fullName!: string;
-  @ApiProperty() @IsString() collegeName!: string;
+  @ApiProperty() @IsString() college!: string;
   @ApiProperty() @IsInt() @Min(13) age!: number;
-  @ApiProperty() @IsString() idCardImageRef!: string;
+  @ApiProperty() @IsString() course!: string;
+  @ApiProperty() @IsInt() @Min(1) year!: number;
+  @ApiProperty() @IsString() studentId!: string;
+  @ApiProperty() @IsString() idCardImage!: string;
 }
 
-export class VerifyRegistrationDto {
-  @ApiProperty({ description: 'Platform admin user ID performing the verification' })
-  @IsString()
-  verifiedBy!: string;
+export class VerifyStudentDto {
+  @ApiProperty({ description: 'Admin user ID' }) @IsString() verifiedBy!: string;
+}
 
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  reason?: string;
+export class RejectStudentDto {
+  @ApiProperty({ description: 'Admin user ID' }) @IsString() verifiedBy!: string;
+  @ApiProperty() @IsString() reason!: string;
 }

@@ -1,6 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { BaseService } from '../common/abstracts/base.service';
-import { TeamEntity, TeamMembershipEntity } from './entities/team.entity';
+import { TeamEntity, TeamMembershipEntity, TeamState } from './entities/team.entity';
 import { CreateTeamDto } from './dto/create-team.dto';
 
 @Injectable()
@@ -12,6 +12,11 @@ export class TeamsService extends BaseService<TeamEntity> {
       hackathonId: dto.hackathonId,
       name: dto.name,
       leadUserId: dto.leadUserId,
+      college: dto.college,
+      studentId: dto.studentId,
+      idCardImage: dto.idCardImage,
+      status: dto.status || TeamState.VerificationPending,
+      stakedXP: 0,
       createdAt: new Date().toISOString(),
     });
     this.memberships.push({
@@ -22,6 +27,29 @@ export class TeamsService extends BaseService<TeamEntity> {
       joinedAt: new Date().toISOString(),
     });
     return team;
+  }
+
+  approve(id: string, verifiedBy: string): TeamEntity {
+    const team = this.findOne(id);
+    return super.update(id, {
+      status: TeamState.Registered,
+      verifiedBy,
+      verifiedAt: new Date().toISOString(),
+    });
+  }
+
+  reject(id: string, verifiedBy: string, reason?: string): TeamEntity {
+    const team = this.findOne(id);
+    return super.update(id, {
+      status: TeamState.Rejected,
+      verifiedBy,
+      rejectionReason: reason || 'ID verification rejected',
+      verifiedAt: new Date().toISOString(),
+    });
+  }
+
+  getPendingApprovals(): TeamEntity[] {
+    return this.items.filter((t) => t.status === TeamState.VerificationPending);
   }
 
   addMember(teamId: string, userId: string): TeamMembershipEntity {
@@ -56,6 +84,22 @@ export class TeamsService extends BaseService<TeamEntity> {
 
   attachProject(teamId: string, projectId: string): TeamEntity {
     return super.update(teamId, { projectId });
+  }
+
+  submitProject(teamId: string, dto: any): TeamEntity {
+    const team = this.findOne(teamId);
+    if (team.status === TeamState.Submitted || team.status === TeamState.Judged) {
+      throw new BadRequestException('Team has already submitted or been judged.');
+    }
+    return super.update(teamId, {
+      status: TeamState.Submitted,
+      submission: {
+        repoUrl: dto.repoUrl,
+        demoUrl: dto.demoUrl,
+        presentationUrl: dto.presentationUrl,
+        submittedAt: new Date().toISOString(),
+      },
+    });
   }
 
   setScore(teamId: string, score: number, scoreComment?: string): TeamEntity {

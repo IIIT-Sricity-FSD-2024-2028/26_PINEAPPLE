@@ -3,7 +3,7 @@ import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../core/decorators/roles.decorator';
 import { RolesGuard } from '../core/guards/roles.guard';
 import { TeamsService } from './teams.service';
-import { CreateTeamDto } from './dto/create-team.dto';
+import { CreateTeamDto, SubmitProjectDto, ApproveTeamDto, RejectTeamDto } from './dto/create-team.dto';
 
 @ApiTags('Teams')
 @Controller('teams')
@@ -16,6 +16,29 @@ export class TeamsController {
   @ApiQuery({ name: 'hackathonId', required: false })
   findAll(@Query('hackathonId') hackathonId?: string) {
     return hackathonId ? this.teamsService.findByHackathon(hackathonId) : this.teamsService.findAll();
+  }
+
+  @Get('pending-approvals')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin gets all teams awaiting ID card verification' })
+  getPendingApprovals() {
+    return this.teamsService.getPendingApprovals();
+  }
+
+  @Post(':id/approve')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin approves team registration ID card' })
+  @ApiBody({ type: ApproveTeamDto })
+  approve(@Param('id') id: string, @Body() dto: ApproveTeamDto) {
+    return this.teamsService.approve(id, dto.verifiedBy);
+  }
+
+  @Post(':id/reject')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin rejects team registration ID card' })
+  @ApiBody({ type: RejectTeamDto })
+  reject(@Param('id') id: string, @Body() dto: RejectTeamDto) {
+    return this.teamsService.reject(id, dto.verifiedBy, dto.reason);
   }
 
   @Get('leaderboard')
@@ -44,5 +67,13 @@ export class TeamsController {
   @ApiBody({ type: CreateTeamDto })
   create(@Body() dto: CreateTeamDto) {
     return this.teamsService.create(dto);
+  }
+
+  @Post(':id/submit')
+  @Roles('user')
+  @ApiOperation({ summary: 'Team submits their final hackathon project' })
+  @ApiBody({ type: SubmitProjectDto })
+  submitProject(@Param('id') id: string, @Body() dto: SubmitProjectDto) {
+    return this.teamsService.submitProject(id, dto);
   }
 }

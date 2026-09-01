@@ -726,6 +726,7 @@ const SEED_USERS = [
     email: "rohan.mehta@teamforge.io",
     password: "Rohan@123",
     phone: "9876543211",
+    role: "mentor",
     profile: { username: "rohanmehta", university: "NIT Trichy" },
   },
   {
@@ -733,6 +734,7 @@ const SEED_USERS = [
     email: "sneha.iyer@teamforge.io",
     password: "Sneha@123",
     phone: "9876543212",
+    role: "mentor",
     profile: { username: "snehaiyer", university: "VIT Vellore" },
   },
   {
@@ -740,6 +742,7 @@ const SEED_USERS = [
     email: "priya.patel@teamforge.io",
     password: "Priya@123",
     phone: "9876543213",
+    role: "administrator",
     profile: { username: "priyapatel", university: "BITS Pilani" },
   },
   {
@@ -764,6 +767,7 @@ const SEED_USERS = [
     email: "kiran.bose@teamforge.io",
     password: "Kiran@123",
     phone: "9876543216",
+    role: "mentor",
     profile: { username: "kiranbose", university: "IIIT Hyderabad" },
   },
   {
@@ -1089,6 +1093,24 @@ const MENTORS_DATA = [
     skills: ["React", "Node.js", "Go"],
     xp: 3400,
     rep: 89,
+  },
+  {
+    name: "Sneha Iyer",
+    initials: "SI",
+    title: "Cloud & DevOps Architect",
+    uni: "VIT Vellore",
+    skills: ["DevOps", "AWS", "Docker"],
+    xp: 3100,
+    rep: 85,
+  },
+  {
+    name: "Kiran Bose",
+    initials: "KB",
+    title: "Full Stack & Database Specialist",
+    uni: "IIIT Hyderabad",
+    skills: ["TypeScript", "Supabase", "NestJS"],
+    xp: 2800,
+    rep: 78,
   },
 ];
 

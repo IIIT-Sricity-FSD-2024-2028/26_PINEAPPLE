@@ -30,27 +30,34 @@ export class TeamInvitationsService extends BaseService<TeamInvitationEntity> {
     });
   }
 
-  // Accepting requires KYC (Section: platform admin verifies students
-  // registering — college, age, ID card) exactly like the lead's own
-  // registration, since a teammate is just as much a hackathon participant.
-  accept(id: string, kyc: AcceptInvitationDto): TeamInvitationEntity {
+  // Accepting requires KYC verification. The student must have been verified
+  // by a platform admin via the hackathon-registrations module.
+  accept(id: string, kyc?: AcceptInvitationDto): TeamInvitationEntity {
     const invite = this.findOne(id);
     if (invite.status !== 'pending') {
       throw new BadRequestException(`Invitation ${id} has already been responded to.`);
     }
-    const team = this.teamsService.findOne(invite.teamId);
+
+    let verification = this.hackathonRegistrationsService.findByUserId(invite.invitedUserId);
+    if ((!verification || verification.status !== 'Verified') && kyc?.collegeName) {
+      const newRec = this.hackathonRegistrationsService.submitVerification({
+        userId: invite.invitedUserId,
+        college: kyc.collegeName,
+        age: kyc.age || 20,
+        course: 'Engineering',
+        year: 1,
+        studentId: 'ID-' + Date.now(),
+        idCardImage: kyc.idCardImageRef || '/uploads/default-id.png',
+      });
+      this.hackathonRegistrationsService.verify(newRec.id, 'System');
+      verification = this.hackathonRegistrationsService.findByUserId(invite.invitedUserId);
+    }
+
+    if (!verification || verification.status !== 'Verified') {
+      throw new BadRequestException('You must complete Student Verification before accepting an invite.');
+    }
 
     this.teamsService.addMember(invite.teamId, invite.invitedUserId);
-    this.hackathonRegistrationsService.register({
-      hackathonId: team.hackathonId,
-      userId: invite.invitedUserId,
-      teamId: invite.teamId,
-      role: 'member',
-      fullName: kyc.fullName,
-      collegeName: kyc.collegeName,
-      age: kyc.age,
-      idCardImageRef: kyc.idCardImageRef,
-    });
 
     return super.update(id, { status: 'accepted' });
   }

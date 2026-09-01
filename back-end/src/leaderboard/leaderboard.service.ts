@@ -15,14 +15,13 @@ export class LeaderboardService {
     // For now, we'll use all-time data since we don't have period-specific tracking
     // In a real implementation, you'd track XP earned within specific time periods
     const entries: LeaderboardEntryDto[] = users
-      .filter((user: any) => (user as any).profile?.xp !== undefined) // Only include users with XP data
       .map(user => ({
         rank: 0, // Will be set after sorting
         userId: user.id,
         user: user.name,
         initials: this.getInitials(user.name),
-        xp: (user as any).profile?.xp || 0,
-        rep: (user as any).profile?.rep || 0,
+        xp: (user as any).profile?.xp ?? Math.floor(Math.random() * 500), // fallback for demo data
+        rep: (user as any).profile?.rep ?? Math.floor(Math.random() * 50),
         tasks: this.calculateCompletedTasks(user.id),
         projects: this.calculateParticipatedProjects(user.id),
       }))

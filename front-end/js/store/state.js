@@ -211,6 +211,7 @@ function defaultUserRuntime(userRecord = {}, email = "") {
       bio: String(userRecord.profile?.bio || "").trim(),
       linkedin: String(userRecord.profile?.linkedin || "").trim(),
       phone: String(userRecord.phone || "").trim(),
+      avatarUrl: String(userRecord.profile?.avatarUrl || "").trim(),
     },
     userSkills: Array.isArray(userRecord.profile?.skills)
       ? cloneStateValue(userRecord.profile.skills)
@@ -298,6 +299,8 @@ function loadUserRuntime(email = getCurrentUserSessionEmail()) {
               authoritativeUsername ||
               String(parsedProfile.username || defaults.userProfile.username || "").trim() ||
               "teamforgeuser",
+            avatarUrl:
+              String(parsedProfile.avatarUrl || userRecord?.profile?.avatarUrl || defaults.userProfile.avatarUrl || "").trim(),
           },
           userSkills: Array.isArray(parsed.userSkills)
             ? parsed.userSkills
@@ -365,6 +368,7 @@ function syncRuntimeProfileToAuthStore() {
     bio: STATE.userProfile?.bio || "",
     linkedin: STATE.userProfile?.linkedin || "",
     phone: STATE.userProfile?.phone || "",
+    avatarUrl: STATE.userProfile?.avatarUrl || users[currentUser].profile?.avatarUrl || "",
     skills: cloneStateValue(STATE.userSkills || []),
   };
   saveStateUsersStore(users);
@@ -493,10 +497,17 @@ function reinitializeStateForUser(email) {
     normalizedEmail.split("@")[0] ||
     "TeamForge User";
 
+  let finalName = name;
+  if (finalName === "Arjun Sharma" && normalizedEmail !== "arjun.sharma@teamforge.io") {
+    finalName = userRecord?.name || normalizedEmail.split("@")[0] || "TeamForge User";
+    if (runtime.userProfile) runtime.userProfile.fullName = finalName;
+    if (userRecord && userRecord.profile) userRecord.profile.fullName = finalName;
+  }
+
   STATE.currentUser = {
-    name: name,
+    name: finalName,
     email: normalizedEmail,
-    initials: name.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("") || "TF",
+    initials: finalName.split(" ").filter(Boolean).slice(0, 2).map((p) => p[0].toUpperCase()).join("") || "TF",
   };
   STATE.role = String(userRecord?.role || runtime.role || "collaborator").trim().toLowerCase();
   STATE.mentorApproved = Boolean(runtime.mentorApproved);

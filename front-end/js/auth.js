@@ -171,7 +171,7 @@ function initializeAuthUsersFromSeed(seedUsers = window.SEED_USERS) {
         email,
         name: String(seed?.name || existing?.name || email.split("@")[0]).trim(),
         password: String(seed?.password || existing?.password || ""),
-        role: String(existing?.role || seed?.role || "collaborator").trim().toLowerCase(),
+        role: String(seed?.role || existing?.role || "collaborator").trim().toLowerCase(),
         phone: String(seed?.phone || existing?.phone || "").trim(),
         status: String(existing?.status || "active").trim().toLowerCase() || "active",
         flagged: Boolean(existing?.flagged),
@@ -183,6 +183,21 @@ function initializeAuthUsersFromSeed(seedUsers = window.SEED_USERS) {
       };
     });
   }
+
+  // Sanitize data leakage where "Arjun Sharma" might have been accidentally saved for other users
+  Object.keys(nextUsers).forEach(email => {
+    if (email !== "arjun.sharma@teamforge.io") {
+      if (nextUsers[email].name === "Arjun Sharma") {
+        nextUsers[email].name = email.split("@")[0];
+        // If they had a seed name, restore it
+        const seed = Array.isArray(seedUsers) ? seedUsers.find(s => normalizeEmail(s.email) === email) : null;
+        if (seed && seed.name) nextUsers[email].name = seed.name;
+      }
+      if (nextUsers[email].profile && nextUsers[email].profile.fullName === "Arjun Sharma") {
+        nextUsers[email].profile.fullName = nextUsers[email].name;
+      }
+    }
+  });
 
   saveStoredUsers(nextUsers);
   return nextUsers;

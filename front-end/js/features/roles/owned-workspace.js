@@ -68,8 +68,7 @@ function renderOwnedProjectWorkspace() {
           <button class="tab ${tab === "overview" ? "active" : ""}" onclick="setOwnedWorkspaceTab('overview')">Overview</button>
           <button class="tab ${tab === "tasks" ? "active" : ""}" onclick="setOwnedWorkspaceTab('tasks')">Tasks</button>
           <button class="tab ${tab === "members" ? "active" : ""}" onclick="setOwnedWorkspaceTab('members')">Members</button>
-          <button class="tab ${tab === "mentors" ? "active" : ""}" onclick="setOwnedWorkspaceTab('mentors')">Mentors</button>
-          <button class="tab ${tab === "chat" ? "active" : ""}" onclick="setOwnedWorkspaceTab('chat')">Chat</button>
+          <button class="tab ${tab === "settings" ? "active" : ""}" onclick="setOwnedWorkspaceTab('settings')">Settings</button>
         </div>
         <button class="btn btn-outline" onclick="requestOwnedMentor('${project.name}')">🛡️ Request Mentor</button>
       </div>
@@ -218,9 +217,12 @@ function inviteOwnedTaskMember() {
     return;
   }
 
-  const emailInput = document.getElementById("owned-task-invite-email");
+  let emailInput = document.getElementById("owned-task-invite-email");
+  if (!emailInput) {
+    emailInput = document.getElementById("owned-members-invite-email");
+  }
   const assigneeSelect = document.getElementById("owned-task-assignee");
-  if (!emailInput || !assigneeSelect) return;
+  if (!emailInput) return;
 
   const email = emailInput.value.trim().toLowerCase();
   if (!email) {
@@ -260,21 +262,41 @@ function inviteOwnedTaskMember() {
     return;
   }
 
-  runtime.members.push({
+  const newMember = {
     name: displayName || "New Member",
     role: "Collaborator",
     initials,
     email,
-  });
+  };
+  runtime.members.push(newMember);
 
-  const option = document.createElement("option");
-  option.value = displayName || email;
-  option.textContent = `${displayName || email} (Invited)`;
-  assigneeSelect.appendChild(option);
-  assigneeSelect.value = option.value;
+  // Also push to the global project so it persists for this session
+  if (Array.isArray(project.members)) {
+    if (!project.members.some(m => m.email === email)) {
+      project.members.push(newMember);
+    }
+  }
+
+  // Persist the runtime changes
+  if (typeof saveUserRuntime === "function") {
+    saveUserRuntime();
+  }
+
+  if (assigneeSelect) {
+    const option = document.createElement("option");
+    option.value = displayName || email;
+    option.textContent = `${displayName || email} (Invited)`;
+    assigneeSelect.appendChild(option);
+    assigneeSelect.value = option.value;
+  }
 
   emailInput.value = "";
   showToast(`Invite sent to ${email}`);
+
+  // Re-render members tab if active
+  if (STATE.ownedWorkspaceTab === "members") {
+    renderOwnedWorkspace();
+  }
 }
 
 async function createOwnedTask() {
@@ -413,12 +435,6 @@ function getOwnedWorkspaceDataset(project) {
           },
         ];
 
-  const mentors = (MENTORS_DATA || []).slice(0, 3).map((m) => ({
-    name: m.name,
-    title: m.title,
-    expertise: (m.skills || []).slice(0, 2).join(", "),
-  }));
-
   const tasks = [
     {
       title: "Design system setup",
@@ -472,7 +488,6 @@ function getOwnedWorkspaceDataset(project) {
     inReview,
     open,
     members: runtimeMembers,
-    mentors,
     tasks: runtimeTasks,
   };
 }
@@ -663,38 +678,18 @@ function renderOwnedWorkspaceTabContent(project, data, tab) {
             )
             .join("")}
         </div>
+        <div style="margin-top:20px; padding-top:16px; border-top:1px solid var(--border)">
+          <div class="font-semibold text-sm" style="margin-bottom:8px">Invite New Member</div>
+          <div class="flex gap-2">
+            <input id="owned-members-invite-email" class="input" placeholder="colleague@example.com" style="flex:1">
+            <button class="btn btn-primary" onclick="inviteOwnedTaskMember()">Invite</button>
+          </div>
+        </div>
       </div>
     `;
   }
 
-  if (tab === "mentors") {
-    return `
-      <div class="card">
-        <div class="card-title">Mentors</div>
-        ${
-          data.mentors.length
-            ? `
-          <div class="space-y-3">
-            ${data.mentors
-              .map(
-                (m) => `
-              <div class="pending-row">
-                <div>
-                  <div class="font-semibold text-sm">${m.name}</div>
-                  <div class="text-xs text-muted">${m.title} · ${m.expertise}</div>
-                </div>
-                <button class="btn btn-outline btn-sm" onclick="showToast('Mentor ${m.name} assigned')">Assign</button>
-              </div>
-            `,
-              )
-              .join("")}
-          </div>
-        `
-            : '<p class="text-sm text-muted italic">No mentors connected yet.</p>'
-        }
-      </div>
-    `;
-  }
+
 
   if (tab === "chat") {
     const chatMessages = getOwnedWorkspaceChat(project, data);

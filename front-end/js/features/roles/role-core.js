@@ -25,10 +25,10 @@ function initializeMentorStatus() {
     typeof getStateUsersStore === "function" ? getStateUsersStore() : {};
   const currentRecord = currentEmail ? currentUsers[currentEmail] : null;
 
-  // Trusted mentors from data.js or if previously unlocked in the user store
+  // Trusted mentors from data.js, if previously unlocked, or if their seed/stored role is "mentor"
   const isTrustedMentor =
-    MENTORS_DATA.some((mentor) => mentor.name === STATE.currentUser.name) ||
-    currentRecord?.profile?.mentorUnlocked === true;
+    currentRecord?.profile?.mentorUnlocked === true ||
+    String(currentRecord?.role || "").toLowerCase() === "mentor";
 
   if (isTrustedMentor) {
     STATE.mentorApproved = true;
@@ -37,20 +37,22 @@ function initializeMentorStatus() {
         ...(currentUsers[currentEmail].profile || {}),
         mentorUnlocked: true,
       };
-      currentUsers[currentEmail].role = "mentor";
+      // Keep base role as mentor
+      if (!currentUsers[currentEmail].baseRole) {
+        currentUsers[currentEmail].baseRole = "mentor";
+      }
       saveStateUsersStore(currentUsers);
     }
-    STATE.role = "mentor";
+    // Only set initial role if not already explicitly set to another role
+    if (!STATE.role || STATE.role === "collaborator") {
+      STATE.role = "mentor";
+    }
   }
 
   // Check if current user has an approved mentor application
   const userApp = STATE.mentorApplications.find((app) => {
     const appEmail = String(app?.email || "").trim().toLowerCase();
-    const appName = String(app?.name || "").trim().toLowerCase();
-    return (
-      (currentEmail && appEmail === currentEmail) ||
-      appName === String(STATE.currentUser?.name || "").trim().toLowerCase()
-    );
+    return currentEmail && appEmail === currentEmail;
   });
 
   if (userApp) {
@@ -58,39 +60,37 @@ function initializeMentorStatus() {
     // User is approved if their application status is "approved"
     if (userApp.status === "approved") {
       STATE.mentorApproved = true;
-      STATE.role = "mentor";
       if (currentEmail && currentUsers[currentEmail]) {
         currentUsers[currentEmail].profile = {
           ...(currentUsers[currentEmail].profile || {}),
           mentorUnlocked: true,
         };
-        currentUsers[currentEmail].role = "mentor";
         saveStateUsersStore(currentUsers);
+      }
+      if (!STATE.role || STATE.role === "collaborator") {
+        STATE.role = "mentor";
       }
       console.log(
         `✅ Mentor application approved for ${STATE.currentUser.name}`,
       );
     } else if (userApp.status === "rejected") {
-      STATE.mentorApproved = false;
-      if (STATE.role === "mentor") {
-        STATE.role = "collaborator";
-      }
-      if (currentEmail && currentUsers[currentEmail]) {
-        currentUsers[currentEmail].profile = {
-          ...(currentUsers[currentEmail].profile || {}),
-          mentorUnlocked: false,
-        };
-        if (currentUsers[currentEmail].role === "mentor") {
-          currentUsers[currentEmail].role = "collaborator";
+      if (!isTrustedMentor) {
+        STATE.mentorApproved = false;
+        if (STATE.role === "mentor") {
+          STATE.role = "collaborator";
         }
-        saveStateUsersStore(currentUsers);
       }
       console.log(
         `❌ Mentor application rejected for ${STATE.currentUser.name}`,
       );
     } else {
       // "pending"
-      STATE.mentorApproved = false;
+      if (!isTrustedMentor) {
+        STATE.mentorApproved = false;
+        if (STATE.role === "mentor") {
+          STATE.role = "collaborator";
+        }
+      }
       console.log(
         `⏳ Mentor application pending for ${STATE.currentUser.name}`,
       );
@@ -98,6 +98,9 @@ function initializeMentorStatus() {
   } else if (!isTrustedMentor) {
     STATE.mentorApproved = false;
     STATE.mentorApplicationId = null;
+    if (STATE.role === "mentor") {
+      STATE.role = "collaborator";
+    }
     console.log(`ℹ️ No mentor application found for ${STATE.currentUser.name}`);
   }
 }
@@ -236,9 +239,10 @@ function renderRoleNav() {
         ? [
             { page: "create-project", icon: "➕", label: "Create Project" },
             { page: "my-projects", icon: "📂", label: "My Projects" },
-            { page: "mentors", icon: "👥", label: "Mentors" },
+            { page: "mentors-market", icon: "👥", label: "Mentors" },
           ]
         : [
+            { page: "mentors-market", icon: "👥", label: "Mentor Market" },
             { page: "mentor-requests", icon: "📚", label: "Mentor Requests" },
             {
               page: "mentored-projects",

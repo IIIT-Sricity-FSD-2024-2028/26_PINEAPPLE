@@ -5,6 +5,8 @@ export class OrganizationEntity {
   @ApiProperty({ description: 'Organization / company / institution name' }) name!: string;
   @ApiProperty({ description: 'Verified email domain, e.g. acme.com' }) domain!: string;
   @ApiProperty({ description: 'Billing / contact email' }) contactEmail!: string;
+  @ApiProperty({ required: false, enum: ['Active', 'Suspended', 'Pending'] }) status?: string;
+  @ApiProperty({ required: false, enum: ['Starter', 'Pro', 'Enterprise'] }) tier?: string;
   @ApiProperty() createdAt!: string;
 }
 

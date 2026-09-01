@@ -33,6 +33,164 @@
         }
       }
     },
+    "/logs/requests": {
+      "get": {
+        "operationId": "LogViewerController_getRequestLogs",
+        "summary": "View recent request logs (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the most recent 200 request log entries."
+          },
+          "403": {
+            "description": "Forbidden — Administrator role required."
+          }
+        },
+        "tags": [
+          "Logs"
+        ]
+      }
+    },
+    "/logs/errors": {
+      "get": {
+        "operationId": "LogViewerController_getErrorLogs",
+        "summary": "View recent error logs (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns the most recent 200 error log entries."
+          },
+          "403": {
+            "description": "Forbidden — Administrator role required."
+          }
+        },
+        "tags": [
+          "Logs"
+        ]
+      }
+    },
+    "/uploads/avatar": {
+      "post": {
+        "operationId": "UploadsController_uploadAvatar",
+        "summary": "Upload user avatar image (max 2MB, images only)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Avatar uploaded successfully."
+          },
+          "400": {
+            "description": "Invalid file or file too large."
+          }
+        },
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/task-proof": {
+      "post": {
+        "operationId": "UploadsController_uploadTaskProof",
+        "summary": "Upload task proof document/archive/image (max 5MB)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Task proof uploaded successfully."
+          },
+          "400": {
+            "description": "Invalid file or file too large."
+          }
+        },
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/resource": {
+      "post": {
+        "operationId": "UploadsController_uploadResource",
+        "summary": "Upload resource file (max 10MB)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Resource uploaded successfully."
+          },
+          "400": {
+            "description": "Invalid file or file too large."
+          }
+        },
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
     "/users": {
       "post": {
         "operationId": "UsersController_create",
@@ -419,6 +577,63 @@
         ]
       }
     },
+    "/projects/hackathon/{hackathonId}": {
+      "get": {
+        "operationId": "ProjectsController_findByHackathonId",
+        "summary": "Get a hackathon's team-projects (host judging queue)",
+        "parameters": [
+          {
+            "name": "hackathonId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
+    "/projects/{id}/submit": {
+      "post": {
+        "operationId": "ProjectsController_submitHackathonProject",
+        "summary": "Team lead submits a hackathon project for host judging",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "description": "ID of the team lead submitting",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Projects"
+        ]
+      }
+    },
     "/tasks/project/{projectId}": {
       "get": {
         "operationId": "TasksController_findAllByProjectId",
@@ -591,6 +806,3809 @@
           "Tasks"
         ]
       }
+    },
+    "/tasks/{id}/status": {
+      "patch": {
+        "operationId": "TasksController_updateStatus",
+        "summary": "Move a task between Kanban columns (status transition)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateTaskStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The task status has been updated."
+          },
+          "400": {
+            "description": "Invalid status or column value."
+          },
+          "403": {
+            "description": "Forbidden."
+          },
+          "404": {
+            "description": "Task not found."
+          }
+        },
+        "tags": [
+          "Tasks"
+        ]
+      }
+    },
+    "/admin/users": {
+      "get": {
+        "operationId": "AdminController_listUsers",
+        "summary": "List all users for administrative review",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Users returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users/{id}/status": {
+      "patch": {
+        "operationId": "AdminController_updateUserStatus",
+        "summary": "Update a user's moderation status",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID to moderate",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ModerateUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User status updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users/{id}/flag": {
+      "put": {
+        "operationId": "AdminController_flagUser",
+        "summary": "Flag a user for review",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID to flag",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User flagged successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users/{id}/suspend": {
+      "put": {
+        "operationId": "AdminController_suspendUser",
+        "summary": "Suspend a user account",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID to suspend",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User suspended successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/users/{id}/warn": {
+      "put": {
+        "operationId": "AdminController_warnUser",
+        "summary": "Issue a warning to a user",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "User ID to warn",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/WarnUserDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "User warned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/stats": {
+      "get": {
+        "operationId": "AdminController_getStats",
+        "summary": "Get platform usage and moderation statistics",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Administration statistics returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AdminStatsEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/admin/audit": {
+      "get": {
+        "operationId": "AdminController_getAuditLog",
+        "summary": "View recent administrative audit log entries",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "superuser"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Audit log returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          }
+        },
+        "tags": [
+          "Admin"
+        ]
+      }
+    },
+    "/communication/messages/project/{projectId}": {
+      "get": {
+        "operationId": "CommunicationController_getMessagesByProjectId",
+        "summary": "Get chat history for a specific project",
+        "parameters": [
+          {
+            "name": "projectId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns an array of messages sorted chronologically."
+          }
+        },
+        "tags": [
+          "Communication"
+        ]
+      }
+    },
+    "/communication/messages": {
+      "post": {
+        "operationId": "CommunicationController_sendMessage",
+        "summary": "Send a message to a project chat board",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "description": "ID of the user sending the message",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SendMessageDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The message has been successfully sent."
+          },
+          "401": {
+            "description": "Unauthorized: missing x-user-id header."
+          }
+        },
+        "tags": [
+          "Communication"
+        ]
+      }
+    },
+    "/communication/notifications": {
+      "get": {
+        "operationId": "CommunicationController_getNotificationsByUserId",
+        "summary": "Get notifications for the logged-in user",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "description": "ID of the logged-in user",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns an array of notifications sorted reverse-chronologically."
+          },
+          "401": {
+            "description": "Unauthorized: missing x-user-id header."
+          }
+        },
+        "tags": [
+          "Communication"
+        ]
+      }
+    },
+    "/communication/notifications/{id}/read": {
+      "patch": {
+        "operationId": "CommunicationController_markNotificationAsRead",
+        "summary": "Mark a notification as read",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The notification has been marked as read."
+          },
+          "404": {
+            "description": "Notification not found."
+          }
+        },
+        "tags": [
+          "Communication"
+        ]
+      }
+    },
+    "/governance/reports": {
+      "post": {
+        "operationId": "GovernanceController_createReport",
+        "summary": "File a moderation report",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Report filed successfully."
+          }
+        },
+        "tags": [
+          "Governance"
+        ]
+      },
+      "get": {
+        "operationId": "GovernanceController_getAllReports",
+        "summary": "Get all reports (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/governance/reports/{id}": {
+      "get": {
+        "operationId": "GovernanceController_getReportById",
+        "summary": "Get a specific report by ID (Admin only)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/governance/reports/{id}/resolve": {
+      "patch": {
+        "operationId": "GovernanceController_resolveReport",
+        "summary": "Resolve a report (Admin only)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResolveReportDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Governance"
+        ]
+      }
+    },
+    "/join-requests": {
+      "get": {
+        "operationId": "JoinRequestsController_getAll",
+        "summary": "List all join requests",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by project ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter by user ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter by status",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of join requests returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/JoinRequestEntity"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions"
+          }
+        },
+        "tags": [
+          "JoinRequests"
+        ]
+      },
+      "post": {
+        "operationId": "JoinRequestsController_create",
+        "summary": "Create a new join request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateJoinRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Join request created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions"
+          }
+        },
+        "tags": [
+          "JoinRequests"
+        ]
+      }
+    },
+    "/join-requests/{id}": {
+      "get": {
+        "operationId": "JoinRequestsController_getOne",
+        "summary": "Get a join request by ID",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Join request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Join request returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions"
+          },
+          "404": {
+            "description": "Join request not found."
+          }
+        },
+        "tags": [
+          "JoinRequests"
+        ]
+      },
+      "put": {
+        "operationId": "JoinRequestsController_update",
+        "summary": "Update an existing join request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Join request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateJoinRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Join request updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JoinRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - Insufficient permissions"
+          },
+          "404": {
+            "description": "Join request not found."
+          }
+        },
+        "tags": [
+          "JoinRequests"
+        ]
+      },
+      "delete": {
+        "operationId": "JoinRequestsController_remove",
+        "summary": "Delete a join request (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Join request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Join request deleted successfully."
+          },
+          "403": {
+            "description": "Forbidden - Admin role required"
+          },
+          "404": {
+            "description": "Join request not found."
+          }
+        },
+        "tags": [
+          "JoinRequests"
+        ]
+      }
+    },
+    "/leaderboard": {
+      "get": {
+        "operationId": "LeaderboardController_getLeaderboard",
+        "summary": "Get leaderboard rankings",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "Time period for leaderboard rankings",
+            "schema": {
+              "enum": [
+                "weekly",
+                "monthly",
+                "alltime"
+              ],
+              "type": "string"
+            }
+          },
+          {
+            "name": "limit",
+            "required": false,
+            "in": "query",
+            "description": "Maximum number of entries to return",
+            "schema": {
+              "type": "number"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Leaderboard rankings",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LeaderboardEntryDto"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Leaderboard"
+        ]
+      }
+    },
+    "/leaderboard/{userId}": {
+      "get": {
+        "operationId": "LeaderboardController_getUserRank",
+        "summary": "Get a specific user's leaderboard ranking",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "description": "User ID to get ranking for",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "period",
+            "required": false,
+            "in": "query",
+            "description": "Time period for ranking",
+            "schema": {
+              "enum": [
+                "weekly",
+                "monthly",
+                "alltime"
+              ],
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "User leaderboard entry",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LeaderboardEntryDto"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "User not found in leaderboard"
+          }
+        },
+        "tags": [
+          "Leaderboard"
+        ]
+      }
+    },
+    "/mentor-applications": {
+      "get": {
+        "operationId": "MentorApplicationsController_getAll",
+        "summary": "List mentor applications",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "x-user-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter applications by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter applications by user ID (applicant-only)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of mentor applications returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentorApplicationEntity"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions or missing applicant identification"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      },
+      "post": {
+        "operationId": "MentorApplicationsController_create",
+        "summary": "Submit a new mentor application",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMentorApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mentor application submitted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorApplicationEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      }
+    },
+    "/mentor-applications/{id}": {
+      "get": {
+        "operationId": "MentorApplicationsController_getOne",
+        "summary": "Get a specific mentor application by ID",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "x-user-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor application ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor application returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorApplicationEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions or missing applicant identification"
+          },
+          "404": {
+            "description": "Mentor application not found"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      },
+      "put": {
+        "operationId": "MentorApplicationsController_update",
+        "summary": "Update a mentor application (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor application ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMentorApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mentor application updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorApplicationEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Mentor application not found"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      },
+      "delete": {
+        "operationId": "MentorApplicationsController_remove",
+        "summary": "Delete a mentor application (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor application ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor application deleted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Mentor application not found"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      }
+    },
+    "/mentor-applications/{id}/approve": {
+      "put": {
+        "operationId": "MentorApplicationsController_approve",
+        "summary": "Approve a mentor application and grant mentor role to the applicant",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor application ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor application approved successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorApplicationEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Mentor application not found"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      }
+    },
+    "/mentor-applications/{id}/reject": {
+      "put": {
+        "operationId": "MentorApplicationsController_reject",
+        "summary": "Reject a mentor application",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for applicant-scoped access",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor application ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor application rejected successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorApplicationEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Mentor application not found"
+          }
+        },
+        "tags": [
+          "Mentor Applications"
+        ]
+      }
+    },
+    "/mentor-requests": {
+      "get": {
+        "operationId": "MentorRequestsController_getAll",
+        "summary": "List mentor requests",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "projectId",
+            "required": false,
+            "in": "query",
+            "description": "Filter mentor requests by project ID",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "mentorId",
+            "required": false,
+            "in": "query",
+            "description": "Filter mentor requests by mentor ID or email",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter mentor requests by status",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of mentor requests returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/MentorRequestEntity"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      },
+      "post": {
+        "operationId": "MentorRequestsController_create",
+        "summary": "Create a new mentor request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateMentorRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Mentor request created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      }
+    },
+    "/mentor-requests/{id}": {
+      "get": {
+        "operationId": "MentorRequestsController_getOne",
+        "summary": "Get a mentor request by ID",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor request returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "description": "Mentor request not found."
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      },
+      "put": {
+        "operationId": "MentorRequestsController_update",
+        "summary": "Update a mentor request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateMentorRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Mentor request updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "description": "Mentor request not found."
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      },
+      "delete": {
+        "operationId": "MentorRequestsController_remove",
+        "summary": "Delete a mentor request (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor request deleted successfully."
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Mentor request not found."
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      }
+    },
+    "/mentor-requests/{id}/accept": {
+      "put": {
+        "operationId": "MentorRequestsController_accept",
+        "summary": "Accept a mentor request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor request accepted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "description": "Mentor request not found."
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      }
+    },
+    "/mentor-requests/{id}/decline": {
+      "put": {
+        "operationId": "MentorRequestsController_decline",
+        "summary": "Decline a mentor request",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "Role used by the RBAC guard",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "mentor",
+                "project-owner",
+                "collaborator",
+                "superuser"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Mentor request ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Mentor request declined successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MentorRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          },
+          "404": {
+            "description": "Mentor request not found."
+          }
+        },
+        "tags": [
+          "Mentor Requests"
+        ]
+      }
+    },
+    "/mentorship/apply": {
+      "post": {
+        "operationId": "MentorshipController_applyForMentorship",
+        "summary": "Submit a mentorship application",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateApplicationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Application submitted successfully."
+          }
+        },
+        "tags": [
+          "Mentorship"
+        ]
+      }
+    },
+    "/mentorship/application": {
+      "get": {
+        "operationId": "MentorshipController_getApplicationByUserId",
+        "summary": "Get current user application status",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Mentorship"
+        ]
+      }
+    },
+    "/mentorship/application/{id}/review": {
+      "patch": {
+        "operationId": "MentorshipController_reviewApplication",
+        "summary": "Review an application (Admin only)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "example": "Approved"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Mentorship"
+        ]
+      }
+    },
+    "/mentorship/badge": {
+      "post": {
+        "operationId": "MentorshipController_issueBadge",
+        "summary": "Issue a recommendation badge (Mentor/Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "description": "ID of the mentor",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/IssueBadgeDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Mentorship"
+        ]
+      }
+    },
+    "/mentorship/badges/{userId}": {
+      "get": {
+        "operationId": "MentorshipController_getBadgesByUserId",
+        "summary": "Get all badges for a user",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Mentorship"
+        ]
+      }
+    },
+    "/notifications": {
+      "get": {
+        "operationId": "NotificationsController_findAll",
+        "summary": "Get all notifications or filter by user",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter notifications by user ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of notifications",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "post": {
+        "operationId": "NotificationsController_create",
+        "summary": "Create a new notification",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateNotificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Notification created successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Invalid input data"
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/{id}": {
+      "get": {
+        "operationId": "NotificationsController_findOne",
+        "summary": "Get a notification by ID",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification details",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "put": {
+        "operationId": "NotificationsController_update",
+        "summary": "Update a notification",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateNotificationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Notification updated successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      },
+      "delete": {
+        "operationId": "NotificationsController_remove",
+        "summary": "Delete a notification",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification deleted successfully"
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/{id}/read": {
+      "put": {
+        "operationId": "NotificationsController_markAsRead",
+        "summary": "Mark a notification as read",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Notification ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notification marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Notification"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "Notification not found"
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/notifications/read-all": {
+      "put": {
+        "operationId": "NotificationsController_markAllAsRead",
+        "summary": "Mark all notifications as read, optionally filtered by user",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": false,
+            "in": "header",
+            "description": "Optional user ID to mark only that user's notifications as read",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Notifications marked as read",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/Notification"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "tags": [
+          "Notifications"
+        ]
+      }
+    },
+    "/portal-admins": {
+      "get": {
+        "operationId": "PortalAdminsController_list",
+        "summary": "List all portal admin accounts",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "portal_admin"
+              ]
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of portal admins returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/PortalAdminEntity"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - superuser or portal_admin role required"
+          }
+        },
+        "tags": [
+          "Portal Admins"
+        ]
+      },
+      "post": {
+        "operationId": "PortalAdminsController_create",
+        "summary": "Create a new portal admin account",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "portal_admin"
+              ]
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreatePortalAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Portal admin created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAdminEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - superuser or portal_admin role required"
+          }
+        },
+        "tags": [
+          "Portal Admins"
+        ]
+      }
+    },
+    "/portal-admins/{id}": {
+      "put": {
+        "operationId": "PortalAdminsController_update",
+        "summary": "Update an existing portal admin account",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "portal_admin"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Portal admin ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdatePortalAdminDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Portal admin updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PortalAdminEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - superuser or portal_admin role required"
+          },
+          "404": {
+            "description": "Portal admin not found"
+          }
+        },
+        "tags": [
+          "Portal Admins"
+        ]
+      },
+      "delete": {
+        "operationId": "PortalAdminsController_remove",
+        "summary": "Delete a portal admin account",
+        "parameters": [
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "superuser",
+                "portal_admin"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Portal admin ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Portal admin deleted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - superuser or portal_admin role required"
+          },
+          "404": {
+            "description": "Portal admin not found"
+          }
+        },
+        "tags": [
+          "Portal Admins"
+        ]
+      }
+    },
+    "/support": {
+      "get": {
+        "operationId": "SupportController_getAll",
+        "summary": "List support tickets",
+        "parameters": [
+          {
+            "name": "x-user-email",
+            "in": "header",
+            "description": "Optional user email for support request submissions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for access control and request ownership",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "x-user-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Filter support tickets by status",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "description": "Filter support tickets by user ID (owner-scoped access)",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Support tickets returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/SupportRequestEntity"
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions or missing requester identification"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      },
+      "post": {
+        "operationId": "SupportController_create",
+        "summary": "Submit a new support ticket",
+        "parameters": [
+          {
+            "name": "x-user-email",
+            "in": "header",
+            "description": "Optional user email for support request submissions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for access control and request ownership",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-email",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSupportRequestDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Support ticket created successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      }
+    },
+    "/support/{id}": {
+      "get": {
+        "operationId": "SupportController_getOne",
+        "summary": "Get a specific support ticket by ID",
+        "parameters": [
+          {
+            "name": "x-user-email",
+            "in": "header",
+            "description": "Optional user email for support request submissions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for access control and request ownership",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "x-user-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Support ticket ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Support ticket returned successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - insufficient permissions or not owner"
+          },
+          "404": {
+            "description": "Support ticket not found"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      },
+      "delete": {
+        "operationId": "SupportController_remove",
+        "summary": "Delete a support ticket (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-email",
+            "in": "header",
+            "description": "Optional user email for support request submissions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for access control and request ownership",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Support ticket ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Support ticket deleted successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Support ticket not found"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      }
+    },
+    "/support/{id}/status": {
+      "put": {
+        "operationId": "SupportController_updateStatus",
+        "summary": "Update support ticket status (Admin only)",
+        "parameters": [
+          {
+            "name": "x-user-email",
+            "in": "header",
+            "description": "Optional user email for support request submissions",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-id",
+            "in": "header",
+            "description": "Optional user ID for access control and request ownership",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "in": "header",
+            "description": "User role for RBAC authorization",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "enum": [
+                "admin",
+                "project-owner",
+                "collaborator",
+                "mentor",
+                "superuser",
+                "user"
+              ]
+            }
+          },
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "Support ticket ID",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UpdateSupportStatusDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Support ticket status updated successfully.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SupportRequestEntity"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Forbidden - admin role required"
+          },
+          "404": {
+            "description": "Support ticket not found"
+          }
+        },
+        "tags": [
+          "Support"
+        ]
+      }
+    },
+    "/organizations": {
+      "get": {
+        "operationId": "OrganizationsController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      },
+      "post": {
+        "operationId": "OrganizationsController_create",
+        "summary": "Register a new Organization (becomes the initial Org Admin / hackathon host account)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateOrganizationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/{id}": {
+      "get": {
+        "operationId": "OrganizationsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/organizations/user/{userId}/memberships": {
+      "get": {
+        "operationId": "OrganizationsController_getOrgsForUser",
+        "summary": "Which orgs a user administers — used to show a 'Host a Hackathon' option only where valid",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Organizations"
+        ]
+      }
+    },
+    "/escrow": {
+      "get": {
+        "operationId": "EscrowController_findAll",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Escrow"
+        ]
+      }
+    },
+    "/escrow/{id}": {
+      "get": {
+        "operationId": "EscrowController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Escrow"
+        ]
+      }
+    },
+    "/payouts/transactions": {
+      "get": {
+        "operationId": "PayoutsController_findAll",
+        "parameters": [
+          {
+            "name": "payeeId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Payouts"
+        ]
+      }
+    },
+    "/teams": {
+      "get": {
+        "operationId": "TeamsController_findAll",
+        "parameters": [
+          {
+            "name": "hackathonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Teams"
+        ]
+      },
+      "post": {
+        "operationId": "TeamsController_create",
+        "summary": "Team lead creates a team for a hackathon (registration step 1)",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateTeamDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/teams/leaderboard": {
+      "get": {
+        "operationId": "TeamsController_getLeaderboard",
+        "summary": "Host's judging leaderboard for a hackathon — re-sorts as scores come in",
+        "parameters": [
+          {
+            "name": "hackathonId",
+            "required": true,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/teams/{id}": {
+      "get": {
+        "operationId": "TeamsController_findOne",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/teams/{id}/members": {
+      "get": {
+        "operationId": "TeamsController_getMembers",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Teams"
+        ]
+      }
+    },
+    "/team-invitations": {
+      "get": {
+        "operationId": "TeamInvitationsController_find",
+        "parameters": [
+          {
+            "name": "userId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Team Invitations"
+        ]
+      },
+      "post": {
+        "operationId": "TeamInvitationsController_invite",
+        "summary": "Team lead invites a specific person to their hackathon team",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Team Invitations"
+        ]
+      }
+    },
+    "/team-invitations/{id}/accept": {
+      "post": {
+        "operationId": "TeamInvitationsController_accept",
+        "summary": "Invitee accepts and submits their KYC (college, age, ID card) in the same step",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AcceptInvitationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Team Invitations"
+        ]
+      }
+    },
+    "/team-invitations/{id}/decline": {
+      "post": {
+        "operationId": "TeamInvitationsController_decline",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Team Invitations"
+        ]
+      }
+    },
+    "/hackathon-registrations/pending": {
+      "get": {
+        "operationId": "HackathonRegistrationsController_findPending",
+        "summary": "Platform Admin's KYC review queue",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathon Registrations (KYC)"
+        ]
+      }
+    },
+    "/hackathon-registrations": {
+      "get": {
+        "operationId": "HackathonRegistrationsController_find",
+        "parameters": [
+          {
+            "name": "hackathonId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathon Registrations (KYC)"
+        ]
+      }
+    },
+    "/hackathon-registrations/{id}/verify": {
+      "post": {
+        "operationId": "HackathonRegistrationsController_verify",
+        "summary": "Platform Admin approves a participant's KYC",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathon Registrations (KYC)"
+        ]
+      }
+    },
+    "/hackathon-registrations/{id}/reject": {
+      "post": {
+        "operationId": "HackathonRegistrationsController_reject",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/VerifyRegistrationDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathon Registrations (KYC)"
+        ]
+      }
+    },
+    "/hackathons": {
+      "get": {
+        "operationId": "HackathonsController_search",
+        "summary": "Browse/search hackathons",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      },
+      "post": {
+        "operationId": "HackathonsController_create",
+        "summary": "Host creates a hackathon and funds the prize pool into escrow",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateHackathonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/host/{orgId}": {
+      "get": {
+        "operationId": "HackathonsController_findByOrg",
+        "summary": "Host's own hackathons",
+        "parameters": [
+          {
+            "name": "orgId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}": {
+      "get": {
+        "operationId": "HackathonsController_findOne",
+        "summary": "Hackathon detail — description, eligibility, team size, prize, dates",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}/register-lead": {
+      "post": {
+        "operationId": "HackathonsController_registerLead",
+        "summary": "Team lead registers: submits KYC and creates their team",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterLeadDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}/start": {
+      "post": {
+        "operationId": "HackathonsController_start",
+        "summary": "Host starts the hackathon — every team gets its own workspace",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "requesterId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}/teams/{teamId}/score": {
+      "post": {
+        "operationId": "HackathonsController_scoreTeam",
+        "summary": "Host scores a submitted team's project (1-10)",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "teamId",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreTeamDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}/close": {
+      "post": {
+        "operationId": "HackathonsController_close",
+        "summary": "Host closes the hackathon — pays top 3 from escrow and notifies winners",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CloseHackathonDto"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
+    },
+    "/hackathons/{id}/cancel": {
+      "post": {
+        "operationId": "HackathonsController_cancel",
+        "summary": "Host cancels the hackathon — refunds the escrowed prize pool",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "properties": {
+                  "requesterId": {
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "tags": [
+          "Hackathons"
+        ]
+      }
     }
   },
   "info": {
@@ -644,7 +4662,9 @@
             "enum": [
               "Active",
               "Suspended",
-              "Warned"
+              "Warned",
+              "Flagged",
+              "Banned"
             ],
             "default": "Active"
           },
@@ -701,7 +4721,9 @@
             "enum": [
               "Active",
               "Suspended",
-              "Warned"
+              "Warned",
+              "Flagged",
+              "Banned"
             ],
             "default": "Active"
           },
@@ -870,6 +4892,1272 @@
             "example": "2"
           }
         }
+      },
+      "UpdateTaskStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Canonical status or any accepted alias (Open, Approved, Done, submitted, ...).",
+            "example": "In Progress"
+          },
+          "column": {
+            "type": "string",
+            "description": "Kanban column key. Alternative to `status`.",
+            "enum": [
+              "todo",
+              "progress",
+              "review",
+              "done"
+            ],
+            "example": "progress"
+          }
+        }
+      },
+      "ModerateUserDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "New moderation status for the user",
+            "enum": [
+              "Active",
+              "Suspended",
+              "Warned",
+              "Flagged",
+              "Banned"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "WarnUserDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "description": "Reason for warning the user"
+          }
+        },
+        "required": [
+          "reason"
+        ]
+      },
+      "AdminStatsEntity": {
+        "type": "object",
+        "properties": {
+          "totalUsers": {
+            "type": "number",
+            "description": "Total number of registered users"
+          },
+          "activeUsers": {
+            "type": "number",
+            "description": "Number of users with active status"
+          },
+          "suspendedUsers": {
+            "type": "number",
+            "description": "Number of suspended users"
+          },
+          "flaggedUsers": {
+            "type": "number",
+            "description": "Number of flagged users"
+          },
+          "bannedUsers": {
+            "type": "number",
+            "description": "Number of banned users"
+          },
+          "totalProjects": {
+            "type": "number",
+            "description": "Total number of projects"
+          },
+          "openProjects": {
+            "type": "number",
+            "description": "Number of projects currently open"
+          },
+          "inProgressProjects": {
+            "type": "number",
+            "description": "Number of projects currently in progress"
+          },
+          "completedProjects": {
+            "type": "number",
+            "description": "Number of completed projects"
+          },
+          "cancelledProjects": {
+            "type": "number",
+            "description": "Number of cancelled projects"
+          },
+          "totalTasks": {
+            "type": "number",
+            "description": "Total number of tasks"
+          },
+          "pendingTasks": {
+            "type": "number",
+            "description": "Number of tasks pending"
+          },
+          "inProgressTasks": {
+            "type": "number",
+            "description": "Number of tasks in progress"
+          },
+          "submittedTasks": {
+            "type": "number",
+            "description": "Number of tasks submitted for review"
+          },
+          "approvedTasks": {
+            "type": "number",
+            "description": "Number of approved tasks"
+          }
+        },
+        "required": [
+          "totalUsers",
+          "activeUsers",
+          "suspendedUsers",
+          "flaggedUsers",
+          "bannedUsers",
+          "totalProjects",
+          "openProjects",
+          "inProgressProjects",
+          "completedProjects",
+          "cancelledProjects",
+          "totalTasks",
+          "pendingTasks",
+          "inProgressTasks",
+          "submittedTasks",
+          "approvedTasks"
+        ]
+      },
+      "SendMessageDto": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "example": "proj-1"
+          },
+          "content": {
+            "type": "string",
+            "example": "Hey team, I just pushed the new database schema."
+          }
+        },
+        "required": [
+          "projectId",
+          "content"
+        ]
+      },
+      "CreateReportDto": {
+        "type": "object",
+        "properties": {
+          "targetUserId": {
+            "type": "string",
+            "example": "3"
+          },
+          "reason": {
+            "type": "string",
+            "example": "Refusing to communicate and abandoning tasks."
+          }
+        },
+        "required": [
+          "targetUserId",
+          "reason"
+        ]
+      },
+      "ResolveReportDto": {
+        "type": "object",
+        "properties": {
+          "action": {
+            "type": "string",
+            "enum": [
+              "Warn",
+              "Suspend",
+              "Dismiss"
+            ],
+            "example": "Warn"
+          },
+          "resolution": {
+            "type": "string",
+            "example": "Issued a formal warning and deducted 50 Rep Score."
+          }
+        },
+        "required": [
+          "action",
+          "resolution"
+        ]
+      },
+      "JoinRequestEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the join request"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User ID making the request"
+          },
+          "userName": {
+            "type": "string",
+            "description": "User display name"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID"
+          },
+          "status": {
+            "type": "string",
+            "description": "Request status",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "User's pitch/application message"
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Creation timestamp"
+          },
+          "updatedAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Last update timestamp"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "userName",
+          "projectId",
+          "status",
+          "message",
+          "createdAt",
+          "updatedAt"
+        ]
+      },
+      "CreateJoinRequestDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User ID making the request"
+          },
+          "userName": {
+            "type": "string",
+            "description": "User display name"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID"
+          },
+          "message": {
+            "type": "string",
+            "description": "User's pitch/application message"
+          }
+        },
+        "required": [
+          "userId",
+          "userName",
+          "projectId",
+          "message"
+        ]
+      },
+      "UpdateJoinRequestDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User ID making the request"
+          },
+          "userName": {
+            "type": "string",
+            "description": "User display name"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID"
+          },
+          "message": {
+            "type": "string",
+            "description": "User's pitch/application message"
+          },
+          "status": {
+            "type": "string",
+            "description": "Request status",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ]
+          }
+        }
+      },
+      "LeaderboardEntryDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User ID",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "rank": {
+            "type": "number",
+            "description": "User ranking position",
+            "example": 1
+          },
+          "user": {
+            "type": "string",
+            "description": "User full name",
+            "example": "Rohan Mehta"
+          },
+          "initials": {
+            "type": "string",
+            "description": "User initials for avatar",
+            "example": "RM"
+          },
+          "xp": {
+            "type": "number",
+            "description": "Total experience points earned",
+            "example": 4200
+          },
+          "rep": {
+            "type": "number",
+            "description": "User reputation score",
+            "example": 89
+          },
+          "tasks": {
+            "type": "number",
+            "description": "Number of completed tasks",
+            "example": 42
+          },
+          "projects": {
+            "type": "number",
+            "description": "Number of projects participated in",
+            "example": 8
+          }
+        },
+        "required": [
+          "userId",
+          "rank",
+          "user",
+          "initials",
+          "xp",
+          "rep",
+          "tasks",
+          "projects"
+        ]
+      },
+      "MentorApplicationEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique application identifier",
+            "example": "0f8fad5b-d9cb-469f-a165-70867728950e"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User ID of the applicant",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "email": {
+            "type": "string",
+            "description": "Applicant email address",
+            "example": "mentor@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "Applicant full name",
+            "example": "Riya Sharma"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Applicant biography or motivation statement",
+            "example": "Experienced software developer with 7 years mentoring students."
+          },
+          "experience": {
+            "type": "string",
+            "description": "Applicant experience summary",
+            "example": "7 years in full-stack development and mentoring."
+          },
+          "skills": {
+            "description": "Skills or expertise offered by the applicant",
+            "example": [
+              "JavaScript",
+              "Node.js",
+              "React"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "Current application status",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "example": "pending"
+          },
+          "applicationDate": {
+            "type": "string",
+            "description": "ISO timestamp when the application was submitted",
+            "example": "2026-04-23T12:34:56.789Z"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "email",
+          "name",
+          "bio",
+          "experience",
+          "skills",
+          "status",
+          "applicationDate"
+        ]
+      },
+      "CreateMentorApplicationDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "User ID of the applicant",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "email": {
+            "type": "string",
+            "description": "Applicant email address",
+            "example": "mentor@example.com"
+          },
+          "name": {
+            "type": "string",
+            "description": "Applicant full name",
+            "example": "Riya Sharma"
+          },
+          "bio": {
+            "type": "string",
+            "description": "Applicant biography or motivation statement",
+            "example": "I have mentored six student teams and enjoy helping new developers."
+          },
+          "experience": {
+            "type": "string",
+            "description": "Applicant experience summary",
+            "example": "7 years in software engineering with leadership and mentoring roles."
+          },
+          "skills": {
+            "description": "Skills or expertise offered by the applicant",
+            "example": [
+              "JavaScript",
+              "Node.js",
+              "React"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "userId",
+          "email",
+          "name"
+        ]
+      },
+      "UpdateMentorApplicationDto": {
+        "type": "object",
+        "properties": {
+          "bio": {
+            "type": "string",
+            "description": "Applicant biography or motivation statement",
+            "example": "I have mentored six student teams and enjoy helping new developers."
+          },
+          "experience": {
+            "type": "string",
+            "description": "Applicant experience summary",
+            "example": "7 years in software engineering with leadership and mentoring roles."
+          },
+          "skills": {
+            "description": "Skills or expertise offered by the applicant",
+            "example": [
+              "JavaScript",
+              "Node.js",
+              "React"
+            ],
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "status": {
+            "type": "string",
+            "description": "Application status",
+            "enum": [
+              "pending",
+              "approved",
+              "rejected"
+            ],
+            "example": "approved"
+          }
+        }
+      },
+      "MentorRequestEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique mentor request identifier",
+            "example": "4f3a9e2d-d9e8-4bbb-b6f8-a3b132b8f1c1"
+          },
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID for this mentor request",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "mentorId": {
+            "type": "string",
+            "description": "Target mentor user ID",
+            "example": "a1d2c3b4-e5f6-7890-1234-56789abcdef0"
+          },
+          "mentorEmail": {
+            "type": "string",
+            "description": "Target mentor email address",
+            "example": "mentor@example.com"
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional project owner message or pitch for the mentor",
+            "example": "We would love your guidance on our full-stack project with React and Node."
+          },
+          "status": {
+            "type": "string",
+            "description": "Current mentor request status",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined"
+            ],
+            "example": "pending"
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "ISO timestamp when the request was created",
+            "example": "2026-04-23T12:34:56.789Z"
+          },
+          "acceptedAt": {
+            "type": "string",
+            "description": "ISO timestamp when the request was accepted",
+            "example": "2026-04-24T08:15:00.123Z"
+          },
+          "declinedAt": {
+            "type": "string",
+            "description": "ISO timestamp when the request was declined",
+            "example": "2026-04-24T09:00:00.123Z"
+          }
+        },
+        "required": [
+          "id",
+          "projectId",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreateMentorRequestDto": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID for the mentor request",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "mentorId": {
+            "type": "string",
+            "description": "Target mentor user ID",
+            "example": "a1d2c3b4-e5f6-7890-1234-56789abcdef0"
+          },
+          "mentorEmail": {
+            "type": "string",
+            "description": "Target mentor email address",
+            "example": "mentor@example.com"
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional message or pitch shared with the mentor",
+            "example": "We would love your guidance on our full-stack project with React and Node."
+          }
+        },
+        "required": [
+          "projectId"
+        ]
+      },
+      "UpdateMentorRequestDto": {
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "description": "Target project ID for the mentor request",
+            "example": "c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12"
+          },
+          "mentorId": {
+            "type": "string",
+            "description": "Target mentor user ID",
+            "example": "a1d2c3b4-e5f6-7890-1234-56789abcdef0"
+          },
+          "mentorEmail": {
+            "type": "string",
+            "description": "Target mentor email address",
+            "example": "mentor@example.com"
+          },
+          "message": {
+            "type": "string",
+            "description": "Optional message or pitch shared with the mentor",
+            "example": "We would love your guidance on our full-stack project with React and Node."
+          },
+          "status": {
+            "type": "string",
+            "description": "Mentor request status",
+            "enum": [
+              "pending",
+              "accepted",
+              "declined"
+            ],
+            "example": "accepted"
+          }
+        }
+      },
+      "CreateApplicationDto": {
+        "type": "object",
+        "properties": {
+          "linkedinURL": {
+            "type": "string",
+            "example": "https://linkedin.com/in/johndoe"
+          },
+          "experienceYears": {
+            "type": "number",
+            "example": 5
+          },
+          "motivation": {
+            "type": "string",
+            "example": "I want to help students build production-ready apps."
+          }
+        },
+        "required": [
+          "linkedinURL",
+          "experienceYears",
+          "motivation"
+        ]
+      },
+      "IssueBadgeDto": {
+        "type": "object",
+        "properties": {
+          "collaboratorId": {
+            "type": "string",
+            "example": "2"
+          },
+          "badgeType": {
+            "type": "string",
+            "enum": [
+              "Technical Excellence",
+              "Leadership",
+              "Team Player",
+              "Innovator"
+            ],
+            "example": "Technical Excellence"
+          },
+          "comment": {
+            "type": "string",
+            "example": "Exceptional code review and problem-solving skills."
+          }
+        },
+        "required": [
+          "collaboratorId",
+          "badgeType",
+          "comment"
+        ]
+      },
+      "Notification": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique identifier for the notification",
+            "example": "123e4567-e89b-12d3-a456-426614174000"
+          },
+          "userId": {
+            "type": "string",
+            "description": "ID of the user who owns this notification",
+            "example": "123e4567-e89b-12d3-a456-426614174001"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of notification",
+            "example": "PROJECT_INVITATION",
+            "enum": [
+              "PROJECT_INVITATION",
+              "APPLICATION_APPROVED",
+              "TASK_APPROVED",
+              "MENTOR_REQUEST",
+              "NEW_MESSAGE",
+              "PROJECT_UPDATE",
+              "HACKATHON_WIN",
+              "TEAM_INVITATION"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification message content",
+            "example": "You have been invited to join the AI Study Planner project"
+          },
+          "readStatus": {
+            "type": "boolean",
+            "description": "Whether the notification has been read",
+            "example": false,
+            "default": false
+          },
+          "createdAt": {
+            "format": "date-time",
+            "type": "string",
+            "description": "Timestamp when the notification was created",
+            "example": "2024-01-15T10:30:00Z"
+          },
+          "referenceId": {
+            "type": "string",
+            "description": "Reference ID (could be project ID, task ID, etc.)",
+            "example": "123e4567-e89b-12d3-a456-426614174002"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "type",
+          "message",
+          "readStatus",
+          "createdAt"
+        ]
+      },
+      "CreateNotificationDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string",
+            "description": "ID of the user who will receive this notification",
+            "example": "123e4567-e89b-12d3-a456-426614174001"
+          },
+          "type": {
+            "type": "string",
+            "description": "Type of notification",
+            "example": "PROJECT_INVITATION",
+            "enum": [
+              "PROJECT_INVITATION",
+              "APPLICATION_APPROVED",
+              "TASK_APPROVED",
+              "MENTOR_REQUEST",
+              "NEW_MESSAGE",
+              "PROJECT_UPDATE",
+              "HACKATHON_WIN",
+              "TEAM_INVITATION"
+            ]
+          },
+          "message": {
+            "type": "string",
+            "description": "Notification message content",
+            "example": "You have been invited to join the AI Study Planner project"
+          },
+          "readStatus": {
+            "type": "boolean",
+            "description": "Whether the notification should be marked as read initially",
+            "example": false,
+            "default": false
+          },
+          "referenceId": {
+            "type": "string",
+            "description": "Reference ID (could be project ID, task ID, etc.)",
+            "example": "123e4567-e89b-12d3-a456-426614174002"
+          }
+        },
+        "required": [
+          "userId",
+          "type",
+          "message"
+        ]
+      },
+      "UpdateNotificationDto": {
+        "type": "object",
+        "properties": {
+          "readStatus": {
+            "type": "boolean",
+            "description": "Whether the notification has been read",
+            "example": true
+          }
+        }
+      },
+      "PortalAdminEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique portal admin identifier"
+          },
+          "name": {
+            "type": "string",
+            "description": "Display name of the portal admin"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the portal admin"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password for the portal admin account"
+          },
+          "portalRole": {
+            "type": "string",
+            "description": "Portal admin role",
+            "enum": [
+              "admin",
+              "superuser"
+            ]
+          },
+          "permissions": {
+            "description": "Permissions assigned to the portal admin",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Creation timestamp in ISO format"
+          },
+          "lastLogin": {
+            "type": "string",
+            "description": "Last login timestamp in ISO format"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "email",
+          "password",
+          "portalRole",
+          "permissions",
+          "createdAt"
+        ]
+      },
+      "CreatePortalAdminDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name of the portal admin"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the portal admin"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password for the portal admin account",
+            "minLength": 8
+          },
+          "portalRole": {
+            "type": "string",
+            "description": "Portal admin role",
+            "enum": [
+              "admin",
+              "superuser"
+            ],
+            "default": "admin"
+          },
+          "permissions": {
+            "description": "Permissions granted to the portal admin",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "name",
+          "email",
+          "password",
+          "portalRole",
+          "permissions"
+        ]
+      },
+      "UpdatePortalAdminDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "description": "Display name of the portal admin"
+          },
+          "email": {
+            "type": "string",
+            "description": "Email address of the portal admin"
+          },
+          "password": {
+            "type": "string",
+            "description": "Password for the portal admin account",
+            "minLength": 8
+          },
+          "portalRole": {
+            "type": "string",
+            "description": "Portal admin role",
+            "enum": [
+              "admin",
+              "superuser"
+            ],
+            "default": "admin"
+          },
+          "permissions": {
+            "description": "Permissions granted to the portal admin",
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "SupportRequestEntity": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "Unique support ticket identifier"
+          },
+          "userId": {
+            "type": "string",
+            "description": "User ID that submitted the request"
+          },
+          "from": {
+            "type": "string",
+            "description": "Email address of the requester"
+          },
+          "category": {
+            "type": "string",
+            "description": "Support request category",
+            "enum": [
+              "Bug Report",
+              "Feature Request",
+              "Account Issue",
+              "Other"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject line for the support request"
+          },
+          "message": {
+            "type": "string",
+            "description": "Detailed support request message"
+          },
+          "status": {
+            "type": "string",
+            "description": "Current ticket status",
+            "enum": [
+              "open",
+              "in-progress",
+              "resolved"
+            ]
+          },
+          "createdAt": {
+            "type": "string",
+            "description": "Ticket creation timestamp in ISO format"
+          }
+        },
+        "required": [
+          "id",
+          "userId",
+          "from",
+          "category",
+          "subject",
+          "message",
+          "status",
+          "createdAt"
+        ]
+      },
+      "CreateSupportRequestDto": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "string",
+            "description": "Support request category",
+            "enum": [
+              "Bug Report",
+              "Feature Request",
+              "Account Issue",
+              "Other"
+            ]
+          },
+          "subject": {
+            "type": "string",
+            "description": "Subject for the support request",
+            "minLength": 5,
+            "maxLength": 100
+          },
+          "message": {
+            "type": "string",
+            "description": "Detailed support request message",
+            "minLength": 20,
+            "maxLength": 1000
+          }
+        },
+        "required": [
+          "category",
+          "message"
+        ]
+      },
+      "UpdateSupportStatusDto": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "description": "Updated support ticket status",
+            "enum": [
+              "open",
+              "in-progress",
+              "resolved"
+            ]
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "CreateOrganizationDto": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "domain": {
+            "type": "string"
+          },
+          "contactEmail": {
+            "type": "string"
+          },
+          "orgAdminUserId": {
+            "type": "string",
+            "description": "User ID to designate as the initial Org Admin (the host account)"
+          }
+        },
+        "required": [
+          "name",
+          "domain",
+          "contactEmail",
+          "orgAdminUserId"
+        ]
+      },
+      "CreateTeamDto": {
+        "type": "object",
+        "properties": {
+          "hackathonId": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "leadUserId": {
+            "type": "string",
+            "description": "User ID of the team lead (creator)"
+          }
+        },
+        "required": [
+          "hackathonId",
+          "name",
+          "leadUserId"
+        ]
+      },
+      "CreateInvitationDto": {
+        "type": "object",
+        "properties": {
+          "teamId": {
+            "type": "string"
+          },
+          "invitedUserId": {
+            "type": "string"
+          },
+          "invitedBy": {
+            "type": "string",
+            "description": "User ID of the inviting team lead"
+          }
+        },
+        "required": [
+          "teamId",
+          "invitedUserId",
+          "invitedBy"
+        ]
+      },
+      "AcceptInvitationDto": {
+        "type": "object",
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Full name as it appears on ID"
+          },
+          "collegeName": {
+            "type": "string"
+          },
+          "age": {
+            "type": "number"
+          },
+          "idCardImageRef": {
+            "type": "string",
+            "description": "Base64/URL reference to an uploaded ID card image"
+          }
+        },
+        "required": [
+          "fullName",
+          "collegeName",
+          "age",
+          "idCardImageRef"
+        ]
+      },
+      "VerifyRegistrationDto": {
+        "type": "object",
+        "properties": {
+          "verifiedBy": {
+            "type": "string",
+            "description": "Platform admin user ID performing the verification"
+          },
+          "reason": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "verifiedBy"
+        ]
+      },
+      "CreateHackathonDto": {
+        "type": "object",
+        "properties": {
+          "orgId": {
+            "type": "string",
+            "description": "Hosting Organization ID"
+          },
+          "createdBy": {
+            "type": "string",
+            "description": "Org Admin user ID creating this hackathon"
+          },
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "theme": {
+            "type": "string"
+          },
+          "eligibilityCriteria": {
+            "type": "string"
+          },
+          "teamSizeMin": {
+            "type": "number"
+          },
+          "teamSizeMax": {
+            "type": "number"
+          },
+          "prizePool": {
+            "type": "number"
+          },
+          "prizeSplit": {
+            "default": [
+              50,
+              30,
+              20
+            ],
+            "description": "1st/2nd/3rd split %, must sum to 100",
+            "type": "array",
+            "items": {
+              "type": "number"
+            }
+          },
+          "registrationDeadline": {
+            "type": "string",
+            "description": "ISO date-time"
+          }
+        },
+        "required": [
+          "orgId",
+          "createdBy",
+          "title",
+          "description",
+          "eligibilityCriteria",
+          "teamSizeMin",
+          "teamSizeMax",
+          "prizePool",
+          "registrationDeadline"
+        ]
+      },
+      "RegisterLeadDto": {
+        "type": "object",
+        "properties": {
+          "userId": {
+            "type": "string"
+          },
+          "teamName": {
+            "type": "string"
+          },
+          "fullName": {
+            "type": "string"
+          },
+          "collegeName": {
+            "type": "string"
+          },
+          "age": {
+            "type": "number"
+          },
+          "idCardImageRef": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "userId",
+          "teamName",
+          "fullName",
+          "collegeName",
+          "age",
+          "idCardImageRef"
+        ]
+      },
+      "ScoreTeamDto": {
+        "type": "object",
+        "properties": {
+          "scoredBy": {
+            "type": "string",
+            "description": "Org Admin / host user ID scoring the team"
+          },
+          "score": {
+            "type": "number",
+            "minimum": 1,
+            "maximum": 10
+          },
+          "comment": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "scoredBy",
+          "score"
+        ]
+      },
+      "CloseHackathonDto": {
+        "type": "object",
+        "properties": {
+          "closedBy": {
+            "type": "string",
+            "description": "Org Admin / host user ID closing the hackathon"
+          }
+        },
+        "required": [
+          "closedBy"
+        ]
       }
     }
   }

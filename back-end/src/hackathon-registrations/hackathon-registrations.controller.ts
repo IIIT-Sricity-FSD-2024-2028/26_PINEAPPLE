@@ -1,47 +1,51 @@
-import { Body, Controller, Get, Param, Post, Query, UseGuards } from '@nestjs/common';
-import { ApiBody, ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
+import { Body, Controller, Get, Param, Post, UseGuards, Req } from '@nestjs/common';
+import { ApiBody, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../core/decorators/roles.decorator';
 import { RolesGuard } from '../core/guards/roles.guard';
 import { HackathonRegistrationsService } from './hackathon-registrations.service';
-import { VerifyRegistrationDto } from './dto/register.dto';
+import { SubmitVerificationDto, VerifyStudentDto, RejectStudentDto } from './dto/register.dto';
 
-// Platform Admin's KYC verification queue — separate from Org Admin actions,
-// since identity verification is a platform-trust concern, not an org one.
-@ApiTags('Hackathon Registrations (KYC)')
+@ApiTags('Hackathon Registrations')
 @Controller('hackathon-registrations')
 @UseGuards(RolesGuard)
 export class HackathonRegistrationsController {
-  constructor(private readonly registrationsService: HackathonRegistrationsService) {}
+  constructor(private readonly service: HackathonRegistrationsService) {}
 
-  @Get('pending')
-  @Roles('admin', 'superuser')
-  @ApiOperation({ summary: "Platform Admin's KYC review queue" })
-  findPending() {
-    return this.registrationsService.findPending();
+  @Post('verify-student')
+  @Roles('user', 'admin')
+  @ApiOperation({ summary: 'Submit student ID for KYC verification' })
+  @ApiBody({ type: SubmitVerificationDto })
+  submitVerification(@Body() dto: SubmitVerificationDto) {
+    return this.service.submitVerification(dto);
   }
 
-  @Get()
-  @Roles('user')
-  @ApiQuery({ name: 'hackathonId', required: false })
-  @ApiQuery({ name: 'teamId', required: false })
-  find(@Query('hackathonId') hackathonId?: string, @Query('teamId') teamId?: string) {
-    if (teamId) return this.registrationsService.findByTeam(teamId);
-    if (hackathonId) return this.registrationsService.findByHackathon(hackathonId);
-    return this.registrationsService.findAll();
+  @Get('pending')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin gets all pending student KYC requests' })
+  getPending() {
+    return this.service.getPendingVerifications();
+  }
+  
+  @Get('status/:userId')
+  @Roles('user', 'admin')
+  @ApiOperation({ summary: 'Get student KYC verification status' })
+  getStatus(@Param('userId') userId: string) {
+    return this.service.findByUserId(userId) || { status: 'NotSubmitted' };
   }
 
   @Post(':id/verify')
-  @Roles('admin', 'superuser')
-  @ApiOperation({ summary: 'Platform Admin approves a participant\'s KYC' })
-  @ApiBody({ type: VerifyRegistrationDto })
-  verify(@Param('id') id: string, @Body() dto: VerifyRegistrationDto) {
-    return this.registrationsService.verify(id, dto.verifiedBy);
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin approves KYC' })
+  @ApiBody({ type: VerifyStudentDto })
+  verify(@Param('id') id: string, @Body() dto: VerifyStudentDto) {
+    return this.service.verify(id, dto.verifiedBy);
   }
 
   @Post(':id/reject')
-  @Roles('admin', 'superuser')
-  @ApiBody({ type: VerifyRegistrationDto })
-  reject(@Param('id') id: string, @Body() dto: VerifyRegistrationDto) {
-    return this.registrationsService.reject(id, dto.verifiedBy, dto.reason);
+  @Roles('admin')
+  @ApiOperation({ summary: 'Admin rejects KYC with reason' })
+  @ApiBody({ type: RejectStudentDto })
+  reject(@Param('id') id: string, @Body() dto: RejectStudentDto) {
+    return this.service.reject(id, dto.verifiedBy, dto.reason);
   }
 }

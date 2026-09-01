@@ -561,6 +561,12 @@ async function saveProfileSettings() {
         // Backend returns: { message, filename, url } where url = "/uploads/filename"
         const avatarUrl = data.url || data.path || (data.filename ? `/uploads/${data.filename}` : null);
         STATE.userProfile.avatarUrl = avatarUrl;
+        if (typeof syncRuntimeProfileToAuthStore === "function") {
+          syncRuntimeProfileToAuthStore();
+        }
+        if (typeof saveUserRuntime === "function") {
+          saveUserRuntime();
+        }
         applyProfileIdentityToUI();
       } else {
         const err = await response.json();

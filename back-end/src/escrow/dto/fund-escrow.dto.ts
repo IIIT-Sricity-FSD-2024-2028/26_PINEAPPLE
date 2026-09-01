@@ -2,9 +2,9 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsNumber, IsOptional, IsPositive, IsString } from 'class-validator';
 
 export class FundEscrowDto {
-  @ApiProperty() @IsString() sourceType!: string;
-  @ApiProperty() @IsString() sourceId!: string;
-  @ApiProperty() @IsNumber() @IsPositive() amount!: number;
-  @ApiPropertyOptional({ default: 'INR' }) @IsOptional() @IsString() currency?: string;
+  @ApiProperty() @IsString() hackathonId!: string;
+  @ApiProperty() @IsNumber() @IsPositive() prizeAmount!: number;
+  @ApiProperty() @IsNumber() @IsPositive() platformFee!: number;
+  @ApiProperty() @IsNumber() @IsPositive() gatewayFee!: number;
   @ApiProperty() @IsString() releaseCondition!: string;
 }
