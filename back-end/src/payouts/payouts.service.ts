@@ -2,9 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 import { TransactionEntity } from './entities/transaction.entity';
 
-// Single ledger of every money movement triggered by the hackathon flow —
-// prize releases, refunds. Kept intentionally minimal (no mentor-marketplace
-// commission logic here — out of scope for the hackathon feature).
+// Single ledger of every money movement released from escrow — currently
+// mentor-session payouts. Kept intentionally minimal (no commission/fee
+// splitting logic here).
 @Injectable()
 export class PayoutsService {
   private transactions: TransactionEntity[] = [];

@@ -415,6 +415,7 @@ function getOwnProfile() {
     uni: String(currentRecord?.profile?.university || "").trim(),
     bio,
     joined: joinedDate,
+    avatarUrl: String(STATE?.userProfile?.avatarUrl || currentRecord?.profile?.avatarUrl || "").trim(),
     xp: xpScore,
     rep: repScore,
     projects: projectList.length,
@@ -652,7 +653,7 @@ function renderProfileHeader(p, isOther) {
     </div>
     <div class="card">
       <div class="profile-header">
-        <div class="${avatarClass}">${p.initials}</div>
+        <div class="${avatarClass}">${p.avatarUrl ? `<img src="${(typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000")}${p.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : p.initials}</div>
         <div class="profile-info">
           <div class="profile-name">
             ${p.name} ${mentorBadge}

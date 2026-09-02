@@ -170,6 +170,7 @@ function approveApp(appId) {
 
   renderAdminMentorApps();
   if (typeof renderAuditLog === "function") renderAuditLog();
+  if (typeof renderAdminDash === "function") renderAdminDash();
   showToast(`✅ ${app.name} approved as mentor`);
 }
 
@@ -215,6 +216,7 @@ function rejectApp(appId) {
 
   renderAdminMentorApps();
   if (typeof renderAuditLog === "function") renderAuditLog();
+  if (typeof renderAdminDash === "function") renderAdminDash();
   showToast(`❌ ${app.name} rejected`);
 }
 

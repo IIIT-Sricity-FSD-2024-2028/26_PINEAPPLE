@@ -100,6 +100,28 @@ function initializeMentorStatus() {
     STATE.mentorApplicationId = null;
     console.log(`ℹ️ No mentor application found for ${STATE.currentUser.name}`);
   }
+
+  // A returning user can land here already approved from a prior session —
+  // STATE.role gets set to "mentor" above without ever going through
+  // tryMentor(). Sync the backend record here too (fire-and-forget), or
+  // mentor-marketplace endpoints keep rejecting them as unverified.
+  if (STATE.mentorApproved) {
+    syncMentorRoleToBackend();
+  }
+}
+
+// Best-effort, fire-and-forget: sync the backend user record to role=Mentor.
+// Whichever admin pathway approved this mentor may only have updated local
+// state, so mentor-marketplace endpoints (which check the real backend
+// role) would otherwise keep rejecting a legitimately approved mentor.
+function syncMentorRoleToBackend() {
+  try {
+    if (typeof mentorMarketApi !== "undefined") {
+      mentorMarketApi.confirmMentorRole().catch(() => {});
+    }
+  } catch {
+    /* non-critical */
+  }
 }
 
 // ══════════════════════════════════════════════
@@ -113,10 +135,31 @@ function setRole(role) {
   navigate("dashboard");
 }
 
-function tryMentor() {
+async function tryMentor() {
   closeDropdowns();
   if (STATE.mentorApproved) {
     setRole("mentor");
+
+    // Best-effort: sync the backend user record to role=Mentor (whichever
+    // admin pathway approved this mentor may only have updated local state)
+    // so mentor-marketplace endpoints recognize them, then send a mentor
+    // with no listing yet straight to the pricing form instead of the
+    // dashboard.
+    try {
+      if (typeof mentorMarketApi !== "undefined") {
+        await mentorMarketApi.confirmMentorRole();
+        const profile = await mentorMarketApi.myProfile();
+        if (!profile && typeof MM_STATE !== "undefined") {
+          MM_STATE.tab = "become-mentor";
+          navigate("mentors-market");
+          if (typeof showToast === "function") {
+            showToast("Set your session price to appear in the mentor marketplace.", "info");
+          }
+        }
+      }
+    } catch {
+      /* non-critical — role switch itself already succeeded */
+    }
   } else if (STATE.mentorApplicationId) {
     // User has a pending/rejected application
     const app = STATE.mentorApplications.find(

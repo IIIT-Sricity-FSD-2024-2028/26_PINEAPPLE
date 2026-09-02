@@ -1,6 +1,78 @@
 // ══════════════════════════════════════════════
 //   ADMIN PORTAL
 // ══════════════════════════════════════════════
+function renderAdminDash() {
+  const totalEl = document.getElementById("admin-kpi-users-total");
+  if (!totalEl) return; // dashboard markup not present (e.g. not in admin portal yet)
+
+  const users = typeof getAllAdminUsers === "function" ? getAllAdminUsers() : [];
+  const totalUsers = users.length;
+  const activeUsers = users.filter((u) => u.status === "active").length;
+  const warnedUsers = users.filter((u) => u.status === "warned").length;
+  const suspendedUsers = users.filter((u) => u.status === "suspended").length;
+  const flaggedOrWarned = users.filter(
+    (u) => u.flagged || u.status === "warned",
+  ).length;
+
+  const pendingMentorApps = Array.isArray(STATE.mentorApplications)
+    ? STATE.mentorApplications.filter((app) => app.status === "pending").length
+    : 0;
+
+  const auditEntries =
+    typeof buildAuditLogEntries === "function" ? buildAuditLogEntries() : [];
+  const auditCount = auditEntries.length;
+
+  document.getElementById("admin-kpi-users-total").textContent = totalUsers;
+  document.getElementById("admin-kpi-users-active").textContent = `${activeUsers} active`;
+  document.getElementById("admin-kpi-mentor-pending").textContent = pendingMentorApps;
+  document.getElementById("admin-kpi-flagged-warned").textContent = flaggedOrWarned;
+  document.getElementById("admin-kpi-suspended-meta").textContent = `${suspendedUsers} suspended`;
+  document.getElementById("admin-kpi-audit-events").textContent = auditCount;
+
+  document.getElementById("admin-action-mentor-sub").textContent = `${pendingMentorApps} pending`;
+  document.getElementById("admin-action-mentor-count").textContent = pendingMentorApps;
+  document.getElementById("admin-action-flagged-sub").textContent = `${flaggedOrWarned} flagged`;
+  document.getElementById("admin-action-flagged-count").textContent = flaggedOrWarned;
+  document.getElementById("admin-action-audit-sub").textContent = `${auditCount} entries`;
+  document.getElementById("admin-action-audit-count").textContent = auditCount;
+
+  const pct = (n) => (totalUsers ? Math.round((n / totalUsers) * 100) : 0);
+  document.getElementById("admin-health-active-label").textContent = `${activeUsers} / ${totalUsers}`;
+  document.getElementById("admin-health-active-fill").style.width = `${pct(activeUsers)}%`;
+  document.getElementById("admin-health-warned-label").textContent = `${warnedUsers} / ${totalUsers}`;
+  document.getElementById("admin-health-warned-fill").style.width = `${pct(warnedUsers)}%`;
+  document.getElementById("admin-health-suspended-label").textContent = `${suspendedUsers} / ${totalUsers}`;
+  document.getElementById("admin-health-suspended-fill").style.width = `${pct(suspendedUsers)}%`;
+
+  const recentEl = document.getElementById("admin-dash-recent-events");
+  if (recentEl) {
+    const recent = auditEntries.slice(0, 5);
+    recentEl.innerHTML = recent.length
+      ? recent
+          .map((entry) => {
+            const type =
+              typeof mapRuntimeActionToAuditType === "function"
+                ? mapRuntimeActionToAuditType(entry.event || entry.details)
+                : "system";
+            const chipClass =
+              typeof getAuditTypeClass === "function" ? getAuditTypeClass(type) : "system";
+            const chipLabel =
+              typeof getAuditTypeLabel === "function" ? getAuditTypeLabel(type) : "System";
+            return `
+              <div class="admin-event-row">
+                <span class="admin-event-chip ${chipClass}">${chipLabel.toUpperCase()}</span>
+                <div>
+                  <div class="admin-event-text">${escapeHtml(entry.event)}</div>
+                  <div class="admin-event-time">${escapeHtml(entry.timestamp)}</div>
+                </div>
+              </div>
+            `;
+          })
+          .join("")
+      : '<div class="admin-users-empty">No recent events.</div>';
+  }
+}
+
 function showAdmin() {
   closeDropdowns();
   document.getElementById("admin-portal").style.display = "";
@@ -19,6 +91,7 @@ function showAdmin() {
     renderAdminProjects();
     renderAdminMentorApps();
     renderAuditLog();
+    renderAdminDash();
     renderSuAdmins();
     renderSuConfig();
     showAdminPage("admin-dash");
@@ -207,6 +280,7 @@ function adminLogin() {
   renderAdminProjects();
   renderAdminMentorApps();
   renderAuditLog();
+  renderAdminDash();
 
   if (account.portalRole === "superuser") {
     renderSuAdmins();
@@ -242,6 +316,9 @@ function showAdminPage(id) {
     .querySelectorAll(".admin-page")
     .forEach((p) => (p.style.display = "none"));
   document.getElementById(id).style.display = "";
+  if (id === "admin-dash") {
+    renderAdminDash();
+  }
   if (id === "admin-projects") {
     renderAdminProjects();
   }
@@ -250,6 +327,9 @@ function showAdminPage(id) {
   }
   if (id === "admin-mentor-apps") {
     renderAdminMentorApps();
+  }
+  if (id === "admin-audit") {
+    renderAuditLog();
   }
   document
     .querySelectorAll(".admin-nav-item")

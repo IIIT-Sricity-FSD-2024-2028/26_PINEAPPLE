@@ -9,7 +9,7 @@ function renderPageByName(page) {
     dashboard: () => window.renderDashboard?.(),
     projects: () => window.renderProjects?.(),
     leaderboard: () => window.switchLeaderboard?.("weekly", document.querySelector(".tab")),
-    hackathons: () => window.renderHackathons?.(),
+    'mentors-market': () => window.renderMentorMarket?.(),
     notifications: () => window.renderNotifications?.(),
     profile: () => window.renderProfile?.(null),
     settings: () => window.renderSettings?.(),

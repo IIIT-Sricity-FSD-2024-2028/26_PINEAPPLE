@@ -52,20 +52,6 @@ export class ProjectsController {
     return this.projectsService.create(ownerId, createProjectDto);
   }
 
-  @Get('hackathon/:hackathonId')
-  @ApiOperation({ summary: "Get a hackathon's team-projects (host judging queue)" })
-  findByHackathonId(@Param('hackathonId') hackathonId: string) {
-    return this.projectsService.findByHackathonId(hackathonId);
-  }
-
-  @Post(':id/submit')
-  @Roles('user')
-  @ApiHeader({ name: 'x-user-id', description: 'ID of the team lead submitting', required: true })
-  @ApiOperation({ summary: 'Team lead submits a hackathon project for host judging' })
-  submitHackathonProject(@Param('id') id: string, @Headers('x-user-id') requesterId: string) {
-    return this.projectsService.submitHackathonProject(id, requesterId);
-  }
-
   @Patch(':id')
   @Roles('Project Owner', 'Administrator')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })

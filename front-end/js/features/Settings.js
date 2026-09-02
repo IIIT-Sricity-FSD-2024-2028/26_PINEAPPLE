@@ -213,7 +213,8 @@ function applyProfileIdentityToUI() {
   const avatar = document.getElementById("header-avatar");
   if (avatar) {
     if (profile.avatarUrl) {
-      avatar.innerHTML = `<img src="http://localhost:3000${profile.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
+      const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+      avatar.innerHTML = `<img src="${apiBase}${profile.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">`;
     } else {
       avatar.textContent = getSettingsInitials(displayName);
     }
@@ -223,7 +224,8 @@ function applyProfileIdentityToUI() {
   const settingsInitials = document.getElementById("settings-avatar-initials");
   if (settingsPreview && settingsInitials) {
     if (profile.avatarUrl) {
-      settingsPreview.src = `http://localhost:3000${profile.avatarUrl}`;
+      const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+      settingsPreview.src = `${apiBase}${profile.avatarUrl}`;
       settingsPreview.style.display = "block";
       settingsInitials.style.display = "none";
     } else {
@@ -561,6 +563,12 @@ async function saveProfileSettings() {
         // Backend returns: { message, filename, url } where url = "/uploads/filename"
         const avatarUrl = data.url || data.path || (data.filename ? `/uploads/${data.filename}` : null);
         STATE.userProfile.avatarUrl = avatarUrl;
+        if (typeof syncRuntimeProfileToAuthStore === "function") {
+          syncRuntimeProfileToAuthStore();
+        }
+        if (typeof saveUserRuntime === "function") {
+          saveUserRuntime();
+        }
         applyProfileIdentityToUI();
       } else {
         const err = await response.json();

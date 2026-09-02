@@ -59,13 +59,6 @@
           </svg>
           <span class="sidebar-nav-label">Leaderboard</span>
         </button>
-        <button class="sidebar-nav-item" data-page="hackathons" onclick="navigate('hackathons')">
-          <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-            <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6M18 9h1.5a2.5 2.5 0 0 0 0-5H18M6 4h12v6a6 6 0 0 1-12 0V4Z" />
-            <path d="M12 16v4M9 20h6" />
-          </svg>
-          <span class="sidebar-nav-label">Hackathons</span>
-        </button>
         <button class="sidebar-nav-item" data-page="notifications" onclick="navigate('notifications')">
           <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
             <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
@@ -247,11 +240,11 @@
           </div>
         </div>
 
-        <!-- ═══════════ HACKATHONS ═══════════ -->
-        <div id="page-hackathons" class="page">
-          <h1>Hackathons</h1>
-          <p class="page-subtitle">Browse and join hackathons, or host your own.</p>
-          <div id="hackathons-content" class="mt-4"></div>
+        <!-- ═══════════ MENTORS MARKETPLACE ═══════════ -->
+        <div id="page-mentors-market" class="page">
+          <h1>Mentorship Marketplace</h1>
+          <p class="page-subtitle">Book a verified mentor, pay securely — get paid after successful completion.</p>
+          <div id="mentors-market-content" class="mt-4"></div>
         </div>
 
         <!-- ═══════════ NOTIFICATIONS ═══════════ -->
@@ -590,26 +583,6 @@
     </div>
   </div>
 
-  <!-- Mentor Resource Modal -->
-  <div id="modal-mentor-resource" class="modal-overlay" onclick="closeMentorResourceModal(event)">
-    <div class="modal-content" style="max-width: 400px; text-align: left;">
-      <h3 style="margin-bottom: 8px;">Upload Learning Resource</h3>
-      <p class="text-sm text-muted" style="margin-bottom: 16px;">Share a document or image with <strong id="mentor-resource-project"></strong>.</p>
-      
-      <div class="input-group">
-        <label class="label">Resource File (Max 10MB)</label>
-        <input type="file" id="mentor-resource-file" class="input" accept="image/*,application/pdf,.zip,.doc,.docx,.txt,.md">
-      </div>
-      
-      <input type="hidden" id="mentor-resource-project-id">
-      
-      <div style="display:flex; justify-content: flex-end; gap: 8px; margin-top: 20px;">
-        <button class="btn btn-outline btn-sm" onclick="closeMentorResourceModal()">Cancel</button>
-        <button class="btn btn-primary btn-sm" onclick="submitMentorResource()">Upload Resource</button>
-      </div>
-    </div>
-  </div>
-
   <!-- ══════════════════ ADMIN PORTAL ══════════════════ -->
   <div id="admin-portal" style="display:none;position:fixed;inset:0;z-index:400;background:var(--bg)">
 
@@ -649,6 +622,7 @@
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
+        <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-revenue'); renderAdminMentorRevenue()">💰 Revenue &amp; Escrow</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
         <div class="su-only-nav" style="display:none">
           <div class="admin-nav-divider">Super User</div>
@@ -669,9 +643,9 @@
             <div class="admin-kpi-card">
               <div class="admin-kpi-row">
                 <div class="admin-kpi-icon info">👥</div>
-                <span class="admin-kpi-meta">6 active</span>
+                <span class="admin-kpi-meta" id="admin-kpi-users-active">0 active</span>
               </div>
-              <div class="admin-kpi-value">8</div>
+              <div class="admin-kpi-value" id="admin-kpi-users-total">0</div>
               <div class="admin-kpi-label">Total Users</div>
             </div>
 
@@ -680,16 +654,16 @@
                 <div class="admin-kpi-icon">📖</div>
                 <span class="admin-kpi-meta">Awaiting review</span>
               </div>
-              <div class="admin-kpi-value">1</div>
+              <div class="admin-kpi-value" id="admin-kpi-mentor-pending">0</div>
               <div class="admin-kpi-label">Pending Mentor Apps</div>
             </div>
 
             <div class="admin-kpi-card">
               <div class="admin-kpi-row">
                 <div class="admin-kpi-icon">⚠️</div>
-                <span class="admin-kpi-meta">1 suspended</span>
+                <span class="admin-kpi-meta" id="admin-kpi-suspended-meta">0 suspended</span>
               </div>
-              <div class="admin-kpi-value">2</div>
+              <div class="admin-kpi-value" id="admin-kpi-flagged-warned">0</div>
               <div class="admin-kpi-label">Flagged / Warned</div>
             </div>
 
@@ -697,7 +671,7 @@
               <div class="admin-kpi-row">
                 <div class="admin-kpi-icon">📜</div>
               </div>
-              <div class="admin-kpi-value">10</div>
+              <div class="admin-kpi-value" id="admin-kpi-audit-events">0</div>
               <div class="admin-kpi-label">Audit Events</div>
             </div>
           </div>
@@ -708,10 +682,10 @@
                 <div class="admin-action-icon">📖</div>
                 <div>
                   <div class="admin-action-title">Review Mentor Applications</div>
-                  <div class="admin-action-sub">1 pending</div>
+                  <div class="admin-action-sub" id="admin-action-mentor-sub">0 pending</div>
                 </div>
               </div>
-              <div class="admin-action-count">1</div>
+              <div class="admin-action-count" id="admin-action-mentor-count">0</div>
             </button>
 
             <button class="admin-action-card" onclick="showAdminPage('admin-users')">
@@ -719,10 +693,10 @@
                 <div class="admin-action-icon">🛡️</div>
                 <div>
                   <div class="admin-action-title">Manage Flagged Users</div>
-                  <div class="admin-action-sub">2 flagged</div>
+                  <div class="admin-action-sub" id="admin-action-flagged-sub">0 flagged</div>
                 </div>
               </div>
-              <div class="admin-action-count">2</div>
+              <div class="admin-action-count" id="admin-action-flagged-count">0</div>
             </button>
 
             <button class="admin-action-card" onclick="showAdminPage('admin-audit')">
@@ -730,10 +704,10 @@
                 <div class="admin-action-icon">📜</div>
                 <div>
                   <div class="admin-action-title">View Full Audit Log</div>
-                  <div class="admin-action-sub">10 entries</div>
+                  <div class="admin-action-sub" id="admin-action-audit-sub">0 entries</div>
                 </div>
               </div>
-              <div class="admin-action-count">10</div>
+              <div class="admin-action-count" id="admin-action-audit-count">0</div>
             </button>
           </div>
 
@@ -742,65 +716,31 @@
               <div class="admin-panel-title">↗ User Health</div>
 
               <div class="admin-health-item">
-                <div class="admin-health-head"><span>Active</span><span>6 / 8</span></div>
+                <div class="admin-health-head"><span>Active</span><span id="admin-health-active-label">0 / 0</span></div>
                 <div class="admin-health-track">
-                  <div class="admin-health-fill success" style="width:75%"></div>
+                  <div class="admin-health-fill success" id="admin-health-active-fill" style="width:0%"></div>
                 </div>
               </div>
 
               <div class="admin-health-item">
-                <div class="admin-health-head"><span>Warned</span><span>1 / 8</span></div>
+                <div class="admin-health-head"><span>Warned</span><span id="admin-health-warned-label">0 / 0</span></div>
                 <div class="admin-health-track">
-                  <div class="admin-health-fill warning" style="width:12.5%"></div>
+                  <div class="admin-health-fill warning" id="admin-health-warned-fill" style="width:0%"></div>
                 </div>
               </div>
 
               <div class="admin-health-item">
-                <div class="admin-health-head"><span>Suspended</span><span>1 / 8</span></div>
+                <div class="admin-health-head"><span>Suspended</span><span id="admin-health-suspended-label">0 / 0</span></div>
                 <div class="admin-health-track">
-                  <div class="admin-health-fill danger" style="width:12.5%"></div>
+                  <div class="admin-health-fill danger" id="admin-health-suspended-fill" style="width:0%"></div>
                 </div>
               </div>
             </div>
 
             <div class="admin-panel">
               <div class="admin-panel-title">📜 Recent Events</div>
-              <div class="admin-events-list">
-                <div class="admin-event-row">
-                  <span class="admin-event-chip task">TASK</span>
-                  <div>
-                    <div class="admin-event-text">Task Approved · Set up project structure</div>
-                    <div class="admin-event-time">Mar 8, 2026 · 10:42 AM</div>
-                  </div>
-                </div>
-                <div class="admin-event-row">
-                  <span class="admin-event-chip mentor">MENTOR</span>
-                  <div>
-                    <div class="admin-event-text">Mentor App Submitted · Mentor Application #app-1</div>
-                    <div class="admin-event-time">Mar 8, 2026 · 09:15 AM</div>
-                  </div>
-                </div>
-                <div class="admin-event-row">
-                  <span class="admin-event-chip warning">WARNING</span>
-                  <div>
-                    <div class="admin-event-text">Warning Issued · Vikram Nair</div>
-                    <div class="admin-event-time">Mar 7, 2026 · 04:30 PM</div>
-                  </div>
-                </div>
-                <div class="admin-event-row">
-                  <span class="admin-event-chip xp">XP</span>
-                  <div>
-                    <div class="admin-event-text">XP Awarded · Rohan Mehta</div>
-                    <div class="admin-event-time">Mar 7, 2026 · 02:11 PM</div>
-                  </div>
-                </div>
-                <div class="admin-event-row">
-                  <span class="admin-event-chip mentor">MENTOR</span>
-                  <div>
-                    <div class="admin-event-text">Mentor App Approved · Priya Patel</div>
-                    <div class="admin-event-time">Mar 7, 2026 · 11:05 AM</div>
-                  </div>
-                </div>
+              <div class="admin-events-list" id="admin-dash-recent-events">
+                <div class="admin-users-empty">No recent events.</div>
               </div>
               <button class="admin-events-link" onclick="showAdminPage('admin-audit')">View full audit log →</button>
             </div>
@@ -843,6 +783,20 @@
           <p class="page-subtitle mt-1">Review and approve mentor applications</p>
           <div class="card mt-4">
             <div id="admin-mentor-list"></div>
+          </div>
+        </div>
+
+        <div id="admin-mentor-revenue" class="admin-page" style="display:none">
+          <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px">
+            <div>
+              <h1>Mentor Marketplace — Revenue &amp; Escrow</h1>
+              <p class="page-subtitle mt-1">Funded on booking, held while pending or active, released to the mentor on completion, refunded to the owner on decline.</p>
+            </div>
+            <button class="btn btn-outline btn-sm" onclick="renderAdminMentorRevenue()">🔄 Refresh</button>
+          </div>
+          <div class="admin-dash-grid-top mt-4" id="admin-mentor-revenue-kpis"></div>
+          <div class="card mt-4" style="padding:0;overflow:hidden">
+            <div id="admin-mentor-revenue-list" class="overflow-x-auto"></div>
           </div>
         </div>
 
@@ -918,6 +872,7 @@
   <script src="js/features/roles/admin-users.js"></script>
   <script src="js/features/roles/admin-projects.js"></script>
   <script src="js/features/roles/admin-mentor-apps.js"></script>
+  <script src="js/features/roles/admin-mentor-revenue.js"></script>
   <script src="js/features/roles/admin-audit.js"></script>
   <script src="js/features/roles/mentors.js"></script>
   <script src="js/features/roles/projects.js"></script>
@@ -926,7 +881,7 @@
   <script src="js/features/roles/collaborator-workspace.js"></script>
   <script src="js/features/roles/my-work.js"></script>
   <script src="js/features/superuser.js"></script>
-  <script src="js/features/hackathons.js"></script>
+  <script src="js/features/mentors-market.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
   <script src="js/app.js"></script>
