@@ -211,6 +211,7 @@ function defaultUserRuntime(userRecord = {}, email = "") {
       bio: String(userRecord.profile?.bio || "").trim(),
       linkedin: String(userRecord.profile?.linkedin || "").trim(),
       phone: String(userRecord.phone || "").trim(),
+      avatarUrl: String(userRecord.profile?.avatarUrl || "").trim(),
     },
     userSkills: Array.isArray(userRecord.profile?.skills)
       ? cloneStateValue(userRecord.profile.skills)
@@ -298,6 +299,8 @@ function loadUserRuntime(email = getCurrentUserSessionEmail()) {
               authoritativeUsername ||
               String(parsedProfile.username || defaults.userProfile.username || "").trim() ||
               "teamforgeuser",
+            avatarUrl:
+              String(parsedProfile.avatarUrl || userRecord?.profile?.avatarUrl || defaults.userProfile.avatarUrl || "").trim(),
           },
           userSkills: Array.isArray(parsed.userSkills)
             ? parsed.userSkills
@@ -365,6 +368,7 @@ function syncRuntimeProfileToAuthStore() {
     bio: STATE.userProfile?.bio || "",
     linkedin: STATE.userProfile?.linkedin || "",
     phone: STATE.userProfile?.phone || "",
+    avatarUrl: STATE.userProfile?.avatarUrl || users[currentUser].profile?.avatarUrl || "",
     skills: cloneStateValue(STATE.userSkills || []),
   };
   saveStateUsersStore(users);

@@ -6,7 +6,7 @@ export class TransactionEntity {
   @ApiPropertyOptional() payeeId?: string;
   @ApiProperty() amount!: number;
   @ApiProperty({ default: 'INR' }) currency!: string;
-  @ApiProperty({ enum: ['hackathon_prize', 'hackathon_listing_fee', 'refund'] }) type!: string;
+  @ApiProperty({ enum: ['mentor_session_payout', 'refund'] }) type!: string;
   @ApiProperty({ enum: ['completed'] }) status!: string;
   @ApiProperty() createdAt!: string;
 }

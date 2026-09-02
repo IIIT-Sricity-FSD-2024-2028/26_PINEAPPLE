@@ -677,6 +677,13 @@
     syncSharedMentorRequestToRuntime(project);
     syncOwnerStoredRequestsToRuntime(project);
     syncCurrentUserProjectAccess(project);
+    // Derive progress from the current task list on every access, rather
+    // than relying on every task-mutating code path to remember to update
+    // it individually (one already did drift — the Kanban drag-and-drop
+    // path bypassed the explicit recalculation calls).
+    if (typeof recalculateProjectProgress === "function") {
+      recalculateProjectProgress(project, project.runtime);
+    }
     return project.runtime;
   }
 
@@ -1295,9 +1302,29 @@
       : false;
   }
 
+  // Keeps project.progress in sync with the approved/total task ratio.
+  // Call after any change to a project's task list or a task's status.
+  function recalculateProjectProgress(project, runtime) {
+    if (!project || project.isCompleted) return; // 100% is a milestone, not recomputed
+    const tasks = Array.isArray(runtime?.tasks) ? runtime.tasks : [];
+    const approved = tasks.filter((task) => task.status === "Approved").length;
+    project.progress = tasks.length ? Math.round((approved / tasks.length) * 100) : 0;
+  }
+
   function canShowTaskProof(task) {
     const status = String(task?.status || "").trim().toLowerCase();
     return Boolean(task?.proofLink) && (status === "in review" || status === "submitted" || status === "approved");
+  }
+
+  // A proof "link" can be an external URL the collaborator pasted, or a
+  // backend-relative path (e.g. "/uploads/xyz.pdf") from an uploaded file —
+  // the latter must be resolved against the API host to actually load.
+  function resolveProofLinkUrl(link) {
+    const value = String(link || "").trim();
+    if (!value) return "";
+    if (/^https?:\/\//i.test(value)) return value;
+    const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+    return `${apiBase}${value.startsWith("/") ? "" : "/"}${value}`;
   }
 
   function taskProofLinkHtml(task, compact) {
@@ -1306,7 +1333,7 @@
         ? '<span class="text-xs text-muted">No proof</span>'
         : '<span class="text-xs text-muted">No proof yet</span>';
     }
-    return `<a class="${compact ? "btn btn-ghost btn-sm" : "workspace-link"}" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">${compact ? "View Proof" : "Proof Link ↗"}</a>`;
+    return `<a class="${compact ? "btn btn-ghost btn-sm" : "workspace-link"}" href="${escapeHtml(resolveProofLinkUrl(task.proofLink))}" target="_blank" rel="noopener noreferrer">${compact ? "View Proof" : "Proof Link ↗"}</a>`;
   }
 
   function taskDifficultyPill(priority) {
@@ -1577,11 +1604,11 @@
       title: "Project Left",
       desc: `You left ${project.name}. Your historical contributions remain visible.`,
     });
+    persistReview2Runtime();
     renderMyWork();
     renderApplied();
     renderProjects();
     renderNotifications();
-    persistReview2Runtime();
     if (STATE.selectedProject === projectId) {
       STATE.selectedProject = "";
       STATE.workspaceMode = "";
@@ -1989,11 +2016,11 @@
         saveStateUsersStore(users);
       }
     }
+    persistReview2Runtime();
     renderApplied();
     renderMyWork();
     renderProjects();
     renderNotifications();
-    persistReview2Runtime();
     showToast(`You joined ${project.name}`);
   }
 
@@ -2055,10 +2082,10 @@
       );
       saveStateUsersStore(users);
     }
+    persistReview2Runtime();
     renderApplied();
     renderProjects();
     renderNotifications();
-    persistReview2Runtime();
     showToast(`Invite declined for ${project?.name || "project"}`);
   }
 
@@ -2289,7 +2316,7 @@
       }
       if (canStart) buttons.push(`<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${idx});closeOwnedTaskDetail()">Start Work</button>`);
       if (canSubmit) buttons.push(`<button class="btn btn-primary btn-sm" onclick="openCollaboratorSubmitModal(${idx});closeOwnedTaskDetail()">Submit Proof</button>`);
-      if (task.proofLink) buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
+      if (task.proofLink) buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(resolveProofLinkUrl(task.proofLink))}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
       buttons.push(`<button class="btn btn-ghost btn-sm" onclick="deleteOwnedTask(${idx});closeOwnedTaskDetail()">Delete</button>`);
       actions = buttons.join(" ");
     }
@@ -2357,6 +2384,7 @@
     const prev = task.status;
     if (prev === newStatus) return;
     task.status = newStatus;
+    recalculateProjectProgress(project, runtime);
     if (typeof saveRuntimeState === "function") saveRuntimeState();
     // Best-effort backend sync – silently ignored when backend is unreachable.
     try {
@@ -2467,7 +2495,7 @@
       const buttons = [];
       if (isMine && task.status === "Open")        buttons.push(`<button class="btn btn-outline btn-sm" onclick="startCollaboratorTask(${idx});closeCollabTaskDetail()">Start Work</button>`);
       if (isMine && task.status === "In Progress") buttons.push(`<button class="btn btn-primary btn-sm" onclick="openCollaboratorSubmitModal(${idx});closeCollabTaskDetail()">Submit Proof</button>`);
-      if (task.proofLink)                          buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(task.proofLink)}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
+      if (task.proofLink)                          buttons.push(`<a class="btn btn-ghost btn-sm" href="${escapeHtml(resolveProofLinkUrl(task.proofLink))}" target="_blank" rel="noopener noreferrer">View Proof</a>`);
       actions = buttons.join(" ") || `<span class="text-xs text-muted">${isMentorView ? "Read-only view" : "No actions available"}</span>`;
     }
     return `
@@ -2651,6 +2679,10 @@
 
   function renderOwnedWorkspaceTab(project, runtime, mentor, tab) {
     if (tab === "tasks") {
+      const taskCount = Array.isArray(runtime.tasks) ? runtime.tasks.length : 0;
+      const approvedCount = Array.isArray(runtime.tasks)
+        ? runtime.tasks.filter((task) => task.status === "Approved").length
+        : 0;
       const publishBox =
         !project.isCompleted && allTasksApproved(runtime)
           ? `
@@ -2663,7 +2695,14 @@
               </div>
             </div>
           `
-          : "";
+          : !project.isCompleted && taskCount > 0
+            ? `
+              <div class="workspace-summary-box mt-3">
+                <div class="workspace-summary-box__title">${approvedCount} of ${taskCount} tasks approved</div>
+                <p class="text-sm text-muted">A task being submitted isn't enough on its own — as the owner, open each task below and click <strong>Approve</strong>. Once every task shows "Approved", the final link submission unlocks here.</p>
+              </div>
+            `
+            : "";
       return `
         <div class="card">
           <div class="workspace-card__top">
@@ -3162,9 +3201,9 @@
       }
     }
 
+    persistReview2Runtime();
     renderProjectWorkspace();
     renderApplied();
-    persistReview2Runtime();
     showToast(
       action === "approve"
         ? `${request.name} added to the project`
@@ -3296,6 +3335,7 @@
       return;
     }
     markProjectCompletedFromPublishedLink(project, runtime, link);
+
     APPLIED.forEach((item) => {
       if (
         (item.projectId === project.id || item.project === project.name) &&
@@ -3333,11 +3373,33 @@
     if (typeof saveStateUsersStore === "function") {
       saveStateUsersStore(users);
     }
+    // Persist BEFORE re-rendering: renderMyProjects() -> refreshSharedReview2Runtime()
+    // -> hydrateReview2Runtime() reloads PROJECTS from localStorage, so persisting
+    // after that render would overwrite the just-saved completion with stale data.
+    persistReview2Runtime();
     renderMyProjects();
     renderProjectWorkspace();
     renderNotifications();
-    persistReview2Runtime();
+    if (typeof renderProfile === "function") renderProfile();
+    if (typeof renderDashboard === "function") renderDashboard();
     showToast(`${project.name} marked as completed`);
+
+    // Fire-and-forget: release escrow to any mentor actively linked to this
+    // project. Must never block or delay the completion feedback above —
+    // a slow/unreachable backend should not make "mark complete" look broken.
+    if (typeof mentorMarketApi !== "undefined") {
+      mentorMarketApi.mySessions()
+        .then((sessions) => {
+          const active = Array.isArray(sessions)
+            ? sessions.find((s) => s.projectId === project.id && s.status === "active")
+            : null;
+          return active ? mentorMarketApi.completeSession(active.id) : null;
+        })
+        .then((completed) => {
+          if (completed) showToast("Escrow released — your mentor has been paid.", "success");
+        })
+        .catch((err) => console.warn("Could not release mentor escrow for this project:", err));
+    }
   }
 
   function deleteOwnedProject(projectId) {
@@ -3682,6 +3744,7 @@
       status: "Open",
     };
     runtime.tasks.push(newTask);
+    recalculateProjectProgress(project, runtime);
     if (assignee === project.owner && !(project.members || []).some(m => m.name === assignee)) {
       project.members = project.members || [];
       project.members.push({ name: assignee, initials: getInitialsFromName(assignee), role: "Collaborator" });
@@ -3698,7 +3761,7 @@
     openOwnedTaskModal();
   }
 
-  function renderMentors() {
+  async function renderMentors() {
     refreshSharedReview2Runtime();
     ensureReview2State();
     const page = document.getElementById("page-mentors");
@@ -3713,8 +3776,13 @@
       null;
 
     page.innerHTML = `
-      <h1>Mentors</h1>
-      <p class="page-subtitle">Request exactly one mentor per project. A mentor appears as assigned only after approval.</p>
+      <div class="flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h1>Mentors</h1>
+          <p class="page-subtitle">Request exactly one mentor per project. Payment is held in escrow until the mentor accepts.</p>
+        </div>
+        <button class="btn btn-outline btn-sm" onclick="if (typeof MM_STATE !== 'undefined') { MM_STATE.tab = 'my-sessions'; } navigate('mentors-market')">📚 Booking History</button>
+      </div>
       ${
         ownerProjects.length
           ? `
@@ -3735,50 +3803,84 @@
           `
           : ""
       }
-      <div class="three-col mt-3">
+      <div class="three-col mt-3" id="mentors-grid-body">
         ${
           selectedProject
-            ? MENTORS_DATA.map((mentor) => {
-                const runtime = getProjectRuntime(selectedProject);
-                const request = runtime.mentorRequest;
-                const isOwnerMentor = mentor.name === selectedProject.owner;
-                const isRequested =
-                  request && request.requestedName === mentor.name && request.status === "requested";
-                const isAssigned =
-                  request && request.requestedName === mentor.name && request.status === "approved";
-                const hasApprovedMentor =
-                  request &&
-                  request.status === "approved" &&
-                  request.requestedName !== mentor.name;
-                const label = isAssigned
-                  ? "Assigned"
-                  : isRequested
-                    ? "Requested"
-                    : isOwnerMentor
-                      ? "Owner cannot mentor"
-                      : hasApprovedMentor
-                        ? "Mentor already assigned"
-                      : "Request";
-                return `
-                  <div class="card">
-                    <div class="flex items-center gap-3 mb-3">
-                      <div class="workspace-member-avatar mentor">${escapeHtml(mentor.initials)}</div>
-                      <div>
-                        <div class="font-semibold text-sm">${escapeHtml(mentor.name)}</div>
-                        <div class="text-xs text-muted">${escapeHtml(mentor.title)} · ${escapeHtml(mentor.uni)}</div>
-                      </div>
-                    </div>
-                    <div class="project-skills" style="margin-bottom:12px">${mentor.skills
-                      .map((skill) => `<span class="skill-tag">${escapeHtml(skill)}</span>`)
-                      .join("")}</div>
-                    <button class="btn btn-${isAssigned ? "outline" : "primary"} btn-sm btn-full" ${isOwnerMentor || isRequested || isAssigned || hasApprovedMentor ? "disabled" : ""} onclick="requestMentorForProject('${selectedProject.id}','${mentor.name.replace(/'/g, "\\'")}')">${label}</button>
-                  </div>
-                `;
-              }).join("")
+            ? '<div class="card"><p class="text-sm text-muted">Loading mentors…</p></div>'
             : '<div class="card"><p class="text-sm text-muted">Create or select an owned project to request a mentor.</p></div>'
         }
       </div>
     `;
+
+    if (!selectedProject) return;
+
+    let mentors = [];
+    try {
+      mentors = await mentorMarketApi.listMentors();
+      if (!Array.isArray(mentors)) mentors = [];
+    } catch {
+      mentors = [];
+    }
+
+    let mySessions = [];
+    try {
+      mySessions = await mentorMarketApi.mySessions();
+      if (!Array.isArray(mySessions)) mySessions = [];
+    } catch {
+      mySessions = [];
+    }
+
+    // The user may have navigated away while these awaits were in flight.
+    const grid = document.getElementById("mentors-grid-body");
+    if (!grid) return;
+
+    if (!mentors.length) {
+      grid.innerHTML =
+        '<div class="card"><p class="text-sm text-muted">No mentors have published pricing yet. Check back soon.</p></div>';
+      return;
+    }
+
+    const runtime = getProjectRuntime(selectedProject);
+    const request = runtime.mentorRequest;
+    const isProjectAssigned = !!(request && request.status === "approved");
+    const pendingSession = mySessions.find(
+      (s) => s.projectId === selectedProject.id && s.status === "escrow_funded",
+    );
+
+    grid.innerHTML = mentors
+      .map((mentor) => {
+        const isOwnerMentor = mentor.name === selectedProject.owner;
+        const isAssigned = isProjectAssigned && request.requestedName === mentor.name;
+        const isPending = !!pendingSession && pendingSession.mentorId === mentor.id;
+        const blockedByOther =
+          (isProjectAssigned && !isAssigned) || (!!pendingSession && !isPending);
+        const label = isAssigned
+          ? "✅ Assigned"
+          : isPending
+            ? "⏳ Pending Response"
+            : isOwnerMentor
+              ? "Owner cannot mentor"
+              : blockedByOther
+                ? "Mentor already assigned"
+                : `📅 Request & Pay ₹${mentor.sessionPrice}`;
+        const disabled = isOwnerMentor || isAssigned || isPending || blockedByOther;
+        return `
+          <div class="card">
+            <div class="flex items-center gap-3 mb-3">
+              <div class="workspace-member-avatar mentor">${escapeHtml(mentor.avatar || "🧑‍🏫")}</div>
+              <div>
+                <div class="font-semibold text-sm">${escapeHtml(mentor.name)}</div>
+                <div class="text-xs text-muted">${escapeHtml(mentor.title)} · ₹${mentor.sessionPrice}/${mentor.sessionDuration}min</div>
+              </div>
+            </div>
+            <div class="project-skills" style="margin-bottom:12px">${(mentor.skills || [])
+              .map((skill) => `<span class="skill-tag">${escapeHtml(skill)}</span>`)
+              .join("")}</div>
+            <button class="btn btn-${isAssigned ? "outline" : "primary"} btn-sm btn-full" ${disabled ? "disabled" : ""} onclick="openEscrowBookingModal('${selectedProject.id}','${mentor.id}','${mentor.name.replace(/'/g, "\\'")}',${mentor.sessionPrice})">${label}</button>
+          </div>
+        `;
+      })
+      .join("");
   }
 
   function selectOwnerMentorProject(projectId) {
@@ -3788,148 +3890,132 @@
     renderMentors();
   }
 
-  function requestMentorForProject(projectId, mentorName) {
-    const project = PROJECTS.find((item) => item.id === projectId);
-    const runtime = getProjectRuntime(project);
-    if (!project || !runtime) return;
-    if (project.owner === mentorName) {
-      showToast("The project owner cannot mentor their own project", "error");
-      return;
-    }
-    if (runtime.mentorRequest) {
-      showToast("Only one mentor can be requested per project", "error");
-      return;
-    }
-    const mentorAccount = findUserByName(mentorName);
-    const requestedOn = getLiveTimestamp();
-    clearDeletedMentorRequest(project);
-    runtime.mentorRequestDeleted = null;
-    runtime.mentorRequest = {
-      requestedName: mentorName,
-      mentorEmail: mentorAccount?.email || "",
-      ownerEmail:
-        typeof getCurrentUserSessionEmail === "function"
-          ? getCurrentUserSessionEmail()
-          : "",
-      status: "requested",
-      requestedOn,
-    };
-    const sharedRequests = loadSharedMentorRequests().filter(
-      (item) => item.projectId !== project.id,
-    );
-    sharedRequests.unshift({
-      projectId: project.id,
-      projectName: project.name,
-      ownerName: project.owner,
-      ownerEmail:
-        typeof getCurrentUserSessionEmail === "function"
-          ? getCurrentUserSessionEmail()
-          : "",
-      mentorName,
-      mentorEmail: mentorAccount?.email || "",
-      status: "requested",
-      requestedOn,
-    });
-    saveSharedMentorRequests(sharedRequests);
-    const existingRequest = MENTOR_REQUESTS.find(
-      (item) => item.project === project.name && item.owner === project.owner,
-    );
-    if (!existingRequest) {
-      MENTOR_REQUESTS.unshift({
-        project: project.name,
-        owner: project.owner,
-        skills: project.skills.slice(0, 3),
-        members: project.members.length,
-        status: "Pending",
-        mentorName,
-        projectId: project.id,
-      });
-    }
-    if (mentorAccount?.email) {
-      const users =
-        typeof getStateUsersStore === "function" ? getStateUsersStore() : {};
-      if (users[mentorAccount.email]) {
-        users[mentorAccount.email].data = ensureStateUserDataShape(users[mentorAccount.email].data);
-        pushUserNotification(users[mentorAccount.email], {
-          type: "MENTOR_REQUEST",
-          message: `${project.owner} requested your mentorship for ${project.name}.`,
-          projectId: project.id,
-          from:
-            typeof getCurrentUserSessionEmail === "function"
-              ? getCurrentUserSessionEmail()
-              : "",
-          status: "pending",
-          timestamp: requestedOn,
-          icon: "🛡️",
-          title: "Mentor Request",
-          desc: `${project.owner} requested your mentorship for ${project.name}.`,
-          time: requestedOn,
-        });
-        if (typeof saveStateUsersStore === "function") {
-          saveStateUsersStore(users);
-        }
-      }
-    } else {
-      pushNotification({
-        roleScope: ["mentor"],
-        icon: "🛡️",
-        title: "Mentor Request",
-        desc: `${project.owner} requested your mentorship for ${project.name}.`,
-      });
-    }
-    persistReview2Runtime();
-    renderMentors();
-    renderNotifications();
-    showToast(`Mentor request sent to ${mentorName}`);
+  // ── Escrow booking modal (project owner requests + pays a real marketplace mentor) ──
+  function openEscrowBookingModal(projectId, mentorId, mentorName, price) {
+    const existing = document.getElementById("mentor-escrow-modal");
+    if (existing) existing.remove();
+
+    const modal = document.createElement("div");
+    modal.id = "mentor-escrow-modal";
+    modal.style.cssText =
+      "position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:2000;display:flex;align-items:center;justify-content:center;padding:16px";
+    modal.innerHTML = `
+      <div class="card" style="padding:24px;max-width:460px;width:100%;max-height:90vh;overflow-y:auto">
+        <h3 style="margin-top:0">📅 Request ${escapeHtml(mentorName)}</h3>
+        <p class="text-sm text-muted" style="margin-bottom:16px">₹${price} will be held in escrow until ${escapeHtml(mentorName)} accepts. You're refunded in full if they decline.</p>
+        <div class="input-group">
+          <label class="label">What do you need help with? *</label>
+          <textarea class="input" id="mentor-escrow-desc" rows="4" placeholder="Describe your project and what you'd like guidance on…" style="width:100%;resize:vertical"></textarea>
+        </div>
+        <div style="display:flex;gap:8px;margin-top:16px">
+          <button class="btn btn-primary" style="flex:1" id="mentor-escrow-confirm-btn" onclick="confirmEscrowBooking('${projectId}','${mentorId}',${price})">Pay ₹${price} & Send Request</button>
+          <button class="btn btn-outline" onclick="document.getElementById('mentor-escrow-modal').remove()">Cancel</button>
+        </div>
+      </div>`;
+    document.body.appendChild(modal);
   }
 
-  function renderMentorRequests() {
+  async function confirmEscrowBooking(projectId, mentorId, price) {
+    const desc = document.getElementById("mentor-escrow-desc")?.value.trim();
+    if (!desc) {
+      showToast("Please describe what you need help with.", "error");
+      return;
+    }
+    const btn = document.getElementById("mentor-escrow-confirm-btn");
+    if (btn) {
+      btn.disabled = true;
+      btn.textContent = "Booking…";
+    }
+    try {
+      await mentorMarketApi.bookSession({ mentorId, projectId, projectDescription: desc });
+      document.getElementById("mentor-escrow-modal")?.remove();
+      showToast(`✅ ₹${price} sent to escrow. Waiting for the mentor to accept.`, "success");
+      renderMentors();
+    } catch (err) {
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = `Pay ₹${price} & Send Request`;
+      }
+      showToast("Booking failed: " + err.message, "error");
+    }
+  }
+
+  async function renderMentorRequests() {
     refreshSharedReview2Runtime();
     const root = document.getElementById("mentor-requests-content");
     if (!root) return;
-    const myName = getCurrentUserName();
-    const myEmail =
-      typeof getCurrentUserSessionEmail === "function"
-        ? getCurrentUserSessionEmail()
-        : "";
-    const runtimeItems = PROJECTS.filter((project) => {
-      const runtime = getProjectRuntime(project);
-      return (
-        runtime.mentorRequest &&
-        (runtime.mentorRequest.requestedName === myName ||
-          runtime.mentorRequest.mentorEmail === myEmail)
-      );
-    });
+    root.innerHTML = '<p class="text-sm text-muted italic">Loading requests…</p>';
 
-    const runtimeHtml = runtimeItems
-      .map((project) => {
-            const runtime = getProjectRuntime(project);
-            const request = runtime.mentorRequest;
-            return `
-              <div class="workspace-request-row">
-                <div>
-                  <div class="font-semibold text-sm">${escapeHtml(project.name)}</div>
-                  <div class="text-xs text-muted">Owner: ${escapeHtml(project.owner)} · ${project.members.length} members · Requested ${escapeHtml(request.requestedOn)}</div>
-                </div>
-                <div class="workspace-card__actions">
-                  ${
-                    request.status === "requested"
-                      ? `
-                        <button class="btn btn-primary btn-sm" onclick="acceptMentorRequest('${project.id}')">Approve</button>
-                        <button class="btn btn-outline btn-sm" onclick="declineMentorRequest('${project.id}')">Reject</button>
-                      `
-                      : `<span class="badge ${request.status === "approved" ? "badge-success" : "badge-warning"}">${request.status}</span>`
-                  }
-                </div>
-              </div>
-            `;
-          })
-          .join("");
+    let sessions = [];
+    try {
+      sessions = await mentorMarketApi.mentorSessions();
+      if (!Array.isArray(sessions)) sessions = [];
+    } catch {
+      sessions = [];
+    }
 
-    root.innerHTML =
-      runtimeHtml
-        ? `<div class="space-y-3">${runtimeHtml}</div>`
-        : '<p class="text-sm text-muted italic">No mentor requests for you right now.</p>';
+    // The user may have navigated away while this await was in flight.
+    const targetRoot = document.getElementById("mentor-requests-content");
+    if (!targetRoot) return;
+
+    const pending = sessions.filter((s) => s.status === "escrow_funded");
+
+    const pendingHtml = pending
+      .map((session) => {
+        const project = PROJECTS.find((p) => p.id === session.projectId);
+        return `
+          <div class="workspace-request-row">
+            <div>
+              <div class="font-semibold text-sm">${escapeHtml(project ? project.name : "Unknown project")}</div>
+              <div class="text-xs text-muted">Owner: ${escapeHtml(project ? project.owner : "—")} · ₹${session.agreedPrice} held in escrow · ${escapeHtml(new Date(session.createdAt).toLocaleDateString())}</div>
+              <div class="text-xs text-muted" style="margin-top:4px">"${escapeHtml(session.projectDescription)}"</div>
+            </div>
+            <div class="workspace-card__actions">
+              <button class="btn btn-primary btn-sm" onclick="acceptMarketplaceMentorRequest('${session.id}','${session.projectId}')">Approve</button>
+              <button class="btn btn-outline btn-sm" onclick="declineMarketplaceMentorRequest('${session.id}')">Reject</button>
+            </div>
+          </div>
+        `;
+      })
+      .join("");
+
+    targetRoot.innerHTML = `
+      <div class="flex items-center justify-between flex-wrap gap-2" style="margin-bottom:12px">
+        <p class="text-sm text-muted" style="margin:0">Requests awaiting your response — payment is already held in escrow.</p>
+        <button class="btn btn-outline btn-sm" onclick="if (typeof MM_STATE !== 'undefined') { MM_STATE.tab = 'become-mentor'; } navigate('mentors-market')">💰 Manage My Listing &amp; Price</button>
+      </div>
+      ${
+        pendingHtml
+          ? `<div class="space-y-3">${pendingHtml}</div>`
+          : '<p class="text-sm text-muted italic">No mentor requests for you right now.</p>'
+      }
+    `;
+  }
+
+  // Mentor approves a paid booking: confirm it on the marketplace (moves
+  // escrow_funded → active) then reuse the existing project-access grant
+  // (adds the mentor to project.members, unlocks workspace/proof-links/chat).
+  async function acceptMarketplaceMentorRequest(sessionId, projectId) {
+    try {
+      await mentorMarketApi.acceptSession(sessionId);
+      if (typeof acceptMentorRequest === "function") {
+        acceptMentorRequest(projectId);
+      }
+      showToast("✅ Request accepted — you now have access to the project workspace.", "success");
+      renderMentorRequests();
+    } catch (err) {
+      showToast("Error: " + err.message, "error");
+    }
+  }
+
+  async function declineMarketplaceMentorRequest(sessionId) {
+    try {
+      await mentorMarketApi.declineSession(sessionId);
+      showToast("Request declined. The escrowed amount has been refunded.", "info");
+      renderMentorRequests();
+    } catch (err) {
+      showToast("Error: " + err.message, "error");
+    }
   }
 
   function acceptMentorRequest(projectId) {
@@ -4609,6 +4695,7 @@
       return;
     }
     task.status = "Approved";
+    recalculateProjectProgress(project, runtime);
     runtime.contributionHistory.unshift({
       title: task.title,
       by: task.assignee || project.owner,
@@ -4655,6 +4742,7 @@
       return;
     }
     task.status = "Open";
+    recalculateProjectProgress(project, runtime);
     runtime.contributionHistory.unshift({
       title: task.title,
       by: task.assignee || project.owner,
@@ -4697,6 +4785,7 @@
     }
 
     runtime.tasks.splice(index, 1);
+    recalculateProjectProgress(project, runtime);
     runtime.contributionHistory = (runtime.contributionHistory || []).filter(
       (entry) => entry.title !== task.title,
     );
@@ -4727,6 +4816,8 @@
         document.getElementById("collab-proof-link")?.value ||
         "",
     ).trim();
+    const fileInput = document.getElementById("collab-proof-file");
+    const file = fileInput?.files?.[0] || null;
     if (!task) {
       showToast("Task not found", "error");
       return;
@@ -4739,10 +4830,42 @@
       showToast("Only the assigned collaborator can submit this task", "error");
       return;
     }
-    if (!isValidWebUrl(link)) {
-      showToast("Please enter a valid proof link", "error");
+    if (!file && !isValidWebUrl(link)) {
+      showToast("Upload a file or enter a valid proof link", "error");
       return;
     }
+
+    const submitBtn = document.querySelector('#collab-submit-modal .btn-primary');
+    let proofLink = link;
+    if (file) {
+      if (submitBtn) { submitBtn.disabled = true; submitBtn.textContent = "Uploading…"; }
+      try {
+        const apiBase = typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000";
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch(`${apiBase}/uploads/task-proof`, {
+          method: "POST",
+          headers: {
+            "x-user-id": typeof getCurrentUserId === "function" ? getCurrentUserId() : "1",
+            "x-user-role": typeof getCurrentUserRole === "function" ? getCurrentUserRole() : "Collaborator",
+          },
+          body: formData,
+        });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({}));
+          throw new Error(err.message || `Upload failed (${response.status})`);
+        }
+        const data = await response.json();
+        proofLink = data.url || data.path || (data.filename ? `/uploads/${data.filename}` : "");
+        if (!proofLink) throw new Error("Upload succeeded but no file URL was returned");
+      } catch (error) {
+        if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Submit For Review"; }
+        showToast("File upload failed: " + error.message, "error");
+        return;
+      }
+      if (submitBtn) { submitBtn.disabled = false; submitBtn.textContent = "Submit For Review"; }
+    }
+
     try {
       if (window.tasksApi && task.id && !task.id.includes("task-")) {
         await window.tasksApi.update(task.id, { status: "In Review" });
@@ -4751,12 +4874,12 @@
       console.warn("Backend unavailable, falling back to local task state.");
     }
     task.status = "In Review";
-    task.proofLink = link;
+    task.proofLink = proofLink;
     runtime.contributionHistory.unshift({
       title: task.title,
       by: getCurrentUserName(),
       status: "In Review",
-      summary: `Submitted work proof: ${link}`,
+      summary: file ? `Submitted work proof: ${file.name}` : `Submitted work proof: ${proofLink}`,
     });
     const users =
       typeof getStateUsersStore === "function" ? getStateUsersStore() : {};
@@ -5195,7 +5318,7 @@
     return `
       <div class="card">
         <div class="profile-header">
-          <div class="profile-avatar">${escapeHtml(profile.initials)}</div>
+          <div class="profile-avatar">${profile.avatarUrl ? `<img src="${(typeof resolveApiBaseUrl === "function" ? resolveApiBaseUrl() : "http://localhost:3000")}${profile.avatarUrl}" style="width:100%; height:100%; border-radius:50%; object-fit:cover;">` : escapeHtml(profile.initials)}</div>
           <div class="profile-info">
             <div class="profile-name">${escapeHtml(profile.name)}${profile.hasMentorBadge ? ` <span class="mentor-rec-badge">${profileIconSvg("mentor")}<span>Mentor Recommended</span></span>` : ""}</div>
             <div class="profile-title">${escapeHtml(profile.title)} Â· ${escapeHtml(profile.uni)}</div>
@@ -5438,10 +5561,13 @@
     inviteOwnedTaskMember,
     renderMentors,
     selectOwnerMentorProject,
-    requestMentorForProject,
+    openEscrowBookingModal,
+    confirmEscrowBooking,
     renderMentorRequests,
     acceptMentorRequest,
     declineMentorRequest,
+    acceptMarketplaceMentorRequest,
+    declineMarketplaceMentorRequest,
     renderMentoredProjects,
     applyToPreviewProject,
     openWorkspace,

@@ -284,6 +284,7 @@ function adminModerateUser(encodedName, action, event) {
     renderAdminUserProfile(user);
   }
   renderAuditLog();
+  if (typeof renderAdminDash === "function") renderAdminDash();
   showToast(`${user.name} ${actionLabel}`);
 }
 

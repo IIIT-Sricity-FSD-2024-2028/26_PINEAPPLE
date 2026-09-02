@@ -1,4 +1,4 @@
-import { IsEmail, IsString, IsEnum, IsOptional, IsArray, IsBoolean, IsUrl } from 'class-validator';
+import { IsEmail, IsString, IsEnum, IsOptional, IsArray, IsBoolean, IsUrl, IsObject } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum UserRole {
@@ -50,4 +50,10 @@ export class CreateUserDto {
   @IsBoolean()
   @IsOptional()
   flags?: boolean;
+
+  /** Extended profile object — bio, username, phone, avatarUrl, xp, rep, etc. */
+  @ApiPropertyOptional({ description: 'Extended profile fields', type: 'object', additionalProperties: true })
+  @IsObject()
+  @IsOptional()
+  profile?: Record<string, any>;
 }

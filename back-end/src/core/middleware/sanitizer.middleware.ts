@@ -24,11 +24,17 @@ export class SanitizerMiddleware implements NestMiddleware {
     if (req.body && typeof req.body === 'object') {
       req.body = this.sanitizeObject(req.body);
     }
+    // Express 5 makes req.query a read-only getter — reassigning the
+    // property itself throws. Mutate the existing object in place instead.
     if (req.query && typeof req.query === 'object') {
-      req.query = this.sanitizeObject(req.query) as any;
+      const sanitizedQuery = this.sanitizeObject(req.query);
+      for (const key of Object.keys(req.query)) delete (req.query as Record<string, unknown>)[key];
+      Object.assign(req.query, sanitizedQuery);
     }
     if (req.params && typeof req.params === 'object') {
-      req.params = this.sanitizeObject(req.params) as any;
+      const sanitizedParams = this.sanitizeObject(req.params);
+      for (const key of Object.keys(req.params)) delete (req.params as Record<string, unknown>)[key];
+      Object.assign(req.params, sanitizedParams);
     }
 
     next();

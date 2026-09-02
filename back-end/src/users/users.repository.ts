@@ -28,7 +28,8 @@ export class UsersRepository {
       linkedIn: 'https://linkedin.com/in/priyapatel',
       status: UserStatus.Active,
       flags: false,
-    });
+      profile: { xp: 1240, rep: 92, bio: 'Platform Administrator & Full-Stack Developer', username: 'priyapatel' },
+    } as any);
     this.users.push({
       id: '2',
       name: 'Arjun Sharma',
@@ -38,17 +39,41 @@ export class UsersRepository {
       linkedIn: 'https://linkedin.com/in/arjunsharma',
       status: UserStatus.Active,
       flags: false,
-    });
+      profile: { xp: 850, rep: 67, bio: 'ML Engineer & React Developer', username: 'arjunsharma' },
+    } as any);
     this.users.push({
       id: '3',
       name: 'Kiran Bose',
       email: 'kiran.bose@teamforge.io',
-      role: UserRole.Collaborator,
+      role: UserRole.Mentor,
       skills: ['TypeScript', 'Supabase'],
       linkedIn: 'https://linkedin.com/in/kiranbose',
-      status: UserStatus.Suspended,
-      flags: true,
-    });
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 320, rep: 28, bio: 'TypeScript Developer', username: 'kiranbose' },
+    } as any);
+    this.users.push({
+      id: '4',
+      name: 'Rohan Mehta',
+      email: 'rohan.mehta@teamforge.io',
+      role: UserRole.Mentor,
+      skills: ['UI/UX', 'Figma', 'React'],
+      linkedIn: 'https://linkedin.com/in/rohanmehta',
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 950, rep: 88, bio: 'UI/UX Designer', username: 'rohanmehta' },
+    } as any);
+    this.users.push({
+      id: '5',
+      name: 'Sneha Iyer',
+      email: 'sneha.iyer@teamforge.io',
+      role: UserRole.Mentor,
+      skills: ['DevOps', 'AWS', 'Docker'],
+      linkedIn: 'https://linkedin.com/in/snehaiyer',
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 780, rep: 71, bio: 'Cloud Architect', username: 'snehaiyer' },
+    } as any);
   }
 
   findAll(): User[] {

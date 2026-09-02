@@ -178,7 +178,7 @@ document.addEventListener("DOMContentLoaded", () => {
   const signupForm = document.getElementById("signup-form");
 
   if (loginForm) {
-    loginForm.addEventListener("submit", (e) => {
+    loginForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearErrors(loginForm);
 
@@ -206,8 +206,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const identifier = normalizeIdentifier(identifierInput.value);
       const password = passwordInput.value;
 
-      // Check if credentials match a superuser account
+      // Check if credentials match a portal account (superuser or admin).
+      // Plain "admin" accounts (default or created via Manage Admins) only
+      // exist in the Admin Portal's own store — they were never signed up
+      // as regular app users, so validateUserLogin() below would never
+      // find them. Route them straight to the Admin Portal login instead
+      // of letting them fall through to a guaranteed "invalid credentials".
       let isSuperUserLogin = false;
+      let isPortalAdminLogin = false;
       if (
         typeof PORTAL_ACCOUNTS !== "undefined" &&
         Array.isArray(PORTAL_ACCOUNTS)
@@ -217,7 +223,14 @@ document.addEventListener("DOMContentLoaded", () => {
         );
         if (account && account.portalRole === "superuser") {
           isSuperUserLogin = true;
+        } else if (account && account.portalRole === "admin") {
+          isPortalAdminLogin = true;
         }
+      }
+
+      if (isPortalAdminLogin) {
+        window.location.href = "teamforge.html?admin=1";
+        return;
       }
 
       if (!isSuperUserLogin) {
@@ -246,30 +259,47 @@ document.addEventListener("DOMContentLoaded", () => {
         }
 
         // ── Backend Integration: Fetch backend user ID on login ──
+        // Awaited so teamforge.backendUserId is reliably set before we
+        // navigate away below — location.replace() aborts any still-
+        // in-flight fetch, which used to leave this unset and made every
+        // backend-tied feature (mentor marketplace, escrow, etc.) silently
+        // fall back to the wrong default identity.
         try {
           if (window.usersApi) {
-            window.usersApi.list()
-              .then((users) => {
-                const match = Array.isArray(users)
-                  ? users.find(
-                      (u) =>
-                        String(u.email || "").toLowerCase() ===
-                        String(result.email || "").toLowerCase(),
-                    )
-                  : null;
-                if (match && match.id) {
-                  localStorage.setItem("teamforge.backendUserId", match.id);
-                  console.log("✅ Backend user ID resolved:", match.id);
+            const users = await window.usersApi.list();
+            const match = Array.isArray(users)
+              ? users.find(
+                  (u) =>
+                    String(u.email || "").toLowerCase() ===
+                    String(result.email || "").toLowerCase(),
+                )
+              : null;
+            if (match && match.id) {
+              localStorage.setItem("teamforge.backendUserId", match.id);
+              console.log("✅ Backend user ID resolved:", match.id);
+            } else {
+              // User exists locally but not in backend (likely due to backend restart). Re-sync!
+              const payload = {
+                name: result.user?.name || result.email.split('@')[0],
+                email: result.email,
+                role: result.user?.role === "administrator" ? "Administrator" : "Collaborator",
+                skills: []
+              };
+              try {
+                const data = await window.usersApi.create(payload, "Collaborator");
+                if (data && data.id) {
+                  localStorage.setItem("teamforge.backendUserId", data.id);
+                  console.log("✅ User re-synced to backend with ID:", data.id);
                 }
-              })
-              .catch((err) =>
-                console.warn("Backend unreachable for user lookup:", err.message),
-              );
+              } catch (e) {
+                console.warn("Failed to re-sync user:", e);
+              }
+            }
           } else {
             console.warn("apiClient not loaded");
           }
-        } catch (e) {
-          console.warn("Backend user lookup error:", e);
+        } catch (err) {
+          console.warn("Backend unreachable for user lookup:", err.message);
         }
         // ── End Backend Integration ──
 
@@ -297,7 +327,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   if (signupForm) {
-    signupForm.addEventListener("submit", (e) => {
+    signupForm.addEventListener("submit", async (e) => {
       e.preventDefault();
       clearErrors(signupForm);
 
@@ -371,6 +401,8 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       // ── Backend Integration: Create user in NestJS ──
+      // Awaited so teamforge.backendUserId is reliably set before we
+      // navigate away below (see the matching note in the login handler).
       try {
         if (window.usersApi) {
           const payload = {
@@ -379,19 +411,16 @@ document.addEventListener("DOMContentLoaded", () => {
             role: "Collaborator",
             skills: [],
           };
-          window.usersApi.create(payload, "Collaborator")
-            .then((data) => {
-              if (data && data.id) {
-                localStorage.setItem("teamforge.backendUserId", data.id);
-                console.log("✅ User synced to backend with ID:", data.id);
-              }
-            })
-            .catch((err) => console.warn("Backend unreachable for user sync:", err.message));
+          const data = await window.usersApi.create(payload, "Collaborator");
+          if (data && data.id) {
+            localStorage.setItem("teamforge.backendUserId", data.id);
+            console.log("✅ User synced to backend with ID:", data.id);
+          }
         } else {
           console.warn("apiClient not loaded");
         }
-      } catch (e) {
-        console.warn("Backend user sync error:", e);
+      } catch (err) {
+        console.warn("Backend unreachable for user sync:", err.message);
       }
       // ── End Backend Integration ──
 

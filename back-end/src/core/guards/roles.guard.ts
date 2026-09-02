@@ -29,10 +29,16 @@ export class RolesGuard implements CanActivate {
     }
 
     const roleAliases: Record<string, string[]> = {
-      'admin': ['administrator', 'admin'],
-      'user': ['collaborator', 'project owner', 'mentor', 'administrator', 'user'],
+      'admin': ['administrator', 'admin', 'portal admin', 'portal_admin'],
+      'administrator': ['administrator', 'admin', 'portal admin', 'portal_admin'],
+      'user': ['collaborator', 'project owner', 'mentor', 'administrator', 'admin', 'super user', 'superuser', 'user'],
+      'collaborator': ['collaborator', 'administrator', 'admin', 'super user', 'superuser', 'user'],
+      'project owner': ['project owner', 'administrator', 'admin', 'super user', 'superuser'],
+      'mentor': ['mentor', 'administrator', 'admin', 'super user', 'superuser'],
       'superuser': ['super user', 'superuser'],
-      'portal_admin': ['administrator', 'portal admin', 'portal_admin']
+      'super user': ['super user', 'superuser'],
+      'portal_admin': ['administrator', 'admin', 'portal admin', 'portal_admin'],
+      'portal admin': ['administrator', 'admin', 'portal admin', 'portal_admin']
     };
 
     const hasRole = requiredRoles.some((requiredRole) => {
