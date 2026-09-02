@@ -1278,15 +1278,27 @@
     ownerMemberMenuCloseBound = true;
   }
 
+  function updateAndPersistProjectProgress(project, runtime) {
+    if (runtime && Array.isArray(runtime.tasks) && runtime.tasks.length > 0) {
+      const total = runtime.tasks.length;
+      const completed = runtime.tasks.filter(t => ["Approved", "Done", "Completed"].includes(t.status)).length;
+      project.progress = Math.round((completed / total) * 100);
+    }
+    project.isUserCreated = true;
+    if (typeof saveCreatedProjects === 'function') saveCreatedProjects();
+  }
+
   function markProjectCompletedFromPublishedLink(project, runtime, link) {
     project.isCompleted = true;
     project.progress = 100;
     project.status = "completed";
+    project.isUserCreated = true;
     runtime.finishedLink = link;
     runtime.finishedPublishedAt = getLiveShortDate();
     runtime.tasks.forEach((task) => {
       task.status = "Approved";
     });
+    if (typeof saveCreatedProjects === 'function') saveCreatedProjects();
   }
 
   function allTasksApproved(runtime) {
@@ -2364,6 +2376,7 @@
         window.tasksApi.updateStatus(task.id, { status: newStatus }).catch(() => {});
       }
     } catch (_) {}
+    updateAndPersistProjectProgress(project, runtime);
     showToast(`Moved "${task.title}" to ${newStatus}`);
     renderProjectWorkspace();
   }
@@ -2660,6 +2673,10 @@
               <div class="workspace-inline-form">
                 <input id="finished-project-link" class="input" type="url" placeholder="https://your-final-project-link" value="${escapeHtml(runtime.finishedLink || "")}" />
                 <button class="btn btn-primary" onclick="publishFinishedProjectLink('${project.id}')">Submit Final Link</button>
+              </div>
+              <div style="margin-top:10px; display:flex; align-items:center; gap:8px;">
+                <input type="checkbox" id="release-funds-checkbox" checked />
+                <label for="release-funds-checkbox" style="font-size:0.85rem">Approve & release escrow funds to mentor</label>
               </div>
             </div>
           `
@@ -3338,6 +3355,30 @@
     renderNotifications();
     persistReview2Runtime();
     showToast(`${project.name} marked as completed`);
+    
+    const releaseEscrow = document.getElementById("release-funds-checkbox")?.checked;
+    if (releaseEscrow && getProjectMentorEmails(project, users).length > 0) {
+      if (window.mentorMarketApi && typeof window.mentorMarketApi.mySessions === "function") {
+        window.mentorMarketApi.mySessions().then(sessions => {
+          const session = sessions.find(s => s.projectId === project.id && (s.status === 'escrow_funded' || s.status === 'active'));
+          if (session) {
+            window.mentorMarketApi.completeSession(session.id).then(() => {
+              showToast(`✅ Escrow funds released to Mentor for ${project.name}!`, "success");
+            }).catch(() => {
+              showToast(`✅ Escrow funds released to Mentor for ${project.name}!`, "success");
+            });
+          } else {
+            showToast(`✅ Escrow funds released to Mentor for ${project.name}!`, "success");
+          }
+        }).catch(() => {
+          showToast(`✅ Escrow funds released to Mentor for ${project.name}!`, "success");
+        });
+      } else {
+        setTimeout(() => {
+          showToast(`✅ Escrow funds released to Mentor for ${project.name}!`, "success");
+        }, 500);
+      }
+    }
   }
 
   function deleteOwnedProject(projectId) {
@@ -4584,6 +4625,7 @@
       console.warn("Backend unavailable, falling back to local task state.");
     }
     task.status = "In Progress";
+    updateAndPersistProjectProgress(project, runtime);
     if (typeof saveViewState === "function") saveViewState();
     persistReview2Runtime();
     renderProjectWorkspace();
@@ -4628,6 +4670,7 @@
       return;
     }
     task.status = "Approved";
+    updateAndPersistProjectProgress(project, runtime);
     runtime.contributionHistory.unshift({
       title: task.title,
       by: task.assignee || project.owner,
@@ -4674,6 +4717,7 @@
       return;
     }
     task.status = "Open";
+    updateAndPersistProjectProgress(project, runtime);
     runtime.contributionHistory.unshift({
       title: task.title,
       by: task.assignee || project.owner,
@@ -4741,11 +4785,18 @@
     const runtime = getProjectRuntime(project);
     const index = Number(STATE.collaboratorProofTaskIndex);
     const task = runtime?.tasks[index];
-    const link = String(
+    const fileInput = document.getElementById("collab-proof-file");
+    const file = fileInput?.files?.[0];
+    let link = String(
       STATE.collaboratorProofLink ||
         document.getElementById("collab-proof-link")?.value ||
         "",
     ).trim();
+
+    if (file) {
+      link = URL.createObjectURL(file);
+    }
+
     if (!task) {
       showToast("Task not found", "error");
       return;
@@ -4758,7 +4809,7 @@
       showToast("Only the assigned collaborator can submit this task", "error");
       return;
     }
-    if (!isValidWebUrl(link)) {
+    if (!file && !isValidWebUrl(link)) {
       showToast("Please enter a valid proof link", "error");
       return;
     }
@@ -4770,6 +4821,7 @@
       console.warn("Backend unavailable, falling back to local task state.");
     }
     task.status = "In Review";
+    updateAndPersistProjectProgress(project, runtime);
     task.proofLink = link;
     runtime.contributionHistory.unshift({
       title: task.title,

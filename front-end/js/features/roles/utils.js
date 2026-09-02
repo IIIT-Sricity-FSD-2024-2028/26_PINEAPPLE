@@ -16,8 +16,8 @@ function isValidWebUrl(urlText) {
   try {
     const url = new URL(urlText);
     return (
-      (url.protocol === "http:" || url.protocol === "https:") &&
-      Boolean(url.hostname)
+      (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "blob:") &&
+      (url.protocol === "blob:" ? true : Boolean(url.hostname))
     );
   } catch {
     return false;
