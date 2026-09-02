@@ -22,6 +22,7 @@ function showAdmin() {
     renderSuAdmins();
     renderSuConfig();
     showAdminPage("admin-dash");
+    if (typeof renderAdminDashboard === "function") renderAdminDashboard();
     showToast("Super User portal open");
     return;
   }
@@ -67,7 +68,7 @@ function openSuperuserAdmin() {
 
 function getCurrentPortalPermissions() {
   if (STATE.portalRole === "superuser") {
-    return ["users", "projects", "mentor_apps", "audit", "admins", "config"];
+    return ["dashboard", "users", "projects", "mentor_apps", "audit", "revenue", "admins", "config"];
   }
   if (STATE.portalRole !== "admin") {
     return [];
@@ -114,9 +115,11 @@ function renderPortalSidebar() {
   });
 
   const permissionMap = {
+    "admin-dash": "dashboard",
     "admin-users": "users",
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
+    "admin-revenue": "revenue",
     "admin-audit": "audit",
     "admin-su-admins": "admins",
     "admin-su-config": "config",
@@ -212,19 +215,23 @@ function adminLogin() {
     renderSuAdmins();
     renderSuConfig();
     showAdminPage("admin-dash");
+    if (typeof renderAdminDashboard === "function") renderAdminDashboard();
     showToast("Signed in as Super User — full system access");
   } else {
     showAdminPage("admin-dash");
+    if (typeof renderAdminDashboard === "function") renderAdminDashboard();
     showToast("Signed in as Admin");
   }
 }
 
 function showAdminPage(id) {
   const pagePermissionMap = {
+    "admin-dash": "dashboard",
     "admin-users": "users",
     "admin-user-profile": "users",
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
+    "admin-revenue": "revenue",
     "admin-audit": "audit",
     "admin-su-admins": "admins",
     "admin-su-config": "config",
@@ -242,6 +249,9 @@ function showAdminPage(id) {
     .querySelectorAll(".admin-page")
     .forEach((p) => (p.style.display = "none"));
   document.getElementById(id).style.display = "";
+  if (id === "admin-dash") {
+    if (typeof renderAdminDashboard === "function") renderAdminDashboard();
+  }
   if (id === "admin-projects") {
     renderAdminProjects();
   }

@@ -643,7 +643,7 @@
         <button class="admin-nav-item" onclick="showAdminPage('admin-users')">👥 Users</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-projects')">📁 Projects</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-mentor-apps')">📋 Mentor Applications</button>
-        <button class="admin-nav-item" onclick="showAdminPage('admin-kyc'); renderAdminKyc()">🪪 Team ID Approvals <span id="kyc-badge" style="background:var(--destructive);color:#fff;border-radius:10px;padding:1px 6px;font-size:0.72rem;margin-left:4px;display:none"></span></button>
+
         <button class="admin-nav-item" onclick="showAdminPage('admin-revenue'); renderAdminRevenue()">💰 Revenue</button>
         <button class="admin-nav-item" onclick="showAdminPage('admin-audit')">📜 Audit Log</button>
         <div class="su-only-nav" style="display:none">
@@ -867,9 +867,6 @@
           <p class="page-subtitle mt-1">Platform revenue from hackathon fees, escrow commissions, and prize payouts.</p>
           <div class="tabs mt-4">
             <button class="tab active" id="rev-tab-overview" onclick="setRevenueTab('overview')">📊 Overview</button>
-            <button class="tab" id="rev-tab-escrow" onclick="setRevenueTab('escrow')">🔒 Escrow</button>
-            <button class="tab" id="rev-tab-payouts" onclick="setRevenueTab('payouts')">💸 Payouts</button>
-            <button class="tab" id="rev-tab-pricing" onclick="setRevenueTab('pricing')">🏷️ Pricing Tiers</button>
           </div>
           <div id="admin-revenue-content" class="mt-3"></div>
         </div>
@@ -958,6 +955,7 @@
   <script src="js/features/roles/admin-kyc.js"></script>
 
   <script src="js/features/roles/admin-revenue.js"></script>
+  <script src="js/features/roles/admin-dashboard.js"></script>
   <script src="js/features/Dashboard.js"></script>
   <script src="js/core/router.js"></script>
   <script src="js/app.js"></script>

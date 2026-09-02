@@ -7,6 +7,7 @@ import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware';
 import { LogManagerService } from './core/services/log-manager.service';
+import helmet from 'helmet';
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -32,6 +33,9 @@ async function bootstrap() {
   // 0. Serve uploaded files at /uploads/<filename>
   const uploadsDir = path.join(process.cwd(), 'uploads');
   app.useStaticAssets(uploadsDir, { prefix: '/uploads' });
+
+  // 0.5 Enable Helmet security headers
+  app.use(helmet());
 
   // 1. Enable CORS for frontend integration
   app.enableCors({
