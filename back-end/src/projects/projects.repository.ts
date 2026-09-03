@@ -11,6 +11,7 @@ export interface Project {
   requiredSkills: string[];
   duration: string;
   status: ProjectStatus;
+  collaborators: any[];
 }
 
 @Injectable()
@@ -28,6 +29,10 @@ export class ProjectsRepository {
       requiredSkills: ['React', 'Python', 'ML'],
       duration: '3 Months',
       status: ProjectStatus.Open,
+      collaborators: [
+        { id: '5', name: 'Vikram Nair', role: 'Contributor' },
+        { id: '6', name: 'Priya Patel', role: 'Contributor' }
+      ],
     });
 
     this.projects.push({
@@ -39,6 +44,51 @@ export class ProjectsRepository {
       requiredSkills: ['React', 'Node.js', 'Firebase'],
       duration: '2 Months',
       status: ProjectStatus.InProgress,
+      collaborators: [
+        { id: '3', name: 'Rohan Mehta', role: 'Contributor' },
+        { id: '4', name: 'TeamForge User', role: 'Contributor' }
+      ],
+    });
+
+    this.projects.push({
+      id: 'proj-3',
+      ownerId: '3', // Rohan Mehta
+      title: 'Smart City Traffic Optimizer',
+      description: 'An IoT and AI based platform to analyze traffic flow and optimize signal timings dynamically.',
+      difficulty: ProjectDifficulty.Hard,
+      requiredSkills: ['Python', 'IoT', 'Data Science'],
+      duration: '4 Months',
+      status: ProjectStatus.Completed,
+      collaborators: [
+        { id: '1', name: 'Priya Patel', role: 'Contributor' }
+      ],
+    });
+
+    this.projects.push({
+      id: 'proj-4',
+      ownerId: '4', // TeamForge User
+      title: 'FinTech Dashboard',
+      description: 'A modern financial dashboard for tracking expenses, managing portfolios, and crypto assets.',
+      difficulty: ProjectDifficulty.Medium,
+      requiredSkills: ['Angular', 'TypeScript', 'TailwindCSS'],
+      duration: '1.5 Months',
+      status: ProjectStatus.Open,
+      collaborators: [],
+    });
+
+    this.projects.push({
+      id: 'proj-5',
+      ownerId: '1', // Priya Patel
+      title: 'Health Tracking App',
+      description: 'A cross-platform mobile application for tracking daily steps, hydration, and sleep cycles.',
+      difficulty: ProjectDifficulty.Easy,
+      requiredSkills: ['Flutter', 'Dart', 'Firebase'],
+      duration: '2 Months',
+      status: ProjectStatus.InProgress,
+      collaborators: [
+        { id: '2', name: 'Arjun Sharma', role: 'Contributor' },
+        { id: '5', name: 'Vikram Nair', role: 'Contributor' }
+      ],
     });
   }
 
@@ -60,6 +110,7 @@ export class ProjectsRepository {
       ownerId,
       ...createProjectDto,
       status,
+      collaborators: [], // Default to empty array
     };
     this.projects.push(newProject);
     return newProject;

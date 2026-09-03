@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsEnum, IsNotEmpty } from 'class-validator';
+import { IsString, IsArray, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum ProjectDifficulty {
@@ -37,4 +37,9 @@ export class CreateProjectDto {
   @IsString()
   @IsNotEmpty()
   duration: string;
+
+  @ApiProperty({ type: [Object], example: [{ id: '1', name: 'User' }], required: false })
+  @IsOptional()
+  @IsArray()
+  collaborators?: any[];
 }
