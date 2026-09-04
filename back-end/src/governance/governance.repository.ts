@@ -29,6 +29,17 @@ export class GovernanceRepository {
       status: ReportStatus.Open,
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24), // 1 day ago
     });
+
+    this.reports.push({
+      id: 'report-2',
+      reporterId: '8', // Vikram Nair
+      targetUserId: '5',
+      reason: 'Spamming the project discussion board with unrelated links.',
+      status: ReportStatus.Resolved,
+      resolution: 'Issued a warning and removed spam posts.',
+      action: ResolutionAction.Warn,
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 3), // 3 days ago
+    });
   }
 
   createReport(reporterId: string, dto: CreateReportDto): Report {

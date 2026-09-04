@@ -90,6 +90,49 @@ export class ProjectsRepository {
         { id: '5', name: 'Vikram Nair', role: 'Contributor' }
       ],
     });
+
+    this.projects.push({
+      id: 'proj-6',
+      ownerId: '6', // Aditya Sai
+      title: 'Decentralized Voting System',
+      description: 'A blockchain-based platform for secure and transparent voting using smart contracts.',
+      difficulty: ProjectDifficulty.Hard,
+      requiredSkills: ['Solidity', 'Vue', 'Node.js'],
+      duration: '3 Months',
+      status: ProjectStatus.Open,
+      collaborators: [
+        { id: '8', name: 'Vikram Nair', role: 'Contributor' }
+      ],
+    });
+
+    this.projects.push({
+      id: 'proj-7',
+      ownerId: '7', // Neha Gupta
+      title: 'Climate Data Analyzer',
+      description: 'An AI-powered tool to analyze and visualize global climate change datasets.',
+      difficulty: ProjectDifficulty.Medium,
+      requiredSkills: ['Python', 'TensorFlow', 'Data Science'],
+      duration: '2.5 Months',
+      status: ProjectStatus.InProgress,
+      collaborators: [
+        { id: '6', name: 'Aditya Sai', role: 'Contributor' },
+        { id: '2', name: 'Arjun Sharma', role: 'Contributor' }
+      ],
+    });
+
+    this.projects.push({
+      id: 'proj-8',
+      ownerId: '8', // Vikram Nair
+      title: 'E-commerce API Engine',
+      description: 'A scalable REST and GraphQL backend engine for rapid e-commerce deployment.',
+      difficulty: ProjectDifficulty.Medium,
+      requiredSkills: ['Java', 'Spring Boot', 'SQL'],
+      duration: '1 Month',
+      status: ProjectStatus.Completed,
+      collaborators: [
+        { id: '1', name: 'Priya Patel', role: 'Contributor' }
+      ],
+    });
   }
 
   findAll(): Project[] {

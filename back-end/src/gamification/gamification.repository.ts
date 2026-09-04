@@ -58,6 +58,43 @@ export class GamificationRepository {
       reason: 'Abandoned project midway',
       timestamp: staleDate,
     });
+
+    // Add stats for new users
+    this.stats.push({
+      userId: '6', // Aditya Sai
+      totalXp: 450,
+      repScore: 40,
+      lastActive: now,
+    });
+    this.stats.push({
+      userId: '7', // Neha Gupta
+      totalXp: 1100,
+      repScore: 85,
+      lastActive: now,
+    });
+    this.stats.push({
+      userId: '8', // Vikram Nair
+      totalXp: 200,
+      repScore: 15,
+      lastActive: now,
+    });
+
+    this.ledgers.push({
+      id: 'ledg-4',
+      userId: '7',
+      type: LedgerType.XP,
+      amount: 100,
+      reason: 'Mentored a successful project',
+      timestamp: now,
+    });
+    this.ledgers.push({
+      id: 'ledg-5',
+      userId: '6',
+      type: LedgerType.XP,
+      amount: 50,
+      reason: 'Completed task: Data Collection',
+      timestamp: now,
+    });
   }
 
   getStatsByUserId(userId: string): GamificationStatsDto | undefined {

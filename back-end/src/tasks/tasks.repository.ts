@@ -46,6 +46,56 @@ export class TasksRepository {
       xpReward: 75,
       status: TaskStatus.ToDo,
     });
+
+    this.tasks.push({
+      id: 'task-4',
+      projectId: 'proj-6',
+      title: 'Write Smart Contracts',
+      description: 'Implement secure voting logic in Solidity.',
+      xpReward: 200,
+      status: TaskStatus.InProgress,
+      assigneeId: '8', // Vikram Nair
+    });
+
+    this.tasks.push({
+      id: 'task-5',
+      projectId: 'proj-6',
+      title: 'Frontend Vue Integration',
+      description: 'Connect Vue frontend with Web3.js.',
+      xpReward: 150,
+      status: TaskStatus.ToDo,
+      assigneeId: '6', // Aditya Sai
+    });
+
+    this.tasks.push({
+      id: 'task-6',
+      projectId: 'proj-7',
+      title: 'Data Collection & Cleaning',
+      description: 'Scrape and clean climate data from public APIs.',
+      xpReward: 100,
+      status: TaskStatus.Completed,
+      assigneeId: '6', // Aditya Sai
+    });
+
+    this.tasks.push({
+      id: 'task-7',
+      projectId: 'proj-7',
+      title: 'Train ML Model',
+      description: 'Train a TensorFlow model on cleaned dataset.',
+      xpReward: 250,
+      status: TaskStatus.InProgress,
+      assigneeId: '7', // Neha Gupta
+    });
+
+    this.tasks.push({
+      id: 'task-8',
+      projectId: 'proj-8',
+      title: 'Database Normalization',
+      description: 'Optimize PostgreSQL schema for product catalog.',
+      xpReward: 80,
+      status: TaskStatus.Completed,
+      assigneeId: '1', // Priya Patel
+    });
   }
 
   findAllByProjectId(projectId: string): Task[] {

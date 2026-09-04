@@ -60,6 +60,46 @@ export class CommunicationRepository {
       isRead: true,
       timestamp: new Date(now.getTime() - 1000 * 60 * 30), // 30 mins ago
     });
+
+    this.messages.push({
+      id: 'msg-3',
+      projectId: 'proj-6',
+      senderId: '6', // Aditya Sai
+      content: 'I have set up the Vue frontend skeleton.',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 5),
+    });
+    this.messages.push({
+      id: 'msg-4',
+      projectId: 'proj-6',
+      senderId: '8', // Vikram Nair
+      content: 'Great, I will start writing the Solidity contracts tomorrow.',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 4),
+    });
+
+    this.messages.push({
+      id: 'msg-5',
+      projectId: 'proj-7',
+      senderId: '7', // Neha Gupta
+      content: 'Hello team, the climate data sets are ready for analysis.',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
+    });
+
+    this.notifications.push({
+      id: 'notif-3',
+      userId: '8', // Vikram Nair
+      title: 'New Project Invite',
+      message: 'Aditya Sai invited you to join "Decentralized Voting System".',
+      isRead: false,
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 48),
+    });
+    this.notifications.push({
+      id: 'notif-4',
+      userId: '7', // Neha Gupta
+      title: 'Task In Progress',
+      message: 'You started working on "Train ML Model".',
+      isRead: true,
+      timestamp: new Date(now.getTime() - 1000 * 60 * 15),
+    });
   }
 
   sendMessage(senderId: string, dto: SendMessageDto): Message {
