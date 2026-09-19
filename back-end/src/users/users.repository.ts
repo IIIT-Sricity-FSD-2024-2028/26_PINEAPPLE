@@ -74,6 +74,39 @@ export class UsersRepository {
       flags: false,
       profile: { xp: 780, rep: 71, bio: 'Cloud Architect', username: 'snehaiyer' },
     } as any);
+    this.users.push({
+      id: '6',
+      name: 'Aditya Sai',
+      email: 'aditya.sai@teamforge.io',
+      role: UserRole.Collaborator,
+      skills: ['Vue', 'Node.js', 'MongoDB'],
+      linkedIn: 'https://linkedin.com/in/adityasai',
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 450, rep: 40, bio: 'Full-Stack Developer', username: 'adityasai' },
+    } as any);
+    this.users.push({
+      id: '7',
+      name: 'Neha Gupta',
+      email: 'neha.gupta@teamforge.io',
+      role: UserRole.Mentor,
+      skills: ['Data Science', 'Python', 'TensorFlow'],
+      linkedIn: 'https://linkedin.com/in/nehagupta',
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 1100, rep: 85, bio: 'Data Scientist & Mentor', username: 'nehagupta' },
+    } as any);
+    this.users.push({
+      id: '8',
+      name: 'Vikram Nair',
+      email: 'vikram.nair@teamforge.io',
+      role: UserRole.Collaborator,
+      skills: ['Java', 'Spring Boot', 'SQL'],
+      linkedIn: 'https://linkedin.com/in/vikramnair',
+      status: UserStatus.Active,
+      flags: false,
+      profile: { xp: 200, rep: 15, bio: 'Backend Developer', username: 'vikramnair' },
+    } as any);
   }
 
   findAll(): User[] {

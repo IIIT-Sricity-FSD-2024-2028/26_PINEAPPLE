@@ -65,9 +65,11 @@ function renderSuAdminModal() {
     : null;
 
   const permOptions = [
+    { key: "dashboard", label: "Dashboard" },
     { key: "users", label: "User Control" },
     { key: "projects", label: "Projects" },
     { key: "mentor_apps", label: "Mentors" },
+    { key: "revenue", label: "Revenue & Escrow" },
     { key: "audit", label: "Audit" },
   ];
 
@@ -285,8 +287,8 @@ function renderSuAdmins() {
   }
 
   const permLabels = {
-    users: "User Control", projects: "Projects",
-    mentor_apps: "Mentors", audit: "Audit Log",
+    dashboard: "Dashboard", users: "User Control", projects: "Projects",
+    mentor_apps: "Mentors", revenue: "Revenue & Escrow", audit: "Audit Log",
   };
 
   container.innerHTML = `

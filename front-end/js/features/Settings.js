@@ -3,6 +3,7 @@ function renderSettings() {
   hydrateProfileData();
   applyProfileDataToSettingsForm();
   applyProfileIdentityToUI();
+  setupAvatarPreview();
 
   renderSkills();
   const savedTheme = localStorage.getItem("teamforge.theme") || "light";
@@ -245,6 +246,24 @@ function applyProfileIdentityToUI() {
   const mentorAppName = document.getElementById("mentor-app-name");
   if (mentorAppName) {
     mentorAppName.value = fullName;
+  }
+}
+
+function setupAvatarPreview() {
+  const avatarInput = document.getElementById("settings-avatar-file");
+  if (avatarInput) {
+    avatarInput.addEventListener("change", function (event) {
+      const file = event.target.files[0];
+      if (file) {
+        const preview = document.getElementById("settings-avatar-preview");
+        const initials = document.getElementById("settings-avatar-initials");
+        if (preview && initials) {
+          preview.src = URL.createObjectURL(file);
+          preview.style.display = "block";
+          initials.style.display = "none";
+        }
+      }
+    });
   }
 }
 

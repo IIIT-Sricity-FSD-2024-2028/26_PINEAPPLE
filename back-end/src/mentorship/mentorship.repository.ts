@@ -49,6 +49,25 @@ export class MentorshipRepository {
       comment: 'Arjun demonstrated exceptional problem-solving during the database schema design phase.',
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
     });
+
+    this.applications.push({
+      id: 'app-2',
+      userId: '7', // Neha Gupta
+      linkedinURL: 'https://linkedin.com/in/nehagupta',
+      experienceYears: 5,
+      motivation: 'Passionate about teaching machine learning and data science concepts.',
+      status: ApplicationStatus.Approved,
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30), // 30 days ago
+    });
+
+    this.badges.push({
+      id: 'badge-2',
+      mentorId: '7', // Neha Gupta
+      collaboratorId: '6', // Aditya Sai
+      badgeType: BadgeType.TeamPlayer,
+      comment: 'Aditya is an excellent team player, always helping others debug their issues.',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
+    });
   }
 
   createApplication(userId: string, dto: CreateApplicationDto, initialStatus: ApplicationStatus): MentorApplication {

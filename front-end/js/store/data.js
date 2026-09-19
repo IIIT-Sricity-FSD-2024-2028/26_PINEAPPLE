@@ -1252,7 +1252,7 @@ const PORTAL_ADMINS = [
     password: "admin123",
     status: "active",
     createdAt: "Mar 1, 2026",
-    permissions: ["users", "projects", "mentor_apps", "audit"],
+    permissions: ["dashboard", "users", "projects", "mentor_apps", "revenue", "audit"],
   },
   {
     id: "adm-2",

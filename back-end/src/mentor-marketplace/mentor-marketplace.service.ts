@@ -31,7 +31,45 @@ export class MentorMarketplaceService {
     private readonly usersService: UsersService,
     private readonly gamificationService: GamificationService,
     private readonly notificationsService: NotificationsService,
-  ) {}
+  ) {
+    this.profiles.push({
+      id: 'mentor-profile-1',
+      userId: '7', // Neha Gupta (Mentor)
+      name: 'Neha Gupta',
+      avatar: '👧',
+      title: 'Data Scientist & Mentor, 5 yrs',
+      bio: 'Passionate about teaching machine learning and data science concepts.',
+      skills: ['Data Science', 'Python', 'TensorFlow'],
+      experienceYears: 5,
+      sessionPrice: 1500,
+      sessionDuration: 60,
+      languages: ['English', 'Hindi'],
+      availability: 'Weekends',
+      rating: 4.9,
+      totalSessions: 12,
+      isAvailable: true,
+      createdAt: new Date().toISOString(),
+    });
+
+    this.profiles.push({
+      id: 'mentor-profile-2',
+      userId: '4', // Rohan Mehta (Mentor)
+      name: 'Rohan Mehta',
+      avatar: '👦',
+      title: 'UI/UX Designer, 4 yrs',
+      bio: 'I help teams design beautiful and accessible user interfaces.',
+      skills: ['UI/UX', 'Figma', 'React'],
+      experienceYears: 4,
+      sessionPrice: 800,
+      sessionDuration: 30,
+      languages: ['English'],
+      availability: 'Anytime',
+      rating: 4.7,
+      totalSessions: 25,
+      isAvailable: true,
+      createdAt: new Date().toISOString(),
+    });
+  }
 
   // ─────────────────────────────────────────────────────────────────────────
   // Verify user has Mentor role before exposing their profile

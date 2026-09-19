@@ -140,7 +140,7 @@ function openSuperuserAdmin() {
 
 function getCurrentPortalPermissions() {
   if (STATE.portalRole === "superuser") {
-    return ["users", "projects", "mentor_apps", "audit", "admins", "config"];
+    return ["dashboard", "users", "projects", "mentor_apps", "revenue", "audit", "admins", "config"];
   }
   if (STATE.portalRole !== "admin") {
     return [];
@@ -187,9 +187,11 @@ function renderPortalSidebar() {
   });
 
   const permissionMap = {
+    "admin-dash": "dashboard",
     "admin-users": "users",
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
+    "admin-mentor-revenue": "revenue",
     "admin-audit": "audit",
     "admin-su-admins": "admins",
     "admin-su-config": "config",
@@ -295,10 +297,12 @@ function adminLogin() {
 
 function showAdminPage(id) {
   const pagePermissionMap = {
+    "admin-dash": "dashboard",
     "admin-users": "users",
     "admin-user-profile": "users",
     "admin-projects": "projects",
     "admin-mentor-apps": "mentor_apps",
+    "admin-mentor-revenue": "revenue",
     "admin-audit": "audit",
     "admin-su-admins": "admins",
     "admin-su-config": "config",

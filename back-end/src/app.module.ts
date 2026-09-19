@@ -37,7 +37,6 @@ import { UploadsModule } from './uploads/uploads.module';
 @Module({
   imports: [
     CoreModule,
-    UploadsModule,
     UsersModule,
     GamificationModule,
     ProjectsModule,
@@ -56,6 +55,7 @@ import { UploadsModule } from './uploads/uploads.module';
     EscrowModule,
     PayoutsModule,
     MentorMarketplaceModule,
+    UploadsModule,
   ],
   controllers: [AppController],
   providers: [

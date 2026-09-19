@@ -343,11 +343,12 @@ function setAdminUsersFilter(filterId) {
   renderAdminUsers();
 }
 
-function renderAdminUsers() {
+async function renderAdminUsers() {
   ensureAdminUserMenuCloseHandler();
 
   const filtersEl = document.getElementById("admin-users-filters");
   const listEl = document.getElementById("admin-users-list");
+  const listEl2 = document.getElementById("admin-users-list2");
   const searchInput = document.getElementById("admin-users-search");
   if (!filtersEl || !listEl) return;
 
@@ -379,12 +380,38 @@ function renderAdminUsers() {
     .join("");
 
   const users = getAdminUsersByFilter();
+  
+  
+  let users2 = [];
+try {
+  const res = await fetch("http://localhost:3000/users", {
+    headers: {
+      "Content-Type": "application/json",
+      "x-user-role": "superuser" 
+    }
+  });
+
+  if (res.ok) {
+    users2 = await res.json();
+  } else {
+    users2 = [];
+  }
+} catch (err) {
+  console.warn("Backend error, using fallback:", err);
+}
+
+
   if (users.length === 0) {
     listEl.innerHTML = `
       <div class="admin-users-empty">No users found for the selected filter.</div>
     `;
     return;
   }
+
+  
+  listEl2.innerHTML = users.map((user) => {
+    return `<div>${user.name}--${user.projects}-</div>`
+  }).join("");
 
   listEl.innerHTML = users
     .map((user) => {
