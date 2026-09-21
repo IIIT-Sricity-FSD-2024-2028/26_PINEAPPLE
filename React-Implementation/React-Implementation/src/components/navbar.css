@@ -1,0 +1,268 @@
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 1.5rem;
+  background-color: #ffffff;
+  border-bottom: 1px solid #eae8e1;
+  height: 60px;
+  box-sizing: border-box;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+}
+
+.navbar-left, .navbar-right, .nav-actions {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.menu-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #5c5c5c;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: 0.5rem;
+}
+
+.menu-btn:hover {
+  color: #000;
+}
+
+.navbar-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.logo-box {
+  background-color: #3b362f;
+  color: #ffffff;
+  font-weight: 600;
+  width: 32px;
+  height: 32px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.brand-name {
+  font-weight: 600;
+  font-size: 1.1rem;
+  color: #1a1a1a;
+}
+
+.role-btn {
+  background-color: #e6edff;
+  color: #1e54ff;
+  border: none;
+  padding: 0.4rem 0.8rem;
+  border-radius: 20px;
+  font-weight: 600;
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  cursor: pointer;
+}
+
+.chevron-down {
+  width: 16px;
+  height: 16px;
+}
+
+.chevron-down.small {
+  width: 14px;
+  height: 14px;
+  color: #666;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: #5c5c5c;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.icon-btn svg {
+  width: 20px;
+  height: 20px;
+}
+
+.badge {
+  position: absolute;
+  top: 0;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  background-color: #f59e0b;
+  border-radius: 50%;
+  border: 2px solid #f5f4f0;
+}
+
+.user-profile {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+}
+
+.avatar {
+  background-color: #a87e35;
+  color: white;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  font-size: 14px;
+}
+
+.username {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: #333;
+}
+
+
+/* Dropdown Container */
+.dropdown-container {
+  position: relative;
+}
+
+/* Dropdown Menu Base */
+.dropdown-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  border: 1px solid #eae8e1;
+  width: 220px;
+  padding: 0.5rem;
+  z-index: 100;
+  display: none;
+}
+
+/* Show on Hover (Since no logic is needed yet) */
+.dropdown-container:hover .dropdown-menu {
+  display: block;
+}
+
+/* Specific Menu Positioning */
+.role-menu {
+  left: 0;
+}
+
+.profile-menu {
+  right: 0;
+  width: 200px;
+}
+
+/* Dropdown Items */
+.dropdown-header {
+  font-size: 0.75rem;
+  color: #8c8b88;
+  font-weight: 700;
+  margin-bottom: 0.25rem;
+  padding: 0.25rem 0.5rem;
+  letter-spacing: 0.5px;
+}
+
+.dropdown-item {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  color: #333;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-bottom: 2px;
+}
+
+.dropdown-item:last-child {
+  margin-bottom: 0;
+}
+
+.dropdown-item:hover {
+  background: #f5f4f0;
+}
+
+.dropdown-item.active {
+  background: #eae7e0;
+}
+
+/* Dots and Icons */
+.dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  margin-right: 0.75rem;
+}
+
+.dot.blue {
+  background-color: #2b5cff;
+}
+
+.dot.brown {
+  background-color: #7a6344;
+}
+
+.star-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-right: 0.75rem;
+  width: 8px;
+}
+
+.status-text {
+  margin-left: auto;
+  font-size: 0.8rem;
+  color: #666;
+  font-weight: 500;
+}
+
+.brown-text {
+  color: #a87e35;
+}
+
+/* Profile Menu Specifics */
+.profile-info {
+  padding: 0.5rem 0.75rem;
+}
+
+.profile-name {
+  font-weight: 600;
+  color: #1a1a1a;
+  font-size: 1rem;
+}
+
+.profile-role {
+  font-size: 0.85rem;
+  color: #8c8b88;
+  margin-top: 0.1rem;
+}
+
+.dropdown-divider {
+  height: 1px;
+  background-color: #eae8e1;
+  margin: 0.5rem 0;
+}
+
+.text-danger {
+  color: #e74c3c;
+}
+

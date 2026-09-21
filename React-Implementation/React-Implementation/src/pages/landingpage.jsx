@@ -1,0 +1,860 @@
+import "./landingpage.css";
+
+function LandingPage() {
+  return (
+    <>
+      {/* =========================================================
+HEADER
+  ========================================================== */}
+      <header className="header">
+        <div className="header__container">
+          <a href="#" className="header__logo" aria-label="TeamForge Home">
+            <div className="header__logo-icon" aria-hidden="true">
+              TF
+            </div>
+            <span className="header__logo-text">TeamForge</span>
+          </a>
+
+          <nav className="header__nav" aria-label="Primary navigation">
+            <a href="#features" className="header__nav-link">
+              Features
+            </a>
+            <a href="#roles" className="header__nav-link">
+              Roles
+            </a>
+            <a href="#how-it-works" className="header__nav-link">
+              How It Works
+            </a>
+            <a href="#rating-system" className="header__nav-link">
+              Rating System
+            </a>
+          </nav>
+
+          <div className="header__actions">
+            <a href="log.html" className="header__btn header__btn--primary">
+              Sign in
+            </a>
+            <a
+              href="log.html#signup"
+              className="header__btn header__btn--secondary"
+            >
+              Sign Up
+            </a>
+            <a
+              href="teamforge.html?admin=1"
+              className="header__btn header__btn--secondary"
+            >
+              Admin Portal
+            </a>
+          </div>
+
+          {/* Mobile menu toggle */}
+          <button
+            className="header__menu-toggle"
+            type="button"
+            aria-expanded="false"
+            aria-controls="mobile-menu"
+            aria-label="Toggle navigation menu"
+          >
+            <span className="header__hamburger"></span>
+            <span className="header__hamburger"></span>
+            <span className="header__hamburger"></span>
+          </button>
+        </div>
+
+        {/* Mobile nav drawer */}
+        <nav
+          className="header__mobile-nav"
+          id="mobile-menu"
+          aria-label="Mobile navigation"
+          hidden
+        >
+          <a href="#features" className="header__mobile-link">
+            Features
+          </a>
+          <a href="#roles" className="header__mobile-link">
+            Roles
+          </a>
+          <a href="#how-it-works" className="header__mobile-link">
+            How It Works
+          </a>
+          <a href="#rating-system" className="header__mobile-link">
+            Rating System
+          </a>
+          <div className="header__mobile-actions">
+            <a href="log.html" className="header__btn header__btn--primary">
+              Sign in
+            </a>
+            <a
+              href="log.html#signup"
+              className="header__btn header__btn--secondary"
+            >
+              Sign Up
+            </a>
+            <a
+              href="teamforge.html?admin=1"
+              className="header__btn header__btn--secondary"
+            >
+              Admin Portal
+            </a>
+          </div>
+        </nav>
+      </header>
+
+      <main>
+        {/* =========================================================
+         HERO
+    ========================================================== */}
+        <section className="hero" aria-labelledby="hero-heading">
+          <div className="hero__background" aria-hidden="true">
+            <video className="hero__bg-vid" playsInline autoPlay muted loop>
+              <source src="/Assets/Video Project 9 (2).mp4" type="video/mp4" />
+            </video>
+            <div className="hero__overlay"></div>
+          </div>
+
+          <div className="hero__content">
+            <div className="hero__badge" aria-label="Version announcement">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="14"
+                height="14"
+                viewBox="0 0 14 14"
+                fill="none"
+              >
+                <path
+                  d="M2.33337 8.16668C2.22298 8.16706 2.11475 8.1361 2.02126 8.07742C1.92776 8.01873 1.85284 7.93472 1.80519 7.83515C1.75754 7.73557 1.73912 7.62452 1.75208 7.5149C1.76503 7.40527 1.80882 7.30157 1.87837 7.21585L7.65337 1.26585C7.69669 1.21584 7.75572 1.18205 7.82078 1.17002C7.88583 1.15799 7.95304 1.16844 8.01138 1.19964C8.06972 1.23084 8.11571 1.28095 8.14182 1.34174C8.16792 1.40253 8.17258 1.47039 8.15504 1.53418L7.03504 5.04585C7.00201 5.13424 6.99092 5.22932 7.00271 5.32293C7.01451 5.41655 7.04884 5.50591 7.10276 5.58335C7.15667 5.66078 7.22857 5.72398 7.31228 5.76752C7.39599 5.81107 7.48901 5.83365 7.58337 5.83335H11.6667C11.7771 5.83297 11.8853 5.86392 11.9788 5.92261C12.0723 5.9813 12.1472 6.06531 12.1949 6.16488C12.2425 6.26445 12.2609 6.3755 12.248 6.48513C12.235 6.59475 12.1912 6.69845 12.1217 6.78418L6.3467 12.7342C6.30338 12.7842 6.24435 12.818 6.1793 12.83C6.11424 12.842 6.04703 12.8316 5.98869 12.8004C5.93036 12.7692 5.88436 12.7191 5.85826 12.6583C5.83215 12.5975 5.82749 12.5296 5.84504 12.4658L6.96504 8.95418C6.99806 8.86579 7.00915 8.77071 6.99736 8.67709C6.98556 8.58348 6.95123 8.49412 6.89732 8.41668C6.8434 8.33925 6.7715 8.27605 6.68779 8.2325C6.60408 8.18896 6.51106 8.16637 6.4167 8.16668H2.33337Z"
+                  stroke="white"
+                  strokeOpacity="0.8"
+                  strokeWidth="1.16667"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              </svg>
+              <span>Built for Students who build things</span>
+            </div>
+
+            <h1 className="hero__title" id="hero-heading">
+              Collaborate. Build.
+              <br />
+              <span className="hero__title-accent">Earn Recognition.</span>
+            </h1>
+
+            <p className="hero__subtitle">
+              The platform where students collaborate on real projects, track
+              contributions with ratings, and build verified portfolios that
+              actually matter.
+            </p>
+
+            <div className="hero__actions">
+              <a href="log.html" className="hero__btn hero__btn--primary">
+                Start Collaborating
+                <svg
+                  xmlns="http://www.w3.org/2000/svg"
+                  width="16"
+                  height="16"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  aria-hidden="true"
+                >
+                  <path d="M5 12h14" />
+                  <path d="m12 5 7 7-7 7" />
+                </svg>
+              </a>
+              <a href="log.html" className="hero__btn hero__btn--secondary">
+                Explore Projects
+              </a>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+         STATS
+    ========================================================== */}
+        <section className="stats" aria-label="Platform statistics">
+          <div className="stats__container">
+            <dl className="stats__grid">
+              <div className="stats__item">
+                <dt className="stats__label">Students</dt>
+                <dd className="stats__value">10K+</dd>
+              </div>
+              <div className="stats__item">
+                <dt className="stats__label">Projects</dt>
+                <dd className="stats__value">2,500+</dd>
+              </div>
+              <div className="stats__item">
+                <dt className="stats__label">Tasks Completed</dt>
+                <dd className="stats__value">50K+</dd>
+              </div>
+              <div className="stats__item">
+                <dt className="stats__label">Mentors</dt>
+                <dd className="stats__value">800+</dd>
+              </div>
+            </dl>
+          </div>
+        </section>
+
+        {/* =========================================================
+         FEATURES
+    ========================================================== */}
+        <section
+          className="features"
+          id="features"
+          aria-labelledby="features-heading"
+        >
+          <div className="features__container">
+            <header className="features__header">
+              <p className="section-label">Features</p>
+              <h2 className="section-title" id="features-heading">
+                Everything you need to level up
+              </h2>
+              <p className="section-subtitle">
+                From project discovery to verified contributions — one platform
+                to build, learn, and grow.
+              </p>
+            </header>
+
+            <div className="features__grid">
+              {/* Card 1 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/Project-Collaboration.jpg"
+                    alt="Project Collaboration interface"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M4 3h16a2 2 0 0 1 2 2v6a10 10 0 0 1-10 9 10 10 0 0 1-10-9V5a2 2 0 0 1 2-2z" />
+                      <path d="m9 11 3 3L22 4" />
+                    </svg>
+                    <h3 className="features__card-title">
+                      Project Collaboration
+                    </h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Browse, create, and join real-world projects. Work with
+                    teammates across domains — from web dev to machine learning.
+                  </p>
+                </div>
+              </article>
+
+              {/* Card 2 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/Expert-Mentorship.jpg"
+                    alt="Expert Mentorship interface"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                      <circle cx="9" cy="7" r="4" />
+                      <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
+                      <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    </svg>
+                    <h3 className="features__card-title">Expert Mentorship</h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Apply for mentorship from industry professionals and
+                    experienced peers. Get guidance when you need it most.
+                  </p>
+                </div>
+              </article>
+
+              {/* Card 3 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/Planning_and_Scheduling.jpg"
+                    alt="Planning and Scheduling interface screenshot"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <rect width="18" height="18" x="3" y="4" rx="2" ry="2" />
+                      <line x1="16" x2="16" y1="2" y2="6" />
+                      <line x1="8" x2="8" y1="2" y2="6" />
+                      <line x1="3" x2="21" y1="10" y2="10" />
+                    </svg>
+                    <h3 className="features__card-title">
+                      Planning &amp; Scheduling
+                    </h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Project owners create tasks, assign collaborators, and set
+                    deadlines. Tasks automatically move through workflow stages
+                    as work progresses.
+                  </p>
+                </div>
+              </article>
+
+              {/* Card 4 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/XP-System.png"
+                    alt="XP System and Personal Dashboard screenshot"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polyline points="22 7 13.5 15.5 8.5 10.5 2 17" />
+                      <polyline points="16 7 22 7 22 13" />
+                    </svg>
+                    <h3 className="features__card-title">XP System</h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Complete tasks. Earn XP. Prove your skills.
+                  </p>
+                </div>
+              </article>
+
+              {/* Card 5 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/Contribution_Report.jpg"
+                    alt="Contribution Report screenshot"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+                      <polyline points="14 2 14 8 20 8" />
+                      <line x1="16" x2="8" y1="13" y2="13" />
+                      <line x1="16" x2="8" y1="17" y2="17" />
+                      <line x1="10" x2="8" y1="9" y2="9" />
+                    </svg>
+                    <h3 className="features__card-title">
+                      Contribution Report
+                    </h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Detailed reports of your contributions across projects.
+                    Showcases verified work history.
+                  </p>
+                </div>
+              </article>
+
+              {/* Card 6 */}
+              <article className="features__card">
+                <div className="features__image-wrapper" aria-hidden="true">
+                  <img
+                    src="/Assets/Real_time_com.jpg"
+                    alt="Real-Time Communication interface screenshot"
+                    className="features__image"
+                  />
+                </div>
+                <div className="features__content">
+                  <div className="features__title-row">
+                    <svg
+                      className="features__icon"
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="20"
+                      height="20"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                    <h3 className="features__card-title">
+                      Real-Time Communication
+                    </h3>
+                  </div>
+                  <p className="features__card-desc">
+                    Integrated chat to keep your team aligned.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+         ROLES
+    ========================================================== */}
+        <section className="roles" id="roles" aria-labelledby="roles-heading">
+          <div className="roles__container">
+            <header className="roles__header">
+              <p className="section-label">User Roles</p>
+              <h2 className="section-title" id="roles-heading">
+                One account, three modes
+              </h2>
+              <p className="section-subtitle">
+                Switch seamlessly between collaborator, owner, and mentor — all
+                within the same profile.
+              </p>
+            </header>
+
+            <div className="roles__grid">
+              <article className="roles__card">
+                <div className="roles__icon-wrap" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
+                  </svg>
+                </div>
+                <h3 className="roles__card-title">Collaborator</h3>
+                <p className="roles__card-desc">
+                  Join projects, complete tasks, earn ratings, and build your
+                  portfolio through verified contributions.
+                </p>
+              </article>
+
+              <article className="roles__card">
+                <div className="roles__icon-wrap" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+                    <path d="m9 12 2 2 4-4" />
+                  </svg>
+                </div>
+                <h3 className="roles__card-title">Project Owner</h3>
+                <p className="roles__card-desc">
+                  Create projects, assign tasks, manage your team, and approve
+                  contributions with full control.
+                </p>
+              </article>
+
+              <article className="roles__card">
+                <div className="roles__icon-wrap" aria-hidden="true">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="24"
+                    height="24"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M22 10v6M2 10l10-5 10 5-10 5z" />
+                    <path d="M6 12v5c3 3 9 3 12 0v-5" />
+                  </svg>
+                </div>
+                <h3 className="roles__card-title">Mentor</h3>
+                <p className="roles__card-desc">
+                  Guide students, review progress, issue recommendation badges,
+                  and shape the next generation.
+                </p>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+         PROCESS
+    ========================================================== */}
+        <section
+          className="process"
+          id="how-it-works"
+          aria-labelledby="process-heading"
+        >
+          <div className="process__container">
+            <header className="process__header">
+              <p className="section-label">Process</p>
+              <h2 className="section-title" id="process-heading">
+                How it works
+              </h2>
+            </header>
+
+            <div className="process__grid">
+              <article className="process__card">
+                <div className="process__number" aria-hidden="true">
+                  01
+                </div>
+                <div className="process__content">
+                  <h3 className="process__card-title">
+                    Create or Join a Project
+                  </h3>
+                  <p className="process__card-desc">
+                    Sign up and explore available projects or start your own
+                    project. Connect with students who want to collaborate.
+                  </p>
+                </div>
+              </article>
+
+              <article className="process__card">
+                <div className="process__number" aria-hidden="true">
+                  02
+                </div>
+                <div className="process__content">
+                  <h3 className="process__card-title">Get Assigned Tasks</h3>
+                  <p className="process__card-desc">
+                    Project owners create and assign tasks with defined
+                    difficulty levels and deadlines.
+                  </p>
+                </div>
+              </article>
+
+              <article className="process__card">
+                <div className="process__number" aria-hidden="true">
+                  03
+                </div>
+                <div className="process__content">
+                  <h3 className="process__card-title">
+                    Complete Tasks &amp; Submit Work
+                  </h3>
+                  <p className="process__card-desc">
+                    Work on the task using external tools and submit evidence
+                    such as pull requests, commits, or documentation links.
+                  </p>
+                </div>
+              </article>
+
+              <article className="process__card">
+                <div className="process__number" aria-hidden="true">
+                  04
+                </div>
+                <div className="process__content">
+                  <h3 className="process__card-title">
+                    Earn XP &amp; Build Reputation
+                  </h3>
+                  <p className="process__card-desc">
+                    Climb the rankings, earn mentor badges, and build a verified
+                    portfolio of contributions.
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+         GAMIFICATION
+    ========================================================== */}
+        <section
+          className="gamification"
+          id="rating-system"
+          aria-labelledby="gamification-heading"
+        >
+          <div className="gamification__container">
+            <header className="gamification__header">
+              <p className="section-label">Gamification</p>
+              <h2 className="section-title" id="gamification-heading">
+                XP &amp; Reputation System
+              </h2>
+              <p className="section-subtitle">
+                Every contribution counts. Earn ratings, build reputation, and
+                climb the rankings.
+              </p>
+            </header>
+
+            <div className="gamification__grid">
+              {/* XP Card */}
+              <article className="gamification__card">
+                <div className="gamification__card-header">
+                  <div className="gamification__icon-wrap" aria-hidden="true">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <path d="M6 9H4.5a2.5 2.5 0 0 1 0-5H6" />
+                      <path d="M18 9h1.5a2.5 2.5 0 0 0 0-5H18" />
+                      <path d="M4 22h16" />
+                      <path d="M10 14.66V17c0 .55-.47.98-.97 1.21C7.85 18.75 7 20.24 7 22" />
+                      <path d="M14 14.66V17c0 .55.47.98.97 1.21C16.15 18.75 17 20.24 17 22" />
+                      <path d="M18 2H6v7a6 6 0 0 0 12 0V2z" />
+                    </svg>
+                  </div>
+                  <h3 className="gamification__card-title">
+                    XP System Details
+                  </h3>
+                </div>
+                <div className="gamification__card-body">
+                  <ul
+                    className="gamification__list"
+                    aria-label="XP reward breakdown"
+                  >
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Easy Task
+                      </span>
+                      <span className="gamification__list-value">10</span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Medium Task
+                      </span>
+                      <span className="gamification__list-value">20</span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Hard Task
+                      </span>
+                      <span className="gamification__list-value">40</span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Early Completion Bonus
+                      </span>
+                      <span className="gamification__list-value">5</span>
+                    </li>
+                  </ul>
+                  <p className="gamification__card-note">
+                    Ratings are awarded across effort. Task appraisal is used to
+                    increase level in the system.
+                  </p>
+                </div>
+              </article>
+
+              {/* Reputation Card */}
+              <article className="gamification__card">
+                <div className="gamification__card-header">
+                  <div className="gamification__icon-wrap" aria-hidden="true">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      width="24"
+                      height="24"
+                      viewBox="0 0 24 24"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      aria-hidden="true"
+                    >
+                      <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
+                    </svg>
+                  </div>
+                  <h3 className="gamification__card-title">Reputation</h3>
+                </div>
+                <div className="gamification__card-body">
+                  <ul
+                    className="gamification__list"
+                    aria-label="Reputation score changes"
+                  >
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Task Approved
+                      </span>
+                      <span className="gamification__list-value gamification__list-value--positive">
+                        +20
+                      </span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Mentor Badge
+                      </span>
+                      <span className="gamification__list-value gamification__list-value--positive">
+                        +20
+                      </span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Revision Required
+                      </span>
+                      <span className="gamification__list-value gamification__list-value--negative">
+                        -5
+                      </span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Missed Deadline
+                      </span>
+                      <span className="gamification__list-value gamification__list-value--negative">
+                        -5
+                      </span>
+                    </li>
+                    <li className="gamification__list-item">
+                      <span className="gamification__list-label">
+                        Leaving Project
+                      </span>
+                      <span className="gamification__list-value gamification__list-value--negative">
+                        -20
+                      </span>
+                    </li>
+                  </ul>
+                  <p className="gamification__card-note">
+                    30 Days inactive = Reputation × 0.95 decay
+                  </p>
+                </div>
+              </article>
+            </div>
+          </div>
+        </section>
+
+        {/* =========================================================
+         CTA
+    ========================================================== */}
+        <section className="cta" aria-labelledby="cta-heading">
+          <div className="cta__container">
+            <h2 className="cta__title" id="cta-heading">
+              Ready to start building?
+            </h2>
+            <p className="cta__subtitle">
+              Join thousands of students who are collaborating on real projects
+              and earning verified experience.
+            </p>
+            <a href="log.html" className="cta__btn">
+              Get Started — It's Free
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="20"
+                height="20"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M5 12h14" />
+                <path d="m12 5 7 7-7 7" />
+              </svg>
+            </a>
+          </div>
+        </section>
+      </main>
+
+      {/* =========================================================
+       FOOTER
+  ========================================================== */}
+      <footer className="footer">
+        <div className="footer__container">
+          <a href="#" className="footer__logo" aria-label="TeamForge Home">
+            <div className="footer__logo-icon" aria-hidden="true">
+              TF
+            </div>
+            <span className="footer__logo-text">TeamForge</span>
+          </a>
+
+          <nav className="footer__nav" aria-label="Footer navigation">
+            <a href="#features" className="footer__nav-link">
+              Features
+            </a>
+            <a href="#roles" className="footer__nav-link">
+              Roles
+            </a>
+            <a href="#how-it-works" className="footer__nav-link">
+              How It Works
+            </a>
+            <a href="#rating-system" className="footer__nav-link">
+              Rating System
+            </a>
+          </nav>
+
+          <p className="footer__copyright">
+            &copy; <span id="footer-year"></span> TeamForge. All rights
+            reserved.
+          </p>
+        </div>
+      </footer>
+    </>
+  );
+}
+
+export default LandingPage;

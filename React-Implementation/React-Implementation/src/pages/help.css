@@ -1,0 +1,92 @@
+﻿/* FAQ accordion */
+.faq-item {
+  border-bottom: 1px solid var(--border, #e5e4e7);
+}
+.faq-item:last-child {
+  border-bottom: none;
+}
+.faq-q {
+  width: 100%;
+  text-align: left;
+  padding: 12px 0;
+  background: none;
+  border: none;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--fg, #000);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 10px;
+}
+.faq-a {
+  font-size: 0.82rem;
+  color: var(--muted-fg, #6b6375);
+  line-height: 1.6;
+  padding-bottom: 12px;
+  display: none;
+}
+.faq-a.open {
+  display: block;
+}
+.faq-chevron {
+  transition: transform 0.2s;
+  font-size: 0.7rem;
+  color: var(--muted-fg, #6b6375);
+  flex-shrink: 0;
+}
+.faq-q.open .faq-chevron {
+  transform: rotate(180deg);
+}
+
+/* Base styles for the Help page components (if not already globally defined) */
+.page {
+  padding: 24px;
+}
+.page-subtitle {
+  color: var(--muted-fg, #6b6375);
+  margin-bottom: 24px;
+}
+.card {
+  background: var(--bg, #fff);
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 8px;
+  padding: 16px;
+  margin-bottom: 16px;
+}
+.card-title {
+  font-weight: 600;
+  margin-bottom: 16px;
+}
+.input-group {
+  margin-bottom: 12px;
+}
+.label {
+  display: block;
+  font-size: 0.85rem;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.input {
+  width: 100%;
+  padding: 8px 12px;
+  border: 1px solid var(--border, #e5e4e7);
+  border-radius: 6px;
+  font-family: inherit;
+}
+.btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+.btn-primary {
+  background: var(--accent, #000);
+  color: #fff;
+}
+.mt-3 {
+  margin-top: 16px;
+}
