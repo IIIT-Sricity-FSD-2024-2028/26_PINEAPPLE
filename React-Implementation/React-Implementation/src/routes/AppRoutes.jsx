@@ -1,8 +1,8 @@
 import { Routes, Route } from "react-router-dom";
 
 import LandingPage from "../pages/landingpage";
-import Login from "../pages/Auth/login";
-import Signup from "../pages/Auth/sinup";
+import Login from "../pages/Login";
+import Signup from "../pages/Signup";
 import Layout from "../pages/layout";
 import Dashboard from "../pages/dashboard";
 import Help from "../pages/help";
@@ -10,6 +10,7 @@ import Leaderboard from "../pages/leaderboard";
 import Notifications from "../pages/notifications";
 import Profile from "../pages/profile";
 import Settings from "../pages/settings";
+import ProtectedRoute from "./ProtectedRoute";
 
 const AppRoutes = () => {
   return (
@@ -18,13 +19,17 @@ const AppRoutes = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
-      <Route element={<Layout />}>
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/help" element={<Help />} />
-        <Route path="/leaderboard" element={<Leaderboard />} />
-        <Route path="/notifications" element={<Notifications />} />
-        <Route path="/profile" element={<Profile />} />
-        <Route path="/settings" element={<Settings />} />
+      
+      {/* Protected pages */}
+      <Route element={<ProtectedRoute />}>
+        <Route element={<Layout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/help" element={<Help />} />
+          <Route path="/leaderboard" element={<Leaderboard />} />
+          <Route path="/notifications" element={<Notifications />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
       </Route>
     </Routes>
   );
