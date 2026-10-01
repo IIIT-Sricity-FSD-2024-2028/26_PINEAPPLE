@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import { usersApi } from '../services/usersApi';
 import './Auth.css';
 
 const EyeIcon = () => (
@@ -46,7 +47,26 @@ const Login = () => {
 
     try {
       if (email && password) {
-        login({ id: "1", email, role: "Collaborator", name: "User" });
+        const users = await usersApi.list();
+        const normalizedIdentity = email.trim().toLocaleLowerCase().replace(/[^a-z0-9]/g, "");
+        const matchedUser = (Array.isArray(users) ? users : []).find((candidate) => {
+          const normalizedEmail = String(candidate.email || "").toLocaleLowerCase();
+          const normalizedName = String(candidate.name || "")
+            .toLocaleLowerCase()
+            .replace(/[^a-z0-9]/g, "");
+          const normalizedUsername = normalizedEmail.split("@")[0].replace(/[^a-z0-9]/g, "");
+
+          return normalizedEmail === email.trim().toLocaleLowerCase()
+            || normalizedName === normalizedIdentity
+            || normalizedUsername === normalizedIdentity;
+        });
+
+        if (!matchedUser) {
+          setError('No account matches that username or email.');
+          return;
+        }
+
+        login(matchedUser);
         navigate('/dashboard');
       } else {
         setError('Please enter both email and password.');
@@ -83,7 +103,8 @@ const Login = () => {
               <div className="input-group">
                 <label>Username / Email</label>
                 <input 
-                  type="email" 
+                  type="text" 
+                  autoComplete="username"
                   placeholder="username or name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
