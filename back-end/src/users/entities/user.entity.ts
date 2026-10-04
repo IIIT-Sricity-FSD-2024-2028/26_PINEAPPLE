@@ -27,6 +27,43 @@ export class UserProfile {
 
   @ApiProperty({ description: 'Whether mentor features are unlocked', default: false })
   mentorUnlocked!: boolean;
+
+  @ApiPropertyOptional({ description: 'Job title or role' })
+  title?: string;
+
+  @ApiPropertyOptional({ description: 'University or organization' })
+  uni?: string;
+
+  @ApiPropertyOptional({ description: 'Date joined string' })
+  joined?: string;
+
+  @ApiProperty({ description: 'Number of completed tasks', default: 0 })
+  tasksCount!: number;
+}
+
+export class MentorRecommendation {
+  @ApiProperty({ description: 'Project name' })
+  project!: string;
+
+  @ApiProperty({ description: 'Mentor name' })
+  mentor!: string;
+
+  @ApiProperty({ description: 'Recommendation note' })
+  note!: string;
+}
+
+export class MentoredProject {
+  @ApiProperty({ description: 'Project name' })
+  name!: string;
+
+  @ApiProperty({ description: 'Owner name' })
+  owner!: string;
+
+  @ApiProperty({ description: 'Project status' })
+  status!: string;
+
+  @ApiProperty({ description: 'Contribution description' })
+  contribution!: string;
 }
 
 export class UserData {
@@ -41,6 +78,12 @@ export class UserData {
 
   @ApiPropertyOptional({ description: 'Administrative warnings issued to the user', type: [Object] })
   warnings?: any[];
+
+  @ApiPropertyOptional({ description: 'Mentor recommendations received', type: [MentorRecommendation] })
+  mentorRecommendations?: MentorRecommendation[];
+
+  @ApiPropertyOptional({ description: 'Projects mentored by the user', type: [MentoredProject] })
+  mentoredProjects?: MentoredProject[];
 }
 
 export class UserEntity {

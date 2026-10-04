@@ -1,0 +1,55 @@
+/* settings.css */
+.settings-page { padding: 2rem; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
+.set-header { margin-bottom: 2.5rem; }
+.set-title-main { font-size: 2.5rem; font-weight: 800; color: #111827; margin: 0 0 0.5rem 0; letter-spacing: -0.02em; }
+.set-subtitle { margin: 0; color: #6b7280; font-size: 1.05rem; }
+
+.set-glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); border: 1px solid rgba(255, 255, 255, 0.5); margin-bottom: 1.5rem; }
+.set-danger-zone { border: 1px solid rgba(239, 68, 68, 0.3); background: rgba(254, 242, 242, 0.5); }
+
+.set-section-header { display: flex; gap: 1rem; align-items: center; margin-bottom: 2rem; }
+.set-icon-box { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; }
+.set-icon-primary { background: rgba(95, 81, 63, 0.1); color: #5f513f; }
+.set-icon-danger { background: rgba(239, 68, 68, 0.1); color: #ef4444; }
+
+.set-section-title { margin: 0 0 0.25rem 0; font-size: 1.2rem; color: #111827; }
+.set-section-title-danger { margin: 0 0 0.25rem 0; font-size: 1.2rem; color: #ef4444; }
+.set-section-desc { margin: 0; color: #6b7280; font-size: 0.9rem; }
+
+.set-input-group { margin-bottom: 1.5rem; }
+.set-input-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(250px, 1fr)); gap: 1.5rem; margin-bottom: 1.5rem; }
+
+.set-label { display: block; font-size: 0.85rem; font-weight: 700; color: #4b5563; margin-bottom: 0.5rem; }
+.set-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; box-sizing: border-box; }
+.set-file-input { font-size: 0.9rem; }
+
+.set-avatar-row { display: flex; gap: 1rem; align-items: center; }
+.set-avatar-preview { width: 56px; height: 56px; border-radius: 50%; background: #5f513f; color: white; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 1.2rem; }
+.set-avatar-desc { color: #6b7280; font-size: 0.8rem; margin: 0.25rem 0 0 0; }
+
+.set-hr { border: none; border-top: 1px solid #e5e7eb; margin: 2rem 0; }
+
+.set-skills-desc { color: #6b7280; font-size: 0.85rem; margin: 0 0 1rem 0; }
+.set-skill-input-row { display: flex; gap: 0.5rem; margin-bottom: 1rem; }
+.set-skill-input { flex: 1; padding: 0.75rem 1rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; box-sizing: border-box; }
+.set-skill-btn { padding: 0.75rem 1.5rem; background: #5f513f; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; width: auto; white-space: nowrap; transition: background 0.2s; }
+.set-skills-list { display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.set-skill-tag { padding: 6px 14px; background: #e5e7eb; color: #374151; border-radius: 20px; font-size: 0.85rem; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+.set-skill-remove { cursor: pointer; color: #9ca3af; }
+
+.set-btn-primary { padding: 0.75rem 1.5rem; background: #5f513f; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: background 0.2s; }
+.set-btn-danger { background: #ef4444; }
+
+.set-theme-wrap { max-width: 300px; margin-bottom: 1.5rem; }
+.set-theme-select { background: white; }
+
+/* Toggle */
+.set-toggle-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.25rem; }
+.set-toggle-label { font-weight: 600; font-size: 0.95rem; color: #111827; }
+.set-toggle-desc { font-size: 0.85rem; color: #6b7280; margin-top: 2px; }
+.set-toggle-switch { position: relative; display: inline-block; width: 44px; height: 24px; flex-shrink: 0; }
+.set-toggle-input { opacity: 0; width: 0; height: 0; position: absolute; }
+.set-toggle-slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #cbd5e1; transition: .3s; border-radius: 24px; }
+.set-toggle-slider.checked { background-color: #5f513f; }
+.set-toggle-knob { position: absolute; height: 18px; width: 18px; left: 3px; bottom: 3px; background-color: white; transition: .3s; border-radius: 50%; box-shadow: 0 2px 4px rgba(0,0,0,0.2); }
+.set-toggle-knob.checked { left: 22px; }

@@ -1,6 +1,7 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
+import usersApi from '../services/usersApi';
 import './Auth.css';
 
 const EyeIcon = () => (
@@ -61,7 +62,15 @@ const Signup = () => {
 
     try {
       if (email && password && username) {
-        login({ id: "1", email, role: "Collaborator", name: username });
+        // Send actual creation request to backend API
+        const newUser = await usersApi.create({
+          name: username,
+          email,
+          password,
+          role: "Collaborator"
+        });
+        
+        login(newUser);
         navigate('/dashboard');
       } else {
         setError('Please fill in all fields.');

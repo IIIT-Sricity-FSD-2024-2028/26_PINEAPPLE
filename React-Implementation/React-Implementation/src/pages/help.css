@@ -1,92 +1,87 @@
-﻿/* FAQ accordion */
-.faq-item {
-  border-bottom: 1px solid var(--border, #e5e4e7);
+/* help.css */
+.help-page { padding: 2rem; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
+.help-header { margin-bottom: 2.5rem; }
+.help-title-main { font-size: 2.5rem; font-weight: 800; color: #111827; margin: 0 0 0.5rem 0; letter-spacing: -0.02em; }
+.help-subtitle { margin: 0; color: #6b7280; font-size: 1.05rem; }
+
+.help-glass-card { background: rgba(255, 255, 255, 0.7); backdrop-filter: blur(10px); border-radius: 16px; padding: 2rem; box-shadow: 0 4px 20px rgba(0, 0, 0, 0.03); border: 1px solid rgba(255, 255, 255, 0.5); margin-bottom: 1.5rem; }
+
+.help-card-title {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #111827;
+  margin-bottom: 1.5rem;
 }
-.faq-item:last-child {
+
+.help-faq-item {
+  border-bottom: 1px solid #f3f4f6;
+  padding: 1rem 0;
+}
+.help-faq-item:last-child {
   border-bottom: none;
+  padding-bottom: 0;
 }
-.faq-q {
+.help-faq-item:first-child {
+  padding-top: 0;
+}
+
+.help-faq-q {
   width: 100%;
-  text-align: left;
-  padding: 12px 0;
-  background: none;
+  background: transparent;
   border: none;
-  font-family: inherit;
-  font-size: 0.85rem;
-  font-weight: 600;
-  cursor: pointer;
-  color: var(--fg, #000);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 10px;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: #111827;
+  cursor: pointer;
+  padding: 0;
+  text-align: left;
 }
-.faq-a {
-  font-size: 0.82rem;
-  color: var(--muted-fg, #6b6375);
-  line-height: 1.6;
-  padding-bottom: 12px;
-  display: none;
+
+.help-faq-a {
+  max-height: 0;
+  overflow: hidden;
+  transition: max-height 0.3s ease, margin-top 0.3s ease;
+  color: #4b5563;
+  font-size: 0.95rem;
+  line-height: 1.5;
 }
-.faq-a.open {
-  display: block;
+.help-faq-a.open {
+  max-height: 500px;
+  margin-top: 1rem;
 }
-.faq-chevron {
-  transition: transform 0.2s;
-  font-size: 0.7rem;
-  color: var(--muted-fg, #6b6375);
-  flex-shrink: 0;
+
+.help-chevron {
+  transition: transform 0.3s ease;
+  color: #9ca3af;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
-.faq-q.open .faq-chevron {
+.help-chevron.open {
   transform: rotate(180deg);
 }
 
-/* Base styles for the Help page components (if not already globally defined) */
-.page {
-  padding: 24px;
-}
-.page-subtitle {
-  color: var(--muted-fg, #6b6375);
-  margin-bottom: 24px;
-}
-.card {
-  background: var(--bg, #fff);
-  border: 1px solid var(--border, #e5e4e7);
+.help-input-group { margin-bottom: 1.5rem; }
+.help-label { display: block; font-size: 0.85rem; font-weight: 700; color: #4b5563; margin-bottom: 0.5rem; }
+.help-input { width: 100%; padding: 0.75rem 1rem; border: 1px solid #e5e7eb; border-radius: 8px; font-size: 0.95rem; outline: none; box-sizing: border-box; background: white; font-family: inherit; }
+.help-textarea { resize: vertical; min-height: 120px; }
+
+.help-btn-primary { padding: 0.75rem 1.5rem; background: #5f513f; color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: background 0.2s; }
+.help-btn-primary:hover { background: #4a3f31; }
+
+.help-icon-box {
+  width: 32px;
+  height: 32px;
   border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 16px;
-}
-.card-title {
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-.input-group {
-  margin-bottom: 12px;
-}
-.label {
-  display: block;
-  font-size: 0.85rem;
-  font-weight: 500;
-  margin-bottom: 6px;
-}
-.input {
-  width: 100%;
-  padding: 8px 12px;
-  border: 1px solid var(--border, #e5e4e7);
-  border-radius: 6px;
-  font-family: inherit;
-}
-.btn {
-  padding: 8px 16px;
-  border: none;
-  border-radius: 6px;
-  cursor: pointer;
-  font-weight: 500;
-}
-.btn-primary {
-  background: var(--accent, #000);
-  color: #fff;
-}
-.mt-3 {
-  margin-top: 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(95, 81, 63, 0.1);
+  color: #5f513f;
 }
