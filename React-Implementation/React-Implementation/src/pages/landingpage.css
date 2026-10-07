@@ -111,6 +111,21 @@ a {
   line-height: 1.7;
 }
 
+/* Override global index.css header styles for section headers */
+.features__header,
+.roles__header,
+.process__header,
+.gamification__header {
+  height: auto !important;
+  background: transparent !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+  border-bottom: none !important;
+  box-shadow: none !important;
+  padding: 0 !important;
+}
+
+
 /* ==========================================================
    HEADER
    ========================================================== */
@@ -460,13 +475,22 @@ a {
    ========================================================== */
 .features {
   padding: var(--section-pad-y) 0;
-  background-color: var(--color-white);
+  background-color: var(--tf-glass-bg, rgba(255,255,255,0.4));
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-xl);
+  margin: 2rem auto;
+  max-width: var(--container-max);
+  overflow: hidden;
+  position: relative;
+  width: calc(100% - 4rem);
 }
 
 .features__container {
   max-width: var(--container-max);
   margin: 0 auto;
   padding: 0 var(--container-pad-x);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .features__header {
@@ -479,48 +503,60 @@ a {
   display: grid;
   grid-template-columns: 1fr;
   gap: 2rem;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .features__card {
   display: flex;
   flex-direction: column;
   height: 100%;
+  min-width: 0;
   background-color: var(--bg-surface);
   border: 1px solid var(--color-gray-200);
   border-radius: var(--radius-xl);
   padding: 1.5rem;
+  overflow: hidden;
+  box-sizing: border-box;
   transition:
     box-shadow var(--transition-medium),
-    border-color var(--transition-medium);
+    border-color var(--transition-medium),
+    transform var(--transition-medium);
 }
 
 .features__card:hover {
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.08);
+  transform: translateY(-3px);
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.08);
   border-color: var(--color-gray-300);
 }
 
 .features__image-wrapper {
   aspect-ratio: 4 / 3;
-  background-color: var(--color-gray-100);
+  width: 100%;
+  background-color: transparent;
   border-radius: var(--radius-lg);
-  margin-bottom: 2rem;
+  margin-bottom: 1.75rem;
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 1rem;
+  padding: 0.75rem;
+  box-sizing: border-box;
 }
 
 .features__image {
-  width: 100%;
-  height: 100%;
+  max-width: 100%;
+  max-height: 100%;
+  width: auto;
+  height: auto;
   object-fit: contain;
+  border-radius: var(--radius-lg);
   mix-blend-mode: multiply;
   transition: transform var(--transition-medium);
 }
 
 .features__card:hover .features__image {
-  transform: scale(1.05);
+  transform: scale(1.04);
 }
 
 .features__content {
@@ -557,7 +593,12 @@ a {
    ========================================================== */
 .roles {
   padding: var(--section-pad-y) 0;
-  background-color: var(--color-gray-100);
+  background-color: var(--tf-glass-bg, rgba(255,255,255,0.4));
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-xl);
+  margin: 2rem auto;
+  max-width: var(--container-max);
+  width: calc(100% - 4rem);
 }
 
 .roles__container {
@@ -624,7 +665,12 @@ a {
    ========================================================== */
 .process {
   padding: var(--section-pad-y) 0;
-  background-color: var(--color-white);
+  background-color: var(--tf-glass-bg, rgba(255,255,255,0.4));
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-xl);
+  margin: 2rem auto;
+  max-width: var(--container-max);
+  width: calc(100% - 4rem);
 }
 
 .process__container {
@@ -695,7 +741,12 @@ a {
    ========================================================== */
 .gamification {
   padding: var(--section-pad-y) 0;
-  background-color: var(--bg-muted);
+  background-color: var(--tf-glass-bg, rgba(255,255,255,0.4));
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-xl);
+  margin: 2rem auto;
+  max-width: var(--container-max);
+  width: calc(100% - 4rem);
 }
 
 .gamification__container {
@@ -812,7 +863,12 @@ a {
    ========================================================== */
 .cta {
   padding: var(--section-pad-y) 0;
-  background-color: var(--color-white);
+  background-color: var(--tf-glass-bg, rgba(255,255,255,0.4));
+  backdrop-filter: blur(16px);
+  border-radius: var(--radius-xl);
+  margin: 2rem auto;
+  max-width: var(--container-max);
+  width: calc(100% - 4rem);
 }
 
 .cta__container {

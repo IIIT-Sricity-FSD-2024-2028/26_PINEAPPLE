@@ -54,7 +54,9 @@ const Login = () => {
           const normalizedName = String(candidate.name || "")
             .toLocaleLowerCase()
             .replace(/[^a-z0-9]/g, "");
-          const normalizedUsername = normalizedEmail.split("@")[0].replace(/[^a-z0-9]/g, "");
+          const normalizedUsername = (candidate.username || normalizedEmail.split("@")[0] || "")
+            .toLocaleLowerCase()
+            .replace(/[^a-z0-9]/g, "");
 
           return normalizedEmail === email.trim().toLocaleLowerCase()
             || normalizedName === normalizedIdentity
@@ -63,6 +65,11 @@ const Login = () => {
 
         if (!matchedUser) {
           setError('No account matches that username or email.');
+          return;
+        }
+
+        if (matchedUser.password && matchedUser.password !== password) {
+          setError('Incorrect password. Please try again.');
           return;
         }
 

@@ -1,0 +1,123 @@
+/* ==========================================================================
+   Create Project Styles (Scoped)
+   ========================================================================== */
+
+.tf-create-proj-container {
+  padding: 24px;
+  max-width: 800px;
+  margin: 0 auto;
+}
+
+.tf-create-proj-header {
+  margin-bottom: 24px;
+}
+
+.tf-create-proj-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-create-proj-subtitle {
+  font-size: 0.92rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+}
+
+.tf-create-proj-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 28px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tf-create-proj-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.tf-create-proj-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.tf-create-proj-label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--tf-ink-700, #374151);
+}
+
+.tf-create-proj-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--card, #ffffff);
+  color: var(--fg, #111827);
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tf-create-proj-input:focus {
+  border-color: var(--tf-brand, #5f513f);
+  box-shadow: 0 0 0 3px rgba(95, 81, 63, 0.15);
+}
+
+.tf-create-proj-textarea {
+  min-height: 80px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.tf-create-proj-grid-2 {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.tf-create-proj-btn-primary {
+  padding: 11px 22px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.92rem;
+  cursor: pointer;
+  align-self: flex-start;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  margin-top: 8px;
+}
+
+.tf-create-proj-btn-primary:hover:not(:disabled) {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+.tf-create-proj-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tf-create-proj-feedback {
+  padding: 12px 16px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+}
+
+.tf-create-proj-feedback-success {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--tf-success, #16a34a);
+  border: 1px solid rgba(22, 163, 74, 0.2);
+}
+
+.tf-create-proj-feedback-error {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--tf-danger, #ef4444);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+}

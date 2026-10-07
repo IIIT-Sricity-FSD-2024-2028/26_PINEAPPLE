@@ -9,6 +9,21 @@ export const tasksApi = {
       role: role || getCurrentUserRole(),
     });
   },
+  listForProjects: async (projectIds = [], role) => {
+    if (!Array.isArray(projectIds) || !projectIds.length) return [];
+    try {
+      const results = await Promise.all(
+        projectIds.map((pid) =>
+          apiRequest(`/tasks/project/${pid}`, "GET", null, {
+            role: role || getCurrentUserRole(),
+          }).catch(() => [])
+        )
+      );
+      return results.flat();
+    } catch {
+      return [];
+    }
+  },
   get: (id, role) =>
     apiRequest(`/tasks/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),

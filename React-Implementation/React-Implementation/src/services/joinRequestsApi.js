@@ -30,6 +30,10 @@ export const joinRequestsApi = {
     apiRequest(`/join-requests/${id}`, "DELETE", null, {
       role: role || getCurrentUserRole(),
     }),
+  respond: (id, status, role) =>
+    apiRequest(`/join-requests/${id}`, "PUT", { status }, {
+      role: role || getCurrentUserRole(),
+    }),
 };
 
 export default joinRequestsApi;

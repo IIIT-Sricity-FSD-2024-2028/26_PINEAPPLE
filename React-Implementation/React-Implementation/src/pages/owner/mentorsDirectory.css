@@ -1,0 +1,184 @@
+/* ==========================================================================
+   Mentors Directory Styles (Scoped)
+   ========================================================================== */
+
+.tf-mentors-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tf-mentors-header {
+  margin-bottom: 24px;
+}
+
+.tf-mentors-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-mentors-subtitle {
+  font-size: 0.92rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+}
+
+.tf-mentors-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 18px;
+}
+
+.tf-mentors-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tf-mentors-card-top {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.tf-mentors-avatar {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--tf-accent, #f59e0b);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.tf-mentors-info h3 {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 2px 0;
+}
+
+.tf-mentors-info p {
+  font-size: 0.8rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+}
+
+.tf-mentors-skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tf-mentors-skill-tag {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  color: var(--tf-ink-700, #374151);
+  font-weight: 500;
+}
+
+.tf-mentors-stats-row {
+  display: flex;
+  gap: 16px;
+  font-size: 0.78rem;
+  color: var(--tf-ink-600, #4b5563);
+  margin-bottom: 16px;
+  border-top: 1px solid var(--border, #f3f4f6);
+  padding-top: 12px;
+}
+
+.tf-mentors-btn-primary {
+  padding: 8px 16px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  width: 100%;
+}
+
+.tf-mentors-btn-primary:hover {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+/* Modal */
+.tf-mentors-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.tf-mentors-modal-box {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  max-width: 500px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.tf-mentors-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.tf-mentors-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0;
+}
+
+.tf-mentors-form-group {
+  margin-bottom: 16px;
+}
+
+.tf-mentors-form-label {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--tf-ink-700, #374151);
+  margin-bottom: 6px;
+}
+
+.tf-mentors-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d1d5db);
+  background: #ffffff;
+  color: var(--fg, #111827);
+  font-size: 0.88rem;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.tf-mentors-input:focus {
+  border-color: var(--tf-brand, #5f513f);
+}

@@ -15,20 +15,26 @@ const API_BASE_URL = resolveApiBaseUrl();
 
 const defaultHeaders = (role, userId, userEmail) => ({
   "Content-Type": "application/json",
-  "x-user-role": role,
-  ...(userId ? { "x-user-id": userId } : {}),
+  "x-user-role": role || getCurrentUserRole(),
+  "x-user-id": userId || getCurrentUserId(),
   ...(userEmail ? { "x-user-email": userEmail } : {}),
 });
 
 async function apiRequest(path, method, body = null, options = {}) {
   const url = `${API_BASE_URL}${path}`;
+  const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
+  const headers = defaultHeaders(options.role, options.userId, options.userEmail);
+  if (isFormData) {
+    delete headers["Content-Type"];
+  }
+
   const config = {
     method,
-    headers: defaultHeaders(options.role, options.userId, options.userEmail),
+    headers,
   };
 
   if (body && ["POST", "PUT", "PATCH"].includes(method)) {
-    config.body = JSON.stringify(body);
+    config.body = isFormData ? body : JSON.stringify(body);
   }
 
   try {
@@ -91,7 +97,11 @@ function getCurrentUserRole() {
     if (sessionStorage.getItem("teamforge.isSuperUser") === "true") {
       return "Super User";
     }
-    if (typeof STATE !== "undefined") {
+    const storedRole = sessionStorage.getItem("teamforge.role");
+    if (storedRole) {
+      return storedRole;
+    }
+    if (typeof STATE !== "undefined" && STATE) {
       return STATE.portalRole || STATE.role || "Collaborator";
     }
     return "Collaborator";

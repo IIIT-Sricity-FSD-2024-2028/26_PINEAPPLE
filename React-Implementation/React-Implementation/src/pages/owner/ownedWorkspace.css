@@ -1,0 +1,334 @@
+/* ==========================================================================
+   Owned Workspace Styles (Scoped)
+   ========================================================================== */
+
+.tf-owned-ws-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tf-owned-ws-back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--tf-ink-600, #4b5563);
+  padding: 6px 0;
+  transition: color 0.15s ease;
+  width: fit-content;
+}
+
+.tf-owned-ws-back-btn:hover {
+  color: var(--tf-brand, #5f513f);
+}
+
+.tf-owned-ws-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tf-owned-ws-header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-bottom: 20px;
+}
+
+.tf-owned-ws-title-group {
+  flex: 1;
+  min-width: 320px;
+}
+
+.tf-owned-ws-title-flex {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.tf-owned-ws-title {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0;
+}
+
+.tf-owned-ws-owner-badge {
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: #f7eee2;
+  color: #7a542a;
+}
+
+.tf-owned-ws-desc {
+  font-size: 0.92rem;
+  color: var(--tf-ink-600, #4b5563);
+  line-height: 1.5;
+  margin: 0 0 12px 0;
+  max-width: 760px;
+}
+
+.tf-owned-ws-meta {
+  font-size: 0.84rem;
+  color: var(--tf-ink-500, #6b7280);
+}
+
+.tf-owned-ws-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.tf-owned-ws-skill-tag {
+  font-size: 0.72rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  color: var(--tf-ink-700, #374151);
+  font-weight: 500;
+}
+
+.tf-owned-ws-progress-box {
+  min-width: 240px;
+}
+
+.tf-owned-ws-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--tf-ink-700, #374151);
+  margin-bottom: 6px;
+}
+
+.tf-owned-ws-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  overflow: hidden;
+}
+
+.tf-owned-ws-progress-fill {
+  height: 100%;
+  background: var(--tf-brand, #5f513f);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Tabs & Toolbar */
+.tf-owned-ws-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-bottom: 1px solid var(--border, #e5e7eb);
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tf-owned-ws-tabs {
+  display: flex;
+  gap: 8px;
+}
+
+.tf-owned-ws-tab-btn {
+  padding: 10px 18px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--tf-ink-500, #6b7280);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-owned-ws-tab-btn:hover {
+  color: var(--tf-ink-900, #111827);
+}
+
+.tf-owned-ws-tab-btn.active {
+  color: var(--tf-brand, #5f513f);
+  border-bottom-color: var(--tf-brand, #5f513f);
+}
+
+.tf-owned-ws-btn-primary {
+  padding: 8px 16px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tf-owned-ws-btn-primary:hover:not(:disabled) {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+.tf-owned-ws-btn-success {
+  background: var(--tf-success, #16a34a);
+}
+
+.tf-owned-ws-btn-success:hover {
+  background: #15803d;
+}
+
+.tf-owned-ws-btn-outline {
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--tf-ink-700, #374151);
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tf-owned-ws-btn-outline:hover {
+  background: var(--tf-ink-100, #f3f4f6);
+}
+
+/* Tasks Tab */
+.tf-owned-ws-tasks-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.tf-owned-ws-task-card {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 16px;
+  background: var(--card, #ffffff);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tf-owned-ws-task-left {
+  flex: 1;
+  min-width: 260px;
+}
+
+.tf-owned-ws-task-title {
+  font-size: 0.96rem;
+  font-weight: 600;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 4px 0;
+}
+
+.tf-owned-ws-task-desc {
+  font-size: 0.83rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0 0 6px 0;
+}
+
+.tf-owned-ws-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 0.78rem;
+  color: var(--tf-ink-600, #4b5563);
+}
+
+.tf-owned-ws-xp-badge {
+  font-weight: 700;
+  color: var(--tf-accent-600, #b45309);
+}
+
+/* Join Requests Section */
+.tf-owned-ws-requests-section {
+  background: #fdfaf6;
+  border: 1px solid #fae8d4;
+  border-radius: 10px;
+  padding: 16px;
+  margin-bottom: 20px;
+}
+
+.tf-owned-ws-request-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 14px;
+  background: #ffffff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  margin-top: 8px;
+}
+
+/* Modal */
+.tf-owned-ws-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.tf-owned-ws-modal-box {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.tf-owned-ws-form-group {
+  margin-bottom: 14px;
+}
+
+.tf-owned-ws-form-label {
+  display: block;
+  font-size: 0.84rem;
+  font-weight: 600;
+  color: var(--tf-ink-700, #374151);
+  margin-bottom: 4px;
+}
+
+.tf-owned-ws-input {
+  width: 100%;
+  padding: 10px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d1d5db);
+  background: #ffffff;
+  color: var(--fg, #111827);
+  font-size: 0.88rem;
+  box-sizing: border-box;
+  outline: none;
+}
+
+.tf-owned-ws-input:focus {
+  border-color: var(--tf-brand, #5f513f);
+}

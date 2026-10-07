@@ -1,29 +1,43 @@
-import React, { createContext, useState, useEffect } from 'react';
+import { createContext, useState, useEffect } from 'react';
 
 export const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
-  const [user, setUser] = useState(null);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-
-  useEffect(() => {
-    // Check localStorage (teamforge.backendUserId) or validate token here
-    const userId = localStorage.getItem("teamforge.backendUserId");
-    if (userId) {
-      setIsAuthenticated(true);
-      // Optional: Fetch user profile logic here using usersApi
+  const [user, setUser] = useState(() => {
+    try {
+      const stored = localStorage.getItem("teamforge.currentUser");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
     }
-  }, []);
+  });
+
+  const [isAuthenticated, setIsAuthenticated] = useState(() => {
+    try {
+      return Boolean(localStorage.getItem("teamforge.backendUserId"));
+    } catch {
+      return false;
+    }
+  });
 
   const login = (userData) => {
-    localStorage.setItem("teamforge.backendUserId", userData.id || "1");
+    const id = userData?.id || "1";
+    localStorage.setItem("teamforge.backendUserId", id);
+    if (userData) {
+      localStorage.setItem("teamforge.currentUser", JSON.stringify(userData));
+    }
+    // Always start newly logged in user in the Collaborator role
+    sessionStorage.setItem("teamforge.role", "Collaborator");
+    sessionStorage.removeItem("teamforge.isSuperUser");
     setUser(userData);
     setIsAuthenticated(true);
   };
 
   const logout = () => {
     localStorage.removeItem("teamforge.backendUserId");
+    localStorage.removeItem("teamforge.currentUser");
     sessionStorage.removeItem("teamforge.isSuperUser");
+    sessionStorage.setItem("teamforge.role", "Collaborator");
     setUser(null);
     setIsAuthenticated(false);
   };

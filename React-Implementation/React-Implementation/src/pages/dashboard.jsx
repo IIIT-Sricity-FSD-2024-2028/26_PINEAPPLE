@@ -1,4 +1,4 @@
-import React, { useState, useContext, useEffect } from "react";
+import { useState, useContext, useEffect } from "react";
 import { AuthContext } from "../context/AuthContext";
 import { NotificationContext } from "../context/NotificationContext";
 import usersApi from "../services/usersApi";
@@ -49,21 +49,33 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchDashboard = async () => {
       try {
-        const userId = localStorage.getItem("teamforge.backendUserId") || "1";
+        const userId = localStorage.getItem("teamforge.backendUserId") || user?.id || "1";
         const data = await usersApi.get(userId);
         
-        setSkills(data.profile?.skills || []);
-        setDashboardData(data);
+        if (isMounted) {
+          setSkills(data?.profile?.skills || data?.skills || user?.skills || []);
+          setDashboardData(data);
+        }
       } catch (error) {
-        console.error("Failed to load dashboard data", error);
+        console.warn("Could not load backend user data, falling back to session user:", error);
+        if (isMounted && user) {
+          setSkills(user?.profile?.skills || user?.skills || []);
+          setDashboardData(user);
+        }
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
     fetchDashboard();
-  }, []);
+    return () => {
+      isMounted = false;
+    };
+  }, [user]);
 
   const handleAddSkill = async () => {
     if (skillInput.trim() && !skills.includes(skillInput.trim())) {
@@ -106,21 +118,22 @@ const Dashboard = () => {
     );
   }
 
-  // Derive stats
-  const activeProjects = (dashboardData?.data?.projects || []).filter(p => p.status !== 'Completed').length;
-  const completedTasks = dashboardData?.profile?.tasksCount || 0;
-  const xp = dashboardData?.profile?.xp || 0;
-  const rep = dashboardData?.profile?.rep || 0;
+  // Derive stats with fallbacks
+  const currentActiveUser = dashboardData || user;
+  const activeProjects = (currentActiveUser?.data?.projects || currentActiveUser?.projects || []).filter(p => p.status !== 'Completed').length;
+  const completedTasks = currentActiveUser?.profile?.tasksCount || currentActiveUser?.tasksCount || 0;
+  const xp = currentActiveUser?.profile?.xp || currentActiveUser?.xp || 0;
+  const rep = currentActiveUser?.profile?.rep || currentActiveUser?.rep || 0;
 
   // Recent activity logic (take up to 3 notifications)
-  const recentActivity = notifications.slice(0, 3);
+  const recentActivity = Array.isArray(notifications) ? notifications.slice(0, 3) : [];
 
   return (
     <div className="dashboard-page">
       {/* Header */}
       <div className="dash-header">
         <h1 className="dash-title">Dashboard</h1>
-        <p className="dash-subtitle">Welcome back, {dashboardData?.profile?.fullName || userName}!</p>
+        <p className="dash-subtitle">Welcome back, {currentActiveUser?.profile?.fullName || currentActiveUser?.name || userName}!</p>
       </div>
 
       {/* Stats Grid */}

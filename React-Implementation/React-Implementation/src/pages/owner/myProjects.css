@@ -1,0 +1,152 @@
+/* ==========================================================================
+   My Projects (Owner) Styles (Scoped)
+   ========================================================================== */
+
+.tf-myproj-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tf-myproj-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.tf-myproj-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-myproj-subtitle {
+  font-size: 0.92rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+}
+
+.tf-myproj-btn-primary {
+  padding: 9px 18px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tf-myproj-btn-primary:hover {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+.tf-myproj-section {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  padding: 22px;
+  margin-bottom: 24px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tf-myproj-section-title {
+  font-size: 1.05rem;
+  font-weight: 600;
+  color: var(--tf-ink-800, #1f2937);
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tf-myproj-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+}
+
+.tf-myproj-card {
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 18px;
+  background: var(--card, #ffffff);
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, border-color 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.tf-myproj-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  border-color: var(--tf-brand, #5f513f);
+}
+
+.tf-myproj-card-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-myproj-card-meta {
+  font-size: 0.8rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0 0 12px 0;
+}
+
+.tf-myproj-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tf-ink-600, #4b5563);
+  margin-bottom: 6px;
+}
+
+.tf-myproj-progress-bar {
+  width: 100%;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.tf-myproj-progress-fill {
+  height: 100%;
+  background: var(--tf-brand, #5f513f);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+.tf-myproj-skills-wrap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.tf-myproj-skill-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  color: var(--tf-ink-700, #374151);
+  font-weight: 500;
+}
+
+.tf-myproj-empty {
+  padding: 36px 20px;
+  text-align: center;
+  color: var(--tf-ink-500, #6b7280);
+}

@@ -1,6 +1,8 @@
 import "./landingpage.css";
+import { useNavigate } from "react-router-dom";
 
 function LandingPage() {
+  const navigate = useNavigate();
   return (
     <>
       {/* =========================================================
@@ -31,21 +33,9 @@ HEADER
           </nav>
 
           <div className="header__actions">
-            <a href="log.html" className="header__btn header__btn--primary">
-              Sign in
-            </a>
-            <a
-              href="log.html#signup"
-              className="header__btn header__btn--secondary"
-            >
-              Sign Up
-            </a>
-            <a
-              href="teamforge.html?admin=1"
-              className="header__btn header__btn--secondary"
-            >
-              Admin Portal
-            </a>
+            <button onClick={() => navigate('/login')} className="header__btn header__btn--primary">Sign in</button>
+            <button onClick={() => navigate('/signup')} className="header__btn header__btn--secondary">Sign Up</button>
+            <button onClick={() => navigate('/admin')} className="header__btn header__btn--secondary">Admin Portal</button>
           </div>
 
           {/* Mobile menu toggle */}
@@ -82,21 +72,9 @@ HEADER
             Rating System
           </a>
           <div className="header__mobile-actions">
-            <a href="log.html" className="header__btn header__btn--primary">
-              Sign in
-            </a>
-            <a
-              href="log.html#signup"
-              className="header__btn header__btn--secondary"
-            >
-              Sign Up
-            </a>
-            <a
-              href="teamforge.html?admin=1"
-              className="header__btn header__btn--secondary"
-            >
-              Admin Portal
-            </a>
+            <button onClick={() => navigate('/login')} className="header__btn header__btn--primary">Sign in</button>
+            <button onClick={() => navigate('/signup')} className="header__btn header__btn--secondary">Sign Up</button>
+            <button onClick={() => navigate('/admin')} className="header__btn header__btn--secondary">Admin Portal</button>
           </div>
         </nav>
       </header>
@@ -147,27 +125,9 @@ HEADER
             </p>
 
             <div className="hero__actions">
-              <a href="log.html" className="hero__btn hero__btn--primary">
-                Start Collaborating
-                <svg
-                  xmlns="http://www.w3.org/2000/svg"
-                  width="16"
-                  height="16"
-                  viewBox="0 0 24 24"
-                  fill="none"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  aria-hidden="true"
-                >
-                  <path d="M5 12h14" />
-                  <path d="m12 5 7 7-7 7" />
-                </svg>
-              </a>
-              <a href="log.html" className="hero__btn hero__btn--secondary">
-                Explore Projects
-              </a>
+              <button onClick={() => navigate('/signup')} className="hero__btn hero__btn--primary">
+                Start Collaborating</button>
+              <button onClick={() => navigate('/dashboard')} className="hero__btn hero__btn--secondary">Explore Projects</button>
             </div>
           </div>
         </section>
@@ -798,24 +758,8 @@ HEADER
               Join thousands of students who are collaborating on real projects
               and earning verified experience.
             </p>
-            <a href="log.html" className="cta__btn">
-              Get Started — It's Free
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                width="20"
-                height="20"
-                viewBox="0 0 24 24"
-                fill="none"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                aria-hidden="true"
-              >
-                <path d="M5 12h14" />
-                <path d="m12 5 7 7-7 7" />
-              </svg>
-            </a>
+            <button onClick={() => navigate('/signup')} className="cta__btn">
+              Get Started - It's Free</button>
           </div>
         </section>
       </main>

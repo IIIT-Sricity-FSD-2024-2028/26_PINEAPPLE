@@ -69,11 +69,27 @@
   align-items: center;
   gap: 0.25rem;
   cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.role-btn.project-owner {
+  background-color: #f7eee2;
+  color: #7a542a;
+}
+
+.role-btn.mentor {
+  background-color: #fef3c7;
+  color: #b45309;
 }
 
 .chevron-down {
   width: 16px;
   height: 16px;
+  transition: transform 0.2s ease;
+}
+
+.chevron-down.rotated {
+  transform: rotate(180deg);
 }
 
 .chevron-down.small {
@@ -114,6 +130,13 @@
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 20px;
+  transition: background-color 0.15s ease;
+}
+
+.user-profile:hover {
+  background-color: #f5f4f0;
 }
 
 .avatar {
@@ -135,7 +158,6 @@
   color: #333;
 }
 
-
 /* Dropdown Container */
 .dropdown-container {
   position: relative;
@@ -144,19 +166,19 @@
 /* Dropdown Menu Base */
 .dropdown-menu {
   position: absolute;
-  top: calc(100% + 8px);
+  top: calc(100% + 6px);
   background: #ffffff;
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
   border: 1px solid #eae8e1;
   width: 220px;
   padding: 0.5rem;
-  z-index: 100;
+  z-index: 1000;
   display: none;
 }
 
-/* Show on Hover (Since no logic is needed yet) */
-.dropdown-container:hover .dropdown-menu {
+/* Stay open via show class */
+.dropdown-menu.show {
   display: block;
 }
 
