@@ -1,6 +1,8 @@
 import { apiRequest, getCurrentUserRole } from './apiClient.js';
 
 export const adminApi = {
+  login: (credentials) =>
+    apiRequest("/admin/login", "POST", credentials),
   listUsers: (role) =>
     apiRequest("/admin/users", "GET", null, {
       role: role || getCurrentUserRole(),

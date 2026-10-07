@@ -4,6 +4,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Put,
   UseGuards,
 } from '@nestjs/common';
@@ -42,6 +43,13 @@ export class AdminController {
   @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
   listUsers() {
     return this.adminService.getUsers();
+  }
+
+  @Post('login')
+  @ApiOperation({ summary: 'Login as an admin or superuser' })
+  @ApiOkResponse({ description: 'Logged in successfully.', type: Object })
+  login(@Body() credentials: any) {
+    return this.adminService.login(credentials);
   }
 
   @Patch('users/:id/status')

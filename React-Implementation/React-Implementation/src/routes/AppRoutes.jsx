@@ -19,7 +19,10 @@ import MyProjects from "../pages/owner/MyProjects";
 import MentorsDirectory from "../pages/owner/MentorsDirectory";
 import OwnedWorkspace from "../pages/owner/OwnedWorkspace";
 import OwnerDashboard from "../pages/owner/OwnerDashboard";
+import AdminLogin from "../pages/admin/AdminLogin";
+import AdminDashboard from "../pages/admin/AdminDashboard";
 import ProtectedRoute from "./ProtectedRoute";
+import AdminProtectedRoute from "./AdminProtectedRoute";
 
 const AppRoutes = () => {
   return (
@@ -28,6 +31,13 @@ const AppRoutes = () => {
       <Route path="/" element={<LandingPage />} />
       <Route path="/login" element={<Login />} />
       <Route path="/signup" element={<Signup />} />
+      
+      {/* Admin Pages (Login is public, Dashboard is protected) */}
+      <Route path="/admin/login" element={<AdminLogin />} />
+      
+      <Route element={<AdminProtectedRoute />}>
+        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+      </Route>
       
       {/* Protected pages */}
       <Route element={<ProtectedRoute />}>

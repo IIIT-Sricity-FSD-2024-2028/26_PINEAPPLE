@@ -1,0 +1,119 @@
+.admin-login-wrapper {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background-color: var(--bg-main, #0d1117);
+  font-family: 'Inter', system-ui, sans-serif;
+}
+
+.admin-login-card {
+  background: var(--bg-card, #161b22);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 12px;
+  padding: 40px;
+  width: 100%;
+  max-width: 420px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  text-align: center;
+}
+
+.admin-login-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin-bottom: 32px;
+  color: var(--text-main, #c9d1d9);
+}
+
+.admin-login-logo svg {
+  width: 40px;
+  height: 40px;
+  fill: #58a6ff;
+}
+
+.admin-login-logo h1 {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0;
+}
+
+.admin-login-title {
+  font-size: 20px;
+  color: var(--text-main, #c9d1d9);
+  margin-bottom: 24px;
+}
+
+.admin-login-form {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.admin-form-group {
+  text-align: left;
+}
+
+.admin-form-group label {
+  display: block;
+  font-size: 14px;
+  color: var(--text-muted, #8b949e);
+  margin-bottom: 8px;
+}
+
+.admin-form-group input {
+  width: 100%;
+  padding: 12px;
+  background: var(--bg-input, #0d1117);
+  border: 1px solid var(--border-color, #30363d);
+  border-radius: 6px;
+  color: var(--text-main, #c9d1d9);
+  font-size: 16px;
+  transition: border-color 0.2s;
+  box-sizing: border-box;
+}
+
+.admin-form-group input:focus {
+  outline: none;
+  border-color: #58a6ff;
+}
+
+.admin-login-btn {
+  background: #238636;
+  color: #ffffff;
+  border: none;
+  border-radius: 6px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+  margin-top: 8px;
+}
+
+.admin-login-btn:hover {
+  background: #2ea043;
+}
+
+.admin-login-btn:disabled {
+  background: #23863680;
+  cursor: not-allowed;
+}
+
+.admin-login-error {
+  color: #f85149;
+  background: rgba(248, 81, 73, 0.1);
+  padding: 12px;
+  border-radius: 6px;
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  font-size: 14px;
+  margin-bottom: 16px;
+}
+
+.admin-login-hint {
+  font-size: 12px;
+  color: var(--text-muted, #8b949e);
+  margin-top: 24px;
+  line-height: 1.5;
+}

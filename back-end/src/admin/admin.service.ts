@@ -25,6 +25,18 @@ export class AdminService {
     return this.usersService.findAll();
   }
 
+  login(credentials: any) {
+    const { email, password } = credentials;
+    // Hardcoded credentials for mock backend (same as legacy app)
+    if (email === 'admin@teamforge.io' && password === 'admin123') {
+      return { token: 'mock-admin-token-123', role: 'admin' };
+    }
+    if (email === 'superuser@teamforge.io' && password === 'Super@123') {
+      return { token: 'mock-su-token-456', role: 'superuser' };
+    }
+    throw new BadRequestException('Invalid credentials');
+  }
+
   updateUserStatus(id: string, payload: ModerateUserDto, performedBy = 'admin') {
     const allowedStatuses = [UserStatus.Active, UserStatus.Suspended, UserStatus.Flagged, UserStatus.Banned];
     if (!allowedStatuses.includes(payload.status as any)) {

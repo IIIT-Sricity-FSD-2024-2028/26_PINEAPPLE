@@ -35,7 +35,7 @@ HEADER
           <div className="header__actions">
             <button onClick={() => navigate('/login')} className="header__btn header__btn--primary">Sign in</button>
             <button onClick={() => navigate('/signup')} className="header__btn header__btn--secondary">Sign Up</button>
-            <button onClick={() => navigate('/admin')} className="header__btn header__btn--secondary">Admin Portal</button>
+            <button onClick={() => navigate('/admin/login')} className="header__btn header__btn--secondary">Admin Portal</button>
           </div>
 
           {/* Mobile menu toggle */}
@@ -74,7 +74,7 @@ HEADER
           <div className="header__mobile-actions">
             <button onClick={() => navigate('/login')} className="header__btn header__btn--primary">Sign in</button>
             <button onClick={() => navigate('/signup')} className="header__btn header__btn--secondary">Sign Up</button>
-            <button onClick={() => navigate('/admin')} className="header__btn header__btn--secondary">Admin Portal</button>
+            <button onClick={() => navigate('/admin/login')} className="header__btn header__btn--secondary">Admin Portal</button>
           </div>
         </nav>
       </header>
