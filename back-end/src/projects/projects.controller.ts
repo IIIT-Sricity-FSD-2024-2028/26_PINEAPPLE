@@ -46,10 +46,11 @@ export class ProjectsController {
     console.log('📥 Received project creation request:');
     console.log('   Owner ID:', ownerId);
     console.log('   Project Data:', JSON.stringify(createProjectDto, null, 2));
-    if (!ownerId) {
+    const effectiveOwnerId = ownerId || createProjectDto.ownerId;
+    if (!effectiveOwnerId) {
       throw new UnauthorizedException('x-user-id header is missing.');
     }
-    return this.projectsService.create(ownerId, createProjectDto);
+    return this.projectsService.create(effectiveOwnerId, createProjectDto);
   }
 
   @Patch(':id')

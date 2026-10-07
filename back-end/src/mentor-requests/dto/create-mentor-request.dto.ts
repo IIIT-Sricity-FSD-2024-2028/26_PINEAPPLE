@@ -1,14 +1,14 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsEmail, IsOptional, IsString, IsUUID, Length } from 'class-validator';
+import { IsEmail, IsOptional, IsString, Length } from 'class-validator';
 
 export class CreateMentorRequestDto {
-  @ApiProperty({ description: 'Target project ID for the mentor request', example: 'c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12' })
-  @IsUUID()
+  @ApiProperty({ description: 'Target project ID for the mentor request', example: 'proj-1' })
+  @IsString()
   projectId!: string;
 
-  @ApiPropertyOptional({ description: 'Target mentor user ID', example: 'a1d2c3b4-e5f6-7890-1234-56789abcdef0' })
+  @ApiPropertyOptional({ description: 'Target mentor user ID', example: '3' })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   mentorId?: string;
 
   @ApiPropertyOptional({ description: 'Target mentor email address', example: 'mentor@example.com' })

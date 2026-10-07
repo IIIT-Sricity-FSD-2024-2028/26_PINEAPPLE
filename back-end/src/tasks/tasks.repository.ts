@@ -6,10 +6,12 @@ export interface Task {
   id: string;
   projectId: string;
   title: string;
-  description: string;
-  xpReward: number;
-  status: TaskStatus;
+  description?: string;
+  xpReward?: number;
+  status: TaskStatus | string;
   assigneeId?: string;
+  assignee?: string;
+  difficulty?: string;
 }
 
 @Injectable()

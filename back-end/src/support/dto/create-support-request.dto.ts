@@ -8,18 +8,16 @@ type SupportCategory = (typeof categories)[number];
 export class CreateSupportRequestDto {
   @ApiProperty({ description: 'Support request category', enum: categories })
   @IsString()
-  @IsEnum(categories)
-  category!: SupportCategory;
+  @IsNotEmpty()
+  category!: string;
 
-  @ApiProperty({ description: 'Subject for the support request', minLength: 5, maxLength: 100, required: false })
+  @ApiProperty({ description: 'Subject for the support request', required: false })
   @IsOptional()
   @IsString()
-  @Length(5, 100)
   subject?: string;
 
-  @ApiProperty({ description: 'Detailed support request message', minLength: 20, maxLength: 1000 })
+  @ApiProperty({ description: 'Detailed support request message' })
   @IsString()
   @IsNotEmpty()
-  @Length(20, 1000)
   message!: string;
 }

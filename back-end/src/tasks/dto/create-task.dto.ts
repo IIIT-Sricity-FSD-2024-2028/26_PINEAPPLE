@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNumber, IsNotEmpty, IsOptional } from 'class-validator';
+import { IsString, IsNumber, IsNotEmpty, IsOptional } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum TaskStatus {
@@ -19,22 +19,33 @@ export class CreateTaskDto {
   @IsNotEmpty()
   title: string;
 
-  @ApiProperty({ example: 'Create the ERD and define the tables for the backend.' })
+  @ApiPropertyOptional({ example: 'Create the ERD and define the tables for the backend.' })
   @IsString()
-  @IsNotEmpty()
-  description: string;
+  @IsOptional()
+  description?: string;
 
   @ApiProperty({ example: 50, description: 'XP awarded upon completion' })
   @IsNumber()
-  xpReward: number;
+  @IsOptional()
+  xpReward?: number;
 
   @ApiPropertyOptional({ enum: TaskStatus, default: TaskStatus.ToDo })
-  @IsEnum(TaskStatus)
   @IsOptional()
-  status?: TaskStatus;
+  @IsString()
+  status?: string;
 
   @ApiPropertyOptional({ example: '2' })
   @IsString()
   @IsOptional()
   assigneeId?: string;
+
+  @ApiPropertyOptional({ example: 'Arjun Sharma' })
+  @IsString()
+  @IsOptional()
+  assignee?: string;
+
+  @ApiPropertyOptional({ example: 'Medium' })
+  @IsString()
+  @IsOptional()
+  difficulty?: string;
 }

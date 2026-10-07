@@ -26,7 +26,7 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       throw new BadRequestException('Invalid status value');
     }
 
-    return super.update(id, updateMentorRequestDto);
+    return super.update(id, updateMentorRequestDto as any);
   }
 
   findByProject(projectId: string): MentorRequestEntity[] {

@@ -95,108 +95,6 @@
         ]
       }
     },
-    "/uploads/avatar": {
-      "post": {
-        "operationId": "UploadsController_uploadAvatar",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Avatar uploaded successfully."
-          },
-          "400": {
-            "description": "Invalid file or file too large."
-          }
-        },
-        "summary": "Upload user avatar image (max 2MB, images only)",
-        "tags": [
-          "Uploads"
-        ]
-      }
-    },
-    "/uploads/task-proof": {
-      "post": {
-        "operationId": "UploadsController_uploadTaskProof",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Task proof uploaded successfully."
-          },
-          "400": {
-            "description": "Invalid file or file too large."
-          }
-        },
-        "summary": "Upload task proof document/archive/image (max 5MB)",
-        "tags": [
-          "Uploads"
-        ]
-      }
-    },
-    "/uploads/resource": {
-      "post": {
-        "operationId": "UploadsController_uploadResource",
-        "parameters": [],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "properties": {
-                  "file": {
-                    "type": "string",
-                    "format": "binary"
-                  }
-                }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Resource uploaded successfully."
-          },
-          "400": {
-            "description": "Invalid file or file too large."
-          }
-        },
-        "summary": "Upload resource file (max 10MB)",
-        "tags": [
-          "Uploads"
-        ]
-      }
-    },
     "/users": {
       "post": {
         "operationId": "UsersController_create",
@@ -4590,6 +4488,22 @@
             "schema": {
               "type": "string"
             }
+          },
+          {
+            "name": "x-user-id",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "x-user-role",
+            "required": true,
+            "in": "header",
+            "schema": {
+              "type": "string"
+            }
           }
         ],
         "responses": {
@@ -4597,7 +4511,7 @@
             "description": ""
           }
         },
-        "summary": "Admin: complete session — releases escrow, pays mentor, awards XP",
+        "summary": "Project owner (or admin) completes a session — releases escrow, pays mentor, awards XP",
         "tags": [
           "Mentor Marketplace"
         ]
@@ -4699,6 +4613,130 @@
         "summary": "Student submits a star rating + review after completion",
         "tags": [
           "Mentor Marketplace"
+        ]
+      }
+    },
+    "/uploads/avatar": {
+      "post": {
+        "operationId": "UploadsController_uploadAvatar",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload user avatar image (max 2MB, images only)",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/task-proof": {
+      "post": {
+        "operationId": "UploadsController_uploadTaskProof",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload task proof file (max 5MB, images/docs/archives)",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads/resource": {
+      "post": {
+        "operationId": "UploadsController_uploadResource",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload project resource file (max 10MB)",
+        "tags": [
+          "Uploads"
+        ]
+      }
+    },
+    "/uploads": {
+      "post": {
+        "operationId": "UploadsController_uploadFile",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "file": {
+                    "type": "string",
+                    "format": "binary"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": ""
+          }
+        },
+        "summary": "Upload file (generic, max 10MB)",
+        "tags": [
+          "Uploads"
         ]
       }
     }
@@ -4870,6 +4908,18 @@
           "duration": {
             "type": "string",
             "example": "3 Months"
+          },
+          "collaborators": {
+            "example": [
+              {
+                "id": "1",
+                "name": "User"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         },
         "required": [
@@ -4914,6 +4964,18 @@
           "duration": {
             "type": "string",
             "example": "3 Months"
+          },
+          "collaborators": {
+            "example": [
+              {
+                "id": "1",
+                "name": "User"
+              }
+            ],
+            "type": "array",
+            "items": {
+              "type": "object"
+            }
           }
         }
       },

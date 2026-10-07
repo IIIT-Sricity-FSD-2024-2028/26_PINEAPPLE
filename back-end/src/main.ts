@@ -47,11 +47,11 @@ async function bootstrap() {
     allowedHeaders: ['Content-Type', 'Accept', 'x-user-role', 'x-user-id', 'x-user-email'],
   });
 
-  // 2. Enable Global Validation Pipe for strict DTO enforcement
+  // 2. Enable Global Validation Pipe for DTO validation
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true, // Strips away non-decorated payload properties
-      forbidNonWhitelisted: true, // Throws 400 if unknown properties are passed
+      forbidNonWhitelisted: false, // Strips unknown properties gracefully instead of rejecting with 400
       transform: true, // Automatically transforms payloads to DTO instances
     }),
   );

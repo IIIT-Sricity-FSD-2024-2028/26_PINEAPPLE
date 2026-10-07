@@ -1,12 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsUUID, IsOptional, IsEnum, IsBoolean } from 'class-validator';
+import { IsString, IsOptional, IsEnum, IsBoolean } from 'class-validator';
 
 export class CreateNotificationDto {
   @ApiProperty({
     description: 'ID of the user who will receive this notification',
-    example: '123e4567-e89b-12d3-a456-426614174001',
+    example: '1',
   })
-  @IsUUID()
+  @IsString()
   userId!: string;
 
   @ApiProperty({
@@ -37,10 +37,10 @@ export class CreateNotificationDto {
 
   @ApiProperty({
     description: 'Reference ID (could be project ID, task ID, etc.)',
-    example: '123e4567-e89b-12d3-a456-426614174002',
+    example: 'proj-1',
     required: false,
   })
   @IsOptional()
-  @IsUUID()
+  @IsString()
   referenceId?: string;
 }

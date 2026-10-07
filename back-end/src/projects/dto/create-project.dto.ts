@@ -1,10 +1,13 @@
-import { IsString, IsArray, IsEnum, IsNotEmpty, IsOptional } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsArray, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum ProjectDifficulty {
   Easy = 'Easy',
   Medium = 'Medium',
   Hard = 'Hard',
+  Beginner = 'Beginner',
+  Intermediate = 'Intermediate',
+  Advanced = 'Advanced',
 }
 
 export enum ProjectStatus {
@@ -24,22 +27,65 @@ export class CreateProjectDto {
   @IsNotEmpty()
   description: string;
 
-  @ApiProperty({ enum: ProjectDifficulty, example: ProjectDifficulty.Medium })
-  @IsEnum(ProjectDifficulty)
-  difficulty: ProjectDifficulty;
+  @ApiPropertyOptional({ example: 'Key goals and deliverables' })
+  @IsOptional()
+  @IsString()
+  objectives?: string;
 
-  @ApiProperty({ type: [String], example: ['React', 'Python', 'ML'] })
+  @ApiPropertyOptional({ enum: ProjectDifficulty, example: ProjectDifficulty.Medium })
+  @IsOptional()
+  @IsString()
+  difficulty?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['React', 'Python', 'ML'] })
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
-  requiredSkills: string[];
+  requiredSkills?: string[];
 
-  @ApiProperty({ example: '3 Months' })
+  @ApiPropertyOptional({ type: [String], example: ['React', 'Python', 'ML'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  skills?: string[];
+
+  @ApiPropertyOptional({ example: '3 Months' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  duration: string;
+  duration?: string;
 
-  @ApiProperty({ type: [Object], example: [{ id: '1', name: 'User' }], required: false })
+  @ApiPropertyOptional({ example: 5 })
+  @IsOptional()
+  @IsNumber()
+  maxCollaborators?: number;
+
+  @ApiPropertyOptional({ example: 'Project Owner' })
+  @IsOptional()
+  @IsString()
+  owner?: string;
+
+  @ApiPropertyOptional({ example: '1' })
+  @IsOptional()
+  @IsString()
+  ownerId?: string;
+
+  @ApiPropertyOptional({ example: 'Open' })
+  @IsOptional()
+  @IsString()
+  status?: string;
+
+  @ApiPropertyOptional({ example: 0 })
+  @IsOptional()
+  @IsNumber()
+  progress?: number;
+
+  @ApiPropertyOptional({ type: [Object], example: [{ id: '1', name: 'User' }], required: false })
   @IsOptional()
   @IsArray()
   collaborators?: any[];
+
+  @ApiPropertyOptional({ type: [Object], required: false })
+  @IsOptional()
+  @IsArray()
+  tasks?: any[];
 }

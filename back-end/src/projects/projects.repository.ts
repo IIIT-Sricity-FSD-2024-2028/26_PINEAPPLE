@@ -5,12 +5,17 @@ import { UpdateProjectDto } from './dto/update-project.dto';
 export interface Project {
   id: string;
   ownerId: string;
+  owner?: string;
   title: string;
   description: string;
-  difficulty: ProjectDifficulty;
+  objectives?: string;
+  difficulty: ProjectDifficulty | string;
   requiredSkills: string[];
+  skills?: string[];
   duration: string;
-  status: ProjectStatus;
+  maxCollaborators?: number;
+  status: ProjectStatus | string;
+  progress?: number;
   collaborators: any[];
 }
 
@@ -152,8 +157,11 @@ export class ProjectsRepository {
       id: `proj-${Date.now()}`,
       ownerId,
       ...createProjectDto,
-      status,
-      collaborators: [], // Default to empty array
+      requiredSkills: createProjectDto.requiredSkills || createProjectDto.skills || [],
+      duration: createProjectDto.duration || '1 month',
+      difficulty: createProjectDto.difficulty || ProjectDifficulty.Medium,
+      status: (createProjectDto.status as any) || status,
+      collaborators: createProjectDto.collaborators || [],
     };
     this.projects.push(newProject);
     return newProject;

@@ -12,7 +12,7 @@ export class SupportService extends BaseService<SupportRequestEntity> {
       status: 'open',
       createdAt: new Date().toISOString(),
       subject: createSupportRequestDto.subject || `Support request: ${createSupportRequestDto.category}`,
-    });
+    } as any);
 
     return created;
   }

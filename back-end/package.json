@@ -5,6 +5,7 @@
   "main": "src/main.ts",
   "scripts": {
     "start": "ts-node src/main.ts",
+    "dev": "ts-node src/main.ts",
     "generate:swagger": "ts-node src/swagger.ts"
   },
   "dependencies": {

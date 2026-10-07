@@ -142,12 +142,12 @@ export class MentorRequestsController {
   }
 
   @Delete(':id')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Delete a mentor request (Admin only)' })
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'Delete or cancel a mentor request' })
   @ApiParam({ name: 'id', description: 'Mentor request ID', type: 'string' })
   @ApiOkResponse({ description: 'Mentor request deleted successfully.' })
   @ApiNotFoundResponse({ description: 'Mentor request not found.' })
-  @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
+  @ApiForbiddenResponse({ description: 'Forbidden - Insufficient permissions' })
   remove(@Param('id') id: string): { message: string } {
     try {
       this.mentorRequestsService.remove(id);

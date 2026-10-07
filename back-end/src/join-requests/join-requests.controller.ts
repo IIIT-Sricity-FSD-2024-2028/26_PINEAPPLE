@@ -117,19 +117,19 @@ export class JoinRequestsController {
   }
 
   @Delete(':id')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Delete a join request (Admin only)' })
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'Delete or withdraw a join request' })
   @ApiParam({ name: 'id', description: 'Join request ID', type: 'string' })
   @ApiOkResponse({ description: 'Join request deleted successfully.' })
   @ApiNotFoundResponse({ description: 'Join request not found.' })
-  @ApiForbiddenResponse({ description: 'Forbidden - Admin role required' })
+  @ApiForbiddenResponse({ description: 'Forbidden - Insufficient permissions' })
   remove(@Param('id') id: string): { message: string } {
     try {
       this.joinRequestsService.remove(id);
       return { message: `Join request ${id} deleted successfully` };
     } catch (error) {
       if (error instanceof NotFoundException) {
-        throw new NotFoundException(`Join request with id ${id} not found`);
+        return { message: `Join request ${id} was already removed or not found` };
       }
       throw error;
     }

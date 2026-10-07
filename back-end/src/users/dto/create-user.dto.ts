@@ -30,14 +30,34 @@ export class CreateUserDto {
   @IsEnum(UserRole)
   role: UserRole;
 
+  @ApiPropertyOptional({ example: 'securePassword123' })
+  @IsString()
+  @IsOptional()
+  password?: string;
+
+  @ApiPropertyOptional({ example: 'johndoe' })
+  @IsString()
+  @IsOptional()
+  username?: string;
+
   @ApiPropertyOptional({ type: [String], example: ['React', 'NestJS'] })
   @IsArray()
   @IsString({ each: true })
   @IsOptional()
   skills?: string[];
 
+  @ApiPropertyOptional({ example: '+1234567890' })
+  @IsString()
+  @IsOptional()
+  phone?: string;
+
+  @ApiPropertyOptional({ example: 'Passionate software engineer' })
+  @IsString()
+  @IsOptional()
+  bio?: string;
+
   @ApiPropertyOptional({ example: 'https://linkedin.com/in/johndoe' })
-  @IsUrl()
+  @IsString()
   @IsOptional()
   linkedIn?: string;
 

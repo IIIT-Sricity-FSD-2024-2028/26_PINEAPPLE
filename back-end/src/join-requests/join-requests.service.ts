@@ -8,12 +8,13 @@ import { UpdateJoinRequestDto } from './dto/update-join-request.dto';
 export class JoinRequestsService extends BaseService<JoinRequestEntity> {
   create(createJoinRequestDto: CreateJoinRequestDto): JoinRequestEntity {
     const now = new Date();
-    const joinRequest = {
+    const joinRequest: JoinRequestEntity = {
       ...createJoinRequestDto,
-      status: 'pending' as const,
+      userName: createJoinRequestDto.userName || 'Collaborator',
+      status: createJoinRequestDto.status || 'Pending',
       createdAt: now,
       updatedAt: now,
-    };
+    } as any;
     return super.create(joinRequest);
   }
 
@@ -21,7 +22,7 @@ export class JoinRequestsService extends BaseService<JoinRequestEntity> {
     const updated = super.update(id, {
       ...updateJoinRequestDto,
       updatedAt: new Date(),
-    });
+    } as any);
     return updated;
   }
 
@@ -34,14 +35,16 @@ export class JoinRequestsService extends BaseService<JoinRequestEntity> {
   }
 
   findByStatus(status: string): JoinRequestEntity[] {
-    return this.items.filter((request: JoinRequestEntity) => request.status === status);
+    return this.items.filter(
+      (request: JoinRequestEntity) => String(request.status).toLowerCase() === String(status).toLowerCase(),
+    );
   }
 
   approveRequest(id: string): JoinRequestEntity {
-    return this.update(id, { status: 'approved' });
+    return this.update(id, { status: 'Approved' });
   }
 
   rejectRequest(id: string): JoinRequestEntity {
-    return this.update(id, { status: 'rejected' });
+    return this.update(id, { status: 'Rejected' });
   }
 }

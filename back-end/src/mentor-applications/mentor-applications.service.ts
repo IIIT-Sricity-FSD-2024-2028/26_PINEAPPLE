@@ -27,7 +27,7 @@ export class MentorApplicationsService extends BaseService<MentorApplicationEnti
       throw new BadRequestException('Invalid status value');
     }
 
-    return super.update(id, updateMentorApplicationDto);
+    return super.update(id, updateMentorApplicationDto as any);
   }
 
   findByUser(userId: string): MentorApplicationEntity[] {

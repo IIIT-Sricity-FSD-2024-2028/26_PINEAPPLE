@@ -1,4 +1,4 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class JoinRequestEntity {
   @ApiProperty({ description: 'Unique identifier for the join request' })
@@ -13,11 +13,14 @@ export class JoinRequestEntity {
   @ApiProperty({ description: 'Target project ID' })
   projectId!: string;
 
-  @ApiProperty({ description: 'Request status', enum: ['pending', 'approved', 'rejected'] })
-  status!: 'pending' | 'approved' | 'rejected';
+  @ApiProperty({ description: 'Request status' })
+  status!: string;
 
   @ApiProperty({ description: 'User\'s pitch/application message' })
   message!: string;
+
+  @ApiPropertyOptional({ description: 'Role requested' })
+  role?: string;
 
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt!: Date;

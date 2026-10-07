@@ -1,6 +1,5 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { ArrayNotEmpty, ArrayUnique, IsArray, IsEnum, IsOptional, IsString, MinLength } from 'class-validator';
-import { MentorApplicationStatus } from '../entities/mentor-application.entity';
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class UpdateMentorApplicationDto {
   @ApiPropertyOptional({ description: 'Applicant biography or motivation statement', example: 'I have mentored six student teams and enjoy helping new developers.' })
@@ -23,8 +22,8 @@ export class UpdateMentorApplicationDto {
   @IsString({ each: true })
   skills?: string[];
 
-  @ApiPropertyOptional({ description: 'Application status', enum: ['pending', 'approved', 'rejected'], example: 'approved' })
+  @ApiPropertyOptional({ description: 'Application status', enum: ['pending', 'approved', 'rejected', 'Pending', 'Approved', 'Rejected'], example: 'approved' })
   @IsOptional()
-  @IsEnum(['pending', 'approved', 'rejected'])
-  status?: MentorApplicationStatus;
+  @IsIn(['pending', 'approved', 'rejected', 'Pending', 'Approved', 'Rejected'])
+  status?: string;
 }

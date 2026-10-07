@@ -1,22 +1,34 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsUUID } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateJoinRequestDto {
   @ApiProperty({ description: 'User ID making the request' })
-  @IsUUID()
+  @IsString()
+  @IsNotEmpty()
   userId!: string;
 
-  @ApiProperty({ description: 'User display name' })
+  @ApiPropertyOptional({ description: 'User display name' })
   @IsString()
-  @IsNotEmpty()
-  userName!: string;
+  @IsOptional()
+  userName?: string;
 
   @ApiProperty({ description: 'Target project ID' })
-  @IsUUID()
-  projectId!: string;
-
-  @ApiProperty({ description: 'User\'s pitch/application message' })
   @IsString()
   @IsNotEmpty()
-  message!: string;
+  projectId!: string;
+
+  @ApiPropertyOptional({ description: 'User\'s pitch/application message' })
+  @IsString()
+  @IsOptional()
+  message?: string;
+
+  @ApiPropertyOptional({ description: 'Role applied for', default: 'Collaborator' })
+  @IsString()
+  @IsOptional()
+  role?: string;
+
+  @ApiPropertyOptional({ description: 'Request status', default: 'Pending' })
+  @IsString()
+  @IsOptional()
+  status?: string;
 }

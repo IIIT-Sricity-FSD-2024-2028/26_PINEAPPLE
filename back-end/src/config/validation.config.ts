@@ -9,8 +9,8 @@ export function getValidationPipeConfig(): ValidationPipe {
     // Automatically remove non-whitelisted properties from the request
     whitelist: true,
 
-    // Throw error if non-whitelisted properties are present
-    forbidNonWhitelisted: true,
+    // Safely ignore and strip non-whitelisted properties without rejecting request
+    forbidNonWhitelisted: false,
 
     // Automatically transform payloads to match DTO class definitions
     transform: true,

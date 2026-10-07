@@ -1,9 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ArrayNotEmpty, ArrayUnique, IsArray, IsEmail, IsOptional, IsString, IsUUID, MinLength } from 'class-validator';
+import { ArrayNotEmpty, ArrayUnique, IsArray, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class CreateMentorApplicationDto {
-  @ApiProperty({ description: 'User ID of the applicant', example: 'c9b1d92a-a73f-4a4c-8b0f-2d2f78a8de12' })
-  @IsUUID()
+  @ApiProperty({ description: 'User ID of the applicant', example: '1' })
+  @IsString()
   userId!: string;
 
   @ApiProperty({ description: 'Applicant email address', example: 'mentor@example.com' })

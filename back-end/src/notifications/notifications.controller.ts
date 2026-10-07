@@ -81,7 +81,7 @@ export class NotificationsController {
   }
 
   @Post()
-  @Roles('admin')
+  @Roles('admin', 'user')
   @ApiOperation({ summary: 'Create a new notification' })
   @ApiBody({ type: CreateNotificationDto })
   @ApiResponse({
@@ -161,7 +161,7 @@ export class NotificationsController {
   }
 
   @Delete(':id')
-  @Roles('admin')
+  @Roles('admin', 'user')
   @ApiOperation({ summary: 'Delete a notification' })
   @ApiParam({
     name: 'id',
