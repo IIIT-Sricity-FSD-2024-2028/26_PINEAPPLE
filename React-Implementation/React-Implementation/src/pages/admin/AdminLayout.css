@@ -1,0 +1,99 @@
+/* ── Admin Legacy Styles ── */
+.admin-layout {
+  display: flex;
+  height: 100vh;
+  overflow: hidden;
+}
+
+.admin-sidebar {
+  width: 200px;
+  background: var(--card);
+  border-right: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  padding: 16px 0;
+}
+
+.admin-logo {
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0 16px 16px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 8px;
+  color: var(--fg);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 0.9rem;
+  font-weight: 300;
+  cursor: pointer;
+  color: var(--fg);
+  transition: background 0.1s;
+  width: 100%;
+  background: none;
+  border: none;
+  font-family: inherit;
+  text-align: left;
+  border-radius: 0;
+}
+
+.admin-nav-item:hover {
+  background: var(--secondary);
+}
+
+.admin-nav-item.active {
+  background: var(--secondary);
+  color: var(--primary);
+  font-weight: 670;
+  border-left: 3px solid var(--primary);
+}
+
+.admin-content,
+.admin-main-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: 24px;
+}
+
+/* ── Extracted Inline Styles ── */
+.admin-logo-icon {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+  background: var(--primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--primary-fg);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.su-only-nav {
+  display: none;
+}
+
+.admin-exit-btn {
+  color: var(--destructive);
+}
+
+.flex-spacer {
+  flex: 1;
+}
+
+.admin-nav-divider {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--muted-fg);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin: 16px 8px 8px;
+  padding-left: 8px;
+}

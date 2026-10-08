@@ -21,6 +21,8 @@ import OwnedWorkspace from "../pages/owner/OwnedWorkspace";
 import OwnerDashboard from "../pages/owner/OwnerDashboard";
 import AdminLogin from "../pages/admin/AdminLogin";
 import AdminDashboard from "../pages/admin/AdminDashboard";
+import AdminLayout from "../pages/admin/AdminLayout";
+import AdminUsers from "../pages/admin/AdminUsers";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminProtectedRoute from "./AdminProtectedRoute";
 
@@ -36,7 +38,16 @@ const AppRoutes = () => {
       <Route path="/admin/login" element={<AdminLogin />} />
       
       <Route element={<AdminProtectedRoute />}>
-        <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="projects" element={<div className="admin-page"><h1>Projects Placeholder</h1></div>} />
+          <Route path="mentor-apps" element={<div className="admin-page"><h1>Mentor Applications Placeholder</h1></div>} />
+          <Route path="mentor-revenue" element={<div className="admin-page"><h1>Revenue & Escrow Placeholder</h1></div>} />
+          <Route path="audit" element={<div className="admin-page"><h1>Audit Log Placeholder</h1></div>} />
+          <Route path="su-admins" element={<div className="admin-page"><h1>Manage Admins Placeholder</h1></div>} />
+          <Route path="su-config" element={<div className="admin-page"><h1>Platform Config Placeholder</h1></div>} />
+        </Route>
       </Route>
       
       {/* Protected pages */}

@@ -3,257 +3,194 @@ import { useNavigate } from 'react-router-dom';
 import adminApi from '../../services/adminApi';
 import './AdminDashboard.css';
 
-// SVG Components
-const TeamForgeLogo = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" />
-  </svg>
-);
-
-const UsersIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M16 11c1.66 0 2.99-1.34 2.99-3S17.66 5 16 5c-1.66 0-3 1.34-3 3s1.34 3 3 3zm-8 0c1.66 0 2.99-1.34 2.99-3S9.66 5 8 5C6.34 5 5 6.34 5 8s1.34 3 3 3zm0 2c-2.33 0-7 1.17-7 3.5V19h14v-2.5c0-2.33-4.67-3.5-7-3.5zm8 0c-.29 0-.62.02-.97.05 1.16.84 1.97 1.97 1.97 3.45V19h6v-2.5c0-2.33-4.67-3.5-7-3.5z"/>
-  </svg>
-);
-
-const MentorIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 3L1 9l4 2.18v6L12 21l7-3.82v-6l2-1.09V17h2V9L12 3zm6.82 6L12 12.72 5.18 9 12 5.28 18.82 9zM17 15.99l-5 2.73-5-2.73v-3.72L12 15l5-2.73v3.72z"/>
-  </svg>
-);
-
-const WarningIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>
-  </svg>
-);
-
-const SecurityIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/>
-  </svg>
-);
-
-const LogOutIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M17 7l-1.41 1.41L18.17 11H8v2h10.17l-2.58 2.58L17 17l5-5zM4 5h8V3H4c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h8v-2H4V5z"/>
-  </svg>
-);
-
-const DashboardIcon = () => (
-  <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-    <path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/>
-  </svg>
-);
-
 const AdminDashboard = () => {
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [stats, setStats] = useState(null);
-  const [auditLog, setAuditLog] = useState([]);
-  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-
-  const role = sessionStorage.getItem('teamforge.portalRole');
-  const email = sessionStorage.getItem('teamforge.adminEmail');
+  const [stats, setStats] = useState({
+    totalUsers: 0,
+    activeUsers: 0,
+    pendingMentorApps: 0,
+    flaggedWarned: 0,
+    suspendedUsers: 0,
+    auditEvents: 0
+  });
+  const [recentEvents, setRecentEvents] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!role) {
-      navigate('/admin/login');
-      return;
-    }
-    fetchDashboardData();
-  }, [role, navigate]);
-
-  const fetchDashboardData = async () => {
-    setLoading(true);
-    try {
-      // Fetch stats and audit log concurrently
-      const [statsData, auditData] = await Promise.all([
-        adminApi.getStats(role),
-        adminApi.getAuditLog(role).catch(() => []) // Fallback if not implemented
-      ]);
-      setStats(statsData);
-      setAuditLog(auditData);
-    } catch (error) {
-      console.error('Error fetching admin data:', error);
-      // Generate some mock stats if API fails, just so it's not totally empty during migration testing
-      // Remove this fallback in true production if backend is strict
-      if (process.env.NODE_ENV === 'development') {
-        setStats({
-          totalUsers: 145, activeUsers: 130, warnedUsers: 10, suspendedUsers: 5,
-          pendingMentorApps: 3, flaggedOrWarned: 15, auditCount: 42
-        });
-        setAuditLog([
-          { type: 'security', event: 'Failed login attempt (admin@teamforge.io)', timestamp: new Date().toISOString() }
+    const fetchDashboardData = async () => {
+      try {
+        setLoading(true);
+        // Using Promise.all to fetch stats and audit logs concurrently
+        const [statsData, auditData] = await Promise.all([
+          adminApi.getStats(),
+          adminApi.getAuditLog()
         ]);
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleLogout = () => {
-    sessionStorage.removeItem('teamforge.adminToken');
-    sessionStorage.removeItem('teamforge.portalRole');
-    sessionStorage.removeItem('teamforge.adminEmail');
-    navigate('/admin/login');
-  };
-
-  const renderSidebar = () => (
-    <div className="admin-sidebar">
-      <div className="admin-sidebar-header">
-        <div className="admin-logo">
-          <TeamForgeLogo />
-          <span>TeamForge</span>
-        </div>
-        <div className={`admin-role-badge ${role === 'superuser' ? 'su-badge' : ''}`}>
-          {role === 'superuser' ? 'Super User' : 'Admin'}
-        </div>
-        <div style={{ fontSize: '12px', color: '#8b949e', marginTop: '8px' }}>{email}</div>
-      </div>
-      <div className="admin-nav">
-        <button className={`admin-nav-item ${activeTab === 'dashboard' ? 'active' : ''}`} onClick={() => setActiveTab('dashboard')}>
-          <DashboardIcon /> Dashboard
-        </button>
-        <button className={`admin-nav-item ${activeTab === 'users' ? 'active' : ''}`} onClick={() => setActiveTab('users')}>
-          <UsersIcon /> Users
-        </button>
-        {/* Render other tabs like projects, mentor apps, audit, etc. */}
-        <button className={`admin-nav-item ${activeTab === 'audit' ? 'active' : ''}`} onClick={() => setActiveTab('audit')}>
-          <SecurityIcon /> Audit Log
-        </button>
         
-        {role === 'superuser' && (
-          <button className={`admin-nav-item ${activeTab === 'config' ? 'active' : ''}`} onClick={() => setActiveTab('config')}>
-            <SecurityIcon /> System Config
-          </button>
-        )}
-      </div>
-      <div className="admin-sidebar-footer">
-        <button className="admin-nav-item danger" onClick={handleLogout}>
-          <LogOutIcon /> Exit Portal
-        </button>
-      </div>
-    </div>
-  );
+        // Populate stats (fallback to 0 if API fields differ)
+        setStats({
+          totalUsers: statsData?.totalUsers || 0,
+          activeUsers: statsData?.activeUsers || 0,
+          pendingMentorApps: statsData?.pendingMentorApps || 0,
+          flaggedWarned: statsData?.flaggedWarned || 0,
+          suspendedUsers: statsData?.suspendedUsers || 0,
+          auditEvents: statsData?.auditEvents || (auditData?.length || 0)
+        });
 
-  const renderDashboardTab = () => {
-    if (loading) return <div className="admin-loading">Loading system data...</div>;
-    if (!stats) return <div className="admin-empty">Failed to load dashboard statistics.</div>;
+        // Set recent events (top 5 from the audit log)
+        setRecentEvents((auditData || []).slice(0, 5));
+      } catch (error) {
+        console.error("Failed to fetch admin dashboard data", error);
+      } finally {
+        setLoading(false);
+      }
+    };
 
-    const activePct = Math.round((stats.activeUsers / stats.totalUsers) * 100) || 0;
-    const warnedPct = Math.round((stats.warnedUsers / stats.totalUsers) * 100) || 0;
-    const suspendedPct = Math.round((stats.suspendedUsers / stats.totalUsers) * 100) || 0;
+    fetchDashboardData();
+  }, []);
 
-    return (
-      <div className="admin-content">
-        <div className="admin-kpi-grid">
-          <div className="admin-kpi-card">
-            <div className="admin-kpi-header"><UsersIcon /> Total Users</div>
-            <div className="admin-kpi-value">{stats.totalUsers}</div>
-            <div className="admin-kpi-sub">{stats.activeUsers} active</div>
-          </div>
-          <div className="admin-kpi-card">
-            <div className="admin-kpi-header"><MentorIcon /> Mentor Apps</div>
-            <div className="admin-kpi-value">{stats.pendingMentorApps}</div>
-            <div className="admin-kpi-sub">{stats.pendingMentorApps} pending</div>
-          </div>
-          <div className="admin-kpi-card">
-            <div className="admin-kpi-header"><WarningIcon /> Flagged / Warned</div>
-            <div className="admin-kpi-value">{stats.flaggedOrWarned}</div>
-            <div className="admin-kpi-sub">{stats.suspendedUsers} suspended</div>
-          </div>
-          <div className="admin-kpi-card">
-            <div className="admin-kpi-header"><SecurityIcon /> Audit Events</div>
-            <div className="admin-kpi-value">{stats.auditCount || auditLog.length}</div>
-            <div className="admin-kpi-sub">{stats.auditCount || auditLog.length} entries</div>
-          </div>
-        </div>
-
-        <div className="admin-dash-panels">
-          <div className="admin-panel">
-            <div className="admin-panel-header">Platform Health Overview</div>
-            <div className="admin-panel-body">
-              <div className="admin-health-row">
-                <div className="admin-health-labels">
-                  <span>Active Users</span>
-                  <span>{stats.activeUsers} / {stats.totalUsers}</span>
-                </div>
-                <div className="admin-health-track">
-                  <div className="admin-health-fill fill-green" style={{ width: `${activePct}%` }}></div>
-                </div>
-              </div>
-              <div className="admin-health-row">
-                <div className="admin-health-labels">
-                  <span>Warned Users</span>
-                  <span>{stats.warnedUsers} / {stats.totalUsers}</span>
-                </div>
-                <div className="admin-health-track">
-                  <div className="admin-health-fill fill-yellow" style={{ width: `${warnedPct}%` }}></div>
-                </div>
-              </div>
-              <div className="admin-health-row">
-                <div className="admin-health-labels">
-                  <span>Suspended Users</span>
-                  <span>{stats.suspendedUsers} / {stats.totalUsers}</span>
-                </div>
-                <div className="admin-health-track">
-                  <div className="admin-health-fill fill-red" style={{ width: `${suspendedPct}%` }}></div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          <div className="admin-panel">
-            <div className="admin-panel-header">Recent Security Events</div>
-            <div className="admin-panel-body" style={{ padding: '0 24px' }}>
-              {auditLog.length > 0 ? (
-                auditLog.slice(0, 5).map((entry, idx) => (
-                  <div className="admin-event-row" key={idx}>
-                    <span className={`admin-event-chip ${entry.type || 'system'}`}>
-                      {(entry.type || 'SYSTEM').toUpperCase()}
-                    </span>
-                    <div>
-                      <div className="admin-event-text">{entry.event}</div>
-                      <div className="admin-event-time">
-                        {new Date(entry.timestamp).toLocaleString()}
-                      </div>
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="admin-event-row">
-                  <div className="admin-event-text" style={{ color: '#8b949e', padding: '16px 0' }}>No recent events.</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+  const getPercentage = (count) => {
+    return stats.totalUsers > 0 ? Math.round((count / stats.totalUsers) * 100) : 0;
   };
 
-  const renderContent = () => {
-    switch (activeTab) {
-      case 'dashboard':
-        return renderDashboardTab();
-      case 'users':
-        return <div className="admin-content"><div className="admin-panel"><div className="admin-panel-body">Users management view placeholder.</div></div></div>;
-      case 'audit':
-        return <div className="admin-content"><div className="admin-panel"><div className="admin-panel-body">Audit log view placeholder.</div></div></div>;
-      default:
-        return <div className="admin-content">View not found.</div>;
-    }
+  const getAuditChipClass = (type) => {
+    const types = {
+      task: 'task',
+      mentor: 'mentor',
+      warning: 'warning',
+      xp: 'xp',
+      system: 'system'
+    };
+    return `admin-event-chip ${types[type] || 'system'}`;
   };
+
+  if (loading) {
+    return <div className="admin-page"><p>Loading Dashboard...</p></div>;
+  }
 
   return (
-    <div className="admin-portal-wrapper">
-      {renderSidebar()}
-      <div className="admin-main">
-        <div className="admin-header">
-          <h2>{activeTab.charAt(0).toUpperCase() + activeTab.slice(1)}</h2>
+    <div id="admin-dash" className="admin-page">
+      <div className="admin-dash-head">
+        <h1>Platform Overview</h1>
+        <p className="page-subtitle mt-1">Real-time snapshot of TeamForge activity.</p>
+      </div>
+
+      <div className="admin-dash-grid-top mt-3">
+        <div className="admin-kpi-card">
+          <div className="admin-kpi-row">
+            <div className="admin-kpi-icon info">👥</div>
+            <span className="admin-kpi-meta" id="admin-kpi-users-active">{stats.activeUsers} active</span>
+          </div>
+          <div className="admin-kpi-value" id="admin-kpi-users-total">{stats.totalUsers}</div>
+          <div className="admin-kpi-label">Total Users</div>
         </div>
-        {renderContent()}
+
+        <div className="admin-kpi-card">
+          <div className="admin-kpi-row">
+            <div className="admin-kpi-icon">📖</div>
+            <span className="admin-kpi-meta">Awaiting review</span>
+          </div>
+          <div className="admin-kpi-value" id="admin-kpi-mentor-pending">{stats.pendingMentorApps}</div>
+          <div className="admin-kpi-label">Pending Mentor Apps</div>
+        </div>
+
+        <div className="admin-kpi-card">
+          <div className="admin-kpi-row">
+            <div className="admin-kpi-icon">⚠️</div>
+            <span className="admin-kpi-meta" id="admin-kpi-suspended-meta">{stats.suspendedUsers} suspended</span>
+          </div>
+          <div className="admin-kpi-value" id="admin-kpi-flagged-warned">{stats.flaggedWarned}</div>
+          <div className="admin-kpi-label">Flagged / Warned</div>
+        </div>
+
+        <div className="admin-kpi-card">
+          <div className="admin-kpi-row">
+            <div className="admin-kpi-icon">📜</div>
+          </div>
+          <div className="admin-kpi-value" id="admin-kpi-audit-events">{stats.auditEvents}</div>
+          <div className="admin-kpi-label">Audit Events</div>
+        </div>
+      </div>
+
+      <div className="admin-dash-grid-actions mt-3">
+        <button className="admin-action-card" onClick={() => navigate('/admin/mentor-apps')}>
+          <div className="admin-action-left">
+            <div className="admin-action-icon">📖</div>
+            <div>
+              <div className="admin-action-title">Review Mentor Applications</div>
+              <div className="admin-action-sub" id="admin-action-mentor-sub">{stats.pendingMentorApps} pending</div>
+            </div>
+          </div>
+          <div className="admin-action-count" id="admin-action-mentor-count">{stats.pendingMentorApps}</div>
+        </button>
+
+        <button className="admin-action-card" onClick={() => navigate('/admin/users')}>
+          <div className="admin-action-left">
+            <div className="admin-action-icon">🛡️</div>
+            <div>
+              <div className="admin-action-title">Manage Flagged Users</div>
+              <div className="admin-action-sub" id="admin-action-flagged-sub">{stats.flaggedWarned} flagged</div>
+            </div>
+          </div>
+          <div className="admin-action-count" id="admin-action-flagged-count">{stats.flaggedWarned}</div>
+        </button>
+
+        <button className="admin-action-card" onClick={() => navigate('/admin/audit')}>
+          <div className="admin-action-left">
+            <div className="admin-action-icon">📜</div>
+            <div>
+              <div className="admin-action-title">View Full Audit Log</div>
+              <div className="admin-action-sub" id="admin-action-audit-sub">{stats.auditEvents} entries</div>
+            </div>
+          </div>
+          <div className="admin-action-count" id="admin-action-audit-count">{stats.auditEvents}</div>
+        </button>
+      </div>
+
+      <div className="admin-dash-grid-bottom mt-3">
+        <div className="admin-panel">
+          <div className="admin-panel-title">↗ User Health</div>
+
+          <div className="admin-health-item">
+            <div className="admin-health-head"><span>Active</span><span id="admin-health-active-label">{stats.activeUsers} / {stats.totalUsers}</span></div>
+            <div className="admin-health-track">
+              <div className="admin-health-fill success" id="admin-health-active-fill" style={{ width: `${getPercentage(stats.activeUsers)}%` }}></div>
+            </div>
+          </div>
+
+          <div className="admin-health-item">
+            <div className="admin-health-head"><span>Warned</span><span id="admin-health-warned-label">{stats.flaggedWarned} / {stats.totalUsers}</span></div>
+            <div className="admin-health-track">
+              <div className="admin-health-fill warning" id="admin-health-warned-fill" style={{ width: `${getPercentage(stats.flaggedWarned)}%` }}></div>
+            </div>
+          </div>
+
+          <div className="admin-health-item">
+            <div className="admin-health-head"><span>Suspended</span><span id="admin-health-suspended-label">{stats.suspendedUsers} / {stats.totalUsers}</span></div>
+            <div className="admin-health-track">
+              <div className="admin-health-fill danger" id="admin-health-suspended-fill" style={{ width: `${getPercentage(stats.suspendedUsers)}%` }}></div>
+            </div>
+          </div>
+        </div>
+
+        <div className="admin-panel">
+          <div className="admin-panel-title">📜 Recent Events</div>
+          <div className="admin-events-list" id="admin-dash-recent-events">
+            {recentEvents.length > 0 ? (
+              recentEvents.map((entry, index) => (
+                <div className="admin-event-row" key={index}>
+                  <span className={getAuditChipClass(entry.type || 'system')}>{String(entry.type || 'system').toUpperCase()}</span>
+                  <div>
+                    <div className="admin-event-text">{entry.event || entry.details}</div>
+                    <div className="admin-event-time">{entry.timestamp || new Date(entry.createdAt).toLocaleString()}</div>
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="admin-users-empty">No recent events.</div>
+            )}
+          </div>
+          <button className="admin-events-link" onClick={() => navigate('/admin/audit')}>View full audit log →</button>
+        </div>
       </div>
     </div>
   );

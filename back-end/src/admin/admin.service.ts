@@ -93,7 +93,11 @@ export class AdminService {
       warnings: [...warnings, warningRecord],
     };
 
-    const updatedUser = this.usersService.update(id, { data: updatedData } as any);
+    const updatedUser = this.usersService.update(id, { 
+      data: updatedData,
+      status: UserStatus.Warned,
+      flags: true 
+    } as any);
     this.logAudit({
       action: 'warn-user',
       entityType: 'user',

@@ -35,7 +35,7 @@ const AdminLogin = () => {
       sessionStorage.setItem('teamforge.adminEmail', email);
       
       // Redirect to admin dashboard
-      navigate('/admin/dashboard');
+      navigate('/admin');
     } catch (err) {
       console.error('Admin login failed:', err);
       setError(err.message || 'Invalid credentials. Please try again.');

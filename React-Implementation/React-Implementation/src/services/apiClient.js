@@ -97,6 +97,10 @@ function getCurrentUserRole() {
     if (sessionStorage.getItem("teamforge.isSuperUser") === "true") {
       return "Super User";
     }
+    const portalRole = sessionStorage.getItem("teamforge.portalRole");
+    if (portalRole) {
+      return portalRole;
+    }
     const storedRole = sessionStorage.getItem("teamforge.role");
     if (storedRole) {
       return storedRole;
