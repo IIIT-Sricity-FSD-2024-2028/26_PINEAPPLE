@@ -1,0 +1,133 @@
+.admin-project-details-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.admin-project-details-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-project-details-actions .btn-warning {
+  background-color: #f59e0b;
+  color: white;
+  border: none;
+}
+
+.admin-project-details-actions .btn-danger {
+  background-color: #ef4444;
+  color: white;
+  border: none;
+}
+
+.admin-project-details-actions .btn-success {
+  background-color: #10b981;
+  color: white;
+  border: none;
+}
+
+.admin-project-details-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 1.5rem;
+}
+
+@media (max-width: 768px) {
+  .admin-project-details-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.glass-card {
+  background: var(--card-bg, rgba(255, 255, 255, 0.05));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  padding: 1.5rem;
+}
+
+.meta-info p {
+  margin-bottom: 0.75rem;
+  line-height: 1.5;
+}
+
+.status-badge {
+  padding: 0.25rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-open {
+  background-color: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-suspended {
+  background-color: rgba(245, 158, 11, 0.2);
+  color: #f59e0b;
+}
+
+.status-closed {
+  background-color: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+.collaborators-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.collaborator-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.75rem 0;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.collaborator-item:last-child {
+  border-bottom: none;
+}
+
+.collab-name {
+  font-weight: 500;
+}
+
+.collab-role {
+  font-size: 0.875rem;
+  color: var(--text-muted, #9ca3af);
+  background: rgba(255, 255, 255, 0.1);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.admin-tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.admin-tasks-table th,
+.admin-tasks-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.admin-tasks-table th {
+  font-weight: 600;
+  background-color: rgba(255, 255, 255, 0.02);
+}
+
+.text-muted {
+  color: var(--text-muted, #9ca3af);
+}
+
+.mr-2 {
+  margin-right: 0.5rem;
+}

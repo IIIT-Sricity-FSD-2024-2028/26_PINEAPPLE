@@ -23,6 +23,8 @@ import AdminLogin from "../pages/admin/AdminLogin";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminLayout from "../pages/admin/AdminLayout";
 import AdminUsers from "../pages/admin/AdminUsers";
+import AdminProjects from "../pages/admin/AdminProjects";
+import AdminProjectDetails from "../pages/admin/AdminProjectDetails";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminProtectedRoute from "./AdminProtectedRoute";
 
@@ -41,7 +43,8 @@ const AppRoutes = () => {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
-          <Route path="projects" element={<div className="admin-page"><h1>Projects Placeholder</h1></div>} />
+          <Route path="projects" element={<AdminProjects />} />
+          <Route path="projects/:id" element={<AdminProjectDetails />} />
           <Route path="mentor-apps" element={<div className="admin-page"><h1>Mentor Applications Placeholder</h1></div>} />
           <Route path="mentor-revenue" element={<div className="admin-page"><h1>Revenue & Escrow Placeholder</h1></div>} />
           <Route path="audit" element={<div className="admin-page"><h1>Audit Log Placeholder</h1></div>} />
