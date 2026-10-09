@@ -1,8 +1,0 @@
-/* AuditLog.css */
-.refresh-btn {
-  cursor: pointer;
-  background: none;
-  border: none;
-  color: var(--primary);
-  text-decoration: underline;
-}
