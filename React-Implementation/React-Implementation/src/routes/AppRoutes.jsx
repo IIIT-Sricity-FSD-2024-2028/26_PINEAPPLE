@@ -25,6 +25,8 @@ import AdminLayout from "../pages/admin/AdminLayout";
 import AdminUsers from "../pages/admin/AdminUsers";
 import AdminProjects from "../pages/admin/AdminProjects";
 import AdminProjectDetails from "../pages/admin/AdminProjectDetails";
+import MentorRevenue from "../pages/admin/MentorRevenue";
+import AuditLog from "../pages/admin/AuditLog";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminProtectedRoute from "./AdminProtectedRoute";
 
@@ -46,8 +48,8 @@ const AppRoutes = () => {
           <Route path="projects" element={<AdminProjects />} />
           <Route path="projects/:id" element={<AdminProjectDetails />} />
           <Route path="mentor-apps" element={<div className="admin-page"><h1>Mentor Applications Placeholder</h1></div>} />
-          <Route path="mentor-revenue" element={<div className="admin-page"><h1>Revenue & Escrow Placeholder</h1></div>} />
-          <Route path="audit" element={<div className="admin-page"><h1>Audit Log Placeholder</h1></div>} />
+          <Route path="mentor-revenue" element={<MentorRevenue />} />
+          <Route path="audit" element={<AuditLog />} />
           <Route path="su-admins" element={<div className="admin-page"><h1>Manage Admins Placeholder</h1></div>} />
           <Route path="su-config" element={<div className="admin-page"><h1>Platform Config Placeholder</h1></div>} />
         </Route>

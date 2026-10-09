@@ -1,0 +1,20 @@
+/* MentorRevenue.css */
+.mentor-revenue-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.overflow-hidden {
+  overflow: hidden;
+}
+
+.p-0 {
+  padding: 0;
+}
+
+.font-mono {
+  font-family: monospace;
+}
