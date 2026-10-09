@@ -76,8 +76,35 @@
   font-weight: 700;
 }
 
+.admin-role-badge {
+  display: inline-block;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  padding: 2px 7px;
+  border-radius: 20px;
+  margin-left: 6px;
+  text-transform: uppercase;
+  vertical-align: middle;
+}
+
+.admin-badge {
+  background: color-mix(in srgb, var(--primary) 15%, transparent);
+  color: var(--primary);
+}
+
+.su-badge {
+  background: color-mix(in srgb, #f59e0b 18%, transparent);
+  color: #b45309;
+}
+
 .su-only-nav {
-  display: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.su-nav-item {
+  border-left: 2px solid #f59e0b !important;
 }
 
 .admin-exit-btn {
