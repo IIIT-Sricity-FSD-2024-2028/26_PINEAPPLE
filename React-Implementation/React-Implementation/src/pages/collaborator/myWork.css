@@ -1,0 +1,324 @@
+/* ==========================================================================
+   My Work Styles (Scoped)
+   ========================================================================== */
+
+.tf-mywork-container {
+  padding: 24px;
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.tf-mywork-header {
+  margin-bottom: 24px;
+}
+
+.tf-mywork-title {
+  font-size: 1.8rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-mywork-subtitle {
+  font-size: 0.92rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+}
+
+/* Segmented Switch */
+.tf-mywork-switch {
+  display: inline-flex;
+  background: var(--tf-ink-100, #f3f4f6);
+  padding: 4px;
+  border-radius: 10px;
+  margin-bottom: 24px;
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.tf-mywork-switch-btn {
+  padding: 8px 18px;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--tf-ink-600, #4b5563);
+  background: transparent;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-mywork-switch-btn.active {
+  background: #ffffff;
+  color: var(--tf-ink-900, #111827);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Projects Stack */
+.tf-mywork-projects-list {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.tf-mywork-project-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 22px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tf-mywork-project-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.tf-mywork-card-title {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0 0 4px 0;
+}
+
+.tf-mywork-card-desc {
+  font-size: 0.88rem;
+  color: var(--tf-ink-600, #4b5563);
+  margin: 0;
+  max-width: 650px;
+}
+
+.tf-mywork-progress-box {
+  min-width: 200px;
+}
+
+.tf-mywork-progress-text {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--tf-ink-600, #4b5563);
+  margin-bottom: 6px;
+}
+
+.tf-mywork-progress-bar {
+  width: 100%;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--tf-ink-100, #f3f4f6);
+  overflow: hidden;
+}
+
+.tf-mywork-progress-fill {
+  height: 100%;
+  background: var(--tf-brand, #5f513f);
+  border-radius: 999px;
+  transition: width 0.3s ease;
+}
+
+/* Tasks section inside project card */
+.tf-mywork-tasks-section {
+  background: var(--tf-ink-50, #f9fafb);
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.tf-mywork-tasks-label {
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--tf-ink-700, #374151);
+  margin-bottom: 10px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.tf-mywork-task-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.tf-mywork-task-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: #ffffff;
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 6px;
+  font-size: 0.84rem;
+}
+
+.tf-mywork-task-name {
+  font-weight: 500;
+  color: var(--tf-ink-800, #1f2937);
+}
+
+.tf-mywork-task-xp {
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: var(--tf-accent-600, #b45309);
+  margin-right: 8px;
+}
+
+.tf-mywork-badge {
+  font-size: 0.72rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+}
+
+.tf-mywork-badge-done {
+  background: rgba(22, 163, 74, 0.1);
+  color: var(--tf-success, #16a34a);
+}
+
+.tf-mywork-badge-progress {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--tf-info, #2563eb);
+}
+
+.tf-mywork-badge-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--tf-accent-600, #b45309);
+}
+
+.tf-mywork-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  border-top: 1px solid var(--border, #f3f4f6);
+  padding-top: 14px;
+}
+
+.tf-mywork-mentor-chip {
+  font-size: 0.82rem;
+  color: var(--tf-ink-600, #4b5563);
+}
+
+.tf-mywork-link {
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: var(--tf-info, #2563eb);
+  text-decoration: none;
+}
+
+.tf-mywork-link:hover {
+  text-decoration: underline;
+}
+
+.tf-mywork-btn-primary {
+  padding: 8px 16px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tf-mywork-btn-primary:hover {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+.tf-mywork-btn-outline {
+  padding: 8px 14px;
+  background: transparent;
+  color: var(--tf-ink-700, #374151);
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  font-weight: 500;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease;
+}
+
+.tf-mywork-btn-outline:hover {
+  background: var(--tf-ink-100, #f3f4f6);
+}
+
+.tf-mywork-empty-card {
+  padding: 48px;
+  text-align: center;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  color: var(--tf-ink-500, #6b7280);
+}
+
+/* Contribution Summary Modal */
+.tf-mywork-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(17, 24, 39, 0.45);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 16px;
+}
+
+.tf-mywork-modal-box {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 14px;
+  max-width: 520px;
+  width: 100%;
+  padding: 24px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+}
+
+.tf-mywork-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.tf-mywork-modal-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tf-mywork-summary-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.tf-mywork-summary-stat {
+  background: var(--tf-ink-50, #f9fafb);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 10px;
+  padding: 14px;
+  text-align: center;
+}
+
+.tf-mywork-stat-val {
+  font-size: 1.4rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+}
+
+.tf-mywork-stat-lbl {
+  font-size: 0.78rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin-top: 4px;
+}
