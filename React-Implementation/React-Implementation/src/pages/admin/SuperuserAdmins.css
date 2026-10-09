@@ -1,0 +1,202 @@
+.su-admins-page {
+  /* page wrapper inherits admin-page */
+}
+
+.su-page-badge {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  background: rgba(239, 68, 68, 0.1);
+  color: #ef4444;
+  padding: 4px 8px;
+  border-radius: 9999px;
+  vertical-align: middle;
+  margin-left: 8px;
+}
+
+.su-card-container {
+  padding: 0;
+  overflow: hidden;
+}
+
+.su-table-container {
+  width: 100%;
+}
+
+.su-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.su-table th {
+  padding: 14px 16px;
+  text-align: left;
+  background-color: var(--secondary, rgba(255,255,255,0.02));
+  font-weight: 600;
+  color: var(--fg);
+  border-bottom: 1px solid var(--border);
+}
+
+.su-table td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--border);
+}
+
+.su-table tr:last-child td {
+  border-bottom: none;
+}
+
+.su-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--secondary, rgba(255,255,255,0.1));
+  color: var(--primary, #3b82f6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 800;
+  font-size: 0.75rem;
+}
+
+.su-perm-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.su-perm-tag {
+  background: var(--secondary, rgba(255,255,255,0.05));
+  color: var(--fg);
+  padding: 4px 8px;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.su-row-actions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.su-action-btn {
+  padding: 6px 12px !important;
+  border-radius: 8px !important;
+}
+
+.status-badge {
+  padding: 4px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.status-active {
+  background: rgba(16, 185, 129, 0.2);
+  color: #10b981;
+}
+
+.status-rejected {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+}
+
+/* Modal styling */
+.su-admin-modal-wrapper {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.su-modal-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  backdrop-filter: blur(4px);
+}
+
+.su-modal-card {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  width: 90%;
+  max-width: 500px;
+  padding: 24px;
+  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  max-height: 90vh;
+  overflow-y: auto;
+}
+
+.su-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.su-modal-title {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.su-modal-close {
+  background: none;
+  border: none;
+  color: var(--muted-fg);
+  font-size: 1.25rem;
+  cursor: pointer;
+}
+
+.su-form-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid #ef4444;
+  color: #ef4444;
+  padding: 12px;
+  border-radius: 10px;
+  margin-bottom: 16px;
+  font-size: 0.875rem;
+}
+
+.su-modal-input {
+  height: 48px;
+  border-radius: 14px;
+  border: 2px solid var(--border);
+  width: 100%;
+  padding: 0 12px;
+  background: transparent;
+  color: var(--fg);
+}
+
+.su-perm-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.su-perm-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+  font-size: 0.875rem;
+}
+
+.su-required {
+  color: #ef4444;
+}
+
+.su-btn-danger {
+  background-color: transparent;
+  color: #ef4444;
+  border: 1px solid #ef4444;
+}
+.su-btn-danger:hover {
+  background-color: #ef4444;
+  color: white;
+}
