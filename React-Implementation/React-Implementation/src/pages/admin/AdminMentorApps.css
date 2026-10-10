@@ -1,0 +1,291 @@
+/* AdminMentorApps.css */
+
+.admin-mentor-criteria {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  padding: 16px;
+}
+
+.admin-mentor-criteria-title {
+  font-size: 0.98rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted-fg);
+  font-weight: 600;
+}
+
+.admin-mentor-criteria-tags {
+  margin-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.admin-mentor-criteria-tag {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 6px 12px;
+  font-size: 0.9rem;
+  color: var(--muted-fg);
+  background: var(--secondary);
+}
+
+.admin-mentor-icon {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  margin-right: 6px;
+  flex-shrink: 0;
+}
+
+.admin-mentor-icon svg {
+  width: 100%;
+  height: 100%;
+}
+
+.admin-mentor-filters {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-mentor-list-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.admin-mentor-card {
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+}
+
+.admin-mentor-card.pending {
+  border-color: color-mix(in srgb, var(--warning, #f59e0b) 35%, var(--border) 65%);
+}
+
+.admin-mentor-head {
+  width: 100%;
+  border: none;
+  background: transparent;
+  padding: 16px 20px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+}
+
+.admin-mentor-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.admin-mentor-avatar {
+  width: 50px;
+  height: 50px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--primary, #3b82f6) 92%, #fff 8%);
+  color: #fff;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+}
+
+.admin-mentor-name {
+  font-size: 1.05rem;
+  font-weight: 560;
+  color: var(--fg);
+}
+
+.admin-mentor-sub {
+  margin-top: 4px;
+  color: var(--muted-fg);
+  font-size: 0.86rem;
+}
+
+.admin-mentor-right {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--muted-fg);
+}
+
+.admin-mentor-spec {
+  font-size: 0.92rem;
+  color: var(--muted-fg);
+}
+
+.admin-mentor-chevron {
+  width: 18px;
+  height: 18px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted-fg);
+}
+
+.admin-mentor-chevron svg {
+  width: 100%;
+  height: 100%;
+}
+
+.admin-mentor-details {
+  display: none;
+  border-top: 1px solid var(--border);
+  padding: 16px 20px 18px;
+}
+
+.admin-mentor-details.open {
+  display: block;
+}
+
+.admin-mentor-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 20px;
+}
+
+.admin-mentor-label {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--muted-fg);
+  font-weight: 600;
+}
+
+.admin-mentor-value {
+  font-size: 0.96rem;
+  color: var(--fg);
+  margin-top: 6px;
+}
+
+.admin-mentor-link {
+  display: inline-flex;
+  margin-top: 6px;
+  font-size: 0.95rem;
+  color: var(--info, #3b82f6);
+  text-decoration: none;
+}
+
+.admin-mentor-link:hover {
+  text-decoration: underline;
+}
+
+.admin-mentor-criteria-pill {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 8px;
+  border-radius: 999px;
+  padding: 2px 8px;
+  font-size: 0.74rem;
+  vertical-align: middle;
+}
+
+.admin-mentor-criteria-pill.pass {
+  background: rgba(34, 197, 94, 0.12);
+  color: var(--success, #22c55e);
+}
+
+.admin-mentor-criteria-pill.fail {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--destructive, #ef4444);
+}
+
+.admin-mentor-quote {
+  margin: 6px 0 0;
+  padding-left: 10px;
+  border-left: 3px solid var(--border);
+  color: var(--muted-fg);
+  font-style: italic;
+  line-height: 1.6;
+  font-size: 0.94rem;
+}
+
+.admin-mentor-actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-mentor-actions .btn {
+  font-size: 0.88rem;
+}
+
+/* Status badges */
+.status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 600;
+}
+
+.status-active {
+  background: rgba(34, 197, 94, 0.1);
+  color: var(--success, #22c55e);
+}
+
+.status-pending {
+  background: rgba(245, 158, 11, 0.1);
+  color: var(--warning, #f59e0b);
+}
+
+.status-rejected {
+  background: rgba(239, 68, 68, 0.1);
+  color: var(--destructive, #ef4444);
+}
+
+/* Filter chip styling */
+.admin-users-filter-chip {
+  border: none;
+  border-radius: 999px;
+  height: 40px;
+  padding: 0 14px;
+  font-size: 0.84rem;
+  font-family: inherit;
+  color: var(--muted-fg);
+  background: var(--secondary);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.admin-users-filter-chip.active {
+  background: var(--primary);
+  color: var(--primary-fg, #fff);
+}
+
+.admin-users-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 24px;
+  text-align: center;
+  color: var(--muted-fg);
+}
+
+@media (max-width: 1180px) {
+  .admin-mentor-head {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .admin-mentor-right {
+    width: 100%;
+    justify-content: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .admin-mentor-grid {
+    grid-template-columns: 1fr;
+  }
+}
