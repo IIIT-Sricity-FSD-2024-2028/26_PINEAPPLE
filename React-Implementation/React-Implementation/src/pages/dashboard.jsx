@@ -128,12 +128,14 @@ const Dashboard = () => {
   // Recent activity logic (take up to 3 notifications)
   const recentActivity = Array.isArray(notifications) ? notifications.slice(0, 3) : [];
 
+  const displayUserName = user?.name || user?.profile?.fullName || currentActiveUser?.name || currentActiveUser?.profile?.fullName || userName;
+
   return (
     <div className="dashboard-page">
       {/* Header */}
       <div className="dash-header">
         <h1 className="dash-title">Dashboard</h1>
-        <p className="dash-subtitle">Welcome back, {currentActiveUser?.profile?.fullName || currentActiveUser?.name || userName}!</p>
+        <p className="dash-subtitle">Welcome back, {displayUserName}!</p>
       </div>
 
       {/* Stats Grid */}

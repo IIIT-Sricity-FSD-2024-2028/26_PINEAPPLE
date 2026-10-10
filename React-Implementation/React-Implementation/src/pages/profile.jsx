@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import usersApi from '../services/usersApi';
 import "./profile.css";
@@ -60,9 +60,10 @@ const Profile = () => {
         const data = await usersApi.get(userId);
 
         setProfileData({
-          name: data.profile?.fullName || data.name || "User",
-          bio: data.profile?.bio || "No bio available.",
-          initials: (data.profile?.fullName || data.name || "US").substring(0, 2).toUpperCase(),
+          name: user?.name || user?.profile?.fullName || data.profile?.fullName || data.name || "User",
+          bio: data.profile?.bio || user?.profile?.bio || user?.bio || "No bio available.",
+          avatarUrl: user?.avatarUrl || user?.profile?.avatarUrl || data.profile?.avatarUrl || data.avatarUrl || null,
+          initials: (user?.name || user?.profile?.fullName || data.profile?.fullName || data.name || "US").substring(0, 2).toUpperCase(),
           hasMentorBadge: data.profile?.mentorUnlocked || false,
           
           title: data.profile?.title || "Team Member",
@@ -75,7 +76,7 @@ const Profile = () => {
             projects: data.data?.projects?.length || 0,
             tasks: data.profile?.tasksCount || 0
           },
-          skills: data.profile?.skills || [],
+          skills: data.profile?.skills || user?.profile?.skills || [],
           
           activeProjects: (data.data?.projects || []).filter(p => p.status !== 'Completed'),
           completedProjects: (data.data?.projects || []).filter(p => p.status === 'Completed'),
@@ -89,12 +90,12 @@ const Profile = () => {
         
         // Bare-minimum fallback so the page doesn't fatally crash if backend is down
         setProfileData({
-          name: user?.name || "Offline User",
+          name: user?.name || user?.profile?.fullName || "Offline User",
           title: "Developer",
           uni: "Offline",
           joined: "N/A",
           bio: "Cannot connect to the backend database.",
-          initials: (user?.name || "OU").substring(0, 2).toUpperCase(),
+          initials: (user?.name || user?.profile?.fullName || "OU").substring(0, 2).toUpperCase(),
           hasMentorBadge: false,
           stats: { xp: 0, rep: 0, projects: 0, tasks: 0 },
           activeProjects: [],
@@ -127,7 +128,15 @@ const Profile = () => {
         <div className="prof-header-wrap">
           {/* Avatar */}
           <div className="prof-avatar-lg">
-            {profileData.initials}
+            {profileData.avatarUrl ? (
+              <img
+                src={profileData.avatarUrl.startsWith('http') || profileData.avatarUrl.startsWith('data:') || profileData.avatarUrl.startsWith('blob:') ? profileData.avatarUrl : `http://localhost:3000${profileData.avatarUrl}`}
+                alt={profileData.name}
+                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
+              />
+            ) : (
+              profileData.initials
+            )}
           </div>
           
           {/* Info */}

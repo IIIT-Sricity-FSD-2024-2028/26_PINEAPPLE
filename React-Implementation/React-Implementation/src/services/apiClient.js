@@ -71,16 +71,18 @@ async function apiRequest(path, method, body = null, options = {}) {
       }
     }
 
-    // For DELETE requests, return success message if no content
-    if (method === "DELETE" && response.status === 200) {
+    // For DELETE requests or 204 No Content, safely parse response
+    if (method === "DELETE" || response.status === 204) {
       try {
-        return await response.json();
+        const text = await response.text();
+        return text ? JSON.parse(text) : { message: "Deleted successfully" };
       } catch {
         return { message: "Deleted successfully" };
       }
     }
 
-    return await response.json();
+    const text = await response.text();
+    return text ? JSON.parse(text) : {};
   } catch (error) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error(
@@ -105,8 +107,8 @@ function getCurrentUserRole() {
     if (storedRole) {
       return storedRole;
     }
-    if (typeof STATE !== "undefined" && STATE) {
-      return STATE.portalRole || STATE.role || "Collaborator";
+    if (typeof window !== "undefined" && window.STATE) {
+      return window.STATE.portalRole || window.STATE.role || "Collaborator";
     }
     return "Collaborator";
   } catch {

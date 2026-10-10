@@ -307,7 +307,7 @@ export class UsersRepository {
   }
 
   findById(id: string): User | undefined {
-    return this.users.find((user) => user.id === id);
+    return this.users.find((user) => String(user.id) === String(id));
   }
 
   create(createUserDto: CreateUserDto): User {
@@ -341,7 +341,7 @@ export class UsersRepository {
   }
 
   update(id: string, updateUserDto: UpdateUserDto): User | undefined {
-    const userIndex = this.users.findIndex((user) => user.id === id);
+    const userIndex = this.users.findIndex((user) => String(user.id) === String(id));
     if (userIndex === -1) {
       return undefined;
     }
@@ -364,7 +364,7 @@ export class UsersRepository {
 
   delete(id: string): boolean {
     const initialLength = this.users.length;
-    this.users = this.users.filter((user) => user.id !== id);
+    this.users = this.users.filter((user) => String(user.id) !== String(id));
     return this.users.length < initialLength;
   }
 }

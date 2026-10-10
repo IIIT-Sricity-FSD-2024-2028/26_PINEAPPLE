@@ -51,8 +51,15 @@ const Navbar = ({ onMenuClick }) => {
   const activeRoleName = currentRole || 'Collaborator';
   const roleClassModifier = activeRoleName.toLowerCase().replace(/\s+/g, '-');
 
-  const displayName = user?.name || user?.username || 'User';
+  const displayName = user?.name || user?.profile?.fullName || user?.username || 'User';
   const userInitials = displayName.slice(0, 1).toUpperCase();
+  const avatarUrl = user?.avatarUrl || user?.profile?.avatarUrl;
+  const apiBase = 'http://localhost:3000';
+  const fullAvatarUrl = avatarUrl
+    ? avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:')
+      ? avatarUrl
+      : `${apiBase}${avatarUrl}`
+    : null;
 
   return (
     <nav className="navbar">
@@ -148,7 +155,13 @@ const Navbar = ({ onMenuClick }) => {
                 setRoleOpen(false);
               }}
             >
-              <div className="avatar">{userInitials}</div>
+              <div className="avatar">
+                {fullAvatarUrl ? (
+                  <img src={fullAvatarUrl} alt={displayName} className="navbar-avatar-img" />
+                ) : (
+                  userInitials
+                )}
+              </div>
               <span className="username">{displayName}</span>
               <svg className={`chevron-down small ${profileOpen ? 'rotated' : ''}`} viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />

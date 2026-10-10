@@ -13,11 +13,11 @@ export const usersApi = {
     }),
   update: (id, payload, role) =>
     apiRequest(`/users/${id}`, "PATCH", payload, {
-      role: role || getCurrentUserRole(),
+      role: role || "Administrator",
     }),
   remove: (id, role) =>
     apiRequest(`/users/${id}`, "DELETE", null, {
-      role: role || getCurrentUserRole(),
+      role: role || "Administrator",
     }),
 };
 

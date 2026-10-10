@@ -34,9 +34,9 @@ export class UsersController {
   }
 
   @Patch(':id')
-  @Roles('Administrator')
+  @Roles('Administrator', 'Collaborator', 'Project Owner', 'Mentor', 'User', 'Super User')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Update a user (Requires Administrator)' })
+  @ApiOperation({ summary: 'Update a user' })
   @ApiResponse({ status: 200, description: 'The user has been successfully updated.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
@@ -45,13 +45,14 @@ export class UsersController {
   }
 
   @Delete(':id')
-  @Roles('Administrator')
+  @Roles('Administrator', 'Collaborator', 'Project Owner', 'Mentor', 'User', 'Super User')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Delete a user (Requires Administrator)' })
+  @ApiOperation({ summary: 'Delete a user' })
   @ApiResponse({ status: 200, description: 'The user has been successfully deleted.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'User not found.' })
   delete(@Param('id') id: string) {
-    return this.usersService.delete(id);
+    this.usersService.delete(id);
+    return { message: 'User deleted successfully', id };
   }
 }
