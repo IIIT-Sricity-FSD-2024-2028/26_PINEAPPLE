@@ -41,6 +41,13 @@ const Navbar = ({ onMenuClick }) => {
   const handleRoleSelect = (newRole) => {
     switchRole(newRole);
     setRoleOpen(false);
+    if (newRole === 'Mentor') {
+      navigate('/mentor/projects');
+    } else if (newRole === 'Project Owner') {
+      navigate('/owner/dashboard');
+    } else if (newRole === 'Collaborator') {
+      navigate('/dashboard');
+    }
   };
 
   const handleLogout = () => {

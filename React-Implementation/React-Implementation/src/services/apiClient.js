@@ -153,5 +153,6 @@ export * from "./portalAdminsApi.js";
 export * from "./notificationsApi.js";
 export * from "./leaderboardApi.js";
 export * from "./mentorMarketplaceApi.js";
+export * from "./mentorshipApi.js";
 
 export default apiRequest;

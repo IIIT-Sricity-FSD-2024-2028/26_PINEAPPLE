@@ -27,8 +27,11 @@ import AdminProjects from "../pages/admin/AdminProjects";
 import AdminProjectDetails from "../pages/admin/AdminProjectDetails";
 import SuperuserAdmins from "../pages/admin/SuperuserAdmins";
 import MentorRevenue from "../pages/admin/MentorRevenue";
+import AuditLog from "../pages/admin/AuditLog";
 import AdminMentorApps from "../pages/admin/AdminMentorApps";
-// import AuditLog from "../pages/admin/AuditLog";
+import MentoredProjects from "../pages/mentor/MentoredProjects";
+import MentorRequests from "../pages/mentor/MentorRequests";
+import MentorProjectWorkspace from "../pages/mentor/MentorProjectWorkspace";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminProtectedRoute from "./AdminProtectedRoute";
 
@@ -49,9 +52,9 @@ const AppRoutes = () => {
           <Route path="users" element={<AdminUsers />} />
           <Route path="projects" element={<AdminProjects />} />
           <Route path="projects/:id" element={<AdminProjectDetails />} />
-          <Route path="mentor-revenue" element={<MentorRevenue />} />
-          {/* <Route path="audit" element={<AuditLog />} /> */}
           <Route path="mentor-apps" element={<AdminMentorApps />} />
+          <Route path="mentor-revenue" element={<MentorRevenue />} />
+          <Route path="audit" element={<AuditLog />} />
           <Route path="su-admins" element={<SuperuserAdmins />} />
         </Route>
       </Route>
@@ -72,6 +75,13 @@ const AppRoutes = () => {
           <Route path="/mentors" element={<MentorsDirectory />} />
           <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
           <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+
+          {/* Mentor Role Routes */}
+          <Route path="/mentor/projects" element={<MentoredProjects />} />
+          <Route path="/mentored-projects" element={<MentoredProjects />} />
+          <Route path="/mentor/requests" element={<MentorRequests />} />
+          <Route path="/mentor-requests" element={<MentorRequests />} />
+          <Route path="/mentor/workspace/:projectId" element={<MentorProjectWorkspace />} />
 
           {/* Shared / Global Routes */}
           <Route path="/help" element={<Help />} />
