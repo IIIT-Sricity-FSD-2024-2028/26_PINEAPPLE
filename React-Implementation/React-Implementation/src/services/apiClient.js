@@ -12,13 +12,56 @@ function resolveApiBaseUrl() {
 }
 
 const API_BASE_URL = resolveApiBaseUrl();
+function normalizeRole(role) {
+  const normalized = String(role || "")
+    .trim()
+    .toLowerCase()
+    .replace(/[_\s]+/g, "-");
+  if (["project-owner", "owner", "projectowner"].includes(normalized)) {
+    return "project-owner";
+  }
+  if (
+    [
+      "admin",
+      "administrator",
+      "portal-admin",
+      "portaladmin",
+      "super-admin",
+      "finance-admin",
+    ].includes(normalized)
+  ) {
+    return "admin";
+  }
+  if (["superuser", "super-user"].includes(normalized)) {
+    return "superuser";
+  }
+  if (["mentor"].includes(normalized)) {
+    return "mentor";
+  }
+  if (["collaborator", "collab", "member"].includes(normalized)) {
+    return "collaborator";
+  }
+  if (["user"].includes(normalized)) {
+    return "user";
+  }
+  return normalized;
+}
 
-const defaultHeaders = (role, userId, userEmail) => ({
-  "Content-Type": "application/json",
-  "x-user-role": role || getCurrentUserRole(),
-  "x-user-id": userId || getCurrentUserId(),
-  ...(userEmail ? { "x-user-email": userEmail } : {}),
-});
+const defaultHeaders = (role, userId, userEmail) => {
+  const resolvedRole = role || getCurrentUserRole();
+  const resolvedUserId = userId || getCurrentUserId();
+  const headers = {
+    "Content-Type": "application/json",
+    "x-user-role": normalizeRole(resolvedRole),
+  };
+  if (resolvedUserId) {
+    headers["x-user-id"] = resolvedUserId;
+  }
+  if (userEmail) {
+    headers["x-user-email"] = userEmail;
+  }
+  return headers;
+};
 
 async function apiRequest(path, method, body = null, options = {}) {
   const url = `${API_BASE_URL}${path}`;
@@ -33,7 +76,7 @@ async function apiRequest(path, method, body = null, options = {}) {
     headers,
   };
 
-  if (body && ["POST", "PUT", "PATCH"].includes(method)) {
+  if (body && ["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
     config.body = isFormData ? body : JSON.stringify(body);
   }
 
@@ -56,8 +99,18 @@ async function apiRequest(path, method, body = null, options = {}) {
           throw new Error(`Validation Error: ${errorMessage}`);
         case 401:
           throw new Error("Authentication required. Please log in again.");
-        case 403:
+        case 403: {
+          if (typeof window !== "undefined" && errorMessage && (errorMessage.toLowerCase().includes('suspended') || errorMessage.toLowerCase().includes('banned'))) {
+            localStorage.removeItem("teamforge.user");
+            sessionStorage.removeItem("teamforge.user");
+            sessionStorage.removeItem("teamforge.userId");
+            sessionStorage.removeItem("teamforge.role");
+            if (!window.location.pathname.startsWith('/admin') && window.location.pathname !== '/login') {
+              window.location.href = '/login?suspended=1';
+            }
+          }
           throw new Error(`Access Forbidden: ${errorMessage}`);
+        }
         case 404:
           throw new Error(`Resource not found: ${errorMessage}`);
         case 409:
@@ -66,6 +119,12 @@ async function apiRequest(path, method, body = null, options = {}) {
           throw new Error(`Validation failed: ${errorMessage}`);
         case 500:
           throw new Error("Server error. Please try again later.");
+        case 503: {
+          if (typeof window !== "undefined" && !window.location.pathname.startsWith('/admin')) {
+            window.dispatchEvent(new CustomEvent('teamforge:maintenance', { detail: { message: errorMessage } }));
+          }
+          throw new Error(`Service Unavailable: ${errorMessage}`);
+        }
         default:
           throw new Error(errorMessage);
       }
@@ -87,6 +146,7 @@ async function apiRequest(path, method, body = null, options = {}) {
     if (error instanceof TypeError && error.message.includes("fetch")) {
       throw new Error(
         "Network error. Please check your connection and try again.",
+        { cause: error }
       );
     }
     throw error;
@@ -120,13 +180,21 @@ function getCurrentUserRole() {
 // session — see teamforge.backendUserId, set at login/registration).
 function getCurrentUserId() {
   try {
-    return (
-      (typeof localStorage !== "undefined" &&
-        localStorage.getItem("teamforge.backendUserId")) ||
-      "1"
-    );
+    const backendId =
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("teamforge.backendUserId");
+    if (backendId) return String(backendId);
+
+    const currentUser =
+      typeof localStorage !== "undefined" &&
+      localStorage.getItem("teamforge.currentUser");
+    if (currentUser) {
+      const parsed = JSON.parse(currentUser);
+      if (parsed?.id) return String(parsed.id);
+    }
+    return "";
   } catch {
-    return "1";
+    return "";
   }
 }
 
@@ -138,6 +206,7 @@ export {
   apiRequest,
   getCurrentUserRole,
   getCurrentUserId,
+  normalizeRole,
 };
 
 // Re-export domain-specific APIs for convenience and backward-compatibility
