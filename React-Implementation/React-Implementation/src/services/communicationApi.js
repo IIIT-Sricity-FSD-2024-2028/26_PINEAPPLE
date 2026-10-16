@@ -1,18 +1,21 @@
-import { apiRequest, getCurrentUserRole } from './apiClient.js';
+import { apiRequest, getCurrentUserRole, getCurrentUserId } from './apiClient.js';
 
 export const communicationApi = {
   getMessages: (projectId, role) =>
     apiRequest(`/communication/messages/project/${projectId}`, "GET", null, {
       role: role || getCurrentUserRole(),
+      userId: getCurrentUserId(),
     }),
 
   sendMessage: (payload, role, userId) => {
-    const activeUserId =
-      userId ||
-      (typeof localStorage !== "undefined"
-        ? localStorage.getItem("teamforge.backendUserId") || ""
-        : "");
-    return apiRequest("/communication/messages", "POST", payload, {
+    const activeUserId = userId || getCurrentUserId();
+    const content = payload?.content || payload?.text || "";
+    const normalizedPayload = {
+      ...payload,
+      content,
+      text: content,
+    };
+    return apiRequest("/communication/messages", "POST", normalizedPayload, {
       role: role || getCurrentUserRole(),
       userId: activeUserId,
     });
