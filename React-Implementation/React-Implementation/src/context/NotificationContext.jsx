@@ -1,57 +1,92 @@
-import { createContext, useState } from "react";
-import { useEffect } from "react";
+import { createContext, useState, useEffect, useContext, useCallback } from "react";
 import notificationsApi from "../services/notificationsApi.js";
+import { AuthContext } from "./AuthContext";
 
 export const NotificationContext = createContext();
 
 export const NotificationProvider = ({ children }) => {
-  // const [notifications, setNotifications] = useState([
-  //   { id: 1, title: 'Mentor Request Approved', message: 'Your request for "AI Integration" was approved by mentor Sarah.', isRead: false, type: 'success' },
-  //   { id: 2, title: 'Invitation Accepted', message: 'You joined the project "Smart Grocery App".', isRead: false, type: 'info' },
-  //   { id: 3, title: 'Task Assigned', message: 'You were assigned "Implement Authentication" in TeamForge.', isRead: true, type: 'warning' }
-  // ]);
-
+  const { user } = useContext(AuthContext) || {};
   const [notifications, setNotifications] = useState([]);
 
+  const normalizeNotification = (n) => ({
+    ...n,
+    isRead: Boolean(n.isRead ?? n.readStatus ?? false),
+    readStatus: Boolean(n.readStatus ?? n.isRead ?? false),
+    title: n.title || (n.type ? n.type.replace(/_/g, " ") : "Notification"),
+  });
+
+  const fetchNotifications = useCallback(async () => {
+    try {
+      const userId = user?.id || (typeof localStorage !== "undefined" ? localStorage.getItem("teamforge.backendUserId") : null);
+      const params = userId ? { userId } : undefined;
+      const response = await notificationsApi.list(params);
+      const rawList = Array.isArray(response)
+        ? response
+        : Array.isArray(response?.data)
+          ? response.data
+          : [];
+      setNotifications(rawList.map(normalizeNotification));
+    } catch (error) {
+      console.error("Error fetching notifications:", error);
+    }
+  }, [user?.id]);
+
   useEffect(() => {
-    // Fetch notifications from the API when the component mounts
-    const fetchNotifications = async () => {
-      try {
-        const response = await notificationsApi.list();
-        setNotifications(
-          Array.isArray(response)
-            ? response
-            : Array.isArray(response?.data)
-              ? response.data
-              : [],
-        );
-      } catch (error) {
-        console.error("Error fetching notifications:", error);
-      }
-    };
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchNotifications();
-  }, []);
+
+    const intervalId = setInterval(fetchNotifications, 10000);
+    const handleUpdate = () => fetchNotifications();
+    window.addEventListener("focus", handleUpdate);
+    window.addEventListener("teamforge:notification_updated", handleUpdate);
+
+    return () => {
+      clearInterval(intervalId);
+      window.removeEventListener("focus", handleUpdate);
+      window.removeEventListener("teamforge:notification_updated", handleUpdate);
+    };
+  }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.isRead).length;
 
-  const addNotification = (message) => {
-    
-    setNotifications((prev) => [
-      { id: Date.now(), message, isRead: false },
-      ...prev,
-    ]);
+  const addNotification = (message, type = "info", title) => {
+    const newNotif = normalizeNotification({
+      id: Date.now().toString(),
+      message,
+      type,
+      title: title || "Notification",
+      isRead: false,
+      readStatus: false,
+      createdAt: new Date().toISOString(),
+    });
+    setNotifications((prev) => [newNotif, ...prev]);
   };
 
-  const markAsRead = (id) => {
-    const response = notificationsApi.markAsRead(id);
+  const markAsRead = async (id) => {
     setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, isRead: response.isRead } : n)),
+      prev.map((n) => (String(n.id) === String(id) ? { ...n, isRead: true, readStatus: true } : n)),
     );
+    try {
+      await notificationsApi.markAsRead(id);
+    } catch (err) {
+      console.error("Failed to mark notification as read:", err);
+    }
   };
 
-  const markAllAsRead = () => {
-    const response = notificationsApi.markAllAsRead();
-    setNotifications((prev) => prev.map((n) => ({ ...n, isRead: response.isRead })));
+  const markAllAsRead = async () => {
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, isRead: true, readStatus: true })),
+    );
+    try {
+      const currentUserId =
+        user?.id ||
+        (typeof localStorage !== "undefined"
+          ? localStorage.getItem("teamforge.backendUserId")
+          : "");
+      await notificationsApi.markAllAsRead(undefined, currentUserId);
+    } catch (err) {
+      console.error("Failed to mark all notifications as read:", err);
+    }
   };
 
   return (
@@ -62,6 +97,7 @@ export const NotificationProvider = ({ children }) => {
         addNotification,
         markAsRead,
         markAllAsRead,
+        refreshNotifications: fetchNotifications,
       }}
     >
       {children}
