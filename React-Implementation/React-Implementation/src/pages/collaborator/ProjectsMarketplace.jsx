@@ -1,26 +1,14 @@
-import React, { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import projectsApi from '../../services/projectsApi';
+import projectsApi, { isProjectLocked } from '../../services/projectsApi';
 import joinRequestsApi from '../../services/joinRequestsApi';
+import ProjectCard from '../../components/features/ProjectCard';
+import SearchBar from '../../components/common/SearchBar';
+import Modal from '../../components/common/Modal';
+import FormInput from '../../components/common/FormInput';
+import EmptyState from '../../components/common/EmptyState';
 import './projectsMarketplace.css';
-
-/* ── Extracted SVG Sub-components ── */
-const UsersIcon = () => (
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
-    <circle cx="9" cy="7" r="4" />
-    <path d="M22 21v-2a4 4 0 0 0-3-3.87" />
-    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
-  </svg>
-);
-
-const CloseIcon = () => (
-  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
 
 const ProjectsMarketplace = () => {
   const { user } = useContext(AuthContext);
@@ -35,28 +23,38 @@ const ProjectsMarketplace = () => {
   const [statusFeedback, setStatusFeedback] = useState(null);
   const [myApplications, setMyApplications] = useState([]);
 
-  useEffect(() => {
-    fetchMarketplaceData();
-  }, []);
-
-  const fetchMarketplaceData = async () => {
-    setLoading(true);
-    try {
-      const [fetchedProjects, fetchedRequests] = await Promise.all([
-        projectsApi.list().catch(() => []),
-        joinRequestsApi.list({ userId: user?.id }).catch(() => []),
-      ]);
-      setProjects(Array.isArray(fetchedProjects) ? fetchedProjects : []);
-      setMyApplications(Array.isArray(fetchedRequests) ? fetchedRequests : []);
-    } catch (err) {
-      console.error('Failed to load marketplace projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   const currentUserName = user?.name || user?.username || 'Collaborator';
   const currentUserId = user?.id || (typeof localStorage !== 'undefined' && localStorage.getItem('teamforge.backendUserId')) || '1';
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadMarketplaceData = async () => {
+      try {
+        const [fetchedProjects, fetchedRequests] = await Promise.all([
+          projectsApi.list().catch(() => []),
+          joinRequestsApi.list({ userId: user?.id }).catch(() => []),
+        ]);
+        if (isMounted) {
+          setProjects(Array.isArray(fetchedProjects) ? fetchedProjects : []);
+          setMyApplications(Array.isArray(fetchedRequests) ? fetchedRequests : []);
+        }
+      } catch (err) {
+        console.error('Failed to load marketplace projects:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadMarketplaceData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, refreshKey]);
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredProjects = projects.filter((p) => {
@@ -73,6 +71,24 @@ const ProjectsMarketplace = () => {
   const recommendedProjects = filteredProjects.slice(0, 2);
   const allProjects = searchQuery ? filteredProjects : filteredProjects.slice(2);
 
+  const hasAlreadyApplied = (projId) => {
+    return myApplications.some((a) => a.projectId === projId);
+  };
+
+  const getApplicationStatus = (projId) => {
+    const app = myApplications.find((a) => a.projectId === projId);
+    return app?.status || '';
+  };
+
+  const getRemovedRecord = (proj) => {
+    if (!proj || !Array.isArray(proj.removedUsers)) return null;
+    return proj.removedUsers.find(
+      (r) =>
+        String(r.userId) === String(currentUserId) ||
+        (currentUserName && r.userName && r.userName.toLowerCase() === currentUserName.toLowerCase())
+    );
+  };
+
   const handleCardClick = (project) => {
     const isOwner = project.owner === currentUserName || project.ownerId === currentUserId;
     if (isOwner) {
@@ -85,6 +101,18 @@ const ProjectsMarketplace = () => {
 
   const handleApply = async () => {
     if (!previewProject) return;
+    if (isProjectLocked(previewProject)) {
+      setStatusFeedback({ type: 'error', message: 'This project is completed and locked. Applications are closed.' });
+      return;
+    }
+    const removedRec = getRemovedRecord(previewProject);
+    if (removedRec) {
+      setStatusFeedback({
+        type: 'error',
+        message: `You were removed from this project with reason: "${removedRec.reason}". Re-applying is not permitted.`,
+      });
+      return;
+    }
     setSubmittingApply(true);
     setStatusFeedback(null);
     try {
@@ -97,7 +125,7 @@ const ProjectsMarketplace = () => {
         status: 'Pending',
       });
       setStatusFeedback({ type: 'success', message: 'Application submitted successfully!' });
-      fetchMarketplaceData();
+      setRefreshKey((k) => k + 1);
       setTimeout(() => {
         setPreviewProject(null);
         setApplyMessage('');
@@ -110,55 +138,6 @@ const ProjectsMarketplace = () => {
     }
   };
 
-  const renderProjectCard = (project) => {
-    const isOwned = project.owner === currentUserName || project.ownerId === currentUserId;
-    const skills = project.skills || project.requiredSkills || [];
-    const progress = Number(project.progress) || 0;
-    const collaboratorsCount = Array.isArray(project.collaborators)
-      ? project.collaborators.length
-      : Number(project.collaborators) || 0;
-
-    return (
-      <div
-        key={project.id}
-        className="tf-market-card"
-        onClick={() => handleCardClick(project)}
-      >
-        <div>
-          <h3 className="tf-market-card-title">{project.title || project.name}</h3>
-          <p className="tf-market-card-desc">{project.description || project.desc}</p>
-          {isOwned && <div className="tf-market-owner-badge">You own this project</div>}
-          <div className="tf-market-skills-wrap">
-            {skills.map((skill, idx) => (
-              <span key={idx} className="tf-market-skill-badge">
-                {skill}
-              </span>
-            ))}
-          </div>
-        </div>
-        <div className="tf-market-card-footer">
-          <div className="tf-market-progress-info">
-            <span>{progress}% complete</span>
-            <span className="tf-market-collaborators-count">
-              <UsersIcon />
-              {collaboratorsCount}
-            </span>
-          </div>
-          <div className="tf-market-progress-bar">
-            <div
-              className="tf-market-progress-fill"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
-        </div>
-      </div>
-    );
-  };
-
-  const hasAlreadyApplied = (projId) => {
-    return myApplications.some((a) => a.projectId === projId);
-  };
-
   return (
     <div className="tf-market-container">
       <div className="tf-market-header">
@@ -167,13 +146,11 @@ const ProjectsMarketplace = () => {
       </div>
 
       <div className="tf-market-search-wrapper">
-        <input
-          id="proj-search"
-          type="text"
-          className="tf-market-search-input"
-          placeholder="Search projects by title, owner, skill, or keyword"
+        <SearchBar
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
+          onClear={() => setSearchQuery('')}
+          placeholder="Search projects by title, owner, skill, or keyword..."
         />
       </div>
 
@@ -181,7 +158,20 @@ const ProjectsMarketplace = () => {
         <div id="proj-recommended" className="tf-market-section">
           <div className="tf-market-section-title">Recommended For You</div>
           <div id="proj-recommended-cards" className="tf-market-grid-2">
-            {recommendedProjects.map((p) => renderProjectCard(p))}
+            {recommendedProjects.map((p) => {
+              const removedRecord = getRemovedRecord(p);
+              return (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  variant="marketplace"
+                  onSelect={handleCardClick}
+                  onApply={handleCardClick}
+                  hasApplied={hasAlreadyApplied(p.id) || Boolean(removedRecord)}
+                  applicationStatus={removedRecord ? 'Removed' : getApplicationStatus(p.id)}
+                />
+              );
+            })}
           </div>
         </div>
       )}
@@ -194,36 +184,102 @@ const ProjectsMarketplace = () => {
           <p className="tf-market-empty-text">Loading projects...</p>
         ) : allProjects.length > 0 ? (
           <div id="proj-all-cards" className="tf-market-grid-3">
-            {allProjects.map((p) => renderProjectCard(p))}
+            {allProjects.map((p) => {
+              const removedRecord = getRemovedRecord(p);
+              return (
+                <ProjectCard
+                  key={p.id}
+                  project={p}
+                  variant="marketplace"
+                  onSelect={handleCardClick}
+                  onApply={handleCardClick}
+                  hasApplied={hasAlreadyApplied(p.id) || Boolean(removedRecord)}
+                  applicationStatus={removedRecord ? 'Removed' : getApplicationStatus(p.id)}
+                />
+              );
+            })}
           </div>
         ) : (
-          <p className="tf-market-empty-text">No projects match your search.</p>
+          <EmptyState
+            title="No projects match your search"
+            message="Try searching with different keywords, skill sets, or clear your query."
+            actionLabel={searchQuery ? 'Clear Search' : undefined}
+            onAction={() => setSearchQuery('')}
+          />
         )}
       </div>
 
       {/* Project Preview & Apply Modal */}
-      {previewProject && (
-        <div
-          className="tf-market-modal-overlay"
-          onClick={() => setPreviewProject(null)}
-        >
-          <div
-            className="tf-market-modal-box"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="tf-market-modal-header">
-              <h2 className="tf-market-modal-title">
-                {previewProject.title || previewProject.name}
-              </h2>
-              <button
-                type="button"
-                className="tf-market-modal-close-btn"
-                onClick={() => setPreviewProject(null)}
-              >
-                <CloseIcon />
-              </button>
-            </div>
-
+      <Modal
+        isOpen={Boolean(previewProject)}
+        title={previewProject?.title || previewProject?.name || 'Project Details'}
+        onClose={() => setPreviewProject(null)}
+        footer={(() => {
+          const removedRec = getRemovedRecord(previewProject);
+          if (isProjectLocked(previewProject)) {
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: '0.85rem', color: '#6b7280' }}>🔒 Project is completed and locked. Applications closed.</span>
+                <button
+                  type="button"
+                  className="tf-market-btn-outline"
+                  onClick={() => setPreviewProject(null)}
+                >
+                  Close
+                </button>
+              </div>
+            );
+          }
+          if (removedRec) {
+            return (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                <span style={{ fontSize: '0.85rem', color: '#be123c', fontWeight: 500 }}>
+                  ⚠️ Removed from project. Re-applying is not permitted.
+                </span>
+                <button
+                  type="button"
+                  className="tf-market-btn-outline"
+                  onClick={() => setPreviewProject(null)}
+                >
+                  Close
+                </button>
+              </div>
+            );
+          }
+          if (!hasAlreadyApplied(previewProject?.id)) {
+            return (
+              <>
+                <button
+                  type="button"
+                  className="tf-market-btn-outline"
+                  onClick={() => setPreviewProject(null)}
+                >
+                  Cancel
+                </button>
+                <button
+                  type="button"
+                  className="tf-market-btn-primary"
+                  disabled={submittingApply}
+                  onClick={handleApply}
+                >
+                  {submittingApply ? 'Applying...' : 'Apply to Project'}
+                </button>
+              </>
+            );
+          }
+          return (
+            <button
+              type="button"
+              className="tf-market-btn-outline"
+              onClick={() => setPreviewProject(null)}
+            >
+              Close
+            </button>
+          );
+        })()}
+      >
+        {previewProject && (
+          <div>
             <div className="tf-market-modal-meta">
               <span>Owner: <strong>{previewProject.owner || 'Community'}</strong></span>
               {previewProject.duration && <span>Duration: <strong>{previewProject.duration}</strong></span>}
@@ -240,6 +296,45 @@ const ProjectsMarketplace = () => {
               ))}
             </div>
 
+            {getRemovedRecord(previewProject) && (
+              <div
+                style={{
+                  marginTop: '1.25rem',
+                  padding: '12px 16px',
+                  borderRadius: '8px',
+                  backgroundColor: '#fff1f2',
+                  border: '1px solid #fecdd3',
+                  color: '#be123c',
+                }}
+              >
+                <div style={{ fontWeight: 600, fontSize: '0.95rem', marginBottom: '4px' }}>
+                  ⚠️ Removed from Project
+                </div>
+                <div style={{ fontSize: '0.875rem' }}>
+                  You were removed from this project by the owner.
+                  <br />
+                  <strong>Reason:</strong> &ldquo;{getRemovedRecord(previewProject).reason}&rdquo;
+                  <br />
+                  Re-applying to this project is not permitted.
+                </div>
+              </div>
+            )}
+
+            {!isProjectLocked(previewProject) && !getRemovedRecord(previewProject) && !hasAlreadyApplied(previewProject.id) && (
+              <div style={{ marginTop: '1.25rem' }}>
+                <FormInput
+                  label="Application Message"
+                  name="applyMessage"
+                  value={applyMessage}
+                  onChange={(e) => setApplyMessage(e.target.value)}
+                  placeholder="Tell the project owner why you would be a great fit..."
+                  multiline
+                  rows={3}
+                  helperText="Highlight your skills and what you want to learn or contribute."
+                />
+              </div>
+            )}
+
             {statusFeedback && (
               <div
                 className={`tf-market-alert ${
@@ -247,44 +342,14 @@ const ProjectsMarketplace = () => {
                     ? 'tf-market-alert-success'
                     : 'tf-market-alert-error'
                 }`}
+                style={{ marginTop: '1rem' }}
               >
                 {statusFeedback.message}
               </div>
             )}
-
-            {!hasAlreadyApplied(previewProject.id) ? (
-              <div className="tf-market-modal-actions">
-                <button
-                  type="button"
-                  className="tf-market-btn-outline"
-                  onClick={() => setPreviewProject(null)}
-                >
-                  Close
-                </button>
-                <button
-                  type="button"
-                  className="tf-market-btn-primary"
-                  disabled={submittingApply}
-                  onClick={handleApply}
-                >
-                  {submittingApply ? 'Applying...' : 'Apply to Project'}
-                </button>
-              </div>
-            ) : (
-              <div className="tf-market-modal-actions">
-                <span className="tf-market-owner-badge">Already applied</span>
-                <button
-                  type="button"
-                  className="tf-market-btn-outline"
-                  onClick={() => setPreviewProject(null)}
-                >
-                  Close
-                </button>
-              </div>
-            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 };
