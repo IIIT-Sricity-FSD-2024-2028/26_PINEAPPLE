@@ -47,58 +47,6 @@
   margin: 0.35rem 0 0 0;
 }
 
-/* Navigation quick-pills (transparent bar flush under navbar) */
-.settings-nav-pills {
-  display: flex;
-  gap: 0.5rem;
-  overflow-x: auto;
-  padding: 0.75rem 0.25rem;
-  margin-top: -2rem;
-  margin-bottom: 0.5rem;
-  scrollbar-width: none;
-  position: sticky;
-  top: -2rem;
-  z-index: 30;
-  background: transparent;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
-  border: none;
-  border-bottom: none;
-  box-shadow: none;
-}
-
-.settings-nav-pills::-webkit-scrollbar {
-  display: none;
-}
-
-.settings-nav-pill {
-  padding: 0.45rem 1rem;
-  border-radius: 9999px;
-  border: 1px solid var(--border, #e5e7eb);
-  background: var(--card, #ffffff);
-  color: var(--muted-fg, #6b7280);
-  font-size: 0.825rem;
-  font-weight: 600;
-  cursor: pointer;
-  white-space: nowrap;
-  transition: all 0.2s ease;
-  display: inline-flex;
-  align-items: center;
-  gap: 0.35rem;
-}
-
-.settings-nav-pill:hover {
-  background: var(--secondary, #f3f4f6);
-  color: var(--fg, #111827);
-  border-color: rgba(95, 81, 63, 0.2);
-}
-
-.settings-nav-pill.active {
-  background: var(--primary, #5f513f);
-  color: var(--primary-fg, #ffffff);
-  border-color: var(--primary, #5f513f);
-  box-shadow: 0 2px 8px rgba(95, 81, 63, 0.25);
-}
 
 /* Cards */
 .settings-card {
