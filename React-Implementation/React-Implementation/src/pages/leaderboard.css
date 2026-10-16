@@ -127,34 +127,6 @@
   text-align: right;
 }
 
-.leaderboard-search {
-  flex: 1 1 220px;
-  min-width: 0;
-}
-
-.leaderboard-search input {
-  box-sizing: border-box;
-  width: 100%;
-  min-width: 0;
-  height: 40px;
-  padding: 0 12px;
-  border: 1px solid var(--border);
-  border-radius: 6px;
-  outline: none;
-  background: var(--tf-glass-bg-2);
-  color: var(--fg);
-  font: inherit;
-  font-size: 0.86rem;
-}
-
-.leaderboard-search input::placeholder {
-  color: var(--muted-fg);
-}
-
-.leaderboard-search input:focus-visible {
-  border-color: var(--accent);
-  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 18%, transparent);
-}
 
 .leaderboard-visually-hidden {
   position: absolute;
@@ -234,6 +206,25 @@
   color: var(--muted-fg);
   font-family: var(--tf-font-brand);
   font-weight: 700;
+}
+
+.leaderboard-rank-num {
+  font-family: var(--tf-font-brand);
+  font-weight: 700;
+  color: var(--muted-fg);
+}
+
+.leaderboard-medal {
+  font-size: 1.15rem;
+  line-height: 1;
+}
+
+.tf-datatable tbody tr.is-current-user {
+  background: color-mix(in srgb, var(--accent, #6366f1) 12%, transparent) !important;
+}
+
+.tf-datatable tbody tr.is-current-user td {
+  border-color: color-mix(in srgb, var(--accent, #6366f1) 28%, var(--border, #e5e7eb));
 }
 
 .leaderboard-person {
@@ -342,10 +333,6 @@
 
   .leaderboard-controls {
     width: 100%;
-  }
-
-  .leaderboard-search {
-    flex-basis: 100%;
   }
 
   .leaderboard-period {
