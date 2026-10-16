@@ -1,32 +1,24 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import projectsApi from '../../services/projectsApi';
+import projectsApi, { isProjectLocked } from '../../services/projectsApi';
 import tasksApi from '../../services/tasksApi';
 import communicationApi from '../../services/communicationApi';
-import uploadsApi from '../../services/uploadsApi';
+import TaskCard from '../../components/features/TaskCard';
+import ChatBox from '../../components/features/ChatBox';
+import Modal from '../../components/common/Modal';
+import FormInput from '../../components/common/FormInput';
+import EmptyState from '../../components/common/EmptyState';
+import Avatar from '../../components/common/Avatar';
+import ProgressBar from '../../components/common/ProgressBar';
+import FilterTabs from '../../components/common/FilterTabs';
+import { calculateProjectProgress } from '../../utils/progress';
 import './collaboratorWorkspace.css';
 
-/* ── Extracted SVG Sub-components ── */
 const BackArrowIcon = () => (
   <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
     <path d="M8.00065 12.6668L3.33398 8.00016L8.00065 3.3335" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M12.6673 8H3.33398" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
-
-const UploadCloudIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-    <polyline points="17 8 12 3 7 8" />
-    <line x1="12" y1="3" x2="12" y2="15" />
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 
@@ -43,55 +35,78 @@ const CollaboratorWorkspace = () => {
 
   // Proof submission modal state
   const [proofTask, setProofTask] = useState(null);
-  const [selectedProofFile, setSelectedProofFile] = useState(null);
+  const [proofUrlInput, setProofUrlInput] = useState('');
   const [proofNotes, setProofNotes] = useState('');
   const [submittingProof, setSubmittingProof] = useState(false);
   const [feedback, setFeedback] = useState(null);
-
-  // Chat input state
-  const [chatInput, setChatInput] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
-  const messagesEndRef = useRef(null);
+
+  // Leave project modal state
+  const [leaveModalOpen, setLeaveModalOpen] = useState(false);
+  const [leaving, setLeaving] = useState(false);
+  const [leaveError, setLeaveError] = useState('');
 
   useEffect(() => {
-    if (projectId) {
-      loadWorkspace();
-    }
+    let isMounted = true;
+    if (!projectId) return;
+
+    const fetchWorkspace = async () => {
+      try {
+        const [projData, tasksData, msgsData] = await Promise.all([
+          projectsApi.get(projectId).catch(() => null),
+          tasksApi.list({ projectId }).catch(() => []),
+          communicationApi.getMessages(projectId).catch(() => []),
+        ]);
+        if (isMounted) {
+          setProject(projData);
+          setTasks(Array.isArray(tasksData) ? tasksData : []);
+          setMessages(Array.isArray(msgsData) ? msgsData : []);
+        }
+      } catch (err) {
+        console.error('Failed to load project workspace:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchWorkspace();
+
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
 
+  // Real-time chat polling (polls every 3 seconds while on chat tab)
   useEffect(() => {
-    if (activeTab === 'chat') {
-      scrollToBottom();
-    }
-  }, [messages, activeTab]);
+    if (!projectId || activeTab !== 'chat') return;
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await communicationApi.getMessages(projectId);
+        if (isMounted && Array.isArray(fresh)) {
+          setMessages(fresh);
+        }
+      } catch {
+        /* non-critical background poll */
+      }
+    }, 3000);
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [projectId, activeTab]);
 
-  const loadWorkspace = async () => {
-    setLoading(true);
-    try {
-      const [projData, tasksData, msgsData] = await Promise.all([
-        projectsApi.get(projectId).catch(() => null),
-        tasksApi.list({ projectId }).catch(() => []),
-        communicationApi.getMessages(projectId).catch(() => []),
-      ]);
-      setProject(projData);
-      setTasks(Array.isArray(tasksData) ? tasksData : []);
-      setMessages(Array.isArray(msgsData) ? msgsData : []);
-    } catch (err) {
-      console.error('Failed to load project workspace:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const isLocked = isProjectLocked(project);
 
   const handleStartTask = async (taskId) => {
+    if (isLocked) return;
     try {
-      await tasksApi.updateStatus(taskId, { status: 'In Progress' });
+      const updated = await tasksApi.updateStatus(taskId, { status: 'In Progress' });
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: 'In Progress' } : t))
+        prev.map((t) => (t.id === taskId ? { ...t, ...(updated || {}), status: 'In Progress' } : t))
       );
     } catch (err) {
       console.error('Failed to update task status:', err);
@@ -100,34 +115,50 @@ const CollaboratorWorkspace = () => {
 
   const handleSubmitProof = async (e) => {
     e.preventDefault();
-    if (!proofTask) return;
+    if (isLocked || !proofTask) return;
     setSubmittingProof(true);
     setFeedback(null);
 
     try {
-      let fileUrl = '';
-      if (selectedProofFile) {
-        const uploadRes = await uploadsApi.uploadTaskProof(selectedProofFile);
-        fileUrl = uploadRes?.url || '';
+      const finalUrl = proofUrlInput.trim();
+
+      if (!finalUrl) {
+        setFeedback({ type: 'error', message: 'Please provide a valid proof URL (e.g., GitHub pull request, Figma, or demo).' });
+        setSubmittingProof(false);
+        return;
       }
 
-      // Update task to completed with optional submission details
-      await tasksApi.updateStatus(proofTask.id, {
-        status: 'Completed',
-        proofUrl: fileUrl,
+      // Validate URL format
+      try {
+        const parsed = new URL(finalUrl);
+        if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
+          throw new Error();
+        }
+      } catch {
+        setFeedback({ type: 'error', message: 'Please enter a valid URL starting with http:// or https://' });
+        setSubmittingProof(false);
+        return;
+      }
+
+      const updated = await tasksApi.updateStatus(proofTask.id, {
+        status: 'In Review',
+        proofUrl: finalUrl,
+        proofLink: finalUrl,
         notes: proofNotes,
       });
 
       setTasks((prev) =>
         prev.map((t) =>
-          t.id === proofTask.id ? { ...t, status: 'Completed', proofUrl: fileUrl } : t
+          t.id === proofTask.id
+            ? { ...t, ...(updated || {}), status: 'In Review', proofUrl: finalUrl, proofLink: finalUrl, notes: proofNotes }
+            : t
         )
       );
 
-      setFeedback({ type: 'success', message: 'Proof submitted! Task marked Completed.' });
+      setFeedback({ type: 'success', message: 'Proof submitted! Task is now In Review.' });
       setTimeout(() => {
         setProofTask(null);
-        setSelectedProofFile(null);
+        setProofUrlInput('');
         setProofNotes('');
         setFeedback(null);
       }, 1400);
@@ -138,30 +169,42 @@ const CollaboratorWorkspace = () => {
     }
   };
 
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim() || sendingMsg) return;
+  const handleSendMessage = async (text) => {
     setSendingMsg(true);
-
     try {
       const newMsg = await communicationApi.sendMessage({
         projectId,
-        text: chatInput.trim(),
+        text,
         senderName: user?.name || 'Collaborator',
-      });
+      }, 'Collaborator', user?.id);
 
-      setMessages((prev) => [...prev, newMsg || {
-        id: Date.now().toString(),
-        text: chatInput.trim(),
-        senderName: user?.name || 'You',
-        senderId: user?.id,
-        createdAt: new Date().toISOString(),
-      }]);
-      setChatInput('');
+      if (newMsg) {
+        setMessages((prev) => [...prev, newMsg]);
+      }
+
+      const fresh = await communicationApi.getMessages(projectId);
+      if (Array.isArray(fresh)) {
+        setMessages(fresh);
+      }
     } catch (err) {
       console.error('Failed to send message:', err);
     } finally {
       setSendingMsg(false);
+    }
+  };
+
+  const handleLeaveProject = async () => {
+    if (isLocked || isOwner) return;
+    setLeaving(true);
+    setLeaveError('');
+    try {
+      await projectsApi.leave(projectId, 'Collaborator', user?.id);
+      navigate('/my-work');
+    } catch (err) {
+      console.error('Failed to leave project:', err);
+      setLeaveError(err.message || 'Failed to leave project.');
+    } finally {
+      setLeaving(false);
     }
   };
 
@@ -193,19 +236,35 @@ const CollaboratorWorkspace = () => {
     );
   }
 
-  const progress = Number(project.progress) || 0;
+  const progress = calculateProjectProgress(tasks);
   const isOwner = project.owner === user?.name || project.ownerId === user?.id;
   const members = Array.isArray(project.collaborators) ? project.collaborators : [];
 
   return (
     <div className="tf-collab-ws-container">
-      <button
-        type="button"
-        className="tf-collab-ws-back-btn"
-        onClick={() => navigate('/my-work')}
-      >
-        <BackArrowIcon /> Back
-      </button>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+        <button
+          type="button"
+          className="tf-collab-ws-back-btn"
+          style={{ marginBottom: 0 }}
+          onClick={() => navigate('/my-work')}
+        >
+          <BackArrowIcon /> Back
+        </button>
+        {!isLocked && !isOwner && (
+          <button
+            type="button"
+            className="tf-collab-ws-back-btn"
+            style={{ marginBottom: 0, color: '#e11d48', borderColor: '#fecdd3' }}
+            onClick={() => {
+              setLeaveModalOpen(true);
+              setLeaveError('');
+            }}
+          >
+            Leave Project
+          </button>
+        )}
+      </div>
 
       {/* Main Workspace Card */}
       <div className="tf-collab-ws-card">
@@ -216,6 +275,11 @@ const CollaboratorWorkspace = () => {
               <span className="tf-collab-ws-role-badge">
                 {isOwner ? 'Project Owner' : 'Collaborator'}
               </span>
+              {isLocked && (
+                <span className="tf-collab-ws-role-badge" style={{ backgroundColor: '#e2e8f0', color: '#475569' }}>
+                  🔒 Locked / Completed
+                </span>
+              )}
             </div>
             <p className="tf-collab-ws-desc">{project.description || project.desc}</p>
             <div className="tf-collab-ws-meta">
@@ -229,50 +293,22 @@ const CollaboratorWorkspace = () => {
           </div>
 
           <div className="tf-collab-ws-progress-box">
-            <div className="tf-collab-ws-progress-info">
-              <span>Progress</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="tf-collab-ws-progress-bar">
-              <div
-                className="tf-collab-ws-progress-fill"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
+            <ProgressBar value={progress} size="md" />
           </div>
         </div>
 
         {/* Workspace Tabs */}
-        <div className="tf-collab-ws-tabs">
-          <button
-            type="button"
-            className={`tf-collab-ws-tab-btn ${activeTab === 'overview' ? 'active' : ''}`}
-            onClick={() => setActiveTab('overview')}
-          >
-            Overview
-          </button>
-          <button
-            type="button"
-            className={`tf-collab-ws-tab-btn ${activeTab === 'tasks' ? 'active' : ''}`}
-            onClick={() => setActiveTab('tasks')}
-          >
-            Tasks ({tasks.length})
-          </button>
-          <button
-            type="button"
-            className={`tf-collab-ws-tab-btn ${activeTab === 'members' ? 'active' : ''}`}
-            onClick={() => setActiveTab('members')}
-          >
-            Members ({members.length + 1})
-          </button>
-          <button
-            type="button"
-            className={`tf-collab-ws-tab-btn ${activeTab === 'chat' ? 'active' : ''}`}
-            onClick={() => setActiveTab('chat')}
-          >
-            Chat
-          </button>
-        </div>
+        <FilterTabs
+          className="mb-4"
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'tasks', label: 'Tasks', count: tasks.length },
+            { id: 'members', label: 'Members', count: members.length + 1 },
+            { id: 'chat', label: 'Chat' },
+          ]}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+        />
 
         {/* Tab 1: Overview */}
         {activeTab === 'overview' && (
@@ -290,56 +326,39 @@ const CollaboratorWorkspace = () => {
             <div className="tf-collab-ws-meta">
               <p>Mentor: <strong>{project.mentor || 'None assigned yet'}</strong></p>
               <p>Duration: <strong>{project.duration || 'Flexible'}</strong></p>
+              {(project.finishedLink || project.finalLink) && (
+                <p>
+                  Published Link:{' '}
+                  <a href={project.finishedLink || project.finalLink} target="_blank" rel="noopener noreferrer">
+                    {project.finishedLink || project.finalLink}
+                  </a>
+                </p>
+              )}
             </div>
           </div>
         )}
 
-        {/* Tab 2: Tasks */}
+        {/* Tab 2: Tasks (Rendered via TaskCard) */}
         {activeTab === 'tasks' && (
           <div className="tf-collab-ws-tasks-list">
             {tasks.length > 0 ? (
-              tasks.map((task) => {
-                const isMyTask = task.assigneeId === user?.id || task.assignee === user?.name;
-                return (
-                  <div key={task.id} className="tf-collab-ws-task-card">
-                    <div className="tf-collab-ws-task-left">
-                      <h4 className="tf-collab-ws-task-title">{task.title}</h4>
-                      <p className="tf-collab-ws-task-desc">{task.description}</p>
-                      <div className="tf-collab-ws-task-meta">
-                        <span className="tf-collab-ws-xp-badge">+{task.xpReward || 50} XP</span>
-                        <span>Assignee: <strong>{task.assignee || 'Unassigned'}</strong></span>
-                        <span>Status: <strong>{task.status || 'To Do'}</strong></span>
-                      </div>
-                    </div>
-
-                    <div className="tf-collab-ws-task-right">
-                      {isMyTask && task.status === 'To Do' && (
-                        <button
-                          type="button"
-                          className="tf-collab-ws-btn-primary"
-                          onClick={() => handleStartTask(task.id)}
-                        >
-                          Start Task
-                        </button>
-                      )}
-                      {isMyTask && task.status === 'In Progress' && (
-                        <button
-                          type="button"
-                          className="tf-collab-ws-btn-primary"
-                          onClick={() => setProofTask(task)}
-                        >
-                          <UploadCloudIcon /> Submit Proof
-                        </button>
-                      )}
-                      {task.status === 'Completed' && (
-                        <span className="tf-collab-ws-role-badge">Completed ✓</span>
-                      )}
-                    </div>
-                  </div>
-                );
-              })
+              tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  userRole="Collaborator"
+                  isLocked={isLocked}
+                  currentUserId={user?.id}
+                  currentUserName={user?.name}
+                  onStart={handleStartTask}
+                  onSubmitProof={(t) => setProofTask(t)}
+                />
+              ))
             ) : (
-              <p className="tf-collab-ws-desc">No tasks available for this project yet.</p>
+              <EmptyState
+                title="No tasks assigned yet"
+                message="Your project owner hasn't published tasks for this workspace yet."
+              />
             )}
           </div>
         )}
@@ -348,9 +367,7 @@ const CollaboratorWorkspace = () => {
         {activeTab === 'members' && (
           <div className="tf-collab-ws-members-grid">
             <div className="tf-collab-ws-member-card">
-              <div className="tf-collab-ws-avatar">
-                {(project.owner || 'O').slice(0, 2).toUpperCase()}
-              </div>
+              <Avatar name={project.owner || 'Project Owner'} size="md" />
               <div className="tf-collab-ws-member-info">
                 <h4>{project.owner || 'Project Owner'}</h4>
                 <p>Project Lead</p>
@@ -362,9 +379,7 @@ const CollaboratorWorkspace = () => {
               const role = typeof member === 'object' && member.role ? member.role : 'Collaborator';
               return (
                 <div key={i} className="tf-collab-ws-member-card">
-                  <div className="tf-collab-ws-avatar">
-                    {name.slice(0, 2).toUpperCase()}
-                  </div>
+                  <Avatar name={name} size="md" />
                   <div className="tf-collab-ws-member-info">
                     <h4>{name}</h4>
                     <p>{role}</p>
@@ -375,119 +390,131 @@ const CollaboratorWorkspace = () => {
           </div>
         )}
 
-        {/* Tab 4: Chat */}
+        {/* Tab 4: Chat (Rendered via reusable ChatBox) */}
         {activeTab === 'chat' && (
-          <div className="tf-collab-ws-chat-container">
-            <div className="tf-collab-ws-messages-feed">
-              {messages.length > 0 ? (
-                messages.map((msg, index) => {
-                  const isMe = msg.senderId === user?.id || msg.senderName === user?.name;
-                  return (
-                    <div
-                      key={msg.id || index}
-                      className={`tf-collab-ws-msg-bubble ${
-                        isMe ? 'tf-collab-ws-msg-me' : 'tf-collab-ws-msg-other'
-                      }`}
-                    >
-                      <div className="tf-collab-ws-msg-author">
-                        {isMe ? 'You' : msg.senderName || 'Team Member'}
-                      </div>
-                      <div>{msg.text || msg.message}</div>
-                    </div>
-                  );
-                })
-              ) : (
-                <p className="tf-collab-ws-desc">No messages yet. Start the conversation!</p>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
-
-            <form onSubmit={handleSendMessage} className="tf-collab-ws-chat-input-bar">
-              <input
-                type="text"
-                className="tf-collab-ws-chat-input"
-                placeholder="Type a message to the team..."
-                value={chatInput}
-                onChange={(e) => setChatInput(e.target.value)}
-              />
-              <button
-                type="submit"
-                className="tf-collab-ws-btn-primary"
-                disabled={sendingMsg || !chatInput.trim()}
-              >
-                <SendIcon />
-              </button>
-            </form>
-          </div>
+          <ChatBox
+            messages={messages}
+            currentUserId={user?.id}
+            currentUserName={user?.name}
+            currentUserRole="Collaborator"
+            onSendMessage={handleSendMessage}
+            onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
+            sending={sendingMsg}
+          />
         )}
       </div>
 
       {/* Task Proof Submission Modal */}
-      {proofTask && (
-        <div
-          id="modal-task-proof"
-          className="tf-collab-ws-modal-overlay"
-          onClick={() => setProofTask(null)}
-        >
-          <div
-            className="tf-collab-ws-modal-box"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h3>Submit Task Proof</h3>
+      <Modal
+        isOpen={Boolean(proofTask)}
+        title="Submit Task Proof"
+        onClose={() => setProofTask(null)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="tf-collab-ws-btn-outline"
+              onClick={() => setProofTask(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="tf-collab-ws-btn-primary"
+              disabled={submittingProof}
+              onClick={handleSubmitProof}
+            >
+              {submittingProof ? 'Submitting...' : 'Submit for Review'}
+            </button>
+          </>
+        }
+      >
+        {proofTask && (
+          <div>
             <p className="tf-collab-ws-desc">
-              Upload evidence for <strong>{proofTask.title}</strong> to mark it complete.
+              Provide live URL or repository link for <strong>{proofTask.title}</strong> for owner review.
             </p>
 
-            <form onSubmit={handleSubmitProof}>
-              <div className="tf-collab-ws-form-group">
-                <label className="tf-collab-ws-form-label">
-                  Proof File (Image, PDF, ZIP — max 5MB)
-                </label>
-                <input
-                  type="file"
-                  className="tf-collab-ws-file-input"
-                  accept="image/*,application/pdf,.zip"
-                  onChange={(e) => setSelectedProofFile(e.target.files[0])}
-                />
-              </div>
+            <FormInput
+              label="Proof URL (Pull Request, Live Demo, Figma, etc.)"
+              name="proofUrl"
+              value={proofUrlInput}
+              onChange={(e) => setProofUrlInput(e.target.value)}
+              placeholder="https://github.com/... or https://..."
+            />
 
-              <div className="tf-collab-ws-form-group">
-                <label className="tf-collab-ws-form-label">
-                  PR Link or Live Demo URL (optional)
-                </label>
-                <input
-                  type="text"
-                  className="tf-collab-ws-chat-input"
-                  placeholder="https://github.com/... or https://demo.com"
-                  value={proofNotes}
-                  onChange={(e) => setProofNotes(e.target.value)}
-                />
-              </div>
+            <FormInput
+              label="Submission Notes (Optional)"
+              name="proofNotes"
+              value={proofNotes}
+              onChange={(e) => setProofNotes(e.target.value)}
+              placeholder="Provide context, pull request link, or notes for the owner..."
+              multiline
+              rows={3}
+            />
 
-              {feedback && (
-                <p className="tf-collab-ws-meta">{feedback.message}</p>
-              )}
-
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', marginTop: '20px' }}>
-                <button
-                  type="button"
-                  className="tf-collab-ws-btn-outline"
-                  onClick={() => setProofTask(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="tf-collab-ws-btn-primary"
-                  disabled={submittingProof}
-                >
-                  {submittingProof ? 'Uploading...' : 'Submit & Complete'}
-                </button>
+            {feedback && (
+              <div
+                className={`tf-collab-ws-feedback ${
+                  feedback.type === 'success'
+                    ? 'tf-collab-ws-feedback-success'
+                    : 'tf-collab-ws-feedback-error'
+                }`}
+              >
+                {feedback.message}
               </div>
-            </form>
+            )}
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
+
+      {/* Modal: Leave Project */}
+      <Modal
+        isOpen={leaveModalOpen}
+        title="Leave Project"
+        onClose={() => {
+          if (!leaving) {
+            setLeaveModalOpen(false);
+            setLeaveError('');
+          }
+        }}
+        footer={
+          <>
+            <button
+              type="button"
+              className="tf-collab-ws-btn-outline"
+              disabled={leaving}
+              onClick={() => {
+                setLeaveModalOpen(false);
+                setLeaveError('');
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="tf-collab-ws-btn-primary"
+              style={{ backgroundColor: '#e11d48', borderColor: '#e11d48' }}
+              disabled={leaving}
+              onClick={handleLeaveProject}
+            >
+              {leaving ? 'Leaving...' : 'Confirm Leave'}
+            </button>
+          </>
+        }
+      >
+        <p className="tf-collab-ws-desc" style={{ marginBottom: '16px' }}>
+          Are you sure you want to leave <strong>{project.title || project.name}</strong>?
+        </p>
+        <p style={{ color: '#64748b', fontSize: '0.875rem', lineHeight: '1.4' }}>
+          Any unapproved tasks assigned to you will be reset to <strong>Unassigned</strong> and <strong>Open</strong> so other contributors can pick them up. Tasks you already completed and their awarded XP/reputation will remain on your profile.
+        </p>
+        {leaveError && (
+          <div style={{ marginTop: '12px', padding: '10px 14px', borderRadius: '6px', backgroundColor: '#fff1f2', color: '#be123c', border: '1px solid #fecdd3', fontSize: '0.9rem' }}>
+            {leaveError}
+          </div>
+        )}
+      </Modal>
     </div>
   );
 };
