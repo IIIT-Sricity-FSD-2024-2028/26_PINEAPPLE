@@ -20,34 +20,34 @@ export const mentorMarketplaceApi = {
       role: role || getCurrentUserRole(),
       userId: getCurrentUserId(),
     }),
-  myProfile: (role) =>
+  myProfile: (role, userId) =>
     apiRequest("/mentor-marketplace/mentors/me", "GET", null, {
       role: role || getCurrentUserRole(),
-      userId: getCurrentUserId(),
+      userId: userId || getCurrentUserId(),
     }),
-  confirmMentorRole: (role) =>
+  confirmMentorRole: (role, userId) =>
     apiRequest(
       "/mentor-marketplace/mentors/confirm-role",
       "PATCH",
       {},
-      { role: role || getCurrentUserRole(), userId: getCurrentUserId() },
+      { role: role || getCurrentUserRole(), userId: userId || getCurrentUserId() },
     ),
-  createProfile: (payload, role) =>
+  createProfile: (payload, role, userId) =>
     apiRequest("/mentor-marketplace/mentors/profile", "POST", payload, {
       role: role || getCurrentUserRole(),
-      userId: getCurrentUserId(),
+      userId: userId || getCurrentUserId(),
     }),
-  updateProfile: (payload, role) =>
+  updateProfile: (payload, role, userId) =>
     apiRequest("/mentor-marketplace/mentors/profile", "PATCH", payload, {
       role: role || getCurrentUserRole(),
-      userId: getCurrentUserId(),
+      userId: userId || getCurrentUserId(),
     }),
-  updateAvailability: (isAvailable, role) =>
+  updateAvailability: (isAvailable, role, userId) =>
     apiRequest(
       "/mentor-marketplace/mentors/availability",
       "PATCH",
       { isAvailable },
-      { role: role || getCurrentUserRole(), userId: getCurrentUserId() },
+      { role: role || getCurrentUserRole(), userId: userId || getCurrentUserId() },
     ),
 
   // Sessionsx
@@ -111,6 +111,13 @@ export const mentorMarketplaceApi = {
       {},
       { role: role || getCurrentUserRole(), userId: getCurrentUserId() },
     ),
+  retryPayout: (id, role) =>
+    apiRequest(
+      `/mentor-marketplace/sessions/${id}/retry-payout`,
+      "POST",
+      {},
+      { role: role || getCurrentUserRole(), userId: getCurrentUserId() },
+    ),
   submitReview: (sessionId, payload, role) =>
     apiRequest(
       `/mentor-marketplace/sessions/${sessionId}/review`,
@@ -121,4 +128,21 @@ export const mentorMarketplaceApi = {
 };
 
 export const mentorMarketApi = mentorMarketplaceApi;
+
+export function calculateEscrowBreakdown(sessionPrice) {
+  const price = Math.round(Number(sessionPrice) || 0);
+  const platformFee = Math.round(price * 0.15);
+  const gatewayFee = Math.round(price * 0.02);
+  const totalAmount = price + platformFee + gatewayFee;
+  const mentorPayout = price;
+  return {
+    price,
+    platformFee,
+    gatewayFee,
+    totalFees: platformFee + gatewayFee,
+    totalAmount,
+    mentorPayout,
+  };
+}
+
 export default mentorMarketplaceApi;
