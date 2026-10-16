@@ -18,30 +18,19 @@ import { AuditService } from '../audit/audit.service';
 import { normalizeRole } from '../core/guards/roles.guard';
 import { PlatformConfigService } from '../platform-config/platform-config.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { TASK_REWARDS, getTaskReward } from './tasks.constants';
 
 /**
- * Single canonical XP & Reputation calculation function reading Platform Config:
- * Low: 0.5x, Medium: 1x, High: 2x standard XP; Rep +8
+ * Single canonical XP & Reputation calculation function:
+ * High: 40 XP / +8 Rep, Medium: 20 XP / +8 Rep, Low: 10 XP / +8 Rep
  */
 export function calculateTaskXp(
   priority?: string,
-  standardXp = 50,
+  _standardXp?: number,
 ): { xp: number; rep: number } {
-  const p = (priority || '').trim().toLowerCase();
-  let multiplier = 1.0;
-  if (p === 'high' || p === 'advanced') {
-    multiplier = 2.0;
-  } else if (p === 'low' || p === 'beginner') {
-    multiplier = 0.5;
-  } else {
-    // Medium, intermediate, or unspecified
-    multiplier = 1.0;
-  }
-  return {
-    xp: Math.round(multiplier * standardXp),
-    rep: 8,
-  };
+  return getTaskReward(priority);
 }
+
 
 /**
  * Aliases accepted by the API so both the current
@@ -91,7 +80,6 @@ export class TasksService implements OnApplicationBootstrap {
   recalculateUserStats(userId?: string): void {
     const users = userId ? [this.usersService.findById(userId)] : this.usersService.findAll();
     const allTasks = this.tasksRepository.findAll();
-    const standardXp = this.platformConfigService.getConfig().xpPerTaskCompletion || 50;
 
     for (const user of users) {
       if (!user) continue;
@@ -111,7 +99,8 @@ export class TasksService implements OnApplicationBootstrap {
       let totalTaskXp = 0;
       let totalTaskRep = 0;
       userApprovedTasks.forEach((t) => {
-        const { xp, rep } = calculateTaskXp(t.priority || t.difficulty, standardXp);
+        const { xp, rep } = calculateTaskXp(t.priority || t.difficulty);
+        t.xpReward = xp;
         totalTaskXp += xp;
         totalTaskRep += rep;
         if (!t.xpAwarded) {
@@ -121,11 +110,17 @@ export class TasksService implements OnApplicationBootstrap {
         }
       });
 
-      const currentProfileXp = Number(user.profile?.xp || 0);
-      const finalXp = userApprovedTasks.length > 0 && currentProfileXp === 0 ? totalTaskXp : Math.max(currentProfileXp, totalTaskXp);
-      const currentProfileRep = Number(user.profile?.rep || 0);
-      const finalRep = userApprovedTasks.length > 0 && currentProfileRep === 0 ? totalTaskRep : Math.max(currentProfileRep, totalTaskRep);
-      const finalTasksCount = Math.max(Number(user.profile?.tasksCount || 0), userApprovedTasks.length);
+      // Recalculate accurately: if a user has approved tasks, their stats must strictly match the approved tasks sum.
+      // If a user has no approved tasks, retain their base/seed profile values.
+      let finalXp = totalTaskXp;
+      let finalRep = totalTaskRep;
+      let finalTasksCount = userApprovedTasks.length;
+
+      if (userApprovedTasks.length === 0) {
+        finalXp = Number(user.profile?.xp || 0);
+        finalRep = Number(user.profile?.rep || 0);
+        finalTasksCount = Number(user.profile?.tasksCount || 0);
+      }
 
       this.usersService.update(user.id, {
         profile: {
@@ -347,8 +342,10 @@ export class TasksService implements OnApplicationBootstrap {
       if (user) assigneeId = String(user.id);
     }
 
+    const taskReward = calculateTaskXp(createTaskDto.priority || createTaskDto.difficulty);
     const created = this.tasksRepository.create({
       ...createTaskDto,
+      xpReward: taskReward.xp,
       assigneeId: assigneeId || undefined,
       assigneeName: assigneeName || 'Unassigned',
       assignee: assigneeName || 'Unassigned',
@@ -525,14 +522,15 @@ export class TasksService implements OnApplicationBootstrap {
         .trim()
         .toLowerCase();
 
-      const standardXp = this.platformConfigService.getConfig().xpPerTaskCompletion || 50;
-      const { xp: xpReward, rep: repReward } = calculateTaskXp(priorityRaw, standardXp);
+      const { xp: xpReward, rep: repReward } = calculateTaskXp(priorityRaw);
 
       // Idempotency: Mark as awarded immediately on both task instance and repository
+      updatedTask.xpReward = xpReward;
       updatedTask.xpAwarded = true;
       updatedTask.awardedXp = xpReward;
       updatedTask.awardedRep = repReward;
       this.tasksRepository.update(id, {
+        xpReward,
         xpAwarded: true,
         awardedXp: xpReward,
         awardedRep: repReward,

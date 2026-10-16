@@ -134,9 +134,46 @@ export class ProjectsService {
     }
     project.owner = ownerName;
 
+    // Resolve mentor if not directly set
+    if (!project.mentorId || !project.mentor) {
+      try {
+        const sessions = this.mentorMarketplaceService.getSessionsByProject(project.id);
+        const activeSession = sessions?.find((s) => {
+          const st = String(s.status || '').toLowerCase();
+          return st === 'active' || st === 'completed' || st === 'in_progress' || st === 'accepted';
+        });
+        if (activeSession) {
+          project.mentorId = project.mentorId || activeSession.mentorId;
+          if (!project.mentor) {
+            try {
+              const mentorInfo = this.mentorMarketplaceService.getMentor(activeSession.mentorId);
+              if (mentorInfo?.profile?.name) {
+                project.mentor = mentorInfo.profile.name;
+              } else {
+                const u = this.usersService.findUserSafe(activeSession.mentorId);
+                if (u) project.mentor = u.name;
+              }
+            } catch {
+              const u = this.usersService.findUserSafe(activeSession.mentorId);
+              if (u) project.mentor = u.name;
+            }
+          }
+        }
+      } catch {
+        /* non-critical */
+      }
+    }
+
+    const mentorName = typeof project.mentor === 'object' && project.mentor !== null
+      ? (project.mentor.name || project.mentor.title || 'Mentor')
+      : (project.mentor || (project.mentorId ? 'Mentor' : ''));
+    if (mentorName && typeof project.mentor !== 'string') {
+      project.mentor = mentorName;
+    }
+
     project.members = [
       {
-        id: project.ownerId || '1',
+        id: String(project.ownerId || '1'),
         name: ownerName,
         role: 'Owner' as any,
         initials: this.getInitials(ownerName),
@@ -146,44 +183,42 @@ export class ProjectsService {
           return {
             id: c,
             name: c,
-            role: 'Contributor' as any,
+            role: 'Collaborator' as any,
             initials: this.getInitials(c),
           };
         }
         return {
-          id: c.id || c.userId || 'collab',
+          id: String(c.id || c.userId || 'collab'),
           name: c.name || 'Collaborator',
-          role: (c.role || 'Contributor') as any,
+          role: 'Collaborator' as any,
           initials: this.getInitials(c.name || 'Collaborator'),
         };
       }),
     ];
 
-    // 4d: Admin Project details page ("Team Members") show owner, collaborators and the mentor with a role badge
-    if (project.mentor) {
-      const mentorName = typeof project.mentor === 'object' ? (project.mentor.name || 'Mentor') : String(project.mentor);
-      const mentorId = typeof project.mentor === 'object' ? (project.mentor.id || project.mentor.userId || 'mentor') : (project.mentorId || 'mentor');
-      project.members.push({
-        id: mentorId,
-        name: mentorName,
-        role: 'Mentor' as any,
-        initials: this.getInitials(mentorName),
-      });
-    } else if (project.mentorId) {
-      let mentorName = 'Mentor';
-      try {
-        const u = this.usersService.findUserSafe(project.mentorId);
-        if (u) mentorName = u.name;
-      } catch {
-        /* ignore */
+    if (project.mentorId || (mentorName && mentorName !== 'None assigned yet')) {
+      let resolvedMentorName = mentorName;
+      if (!resolvedMentorName || resolvedMentorName === 'Mentor') {
+        try {
+          const u = this.usersService.findUserSafe(project.mentorId!);
+          if (u) resolvedMentorName = u.name;
+        } catch {
+          /* ignore */
+        }
       }
+      resolvedMentorName = resolvedMentorName || 'Mentor';
+      project.mentor = resolvedMentorName;
+
+      const mId = String(project.mentorId || (typeof project.mentor === 'object' ? (project.mentor.id || project.mentor.userId) : '') || 'mentor');
       project.members.push({
-        id: project.mentorId,
-        name: mentorName,
+        id: mId,
+        name: resolvedMentorName,
         role: 'Mentor' as any,
-        initials: this.getInitials(mentorName),
+        initials: this.getInitials(resolvedMentorName),
       });
     }
+
+    (project as any).memberCount = project.members.length;
 
     if (project.finalLink && !project.finalProjectUrl) {
       project.finalProjectUrl = project.finalLink;

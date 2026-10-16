@@ -232,9 +232,18 @@ const MentorProjectWorkspace = () => {
           : { ...c, role: c.role || 'Collaborator', initials: (c.name || 'CL').slice(0, 2).toUpperCase() }
       )
     : [];
+  const mentorName = typeof project.mentor === 'object' && project.mentor !== null
+    ? (project.mentor.name || project.mentor.title)
+    : (project.mentor && project.mentor !== 'None assigned yet' ? project.mentor : null);
+  const mentorMember = (mentorName || project.mentorId) ? [{
+    id: project.mentorId || 'mentor',
+    name: mentorName || 'Assigned Mentor',
+    role: 'Mentor',
+    initials: (mentorName || 'ME').slice(0, 2).toUpperCase(),
+  }] : [];
   const membersList = (Array.isArray(project.members) && project.members.length > 0)
     ? project.members
-    : [...ownerMember, ...collabs];
+    : [...ownerMember, ...collabs, ...mentorMember];
 
   const inReviewCount = tasks.filter((t) => {
     const s = String(t.status || '').toLowerCase();
@@ -403,7 +412,7 @@ const MentorProjectWorkspace = () => {
       {activeTab === 'members' && (
         <div className="tf-mentor-ws-card">
           <div className="tf-mentor-ws-card-header">
-            <h2 className="tf-mentor-ws-card-title">Project Members</h2>
+            <h2 className="tf-mentor-ws-card-title">Project Members ({membersList.length})</h2>
             <p className="tf-mentor-ws-card-subtitle">
               Team members contributing to this project. As mentor, you can assign recommendation badges to outstanding collaborators.
             </p>
@@ -411,7 +420,8 @@ const MentorProjectWorkspace = () => {
 
           <div className="tf-mentor-ws-members-list">
             {membersList.map((member, mIdx) => {
-              const isOwner = member.name === project.owner;
+              const isOwner = member.name === project.owner || member.role === 'Owner';
+              const isMentorRole = member.role === 'Mentor';
               const isSelf = member.name === user?.name || String(member.id || member.userId) === String(user?.id);
               const mName = String(member.name || '').toLowerCase();
               const mId = String(member.id || member.userId || '').toLowerCase();
@@ -438,7 +448,7 @@ const MentorProjectWorkspace = () => {
                     </div>
                   </div>
 
-                  {!isOwner && !isSelf && (
+                  {!isOwner && !isMentorRole && !isSelf && (
                     <div>
                       {hasBadge ? (
                         <span className="tf-mentor-ws-badge warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>

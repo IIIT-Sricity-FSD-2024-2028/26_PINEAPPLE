@@ -10,6 +10,7 @@ import tasksApi from "../services/tasksApi";
 import joinRequestsApi from "../services/joinRequestsApi";
 import mentorshipApi from "../services/mentorshipApi";
 import { formatRelativeTime } from "../utils/dateUtils";
+import { getTaskReward } from "../utils/workflow";
 import "./dashboard.css"; // Import page-specific stylesheet
 
 const AwardIcon = () => (
@@ -175,12 +176,12 @@ const Dashboard = () => {
           const isCompleted = rawStatus === "completed" || rawStatus === "approved" || rawStatus === "done";
           const isSubmitted = rawStatus === "submitted" || rawStatus === "in review" || rawStatus === "inreview";
 
-          const taskPoints = t.points || (t.priority === "High" ? 40 : t.priority === "Medium" ? 20 : 10);
+          const reward = getTaskReward(t.priority || t.difficulty);
           contributionList.push({
             id: key,
             name: projName,
             contribution: t.title || "Task contribution",
-            xp: isCompleted ? taskPoints : Math.round(taskPoints / 2),
+            xp: isCompleted ? reward.xp : 0,
             finalLink: t.proofLink || t.proofUrl || proj?.deliverableUrl || proj?.finalLink || "#",
             status: isCompleted ? "Completed" : isSubmitted ? "In Review" : "In Progress",
             statusLabel: isCompleted ? "Approved" : isSubmitted ? "In Review" : "In Progress",
@@ -201,7 +202,7 @@ const Dashboard = () => {
               id: key,
               name: p.title || p.name,
               contribution: p.description ? (p.description.slice(0, 50) + (p.description.length > 50 ? "..." : "")) : (p.category || "Project Member"),
-              xp: isCompleted ? 100 : 50,
+              xp: 0,
               finalLink: p.deliverableUrl || p.finalLink || p.repoLink || "#",
               status: isCompleted ? "Completed" : "Active",
               statusLabel: isCompleted ? "Approved" : "In Review",
@@ -222,7 +223,7 @@ const Dashboard = () => {
               id: key,
               name: dp.name,
               contribution: dp.contribution || dp.role || "Contributor",
-              xp: isCompleted ? (dp.xp || 40) : (dp.xp || 20),
+              xp: 0,
               finalLink: dp.finalLink || "#",
               status: isCompleted ? "Completed" : "In Review",
               statusLabel: isCompleted ? "Approved" : "In Review",
@@ -236,20 +237,24 @@ const Dashboard = () => {
       contributionList.sort((a, b) => new Date(b.updatedAt || 0) - new Date(a.updatedAt || 0));
 
       // Calculate dynamic stats
-      const baseTasksCount = userData?.profile?.tasksCount || userData?.tasksCount || 0;
-      const completedTasksFromList = userTasks.filter((t) => {
+      const approvedUserTasks = userTasks.filter((t) => {
         const s = (t.status || "").toLowerCase();
         return s === "completed" || s === "approved" || s === "done";
-      }).length;
-      const finalCompletedTasks = Math.max(baseTasksCount, completedTasksFromList);
+      });
+      const derivedXp = approvedUserTasks.reduce(
+        (sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp,
+        0
+      );
+      const derivedRep = approvedUserTasks.length * 8;
+      const finalCompletedTasks = approvedUserTasks.length;
 
       const activeProjectsCount = Array.from(relevantProjectIds).filter((pid) => {
         const p = projectMap.get(pid);
         return isProjectActive(p);
       }).length;
 
-      const finalXp = Number(userData?.profile?.xp ?? userData?.xp ?? 0);
-      const finalRep = Number(userData?.profile?.rep ?? userData?.rep ?? 0);
+      const finalXp = userTasks.length > 0 ? derivedXp : Number(userData?.profile?.xp ?? userData?.xp ?? 0);
+      const finalRep = userTasks.length > 0 ? derivedRep : Number(userData?.profile?.rep ?? userData?.rep ?? 0);
 
       setStats({
         xp: finalXp,

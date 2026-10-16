@@ -46,10 +46,12 @@ const ProjectCard = ({
   const ownerName = project.owner || 'Project Owner';
   const difficulty = project.difficulty || 'Intermediate';
   const status = project.status || 'Open';
-  const maxCollabs = project.maxCollaborators || 5;
-  const currentMembers = Array.isArray(project.collaborators)
-    ? project.collaborators.length
-    : (Array.isArray(project.members) ? project.members.filter((m) => m.role !== 'Owner').length : (Number(project.collaborators) || 0));
+  const maxCapacity = project.maxCollaborators ? Number(project.maxCollaborators) + 1 : 6;
+  const currentMembers = project.memberCount !== undefined && project.memberCount !== null
+    ? Number(project.memberCount)
+    : (Array.isArray(project.members) && project.members.length > 0
+        ? project.members.length
+        : (Array.isArray(project.collaborators) ? project.collaborators.length + 1 : (Number(project.collaborators) || 0) + 1));
   const skills = Array.isArray(project.skills || project.requiredSkills)
     ? project.skills || project.requiredSkills
     : [];
@@ -116,7 +118,7 @@ const ProjectCard = ({
         <div className="tf-project-card-meta">
           <span className="tf-project-card-owner">By {ownerName}</span>
           <span className="tf-project-card-members">
-            <UsersIcon /> {currentMembers}/{maxCollabs}
+            <UsersIcon /> {currentMembers}/{maxCapacity}
           </span>
         </div>
 

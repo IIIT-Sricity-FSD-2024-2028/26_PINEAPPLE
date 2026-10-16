@@ -10,6 +10,7 @@ import Badge from '../components/common/Badge';
 import DataTable from '../components/common/DataTable';
 import StatCard from '../components/common/StatCard';
 import EmptyState from '../components/common/EmptyState';
+import { getTaskReward } from '../utils/workflow';
 import "./profile.css";
 
 // --- SVGs ---
@@ -148,12 +149,13 @@ const Profile = () => {
           const key = `task-${t.id}`;
           if (!seenKeys.has(key)) {
             seenKeys.add(key);
+            const reward = getTaskReward(t.priority || t.difficulty);
             contributionList.push({
               id: key,
               projectName: projName,
               title: t.title || "Task contribution",
               status: isApproved ? "Approved" : (rawStatus === "submitted" || rawStatus === "in review" || rawStatus === "inreview") ? "In Review" : "In Progress",
-              xp: isApproved ? (Number(t.xpReward) || 50) : 0,
+              xp: isApproved ? reward.xp : 0,
               date: t.updatedAt || t.createdAt || new Date().toISOString(),
               proofLink: t.proofLink || t.proofUrl || null,
             });
@@ -171,7 +173,7 @@ const Profile = () => {
               projectName: p.title || p.name,
               title: isCompleted ? "Deliverable published & project completed" : "Project created & managed",
               status: isCompleted ? "Approved" : "Active",
-              xp: isCompleted ? 150 : 0,
+              xp: 0,
               date: p.completedAt || p.updatedAt || p.createdAt || new Date().toISOString(),
               proofLink: p.deliverableUrl || p.finalLink || null,
             });
@@ -189,7 +191,7 @@ const Profile = () => {
                 projectName: mp.name,
                 title: mp.contribution || `Mentored ${mp.owner}'s project`,
                 status: mp.status === "Completed" ? "Approved" : mp.status || "Completed",
-                xp: 100,
+                xp: 0,
                 date: new Date().toISOString(),
                 proofLink: null,
               });
@@ -201,8 +203,18 @@ const Profile = () => {
         contributionList.sort((a, b) => new Date(b.date) - new Date(a.date));
 
         const totalProjectsCount = ownedProjects.length + joinedProjects.length;
-        const totalXp = Number(data.profile?.xp ?? data.xp ?? 0);
-        const totalRep = Number(data.profile?.rep ?? data.rep ?? 0);
+        const approvedUserTasks = userTasks.filter((t) => {
+          const s = (t.status || "").toLowerCase();
+          return s === "completed" || s === "approved" || s === "done";
+        });
+        const derivedXp = approvedUserTasks.reduce(
+          (sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp,
+          0
+        );
+        const derivedRep = approvedUserTasks.length * 8;
+        const totalXp = userTasks.length > 0 ? derivedXp : Number(data.profile?.xp ?? data.xp ?? 0);
+        const totalRep = userTasks.length > 0 ? derivedRep : Number(data.profile?.rep ?? data.rep ?? 0);
+        const totalApprovedTasksCount = approvedUserTasks.length;
 
         const rawBadges = Array.isArray(badgesRes) && badgesRes.length > 0
           ? badgesRes
@@ -234,7 +246,7 @@ const Profile = () => {
             xp: totalXp,
             rep: totalRep,
             projects: totalProjectsCount || (data.data?.projects?.length || 0),
-            tasks: userTasks.length || (data.profile?.tasksCount || 0)
+            tasks: totalApprovedTasksCount,
           },
           skills: data.profile?.skills || user?.profile?.skills || [],
           

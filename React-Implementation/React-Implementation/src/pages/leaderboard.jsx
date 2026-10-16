@@ -3,16 +3,9 @@ import { AuthContext } from "../context/AuthContext";
 import { RoleContext } from "../context/RoleContext";
 import { leaderboardApi } from "../services/leaderboardApi";
 import SearchBar from "../components/common/SearchBar";
-import FilterTabs from "../components/common/FilterTabs";
 import DataTable from "../components/common/DataTable";
 import Avatar from "../components/common/Avatar";
 import "./leaderboard.css";
-
-const periods = [
-  { id: "weekly", label: "Weekly" },
-  { id: "monthly", label: "Monthly" },
-  { id: "alltime", label: "All time" },
-];
 
 const renderRankBadge = (rank) => {
   if (rank === 1) {
@@ -78,7 +71,6 @@ const FALLBACK_LEADERBOARD = {
 function Leaderboard() {
   const { user } = useContext(AuthContext) || {};
   const { currentRole } = useContext(RoleContext) || {};
-  const [period, setPeriod] = useState("weekly");
   const [searchQuery, setSearchQuery] = useState("");
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -93,18 +85,18 @@ function Leaderboard() {
       setError("");
 
       try {
-        const result = await leaderboardApi.getLeaderboard({ period }, currentRole);
+        const result = await leaderboardApi.getLeaderboard({ period: "alltime" }, currentRole);
         if (isCurrentRequest) {
           if (Array.isArray(result) && result.length > 0) {
             setEntries(result);
           } else {
-            setEntries(FALLBACK_LEADERBOARD[period] || FALLBACK_LEADERBOARD.weekly);
+            setEntries(FALLBACK_LEADERBOARD.alltime);
           }
         }
       } catch {
         if (isCurrentRequest) {
-          // Gracefully fallback to period-specific benchmarks if network or backend fails
-          setEntries(FALLBACK_LEADERBOARD[period] || FALLBACK_LEADERBOARD.weekly);
+          // Gracefully fallback to alltime benchmarks if network or backend fails
+          setEntries(FALLBACK_LEADERBOARD.alltime);
         }
       } finally {
         if (isCurrentRequest) setIsLoading(false);
@@ -124,7 +116,7 @@ function Leaderboard() {
       window.removeEventListener("teamforge:task_updated", handleUpdate);
       window.removeEventListener("focus", handleUpdate);
     };
-  }, [period, currentRole, retryCount]);
+  }, [currentRole, retryCount]);
 
   const currentUserId = user?.id || localStorage.getItem("teamforge.backendUserId");
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
@@ -218,12 +210,6 @@ function Leaderboard() {
 
       <div className="leaderboard-toolbar">
         <div className="leaderboard-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
-          <FilterTabs
-            tabs={periods}
-            activeTab={period}
-            onChange={setPeriod}
-            ariaLabel="Leaderboard period"
-          />
           <div style={{ flex: 1, minWidth: '220px' }}>
             <SearchBar
               value={searchQuery}
@@ -233,16 +219,11 @@ function Leaderboard() {
             />
           </div>
         </div>
-        <span className="leaderboard-period-note">
-          {period === "alltime" ? "All recorded XP" : `${period[0].toUpperCase()}${period.slice(1)} XP`}
-        </span>
       </div>
 
       <div
         className="leaderboard-table-wrap"
         id="leaderboard-results"
-        role="tabpanel"
-        aria-labelledby={`leaderboard-tab-${period}`}
         aria-busy={isLoading}
       >
         {error ? (
@@ -260,7 +241,7 @@ function Leaderboard() {
             loadingMessage="Loading rankings..."
             emptyMessage={
               entries.length === 0
-                ? "No rankings to show for this period yet."
+                ? "No rankings to show yet."
                 : `No contributors match: ${searchQuery.trim()}`
             }
             keyField={(row, idx) => row?.userId || row?.id || idx}

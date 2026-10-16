@@ -9,6 +9,7 @@ import EmptyState from '../../components/common/EmptyState';
 import FilterTabs from '../../components/common/FilterTabs';
 import ProjectCard from '../../components/features/ProjectCard';
 import { calculateProjectProgress } from '../../utils/progress';
+import { getTaskReward } from '../../utils/workflow';
 import './myWork.css';
 
 const MyWork = () => {
@@ -208,7 +209,7 @@ const MyWork = () => {
                          ))) &&
                         (t.status === 'Completed' || String(t.status).toLowerCase() === 'completed')
                     )
-                    .reduce((sum, t) => sum + (t.xpReward || 50), 0)} XP
+                    .reduce((sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp, 0)} XP
                 </div>
                 <div className="tf-mywork-stat-lbl">Total XP Earned</div>
               </div>

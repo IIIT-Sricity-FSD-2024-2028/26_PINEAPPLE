@@ -16,6 +16,7 @@ import Avatar from '../../components/common/Avatar';
 import ProgressBar from '../../components/common/ProgressBar';
 import FilterTabs from '../../components/common/FilterTabs';
 import { calculateProjectProgress } from '../../utils/progress';
+import { getTaskReward } from '../../utils/workflow';
 import './ownedWorkspace.css';
 
 const BackArrowIcon = () => (
@@ -31,12 +32,6 @@ const PlusIcon = () => (
     <line x1="5" y1="12" x2="19" y2="12" />
   </svg>
 );
-
-const PRIORITY_XP = {
-  High: 40,
-  Medium: 20,
-  Low: 10,
-};
 
 const OwnedWorkspace = () => {
   const { projectId } = useParams();
@@ -154,7 +149,8 @@ const OwnedWorkspace = () => {
     setCreatingTask(true);
     try {
       const priority = taskForm.priority || 'Medium';
-      const xpReward = PRIORITY_XP[priority] || 20;
+      const reward = getTaskReward(priority);
+      const xpReward = reward.xp;
       const selectedMember = members.find((m) => {
         const mId = m.id || m.userId;
         return String(mId) === String(taskForm.assigneeId);
@@ -197,9 +193,11 @@ const OwnedWorkspace = () => {
   const handleApproveTask = async (taskId) => {
     if (isLocked) return;
     try {
+      const taskObj = tasks.find((t) => t.id === taskId);
+      const reward = getTaskReward(taskObj?.priority || taskObj?.difficulty);
       await tasksApi.updateStatus(taskId, { status: 'Completed' });
       setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, status: 'Completed' } : t))
+        prev.map((t) => (t.id === taskId ? { ...t, status: 'Completed', xpAwarded: true, xpReward: reward.xp } : t))
       );
     } catch (err) {
       console.error('Failed to approve task:', err);
@@ -501,6 +499,22 @@ const OwnedWorkspace = () => {
     }
   });
   const members = Array.from(memberMap.values());
+  const ownerName = typeof project.owner === 'object' && project.owner !== null
+    ? (project.owner.name || project.owner.id || 'You')
+    : (project.owner || 'You');
+  const mentorName = typeof project.mentor === 'object' && project.mentor !== null
+    ? (project.mentor.name || project.mentor.title || 'Assigned Mentor')
+    : (project.mentor && project.mentor !== 'None assigned yet' ? project.mentor : null);
+  const mentorObj = (mentorName || project.mentorId) ? {
+    id: String(project.mentorId || 'mentor'),
+    name: mentorName || 'Assigned Mentor',
+    role: 'Mentor',
+  } : null;
+  const allMembers = [
+    { id: String(project.ownerId || (typeof project.owner === 'object' ? project.owner?.id : '') || 'owner'), name: ownerName, role: 'Owner' },
+    ...members,
+    ...(mentorObj ? [mentorObj] : []),
+  ];
   const pendingRequests = joinRequests.filter((r) => r && r.status === 'Pending');
   const unapprovedTasks = tasks.filter(
     (t) => t && t.status !== 'Completed' && String(t.status || '').toLowerCase() !== 'completed'
@@ -528,7 +542,7 @@ const OwnedWorkspace = () => {
             </div>
             <p className="tf-owned-ws-desc">{project.description || project.desc}</p>
             <div className="tf-owned-ws-meta">
-              Owned by <strong>{typeof project.owner === 'object' && project.owner !== null ? (project.owner.name || project.owner.id || 'You') : (project.owner || 'You')}</strong> · {members.length} collaborators · {project.duration || 'Ongoing'}
+              Owned by <strong>{ownerName}</strong>{mentorName ? <> · Mentor: <strong>{mentorName}</strong></> : null} · {allMembers.length} members · {project.duration || 'Ongoing'}
             </div>
             <div className="tf-owned-ws-skills">
               {(project.skills || project.requiredSkills || []).map((s, i) => (
@@ -565,7 +579,7 @@ const OwnedWorkspace = () => {
             tabs={[
               { id: 'overview', label: 'Overview' },
               { id: 'tasks', label: 'Tasks', count: tasks.length },
-              { id: 'members', label: pendingRequests.length > 0 ? `Members (🔔 ${pendingRequests.length})` : 'Members', count: members.length },
+              { id: 'members', label: pendingRequests.length > 0 ? `Members (🔔 ${pendingRequests.length})` : 'Members', count: allMembers.length },
               { id: 'chat', label: 'Chat' },
             ]}
             activeTab={activeTab}
@@ -611,7 +625,7 @@ const OwnedWorkspace = () => {
               </div>
             )}
             <div className="tf-owned-ws-meta" style={{ marginTop: '16px' }}>
-              <p>Mentor: <strong>{typeof project.mentor === 'object' && project.mentor !== null ? (project.mentor.name || project.mentor.title || 'Assigned Mentor') : (project.mentor || 'None assigned yet')}</strong></p>
+              <p>Mentor: <strong>{mentorName || 'None assigned yet'}</strong></p>
               <p>Status: <strong>{project.status || 'Active'}</strong></p>
               {(project.finishedLink || project.finalLink) && (
                 <p>
@@ -671,15 +685,15 @@ const OwnedWorkspace = () => {
             )}
 
             <h4 style={{ marginTop: '24px', marginBottom: '12px', fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>
-              Project Members ({members.length + 1})
+              Project Members ({allMembers.length})
             </h4>
             <div className="tf-owned-ws-members-grid">
               {/* Owner first */}
               <div className="tf-owned-ws-member-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                  <Avatar name={project.owner || 'You'} size="md" />
+                  <Avatar name={ownerName} size="md" />
                   <div>
-                    <h4 className="tf-owned-ws-member-name">{project.owner || 'You'}</h4>
+                    <h4 className="tf-owned-ws-member-name">{ownerName}</h4>
                     <p className="tf-owned-ws-member-role">Project Lead</p>
                   </div>
                 </div>
@@ -687,7 +701,7 @@ const OwnedWorkspace = () => {
               </div>
 
               {/* Accepted Collaborators */}
-              {members.length > 0 ? (
+              {members.length > 0 && (
                 members.map((member, i) => {
                   if (!member) return null;
                   const name = typeof member === 'string' ? member : (member.name || member.id || 'Collaborator');
@@ -717,7 +731,23 @@ const OwnedWorkspace = () => {
                     </div>
                   );
                 })
-              ) : (
+              )}
+
+              {/* Mentor */}
+              {mentorObj && (
+                <div className="tf-owned-ws-member-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                    <Avatar name={mentorObj.name} size="md" />
+                    <div>
+                      <h4 className="tf-owned-ws-member-name">{mentorObj.name}</h4>
+                      <p className="tf-owned-ws-member-role">Project Mentor</p>
+                    </div>
+                  </div>
+                  <Badge variant="warning">Mentor</Badge>
+                </div>
+              )}
+
+              {members.length === 0 && !mentorObj && (
                 <EmptyState
                   title="No collaborators yet"
                   message="Pending applicants will appear in requests above. When approved, team members show up here."
@@ -798,7 +828,7 @@ const OwnedWorkspace = () => {
                     ...prev,
                     priority: prio,
                     difficulty: prio,
-                    xpReward: PRIORITY_XP[prio] || 10,
+                    xpReward: getTaskReward(prio).xp,
                   }));
                 }}
               >

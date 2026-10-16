@@ -553,6 +553,10 @@ export class MentorMarketplaceService implements OnApplicationBootstrap {
         if (project) {
           project.mentorId = mentorUserId;
           project.mentor = profile?.name || 'Mentor';
+          this.projectsRepository.update(session.projectId, {
+            mentorId: mentorUserId,
+            mentor: profile?.name || 'Mentor',
+          });
         }
       } catch {
         /* non-critical */
@@ -660,12 +664,6 @@ export class MentorMarketplaceService implements OnApplicationBootstrap {
       type: 'mentor_session_payout',
     });
 
-    // Award XP — mentor gets 100, student gets 25
-    try {
-      this.gamificationService.awardXp(profile?.userId ?? session.mentorId, 100, 'Mentor session completed');
-      this.gamificationService.awardXp(session.studentId, 25, 'Attended mentoring session');
-    } catch { /* non-critical */ }
-
     // Update stats
     if (profile && profile.totalSessions !== undefined) profile.totalSessions += 1;
 
@@ -767,11 +765,6 @@ export class MentorMarketplaceService implements OnApplicationBootstrap {
         (mentorReviews.reduce((s, r) => s + r.rating, 0) / mentorReviews.length) * 10,
       ) / 10;
     }
-
-    // Award XP for review
-    try {
-      this.gamificationService.awardXp(studentId, 25, 'Left a mentor review');
-    } catch { /* non-critical */ }
 
     return review;
   }

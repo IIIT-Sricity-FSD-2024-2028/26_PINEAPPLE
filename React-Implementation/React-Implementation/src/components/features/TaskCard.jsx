@@ -1,6 +1,7 @@
 import { useContext, useState } from 'react';
 import Badge from '../common/Badge';
 import { AuthContext } from '../../context/AuthContext';
+import { getTaskReward } from '../../utils/workflow';
 import './TaskCard.css';
 
 /**
@@ -33,8 +34,7 @@ const TaskCard = ({
 
   const status = task.status || 'To Do';
   const priority = task.priority || task.difficulty || 'Medium';
-  const pNorm = priority.trim().toLowerCase();
-  const xpReward = pNorm === 'high' || pNorm === 'advanced' ? 40 : pNorm === 'medium' || pNorm === 'intermediate' ? 20 : 10;
+  const xpReward = getTaskReward(priority).xp;
   const isOwner = userRole === 'Project Owner';
   const sNorm = status.toLowerCase();
   const sClean = sNorm.replace(/[\s-_]/g, '');

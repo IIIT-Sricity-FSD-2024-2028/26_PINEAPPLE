@@ -146,7 +146,7 @@ export class TasksRepository {
 
   create(createTaskDto: CreateTaskDto): Task {
     const newTask: Task = {
-      id: `task-${Date.now()}`,
+      id: `task-${Date.now()}-${Math.floor(Math.random() * 100000)}`,
       ...createTaskDto,
       priority: createTaskDto.priority || createTaskDto.difficulty || 'Medium',
       proofLink: createTaskDto.proofLink || createTaskDto.proofUrl,

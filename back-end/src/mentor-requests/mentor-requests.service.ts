@@ -118,11 +118,49 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       }
     }
 
-    return super.update(id, {
+    const current = this.findOne(id);
+    const updated = super.update(id, {
       status: 'accepted',
       acceptedAt: new Date().toISOString(),
       declinedAt: undefined,
     });
+
+    if (current?.projectId) {
+      try {
+        let mentorName = 'Mentor';
+        let assignedMentorId = userId || current.mentorId;
+        if (assignedMentorId) {
+          try {
+            const u = this.usersService.findById(assignedMentorId);
+            if (u) mentorName = u.name;
+          } catch {
+            /* ignore */
+          }
+        } else if (current.mentorEmail) {
+          try {
+            const u = this.usersService.findAll().find(
+              (usr) => usr.email && usr.email.toLowerCase() === current.mentorEmail!.toLowerCase(),
+            );
+            if (u) {
+              mentorName = u.name;
+              assignedMentorId = u.id;
+            }
+          } catch {
+            /* ignore */
+          }
+        }
+
+        const project = this.projectsService.findById(current.projectId);
+        if (project) {
+          project.mentorId = assignedMentorId;
+          project.mentor = mentorName;
+        }
+      } catch {
+        /* non-critical */
+      }
+    }
+
+    return updated;
   }
 
   decline(id: string, userId?: string, role?: string): MentorRequestEntity {

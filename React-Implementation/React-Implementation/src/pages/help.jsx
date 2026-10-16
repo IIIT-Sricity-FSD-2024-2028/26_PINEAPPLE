@@ -73,7 +73,7 @@ const FAQS = [
     items: [
       {
         q: "How do I earn XP?",
-        a: "XP is earned when your submitted tasks are approved by the project owner. Easy tasks give 10 XP, Medium tasks 20 XP, and Hard tasks 40 XP. You also earn a +5 XP early completion bonus if you submit before the deadline.",
+        a: "XP is earned when your submitted tasks are approved by the project owner. Low tasks give 10 XP (+8 Rep), Medium tasks 20 XP (+8 Rep), and High tasks 40 XP (+8 Rep). XP and reputation are awarded strictly upon approval.",
       },
       {
         q: "What is the Reputation Score?",

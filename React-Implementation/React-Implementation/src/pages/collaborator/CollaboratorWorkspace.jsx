@@ -238,7 +238,28 @@ const CollaboratorWorkspace = () => {
 
   const progress = calculateProjectProgress(tasks);
   const isOwner = project.owner === user?.name || project.ownerId === user?.id;
-  const members = Array.isArray(project.collaborators) ? project.collaborators : [];
+  const rawCollaborators = Array.isArray(project.collaborators) ? project.collaborators : [];
+  const ownerName = typeof project.owner === 'object' && project.owner !== null
+    ? (project.owner.name || project.owner.id || 'Project Owner')
+    : (project.owner || 'Project Owner');
+  const mentorName = typeof project.mentor === 'object' && project.mentor !== null
+    ? (project.mentor.name || project.mentor.title || 'Assigned Mentor')
+    : (project.mentor && project.mentor !== 'None assigned yet' ? project.mentor : null);
+  const mentorObj = (mentorName || project.mentorId) ? {
+    id: String(project.mentorId || 'mentor'),
+    name: mentorName || 'Assigned Mentor',
+    role: 'Mentor',
+  } : null;
+  const allMembers = [
+    { id: String(project.ownerId || (typeof project.owner === 'object' ? project.owner?.id : '') || 'owner'), name: ownerName, role: 'Owner' },
+    ...rawCollaborators.map((m, i) => {
+      const id = typeof m === 'object' ? String(m.id || m.userId || `c-${i}`) : String(m);
+      const name = typeof m === 'object' ? (m.name || id) : id;
+      const role = typeof m === 'object' && m.role ? m.role : 'Collaborator';
+      return { id, name, role };
+    }),
+    ...(mentorObj ? [mentorObj] : []),
+  ];
 
   return (
     <div className="tf-collab-ws-container">
@@ -283,7 +304,7 @@ const CollaboratorWorkspace = () => {
             </div>
             <p className="tf-collab-ws-desc">{project.description || project.desc}</p>
             <div className="tf-collab-ws-meta">
-              Owned by <strong>{project.owner || 'Lead'}</strong> · {members.length + 1} members
+              Owned by <strong>{ownerName}</strong>{mentorName ? <> · Mentor: <strong>{mentorName}</strong></> : null} · {allMembers.length} members
             </div>
             <div className="tf-collab-ws-skills">
               {(project.skills || project.requiredSkills || []).map((s, i) => (
@@ -303,7 +324,7 @@ const CollaboratorWorkspace = () => {
           tabs={[
             { id: 'overview', label: 'Overview' },
             { id: 'tasks', label: 'Tasks', count: tasks.length },
-            { id: 'members', label: 'Members', count: members.length + 1 },
+            { id: 'members', label: 'Members', count: allMembers.length },
             { id: 'chat', label: 'Chat' },
           ]}
           activeTab={activeTab}
@@ -324,7 +345,7 @@ const CollaboratorWorkspace = () => {
               </div>
             )}
             <div className="tf-collab-ws-meta">
-              <p>Mentor: <strong>{project.mentor || 'None assigned yet'}</strong></p>
+              <p>Mentor: <strong>{mentorName || 'None assigned yet'}</strong></p>
               <p>Duration: <strong>{project.duration || 'Flexible'}</strong></p>
               {(project.finishedLink || project.finalLink) && (
                 <p>
@@ -365,28 +386,43 @@ const CollaboratorWorkspace = () => {
 
         {/* Tab 3: Members */}
         {activeTab === 'members' && (
-          <div className="tf-collab-ws-members-grid">
-            <div className="tf-collab-ws-member-card">
-              <Avatar name={project.owner || 'Project Owner'} size="md" />
-              <div className="tf-collab-ws-member-info">
-                <h4>{project.owner || 'Project Owner'}</h4>
-                <p>Project Lead</p>
+          <div>
+            <h4 style={{ marginBottom: '16px', fontSize: '1.1rem', fontWeight: 700, color: '#111827' }}>
+              Project Members ({allMembers.length})
+            </h4>
+            <div className="tf-collab-ws-members-grid">
+              <div className="tf-collab-ws-member-card">
+                <Avatar name={ownerName} size="md" />
+                <div className="tf-collab-ws-member-info">
+                  <h4>{ownerName}</h4>
+                  <p>Project Lead</p>
+                </div>
               </div>
-            </div>
 
-            {members.map((member, i) => {
-              const name = typeof member === 'string' ? member : member.name || 'Collaborator';
-              const role = typeof member === 'object' && member.role ? member.role : 'Collaborator';
-              return (
-                <div key={i} className="tf-collab-ws-member-card">
-                  <Avatar name={name} size="md" />
+              {rawCollaborators.map((member, i) => {
+                const name = typeof member === 'string' ? member : member.name || 'Collaborator';
+                const role = typeof member === 'object' && member.role ? member.role : 'Collaborator';
+                return (
+                  <div key={i} className="tf-collab-ws-member-card">
+                    <Avatar name={name} size="md" />
+                    <div className="tf-collab-ws-member-info">
+                      <h4>{name}</h4>
+                      <p>{role}</p>
+                    </div>
+                  </div>
+                );
+              })}
+
+              {mentorObj && (
+                <div className="tf-collab-ws-member-card">
+                  <Avatar name={mentorObj.name} size="md" />
                   <div className="tf-collab-ws-member-info">
-                    <h4>{name}</h4>
-                    <p>{role}</p>
+                    <h4>{mentorObj.name}</h4>
+                    <p>Project Mentor</p>
                   </div>
                 </div>
-              );
-            })}
+              )}
+            </div>
           </div>
         )}
 

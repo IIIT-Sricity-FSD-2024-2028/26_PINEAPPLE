@@ -128,7 +128,7 @@ export class CommunicationRepository {
 
   sendMessage(senderId: string, roleHeader: string | undefined, dto: SendMessageDto): Message {
     const user = this.usersRepository.findById(senderId);
-    const senderName = user ? (user.name || user.profile?.fullName || 'Unknown user') : 'Unknown user';
+    const senderName = (user ? (user.name || user.profile?.fullName) : undefined) || dto.senderName || 'Unknown user';
 
     // Role priority: roleHeader (from active context) or user's base role
     const resolvedRole = this.resolveDisplayRole(roleHeader || user?.role);

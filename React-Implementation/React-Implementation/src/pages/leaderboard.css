@@ -88,44 +88,6 @@
   gap: 12px;
 }
 
-.leaderboard-periods {
-  display: inline-flex;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--border);
-  border-radius: 7px;
-  background: var(--tf-glass-bg-2);
-}
-
-.leaderboard-period {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 4px;
-  background: transparent;
-  color: var(--muted-fg);
-  font: inherit;
-  font-size: 0.84rem;
-  font-weight: 600;
-  cursor: pointer;
-}
-
-.leaderboard-period:hover {
-  color: var(--fg);
-}
-
-.leaderboard-period.is-active {
-  background: var(--primary);
-  color: var(--primary-fg);
-  box-shadow: var(--tf-shadow-xs);
-}
-
-.leaderboard-period-note {
-  color: var(--muted-fg);
-  font-size: 0.82rem;
-  overflow-wrap: anywhere;
-  text-align: right;
-}
 
 
 .leaderboard-visually-hidden {
@@ -335,9 +297,6 @@
     width: 100%;
   }
 
-  .leaderboard-period {
-    padding: 0 11px;
-  }
 }
 
 @media (max-width: 420px) {
