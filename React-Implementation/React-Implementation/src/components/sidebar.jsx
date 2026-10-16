@@ -134,7 +134,7 @@ const Sidebar = ({ isOpen }) => {
                 {isOpen && <span className="nav-text">My Projects</span>}
               </span>
             </li>
-            <li className="nav-item" onClick={() => handleNavigate('/mentors')}>
+            <li className="nav-item" onClick={() => handleNavigate('/owner/mentors')}>
               <span className="nav-link">
                 <span className="icon-wrapper icon-purple">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -174,17 +174,26 @@ const Sidebar = ({ isOpen }) => {
                 {isOpen && <span className="nav-text">Mentor Requests</span>}
               </span>
             </li>
-            <li className="nav-item" onClick={() => handleNavigate('/mentors')}>
+            <li className="nav-item" onClick={() => handleNavigate('/mentor/earnings')}>
+              <span className="nav-link">
+                <span className="icon-wrapper icon-yellow">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="12" y1="1" x2="12" y2="23"></line>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                  </svg>
+                </span>
+                {isOpen && <span className="nav-text">Earnings</span>}
+              </span>
+            </li>
+            <li className="nav-item" onClick={() => handleNavigate('/mentor/profile')}>
               <span className="nav-link">
                 <span className="icon-wrapper icon-purple">
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-                    <circle cx="9" cy="7" r="4" />
-                    <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
-                    <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" />
+                    <circle cx="12" cy="7" r="4" />
                   </svg>
                 </span>
-                {isOpen && <span className="nav-text">Directory</span>}
+                {isOpen && <span className="nav-text">My Mentor Profile</span>}
               </span>
             </li>
           </ul>
