@@ -1,5 +1,7 @@
-import React, { useContext } from "react";
+import { useContext } from "react";
 import { NotificationContext } from "../context/NotificationContext";
+import EmptyState from "../components/common/EmptyState";
+import { formatRelativeTime } from "../utils/dateUtils";
 import "./notifications.css";
 
 const getIconColorClass = (type) => {
@@ -33,11 +35,11 @@ const Notifications = () => {
       <div className="notif-glass-card">
         
         {notifications.length === 0 ? (
-          <div className="notif-empty">
-            <div className="notif-empty-icon">🔔</div>
-            <div className="notif-empty-title">You're all caught up!</div>
-            <div>There are no new notifications right now.</div>
-          </div>
+          <EmptyState
+            icon="🔔"
+            title="You're all caught up!"
+            message="There are no new notifications right now."
+          />
         ) : (
           <div className="notif-list-container">
             {notifications.map((notif) => (
@@ -59,6 +61,11 @@ const Notifications = () => {
                   <div className={`notif-desc ${notif.isRead ? 'read' : 'unread'}`}>
                     {notif.message}
                   </div>
+                  {(notif.createdAt || notif.timestamp) && (
+                    <div className="notif-time">
+                      {formatRelativeTime(notif.createdAt || notif.timestamp)}
+                    </div>
+                  )}
                 </div>
               </div>
             ))}
