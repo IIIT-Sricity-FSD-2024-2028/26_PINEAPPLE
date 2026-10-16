@@ -293,8 +293,8 @@
 
 .tf-collab-ws-msg-other {
   align-self: flex-start;
-  background: #ffffff;
-  color: var(--tf-ink-900, #111827);
+  background: var(--card, #ffffff);
+  color: var(--fg, #111827);
   border: 1px solid var(--border, #e5e7eb);
 }
 
@@ -313,7 +313,9 @@
 .tf-collab-ws-chat-input {
   flex: 1;
   padding: 10px 14px;
-  border: 1px solid var(--border, #e5e7eb);
+  border: 1px solid var(--input-border, var(--border, #e5e7eb));
+  background: var(--input-bg, #ffffff);
+  color: var(--fg, #111827);
   border-radius: 8px;
   font-size: 0.88rem;
   outline: none;
