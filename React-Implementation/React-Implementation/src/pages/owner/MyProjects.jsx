@@ -1,11 +1,12 @@
 import { useState, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import projectsApi from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
+import projectsApi, { isProjectLocked } from '../../services/projectsApi';
+import ProjectCard from '../../components/features/ProjectCard';
+import EmptyState from '../../components/common/EmptyState';
+import FilterTabs from '../../components/common/FilterTabs';
 import './myProjects.css';
 
-/* ── Extracted SVG Sub-components ── */
 const PlusIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <line x1="12" y1="5" x2="12" y2="19" />
@@ -24,95 +25,45 @@ const MyProjects = () => {
   const navigate = useNavigate();
 
   const [projects, setProjects] = useState([]);
-  const [tasksMap, setTasksMap] = useState({});
+  const [filter, setFilter] = useState('all');
   const [loading, setLoading] = useState(true);
 
-  const fetchOwnedProjects = async () => {
-    setLoading(true);
-    try {
-      const currentUserId = user?.id;
-      const currentUserName = user?.name || '';
-
-      const allProjects = await projectsApi.list().catch(() => []);
-      const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
-        (p) => p.ownerId === currentUserId || p.owner === currentUserName
-      );
-
-      setProjects(owned);
-
-      // Fetch task stats for each project
-      const projectIds = owned.map((p) => p.id);
-      if (projectIds.length > 0) {
-        const tasks = await tasksApi.listForProjects(projectIds);
-        const mapped = {};
-        tasks.forEach((t) => {
-          if (!mapped[t.projectId]) mapped[t.projectId] = [];
-          mapped[t.projectId].push(t);
-        });
-        setTasksMap(mapped);
-      }
-    } catch (err) {
-      console.error('Failed to load owned projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   useEffect(() => {
-    fetchOwnedProjects();
-  }, [user]);
+    let isMounted = true;
+    const loadOwnedProjects = async () => {
+      try {
+        const currentUserId = user?.id;
+        const currentUserName = user?.name || '';
 
-  const activeProjects = projects.filter(
-    (p) => p.status !== 'Completed' && (Number(p.progress) || 0) < 100
-  );
-  const completedProjects = projects.filter(
-    (p) => p.status === 'Completed' || (Number(p.progress) || 0) >= 100
-  );
+        const allProjects = await projectsApi.list().catch(() => []);
+        const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
+          (p) => p.ownerId === currentUserId || p.owner === currentUserName
+        );
 
-  const renderProjectCard = (p) => {
-    const projectTasks = tasksMap[p.id] || [];
-    const completedTasksCount = projectTasks.filter((t) => t.status === 'Completed').length;
-    const totalTasksCount = projectTasks.length;
-    const progress = Number(p.progress) || 0;
-    const membersCount = Array.isArray(p.collaborators) ? p.collaborators.length : 0;
-    const skills = p.skills || p.requiredSkills || [];
+        if (isMounted) {
+          setProjects(owned);
+        }
+      } catch (err) {
+        console.error('Failed to load owned projects:', err);
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
 
-    return (
-      <div
-        key={p.id}
-        className="tf-myproj-card"
-        onClick={() => navigate(`/owner/workspace/${p.id}`)}
-      >
-        <div>
-          <h3 className="tf-myproj-card-title">{p.title || p.name}</h3>
-          <p className="tf-myproj-card-meta">
-            {completedTasksCount}/{totalTasksCount} tasks completed · {membersCount} collaborators · {p.duration || 'Ongoing'}
-          </p>
-        </div>
+    loadOwnedProjects();
 
-        <div>
-          <div className="tf-myproj-progress-info">
-            <span>Progress</span>
-            <span>{progress}%</span>
-          </div>
-          <div className="tf-myproj-progress-bar">
-            <div
-              className="tf-myproj-progress-fill"
-              style={{ width: `${progress}%` }}
-            />
-          </div>
+    return () => {
+      isMounted = false;
+    };
+  }, [user?.id, user?.name]);
 
-          <div className="tf-myproj-skills-wrap">
-            {skills.map((s, idx) => (
-              <span key={idx} className="tf-myproj-skill-badge">
-                {s}
-              </span>
-            ))}
-          </div>
-        </div>
-      </div>
-    );
-  };
+  const isCompletedProject = (p) => p.isCompleted === true || isProjectLocked(p);
+  const activeProjects = projects.filter((p) => !isCompletedProject(p));
+  const completedProjects = projects
+    .filter(isCompletedProject)
+    .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
 
   return (
     <div id="page-my-projects" className="tf-myproj-container">
@@ -130,48 +81,69 @@ const MyProjects = () => {
         </button>
       </div>
 
+      {!loading && projects.length > 0 && (
+        <div style={{ marginBottom: '24px' }}>
+          <FilterTabs
+            tabs={[
+              { id: 'all', label: 'All', count: projects.length },
+              { id: 'active', label: 'Active', count: activeProjects.length },
+              { id: 'completed', label: 'Completed', count: completedProjects.length }
+            ]}
+            activeTab={filter}
+            onChange={setFilter}
+          />
+        </div>
+      )}
+
       {loading ? (
         <div className="tf-myproj-section">
           <p className="tf-myproj-empty">Loading your projects...</p>
         </div>
       ) : projects.length === 0 ? (
-        <div className="tf-myproj-section">
-          <div className="tf-myproj-empty">
-            <FolderIcon />
-            <h3>No projects created yet</h3>
-            <p>Ready to start building? Create your first project to recruit collaborators!</p>
-            <button
-              type="button"
-              className="tf-myproj-btn-primary"
-              style={{ marginTop: '14px' }}
-              onClick={() => navigate('/create-project')}
-            >
-              <PlusIcon /> Create Project
-            </button>
-          </div>
-        </div>
+        <EmptyState
+          title="No projects created yet"
+          message="Ready to start building? Create your first project to recruit collaborators!"
+          actionLabel="Create Project"
+          onAction={() => navigate('/create-project')}
+        />
       ) : (
         <>
-          <div className="tf-myproj-section">
-            <div className="tf-myproj-section-title">
-              <FolderIcon /> Active ({activeProjects.length})
-            </div>
-            {activeProjects.length > 0 ? (
-              <div className="tf-myproj-grid">
-                {activeProjects.map((p) => renderProjectCard(p))}
+          {(filter === 'all' || filter === 'active') && (
+            <div className="tf-myproj-section">
+              <div className="tf-myproj-section-title">
+                <FolderIcon /> Active ({activeProjects.length})
               </div>
-            ) : (
-              <p className="tf-myproj-empty">No active projects.</p>
-            )}
-          </div>
+              {activeProjects.length > 0 ? (
+                <div className="tf-myproj-grid">
+                  {activeProjects.map((p) => (
+                    <ProjectCard
+                      key={p.id}
+                      project={p}
+                      variant="owner"
+                      onSelect={(proj) => navigate(`/owner/workspace/${proj.id}`)}
+                    />
+                  ))}
+                </div>
+              ) : (
+                <p className="tf-myproj-empty">No active projects.</p>
+              )}
+            </div>
+          )}
 
-          {completedProjects.length > 0 && (
+          {(filter === 'all' || filter === 'completed') && completedProjects.length > 0 && (
             <div className="tf-myproj-section">
               <div className="tf-myproj-section-title">
                 🏆 Completed & Archived ({completedProjects.length})
               </div>
               <div className="tf-myproj-grid">
-                {completedProjects.map((p) => renderProjectCard(p))}
+                {completedProjects.map((p) => (
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    variant="owner"
+                    onSelect={(proj) => navigate(`/owner/workspace/${proj.id}`)}
+                  />
+                ))}
               </div>
             </div>
           )}
