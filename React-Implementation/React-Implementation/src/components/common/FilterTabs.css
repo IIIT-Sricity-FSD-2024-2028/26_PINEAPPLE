@@ -1,0 +1,41 @@
+.tf-filter-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.tf-filter-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--border, #e5e7eb);
+  background: var(--card, #ffffff);
+  color: var(--muted-fg, #6b7280);
+  font-size: 0.84rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  outline: none;
+}
+
+.tf-filter-tab:hover {
+  background: var(--secondary, #f3f4f6);
+  color: var(--fg, #111827);
+  border-color: #d1d5db;
+}
+
+.tf-filter-tab.active,
+.tf-filter-tab.is-active {
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border-color: var(--tf-brand, #5f513f);
+}
+
+.tf-filter-tab-count {
+  font-size: 0.78rem;
+  opacity: 0.85;
+}

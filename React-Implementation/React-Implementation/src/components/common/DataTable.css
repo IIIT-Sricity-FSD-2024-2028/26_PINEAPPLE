@@ -1,0 +1,98 @@
+.tf-datatable-wrapper {
+  width: 100%;
+  background: var(--card, var(--surface, #ffffff));
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tf-datatable-wrapper--bordered {
+  border: 1px solid var(--border, #e5e7eb);
+}
+
+.tf-datatable-scroll {
+  width: 100%;
+  overflow-x: auto;
+}
+
+.tf-datatable {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.875rem;
+}
+
+.tf-datatable thead {
+  background: var(--table-header, var(--secondary, #f9fafb));
+  border-bottom: 1px solid var(--border, #e5e7eb);
+}
+
+.tf-datatable th {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted-fg, #6b7280);
+  white-space: nowrap;
+}
+
+.tf-datatable td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border, #f3f4f6);
+  color: var(--fg, #1f2937);
+  vertical-align: middle;
+}
+
+.tf-datatable-row:hover {
+  background-color: var(--hover-bg, var(--secondary, #f9fafb));
+}
+
+.tf-datatable-row--clickable {
+  cursor: pointer;
+}
+
+.tf-datatable-row--clickable:focus-visible {
+  outline: 2px solid var(--primary, #4f46e5);
+  outline-offset: -2px;
+}
+
+/* Alignments */
+.tf-datatable-align-left {
+  text-align: left;
+}
+
+.tf-datatable-align-center {
+  text-align: center;
+}
+
+.tf-datatable-align-right {
+  text-align: right;
+}
+
+/* Skeleton Loading State */
+.tf-datatable-skeleton-row td {
+  padding: 1rem;
+}
+
+.tf-datatable-skeleton-bar {
+  height: 16px;
+  width: 80%;
+  background: linear-gradient(90deg, var(--secondary, #f3f4f6) 25%, var(--border, #e5e7eb) 50%, var(--secondary, #f3f4f6) 75%);
+  background-size: 200% 100%;
+  border-radius: 4px;
+  animation: tf-skeleton-loading 1.5s infinite;
+}
+
+@keyframes tf-skeleton-loading {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+.tf-datatable-empty-wrap {
+  padding: 2.5rem 1rem;
+}

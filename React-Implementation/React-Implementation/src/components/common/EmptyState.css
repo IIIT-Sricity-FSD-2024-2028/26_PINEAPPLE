@@ -1,0 +1,49 @@
+.tf-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 3rem 1.5rem;
+  text-align: center;
+  background-color: var(--card, #ffffff);
+  border-radius: 12px;
+  border: 1px dashed var(--border, #d1d5db);
+  margin: 1.5rem 0;
+  width: 100%;
+}
+
+.tf-empty-state-icon {
+  color: var(--muted-fg, #9ca3af);
+  margin-bottom: 1rem;
+}
+
+.tf-empty-state-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--fg, #111827);
+  margin: 0 0 0.4rem 0;
+}
+
+.tf-empty-state-msg {
+  font-size: 0.9rem;
+  color: var(--muted-fg, #6b7280);
+  max-width: 400px;
+  margin: 0 0 1.25rem 0;
+  line-height: 1.5;
+}
+
+.tf-empty-state-btn {
+  background-color: var(--primary, #5f513f);
+  color: var(--primary-fg, #ffffff);
+  border: none;
+  padding: 0.6rem 1.25rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: opacity 0.15s ease;
+}
+
+.tf-empty-state-btn:hover {
+  opacity: 0.9;
+}

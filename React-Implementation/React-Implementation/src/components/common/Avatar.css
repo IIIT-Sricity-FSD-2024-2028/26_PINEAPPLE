@@ -1,0 +1,122 @@
+.tf-avatar {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  overflow: hidden;
+  font-weight: 700;
+  color: #ffffff;
+  user-select: none;
+  flex-shrink: 0;
+  text-transform: uppercase;
+  background-color: #4b5563;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.05);
+}
+
+/* Size Variants */
+.tf-avatar--xs {
+  width: 24px;
+  height: 24px;
+  font-size: 0.65rem;
+}
+
+.tf-avatar--sm {
+  width: 32px;
+  height: 32px;
+  font-size: 0.75rem;
+}
+
+.tf-avatar--md {
+  width: 40px;
+  height: 40px;
+  font-size: 0.9rem;
+}
+
+.tf-avatar--lg {
+  width: 48px;
+  height: 48px;
+  font-size: 1.1rem;
+}
+
+.tf-avatar--xl {
+  width: 64px;
+  height: 64px;
+  font-size: 1.4rem;
+}
+
+/* Image */
+.tf-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.tf-avatar-initials {
+  line-height: 1;
+  letter-spacing: -0.02em;
+}
+
+/* Distinct Stable Palettes for Initials */
+.tf-avatar-bg-0 {
+  background: linear-gradient(135deg, #4f46e5, #6366f1);
+}
+
+.tf-avatar-bg-1 {
+  background: linear-gradient(135deg, #0d9488, #14b8a6);
+}
+
+.tf-avatar-bg-2 {
+  background: linear-gradient(135deg, #d97706, #f59e0b);
+}
+
+.tf-avatar-bg-3 {
+  background: linear-gradient(135deg, #e11d48, #f43f5e);
+}
+
+.tf-avatar-bg-4 {
+  background: linear-gradient(135deg, #7c3aed, #8b5cf6);
+}
+
+.tf-avatar-bg-5 {
+  background: linear-gradient(135deg, #2563eb, #3b82f6);
+}
+
+/* Status Indicator Dot */
+.tf-avatar-status {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  border-radius: 50%;
+  border: 2px solid var(--card-bg, #ffffff);
+}
+
+.tf-avatar--xs .tf-avatar-status,
+.tf-avatar--sm .tf-avatar-status {
+  width: 8px;
+  height: 8px;
+}
+
+.tf-avatar--md .tf-avatar-status {
+  width: 10px;
+  height: 10px;
+}
+
+.tf-avatar--lg .tf-avatar-status,
+.tf-avatar--xl .tf-avatar-status {
+  width: 14px;
+  height: 14px;
+}
+
+.tf-avatar-status--online {
+  background-color: #10b981;
+}
+
+.tf-avatar-status--offline {
+  background-color: #9ca3af;
+}
+
+.tf-avatar-status--busy {
+  background-color: #ef4444;
+}
