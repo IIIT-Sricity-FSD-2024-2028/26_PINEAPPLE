@@ -1,0 +1,66 @@
+.tf-form-group {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 1.15rem;
+  width: 100%;
+}
+
+.tf-form-label {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--fg, #374151);
+  margin-bottom: 0.4rem;
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.tf-form-required {
+  color: var(--destructive, #ef4444);
+}
+
+.tf-form-control {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.92rem;
+  color: var(--fg, #111827);
+  background-color: var(--input-bg, var(--card, #ffffff));
+  border: 1px solid var(--border, #d1d5db);
+  border-radius: 8px;
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.tf-form-control:focus {
+  border-color: var(--primary, #5f513f);
+  box-shadow: 0 0 0 3px rgba(178, 138, 100, 0.2);
+}
+
+.tf-form-control--textarea {
+  resize: vertical;
+  min-height: 80px;
+}
+
+.tf-form-group--error .tf-form-control {
+  border-color: #ef4444;
+}
+
+.tf-form-group--error .tf-form-control:focus {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.tf-form-error {
+  font-size: 0.78rem;
+  color: #dc2626;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
+
+.tf-form-helper {
+  font-size: 0.78rem;
+  color: #6b7280;
+  margin-top: 0.35rem;
+  margin-bottom: 0;
+}
