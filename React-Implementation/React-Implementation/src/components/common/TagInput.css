@@ -1,0 +1,102 @@
+.tf-tag-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 100%;
+}
+
+.tf-tag-input-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg, #0f172a);
+}
+
+.tf-tag-input-box {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 42px;
+  padding: 6px 10px;
+  background-color: var(--input-bg, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  cursor: text;
+}
+
+.tf-tag-input-box:focus-within {
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
+}
+
+.tf-tag-input-box.has-error {
+  border-color: var(--danger, #ef4444);
+}
+
+.tf-tag-input-box.has-error:focus-within {
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.12);
+}
+
+.tf-tag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  background-color: var(--tag-bg, #eff6ff);
+  color: var(--tag-fg, #1d4ed8);
+  border: 1px solid rgba(37, 99, 235, 0.18);
+  border-radius: 9999px;
+  font-size: 0.8rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.tf-tag-remove-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  background: none;
+  border: none;
+  color: inherit;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 50%;
+  opacity: 0.7;
+  transition: opacity 0.15s ease, background-color 0.15s ease;
+}
+
+.tf-tag-remove-btn:hover {
+  opacity: 1;
+  background-color: rgba(0, 0, 0, 0.1);
+}
+
+.tf-tag-native-input {
+  flex: 1;
+  min-width: 120px;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--fg, #0f172a);
+  outline: none;
+  padding: 2px 4px;
+}
+
+.tf-tag-native-input::placeholder {
+  color: var(--muted-fg, #94a3b8);
+}
+
+.tf-tag-input-error {
+  font-size: 0.75rem;
+  color: var(--danger, #ef4444);
+  font-weight: 500;
+}
+
+.tf-tag-input-helper {
+  font-size: 0.75rem;
+  color: var(--muted-fg, #64748b);
+}
