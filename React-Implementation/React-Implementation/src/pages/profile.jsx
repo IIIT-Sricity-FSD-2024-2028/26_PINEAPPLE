@@ -1,6 +1,15 @@
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import usersApi from '../services/usersApi';
+import projectsApi, { isProjectActive, isProjectLocked } from '../services/projectsApi';
+import tasksApi from '../services/tasksApi';
+import joinRequestsApi from '../services/joinRequestsApi';
+import mentorshipApi from '../services/mentorshipApi';
+import Avatar from '../components/common/Avatar';
+import Badge from '../components/common/Badge';
+import DataTable from '../components/common/DataTable';
+import StatCard from '../components/common/StatCard';
+import EmptyState from '../components/common/EmptyState';
 import "./profile.css";
 
 // --- SVGs ---
@@ -54,55 +63,207 @@ const Profile = () => {
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const userId = localStorage.getItem("teamforge.backendUserId") || "1";
-        
-        // Fetch dynamic user data from backend
-        const data = await usersApi.get(userId);
+        const userId = localStorage.getItem("teamforge.backendUserId") || user?.id || "";
+        if (!userId) {
+          setLoading(false);
+          return;
+        }
+
+        const [data, allProjectsRes, joinRequestsRes, badgesRes] = await Promise.all([
+          usersApi.get(userId).catch(() => ({})),
+          projectsApi.list().catch(() => []),
+          joinRequestsApi.list({ userId }).catch(() => []),
+          mentorshipApi.getBadges(userId).catch(() => []),
+        ]);
+
+        const allProjects = Array.isArray(allProjectsRes) ? allProjectsRes : (allProjectsRes?.data || []);
+        const userJoinRequests = Array.isArray(joinRequestsRes) ? joinRequestsRes : (joinRequestsRes?.data || []);
+
+        const currentUserIdStr = String(userId);
+        const resolvedName = (user?.name || data?.name || data?.profile?.fullName || "").toLowerCase();
+        const userEmail = (user?.email || data?.email || "").toLowerCase();
+
+        // Relevant projects
+        const relevantProjectIds = new Set();
+        const projectMap = new Map();
+        const ownedProjects = [];
+        const joinedProjects = [];
+
+        allProjects.forEach((p) => {
+          const pid = String(p.id);
+          projectMap.set(pid, p);
+          const isOwner = String(p.ownerId) === currentUserIdStr || (p.owner && p.owner.toLowerCase() === resolvedName);
+          const isCollab = Array.isArray(p.collaborators) && p.collaborators.some((c) => {
+            if (typeof c === "string") {
+              return c === currentUserIdStr || c.toLowerCase() === resolvedName || c.toLowerCase() === userEmail;
+            }
+            return (
+              String(c.id || c.userId) === currentUserIdStr ||
+              (c.name && c.name.toLowerCase() === resolvedName) ||
+              (c.email && c.email.toLowerCase() === userEmail)
+            );
+          });
+          if (isOwner) {
+            ownedProjects.push(p);
+            relevantProjectIds.add(pid);
+          } else if (isCollab) {
+            joinedProjects.push(p);
+            relevantProjectIds.add(pid);
+          }
+        });
+
+        userJoinRequests.forEach((req) => {
+          const status = (req.status || "").toLowerCase();
+          if ((status === "approved" || status === "accepted" || status === "completed") && req.projectId) {
+            relevantProjectIds.add(String(req.projectId));
+          }
+        });
+
+        // Tasks across relevant projects
+        let userTasks = [];
+        if (relevantProjectIds.size > 0) {
+          try {
+            const rawTasks = await tasksApi.listForProjects(Array.from(relevantProjectIds));
+            const allTasks = Array.isArray(rawTasks) ? rawTasks : [];
+            userTasks = allTasks.filter((t) => {
+              const aId = String(t.assigneeId || "");
+              const aName = (t.assignee || t.assignedTo || "").toLowerCase();
+              return aId === currentUserIdStr || aName === resolvedName || aName === userEmail;
+            });
+          } catch (err) {
+            console.warn("Could not load tasks for projects:", err);
+          }
+        }
+
+        // Contributions list
+        const contributionList = [];
+        const seenKeys = new Set();
+
+        // 1. Tasks
+        userTasks.forEach((t) => {
+          const rawStatus = (t.status || "").toLowerCase();
+          const isApproved = rawStatus === "completed" || rawStatus === "approved" || rawStatus === "done";
+          const proj = projectMap.get(String(t.projectId));
+          const projName = proj ? (proj.title || proj.name) : (t.projectName || "Project");
+          const key = `task-${t.id}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            contributionList.push({
+              id: key,
+              projectName: projName,
+              title: t.title || "Task contribution",
+              status: isApproved ? "Approved" : (rawStatus === "submitted" || rawStatus === "in review" || rawStatus === "inreview") ? "In Review" : "In Progress",
+              xp: isApproved ? (Number(t.xpReward) || 50) : 0,
+              date: t.updatedAt || t.createdAt || new Date().toISOString(),
+              proofLink: t.proofLink || t.proofUrl || null,
+            });
+          }
+        });
+
+        // 2. Owned projects / deliverables
+        ownedProjects.forEach((p) => {
+          const key = `owned-proj-${p.id}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            const isCompleted = (p.status || "").toLowerCase() === "completed";
+            contributionList.push({
+              id: key,
+              projectName: p.title || p.name,
+              title: isCompleted ? "Deliverable published & project completed" : "Project created & managed",
+              status: isCompleted ? "Approved" : "Active",
+              xp: isCompleted ? 150 : 0,
+              date: p.completedAt || p.updatedAt || p.createdAt || new Date().toISOString(),
+              proofLink: p.deliverableUrl || p.finalLink || null,
+            });
+          }
+        });
+
+        // 3. Mentored projects
+        if (Array.isArray(data.data?.mentoredProjects)) {
+          data.data.mentoredProjects.forEach((mp, idx) => {
+            const key = `mentor-${idx}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              contributionList.push({
+                id: key,
+                projectName: mp.name,
+                title: mp.contribution || `Mentored ${mp.owner}'s project`,
+                status: mp.status === "Completed" ? "Approved" : mp.status || "Completed",
+                xp: 100,
+                date: new Date().toISOString(),
+                proofLink: null,
+              });
+            }
+          });
+        }
+
+        // Sort by newest first
+        contributionList.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+        const totalProjectsCount = ownedProjects.length + joinedProjects.length;
+        const totalXp = Number(data.profile?.xp ?? data.xp ?? 0);
+        const totalRep = Number(data.profile?.rep ?? data.rep ?? 0);
+
+        const rawBadges = Array.isArray(badgesRes) && badgesRes.length > 0
+          ? badgesRes
+          : (Array.isArray(data.data?.mentorRecommendations) ? data.data.mentorRecommendations : []);
+
+        const normalizedRecommendations = rawBadges.map((b, idx) => ({
+          id: b.id || `rec-${idx}`,
+          badgeName: b.badgeName || b.badgeType || "Technical Excellence",
+          mentorName: b.mentorName || b.mentor || "Mentor",
+          projectTitle: b.projectTitle || b.project || "Project",
+          comment: b.comment || b.note || "",
+          awardedAt: b.awardedAt || b.timestamp || null,
+        }));
+
+        const hasAnyBadge = normalizedRecommendations.length > 0 || Boolean(data.profile?.hasMentorBadge);
 
         setProfileData({
           name: user?.name || user?.profile?.fullName || data.profile?.fullName || data.name || "User",
           bio: data.profile?.bio || user?.profile?.bio || user?.bio || "No bio available.",
           avatarUrl: user?.avatarUrl || user?.profile?.avatarUrl || data.profile?.avatarUrl || data.avatarUrl || null,
           initials: (user?.name || user?.profile?.fullName || data.profile?.fullName || data.name || "US").substring(0, 2).toUpperCase(),
-          hasMentorBadge: data.profile?.mentorUnlocked || false,
+          hasMentorBadge: hasAnyBadge,
           
           title: data.profile?.title || "Team Member",
           uni: data.profile?.uni || "Unknown Organization",
           joined: data.profile?.joined || "Unknown Date",
 
           stats: {
-            xp: data.profile?.xp || 0,
-            rep: data.profile?.rep || 0,
-            projects: data.data?.projects?.length || 0,
-            tasks: data.profile?.tasksCount || 0
+            xp: totalXp,
+            rep: totalRep,
+            projects: totalProjectsCount || (data.data?.projects?.length || 0),
+            tasks: userTasks.length || (data.profile?.tasksCount || 0)
           },
           skills: data.profile?.skills || user?.profile?.skills || [],
           
-          activeProjects: (data.data?.projects || []).filter(p => p.status !== 'Completed'),
-          completedProjects: (data.data?.projects || []).filter(p => p.status === 'Completed'),
+          activeProjects: [...ownedProjects, ...joinedProjects].filter(isProjectActive),
+          completedProjects: [...ownedProjects, ...joinedProjects].filter(isProjectLocked),
 
-          mentorRecommendations: data.data?.mentorRecommendations || [],
-          mentoredProjects: data.data?.mentoredProjects || []
+          mentorRecommendations: normalizedRecommendations,
+          mentoredProjects: data.data?.mentoredProjects || [],
+          contributions: contributionList,
         });
 
       } catch (error) {
-        console.error("Failed to fetch profile from API. Are you sure the NestJS backend is running?", error);
+        console.error("Failed to fetch profile from API:", error);
         
-        // Bare-minimum fallback so the page doesn't fatally crash if backend is down
         setProfileData({
-          name: user?.name || user?.profile?.fullName || "Offline User",
-          title: "Developer",
-          uni: "Offline",
+          name: user?.name || user?.profile?.fullName || "User",
+          title: "Team Member",
+          uni: "Unknown",
           joined: "N/A",
-          bio: "Cannot connect to the backend database.",
-          initials: (user?.name || user?.profile?.fullName || "OU").substring(0, 2).toUpperCase(),
+          bio: "No bio available.",
+          initials: (user?.name || user?.profile?.fullName || "US").substring(0, 2).toUpperCase(),
           hasMentorBadge: false,
           stats: { xp: 0, rep: 0, projects: 0, tasks: 0 },
           activeProjects: [],
           skills: [],
           completedProjects: [],
           mentorRecommendations: [],
-          mentoredProjects: []
+          mentoredProjects: [],
+          contributions: [],
         });
       } finally {
         setLoading(false);
@@ -110,6 +271,17 @@ const Profile = () => {
     };
 
     fetchProfile();
+
+    const handleFocus = () => {
+      fetchProfile();
+    };
+    window.addEventListener("focus", handleFocus);
+    window.addEventListener("teamforge:badge_awarded", handleFocus);
+
+    return () => {
+      window.removeEventListener("focus", handleFocus);
+      window.removeEventListener("teamforge:badge_awarded", handleFocus);
+    };
   }, [user]);
 
   if (loading || !profileData) {
@@ -127,17 +299,12 @@ const Profile = () => {
       <div className="prof-glass-card">
         <div className="prof-header-wrap">
           {/* Avatar */}
-          <div className="prof-avatar-lg">
-            {profileData.avatarUrl ? (
-              <img
-                src={profileData.avatarUrl.startsWith('http') || profileData.avatarUrl.startsWith('data:') || profileData.avatarUrl.startsWith('blob:') ? profileData.avatarUrl : `http://localhost:3000${profileData.avatarUrl}`}
-                alt={profileData.name}
-                style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }}
-              />
-            ) : (
-              profileData.initials
-            )}
-          </div>
+          <Avatar
+            src={profileData.avatarUrl ? (profileData.avatarUrl.startsWith('http') || profileData.avatarUrl.startsWith('data:') || profileData.avatarUrl.startsWith('blob:') ? profileData.avatarUrl : `http://localhost:3000${profileData.avatarUrl}`) : null}
+            name={profileData.name}
+            size="xl"
+            className="prof-avatar-lg"
+          />
           
           {/* Info */}
           <div className="prof-info-col">
@@ -162,35 +329,27 @@ const Profile = () => {
         </div>
 
         {/* Stats Row */}
-        <div className="prof-stats-grid">
-          <div className="prof-stat-pill">
-            <div className="prof-icon-xp"><XPIcon /></div>
-            <div>
-              <div className="prof-stat-label">XP</div>
-              <div className="prof-stat-val">{profileData.stats.xp.toLocaleString()}</div>
-            </div>
-          </div>
-          <div className="prof-stat-pill">
-            <div className="prof-icon-rep"><RepIcon /></div>
-            <div>
-              <div className="prof-stat-label">Reputation</div>
-              <div className="prof-stat-val">{profileData.stats.rep}</div>
-            </div>
-          </div>
-          <div className="prof-stat-pill">
-            <div className="prof-icon-proj"><ProjectsIcon /></div>
-            <div>
-              <div className="prof-stat-label">Projects</div>
-              <div className="prof-stat-val">{profileData.stats.projects}</div>
-            </div>
-          </div>
-          <div className="prof-stat-pill">
-            <div className="prof-icon-tasks"><TasksIcon /></div>
-            <div>
-              <div className="prof-stat-label">Tasks</div>
-              <div className="prof-stat-val">{profileData.stats.tasks}</div>
-            </div>
-          </div>
+        <div className="prof-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '20px' }}>
+          <StatCard
+            icon={<XPIcon />}
+            label="XP Points"
+            value={profileData.stats.xp.toLocaleString()}
+          />
+          <StatCard
+            icon={<RepIcon />}
+            label="Reputation"
+            value={profileData.stats.rep}
+          />
+          <StatCard
+            icon={<ProjectsIcon />}
+            label="Projects"
+            value={profileData.stats.projects}
+          />
+          <StatCard
+            icon={<TasksIcon />}
+            label="Tasks"
+            value={profileData.stats.tasks}
+          />
         </div>
       </div>
 
@@ -205,7 +364,13 @@ const Profile = () => {
               <div className="prof-proj-title">{proj.name}</div>
               <div className="prof-proj-desc">{proj.role || "Member"} &middot; {proj.contribution || "Contributor"}</div>
             </div>
-          )) : <div className="prof-empty-state">No active projects.</div>}
+          )) : (
+            <EmptyState
+              icon="📁"
+              title="No active projects"
+              message="You are not currently active on any ongoing projects."
+            />
+          )}
         </div>
 
         {/* Skills */}
@@ -245,15 +410,100 @@ const Profile = () => {
 
         {/* Mentor Recommendations */}
         <div className="prof-glass-card">
-          <h3 className="prof-sub-title">Mentor Recommendations</h3>
-          {profileData.mentorRecommendations.length ? profileData.mentorRecommendations.map((rec, idx) => (
-            <div key={idx} className="prof-proj-row">
-              <div className="prof-proj-title">{rec.project}</div>
-              <div className="prof-proj-desc">Recommended by {rec.mentor} &middot; "{rec.note}"</div>
+          <h3 className="prof-sub-title">
+            Mentor Recommendations {profileData.mentorRecommendations.length > 0 ? `(${profileData.mentorRecommendations.length})` : ''}
+          </h3>
+          {profileData.mentorRecommendations.length > 0 ? (
+            <div className="prof-recommendations-list">
+              {profileData.mentorRecommendations.map((rec, idx) => (
+                <div key={rec.id || idx} className="prof-badge-row">
+                  <div className="prof-badge-header">
+                    <span className="prof-badge-chip">
+                      <BadgeIcon /> {rec.badgeName}
+                    </span>
+                    {rec.awardedAt && (
+                      <span className="prof-badge-date">
+                        {new Date(rec.awardedAt).toLocaleDateString(undefined, {
+                          year: 'numeric',
+                          month: 'short',
+                          day: 'numeric',
+                        })}
+                      </span>
+                    )}
+                  </div>
+                  <div className="prof-badge-meta">
+                    <span className="prof-badge-giver">
+                      Given by <strong>{rec.mentorName}</strong>
+                    </span>
+                    <span className="prof-badge-sep">&bull;</span>
+                    <span className="prof-badge-project">{rec.projectTitle}</span>
+                  </div>
+                  {rec.comment && (
+                    <div className="prof-badge-quote">
+                      &ldquo;{rec.comment}&rdquo;
+                    </div>
+                  )}
+                </div>
+              ))}
             </div>
-          )) : <div className="prof-empty-state">No recommendation badges yet.</div>}
+          ) : (
+            <div className="prof-empty-state">No recommendation badges yet.</div>
+          )}
         </div>
 
+      </div>
+
+      {/* Contribution History */}
+      <div className="prof-glass-card">
+        <h3 className="prof-sub-title">Contribution History</h3>
+        <DataTable
+          columns={[
+            {
+              header: 'Project',
+              key: 'projectName',
+              render: (item) => (
+                <div>
+                  <div style={{ fontWeight: 600 }}>{item.projectName}</div>
+                  <div style={{ fontSize: '0.8rem', color: 'var(--muted-fg, #6b7280)' }}>{item.title}</div>
+                </div>
+              ),
+            },
+            {
+              header: 'Date & XP',
+              key: 'date',
+              render: (item) => (
+                <div>
+                  <span>{new Date(item.date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}</span>
+                  {item.xp > 0 && <span style={{ marginLeft: '0.5rem', color: '#2563eb', fontWeight: 600 }}>+{item.xp} XP</span>}
+                </div>
+              ),
+            },
+            {
+              header: 'Proof',
+              key: 'proofLink',
+              render: (item) => (
+                item.proofLink ? (
+                  <a href={item.proofLink} target="_blank" rel="noreferrer" className="prof-link">
+                    Proof <LinkIcon />
+                  </a>
+                ) : <span style={{ color: '#9ca3af' }}>—</span>
+              ),
+            },
+            {
+              header: 'Status',
+              key: 'status',
+              align: 'right',
+              render: (item) => (
+                <Badge variant={item.status === 'Approved' || item.status === 'Completed' ? 'completed' : 'in-progress'}>
+                  {item.status}
+                </Badge>
+              ),
+            },
+          ]}
+          data={profileData.contributions || []}
+          emptyTitle="No contributions yet."
+          emptyMessage="Complete tasks and submit approved deliverables to earn XP and record your contributions."
+        />
       </div>
 
       {/* Row 4: Mentored Projects */}
