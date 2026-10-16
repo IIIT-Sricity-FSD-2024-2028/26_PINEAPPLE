@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router-dom";
+import { Routes, Route, Navigate } from "react-router-dom";
 
 import LandingPage from "../pages/landingpage";
 import Login from "../pages/Login";
@@ -23,17 +23,24 @@ import AdminLogin from "../pages/admin/AdminLogin";
 import AdminDashboard from "../pages/admin/AdminDashboard";
 import AdminLayout from "../pages/admin/AdminLayout";
 import AdminUsers from "../pages/admin/AdminUsers";
+import AdminUserDetails from "../pages/admin/AdminUserDetails";
 import AdminProjects from "../pages/admin/AdminProjects";
 import AdminProjectDetails from "../pages/admin/AdminProjectDetails";
 import SuperuserAdmins from "../pages/admin/SuperuserAdmins";
+import SuperuserConfig from "../pages/admin/SuperuserConfig";
 import MentorRevenue from "../pages/admin/MentorRevenue";
 import AuditLog from "../pages/admin/AuditLog";
 import AdminMentorApps from "../pages/admin/AdminMentorApps";
 import MentoredProjects from "../pages/mentor/MentoredProjects";
 import MentorRequests from "../pages/mentor/MentorRequests";
 import MentorProjectWorkspace from "../pages/mentor/MentorProjectWorkspace";
+import MentorApplication from "../pages/mentor/MentorApplication";
+import MyMentorProfile from "../pages/mentor/MyMentorProfile";
+import MentorEarnings from "../pages/mentor/MentorEarnings";
 import ProtectedRoute from "./ProtectedRoute";
 import AdminProtectedRoute from "./AdminProtectedRoute";
+import MentorProtectedRoute from "./MentorProtectedRoute";
+import OwnerProtectedRoute from "./OwnerProtectedRoute";
 
 const AppRoutes = () => {
   return (
@@ -50,12 +57,14 @@ const AppRoutes = () => {
         <Route path="/admin" element={<AdminLayout />}>
           <Route index element={<AdminDashboard />} />
           <Route path="users" element={<AdminUsers />} />
+          <Route path="users/:id" element={<AdminUserDetails />} />
           <Route path="projects" element={<AdminProjects />} />
           <Route path="projects/:id" element={<AdminProjectDetails />} />
           <Route path="mentor-apps" element={<AdminMentorApps />} />
           <Route path="mentor-revenue" element={<MentorRevenue />} />
           <Route path="audit" element={<AuditLog />} />
           <Route path="su-admins" element={<SuperuserAdmins />} />
+          <Route path="su-config" element={<SuperuserConfig />} />
         </Route>
       </Route>
       
@@ -69,19 +78,34 @@ const AppRoutes = () => {
           <Route path="/my-work" element={<MyWork />} />
           <Route path="/workspace/:projectId" element={<CollaboratorWorkspace />} />
 
-          {/* Project Owner Role Routes */}
-          <Route path="/create-project" element={<CreateProject />} />
-          <Route path="/my-projects" element={<MyProjects />} />
-          <Route path="/mentors" element={<MentorsDirectory />} />
-          <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
-          <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+          {/* Project Owner Role Routes (Guarded for owners) */}
+          <Route element={<OwnerProtectedRoute />}>
+            <Route path="/create-project" element={<CreateProject />} />
+            <Route path="/my-projects" element={<MyProjects />} />
+            <Route path="/owner/mentors" element={<MentorsDirectory />} />
+            <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
+            <Route path="/owner/dashboard" element={<OwnerDashboard />} />
+          </Route>
 
-          {/* Mentor Role Routes */}
-          <Route path="/mentor/projects" element={<MentoredProjects />} />
-          <Route path="/mentored-projects" element={<MentoredProjects />} />
-          <Route path="/mentor/requests" element={<MentorRequests />} />
-          <Route path="/mentor-requests" element={<MentorRequests />} />
-          <Route path="/mentor/workspace/:projectId" element={<MentorProjectWorkspace />} />
+          {/* Legacy route redirect for mentors directory */}
+          <Route path="/mentors" element={<Navigate to="/owner/mentors" replace />} />
+
+          {/* Mentor Application Route (Open for pending/new mentors) */}
+          <Route path="/mentor/apply" element={<MentorApplication />} />
+          <Route path="/mentor-application" element={<MentorApplication />} />
+
+          {/* Mentor Role Routes (Locked until admin approval) */}
+          <Route element={<MentorProtectedRoute />}>
+            <Route path="/mentor/projects" element={<MentoredProjects />} />
+            <Route path="/mentored-projects" element={<MentoredProjects />} />
+            <Route path="/mentor/requests" element={<MentorRequests />} />
+            <Route path="/mentor-requests" element={<MentorRequests />} />
+            <Route path="/mentor/earnings" element={<MentorEarnings />} />
+            <Route path="/mentor-earnings" element={<MentorEarnings />} />
+            <Route path="/mentor/profile" element={<MyMentorProfile />} />
+            <Route path="/mentor-profile" element={<MyMentorProfile />} />
+            <Route path="/mentor/workspace/:projectId" element={<MentorProjectWorkspace />} />
+          </Route>
 
           {/* Shared / Global Routes */}
           <Route path="/help" element={<Help />} />
