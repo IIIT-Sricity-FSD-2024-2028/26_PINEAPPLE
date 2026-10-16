@@ -1,4 +1,3 @@
-import React from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import './AdminLayout.css';
 
@@ -6,7 +5,16 @@ const AdminLayout = () => {
   const navigate = useNavigate();
 
   const handleExit = () => {
-    navigate('/dashboard');
+    sessionStorage.removeItem('teamforge.portalRole');
+    sessionStorage.removeItem('teamforge.adminToken');
+    sessionStorage.removeItem('teamforge.isSuperUser');
+    sessionStorage.removeItem('teamforge.adminPermissions');
+    sessionStorage.removeItem('teamforge.adminEmail');
+    sessionStorage.removeItem('teamforge.adminName');
+    sessionStorage.removeItem('portalRole');
+    sessionStorage.removeItem('adminToken');
+    sessionStorage.removeItem('isSuperUser');
+    navigate('/', { replace: true });
   };
 
   const portalRole = sessionStorage.getItem('teamforge.portalRole');
@@ -19,6 +27,22 @@ const AdminLayout = () => {
     role?.toLowerCase() === 'superuser' ||
     role?.toLowerCase() === 'super user';
 
+  const permissionsRaw = sessionStorage.getItem('teamforge.adminPermissions');
+  let permissions = null;
+  if (permissionsRaw) {
+    try {
+      permissions = JSON.parse(permissionsRaw);
+    } catch {
+      permissions = null;
+    }
+  }
+
+  const hasPermission = (key) => {
+    if (isSuperUser) return true;
+    if (!permissions || !Array.isArray(permissions)) return true;
+    return permissions.includes(key);
+  };
+
   return (
     <div id="admin-dashboard-screen" className="admin-layout">
       <aside className="admin-sidebar">
@@ -30,24 +54,36 @@ const AdminLayout = () => {
           </span>
         </div>
         
-        <NavLink end to="/admin" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          📊 Dashboard
-        </NavLink>
-        <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          👥 Users
-        </NavLink>
-        <NavLink to="/admin/projects" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          📁 Projects
-        </NavLink>
-        <NavLink to="/admin/mentor-apps" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          📋 Mentor Applications
-        </NavLink>
-        <NavLink to="/admin/mentor-revenue" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          💰 Revenue &amp; Escrow
-        </NavLink>
-        <NavLink to="/admin/audit" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
-          📜 Audit Log
-        </NavLink>
+        {hasPermission('dashboard') && (
+          <NavLink end to="/admin" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            📊 Dashboard
+          </NavLink>
+        )}
+        {hasPermission('users') && (
+          <NavLink to="/admin/users" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            👥 Users
+          </NavLink>
+        )}
+        {hasPermission('projects') && (
+          <NavLink to="/admin/projects" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            📁 Projects
+          </NavLink>
+        )}
+        {hasPermission('mentor_apps') && (
+          <NavLink to="/admin/mentor-apps" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            📋 Mentor Applications
+          </NavLink>
+        )}
+        {hasPermission('revenue') && (
+          <NavLink to="/admin/mentor-revenue" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            💰 Revenue &amp; Escrow
+          </NavLink>
+        )}
+        {hasPermission('audit') && (
+          <NavLink to="/admin/audit" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            📜 Audit Log
+          </NavLink>
+        )}
 
         {isSuperUser && (
           <div className="su-only-nav">
