@@ -51,32 +51,42 @@
   gap: 16px;
 }
 
-.admin-form-group {
+.admin-login-card .tf-form-label,
+.admin-login-form .tf-form-label,
+.admin-login-card label,
+.admin-form-group label {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  font-size: 14px;
+  font-weight: 600;
+  color: #ffffff !important;
+  margin-bottom: 8px;
   text-align: left;
 }
 
-.admin-form-group label {
-  display: block;
-  font-size: 14px;
-  color: var(--text-muted, #8b949e);
-  margin-bottom: 8px;
-}
-
+.admin-login-card .tf-form-control,
 .admin-form-group input {
   width: 100%;
   padding: 12px;
   background: var(--bg-input, #0d1117);
   border: 1px solid var(--border-color, #30363d);
   border-radius: 6px;
-  color: var(--text-main, #c9d1d9);
+  color: #ffffff;
   font-size: 16px;
   transition: border-color 0.2s;
   box-sizing: border-box;
 }
 
+.admin-login-card .tf-form-control:focus,
 .admin-form-group input:focus {
   outline: none;
   border-color: #58a6ff;
+}
+
+.admin-login-card .tf-form-control::placeholder,
+.admin-form-group input::placeholder {
+  color: #8b949e;
 }
 
 .admin-login-btn {
