@@ -1,11 +1,17 @@
-import React, { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import projectsApi from '../../services/projectsApi';
+import projectsApi, { isProjectLocked } from '../../services/projectsApi';
 import tasksApi from '../../services/tasksApi';
 import communicationApi from '../../services/communicationApi';
 import mentorshipApi from '../../services/mentorshipApi';
-import mentorRequestsApi from '../../services/mentorRequestsApi';
+import TaskCard from '../../components/features/TaskCard';
+import ChatBox from '../../components/features/ChatBox';
+import EmptyState from '../../components/common/EmptyState';
+import Avatar from '../../components/common/Avatar';
+import FilterTabs from '../../components/common/FilterTabs';
+import StatCard from '../../components/common/StatCard';
+import { calculateProjectProgress } from '../../utils/progress';
 import './mentorProjectWorkspace.css';
 
 /* ── Extracted SVG Functional Components ── */
@@ -16,38 +22,10 @@ const BackArrowIcon = () => (
   </svg>
 );
 
-const ExternalLinkIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-    <polyline points="15 3 21 3 21 9" />
-    <line x1="10" y1="14" x2="21" y2="3" />
-  </svg>
-);
-
 const AwardIcon = () => (
   <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <circle cx="12" cy="8" r="7" />
     <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88" />
-  </svg>
-);
-
-const CheckIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <polyline points="20 6 9 17 4 12" />
-  </svg>
-);
-
-const XIcon = () => (
-  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="18" y1="6" x2="6" y2="18" />
-    <line x1="6" y1="6" x2="18" y2="18" />
-  </svg>
-);
-
-const SendIcon = () => (
-  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <line x1="22" y1="2" x2="11" y2="13" />
-    <polygon points="22 2 15 22 11 13 2 9 22 2" />
   </svg>
 );
 
@@ -63,116 +41,82 @@ const MentorProjectWorkspace = () => {
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
 
-  // Review Modal state for task approval/rejection
-  const [reviewModalTask, setReviewModalTask] = useState(null);
-  const [reviewFeedback, setReviewFeedback] = useState('');
-  const [submittingReview, setSubmittingReview] = useState(false);
-
   // Recommendation Badge Modal state
   const [badgeModalMember, setBadgeModalMember] = useState(null);
   const [badgeType, setBadgeType] = useState('Technical Excellence');
   const [badgeComment, setBadgeComment] = useState('');
   const [submittingBadge, setSubmittingBadge] = useState(false);
   const [awardedMembers, setAwardedMembers] = useState(new Set());
-
-  // Chat input
-  const [chatInput, setChatInput] = useState('');
   const [sendingMsg, setSendingMsg] = useState(false);
-  const chatBottomRef = useRef(null);
-
-  const loadWorkspace = async () => {
-    setLoading(true);
-    try {
-      const [projData, tasksData, msgsData] = await Promise.all([
-        projectsApi.get(projectId).catch(() => null),
-        tasksApi.list({ projectId }).catch(() => []),
-        communicationApi.getMessages(projectId).catch(() => []),
-      ]);
-
-      setProject(projData);
-      setTasks(Array.isArray(tasksData) ? tasksData : []);
-      setMessages(Array.isArray(msgsData) ? msgsData : []);
-    } catch (err) {
-      console.error('Failed to load mentor workspace:', err);
-      setFeedback({ type: 'error', message: 'Failed to load project details.' });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   useEffect(() => {
-    if (projectId) {
-      loadWorkspace();
-    }
+    let isMounted = true;
+    if (!projectId) return;
+
+    const fetchWorkspace = async () => {
+      try {
+        const [projData, tasksData, msgsData, badgesData] = await Promise.all([
+          projectsApi.get(projectId).catch(() => null),
+          tasksApi.list({ projectId }).catch(() => []),
+          communicationApi.getMessages(projectId).catch(() => []),
+          mentorshipApi.getBadgesByProject(projectId).catch(() => []),
+        ]);
+
+        if (isMounted) {
+          setProject(projData);
+          setTasks(Array.isArray(tasksData) ? tasksData : []);
+          setMessages(Array.isArray(msgsData) ? msgsData : []);
+          const existingAwarded = new Set();
+          if (Array.isArray(badgesData)) {
+            badgesData.forEach((b) => {
+              if (b.recipientId) existingAwarded.add(String(b.recipientId).toLowerCase());
+              if (b.recipientName) existingAwarded.add(String(b.recipientName).toLowerCase());
+              if (b.collaboratorId) existingAwarded.add(String(b.collaboratorId).toLowerCase());
+            });
+          }
+          setAwardedMembers(existingAwarded);
+        }
+      } catch (err) {
+        console.error('Failed to load mentor workspace:', err);
+        if (isMounted) {
+          setFeedback({ type: 'error', message: 'Failed to load project details.' });
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    fetchWorkspace();
+
+    return () => {
+      isMounted = false;
+    };
   }, [projectId]);
 
+  // Real-time chat polling (polls every 3 seconds while on chat tab)
   useEffect(() => {
-    if (activeTab === 'chat') {
-      chatBottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }
-  }, [messages, activeTab]);
+    if (!projectId || activeTab !== 'chat') return;
+    let isMounted = true;
+    const interval = setInterval(async () => {
+      try {
+        const fresh = await communicationApi.getMessages(projectId);
+        if (isMounted && Array.isArray(fresh)) {
+          setMessages(fresh);
+        }
+      } catch {
+        /* non-critical background poll */
+      }
+    }, 3000);
 
-  /* ── Task Review Handlers ── */
-  const handleOpenReviewModal = (task) => {
-    setReviewModalTask(task);
-    setReviewFeedback('');
-  };
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
+  }, [projectId, activeTab]);
 
-  const handleApproveTask = async () => {
-    if (!reviewModalTask) return;
-    setSubmittingReview(true);
-    try {
-      await tasksApi.updateStatus(reviewModalTask.id, {
-        status: 'Completed',
-        feedback: reviewFeedback || 'Task approved by mentor.',
-      });
 
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === reviewModalTask.id ? { ...t, status: 'Completed', proofStatus: 'Approved' } : t
-        )
-      );
-
-      setFeedback({
-        type: 'success',
-        message: `Task "${reviewModalTask.title}" approved successfully.`,
-      });
-      setReviewModalTask(null);
-    } catch (err) {
-      console.error('Failed to approve task:', err);
-      setFeedback({ type: 'error', message: err.message || 'Failed to approve task.' });
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
-
-  const handleRejectTask = async () => {
-    if (!reviewModalTask) return;
-    setSubmittingReview(true);
-    try {
-      await tasksApi.updateStatus(reviewModalTask.id, {
-        status: 'In Progress',
-        feedback: reviewFeedback || 'Mentor requested revisions for this submission.',
-      });
-
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === reviewModalTask.id ? { ...t, status: 'In Progress', proofStatus: 'Returned' } : t
-        )
-      );
-
-      setFeedback({
-        type: 'info',
-        message: `Task "${reviewModalTask.title}" returned for revision.`,
-      });
-      setReviewModalTask(null);
-    } catch (err) {
-      console.error('Failed to return task for revision:', err);
-      setFeedback({ type: 'error', message: err.message || 'Failed to update task status.' });
-    } finally {
-      setSubmittingReview(false);
-    }
-  };
 
   /* ── Issue Recommendation Badge Handler ── */
   const handleOpenBadgeModal = (member) => {
@@ -186,13 +130,21 @@ const MentorProjectWorkspace = () => {
     if (!badgeModalMember) return;
     setSubmittingBadge(true);
     try {
+      const targetId = badgeModalMember.id || badgeModalMember.userId || badgeModalMember.name;
       await mentorshipApi.issueBadge({
-        collaboratorId: badgeModalMember.id || badgeModalMember.userId || '1',
+        projectId,
+        recipientId: targetId,
+        collaboratorId: targetId,
+        badgeName: badgeType,
         badgeType: badgeType,
         comment: badgeComment || 'Exceptional mentorship recommendation.',
+        note: badgeComment || 'Exceptional mentorship recommendation.',
       });
 
-      setAwardedMembers((prev) => new Set([...prev, badgeModalMember.name]));
+      const memberNameKey = String(badgeModalMember.name || '').toLowerCase();
+      const memberIdKey = String(targetId).toLowerCase();
+
+      setAwardedMembers((prev) => new Set([...prev, memberNameKey, memberIdKey]));
       setFeedback({
         type: 'success',
         message: `Recommendation badge "${badgeType}" awarded to ${badgeModalMember.name}!`,
@@ -200,70 +152,41 @@ const MentorProjectWorkspace = () => {
       setBadgeModalMember(null);
     } catch (err) {
       console.error('Failed to issue badge:', err);
-      // Fallback: update local UI state if backend already recorded
-      setAwardedMembers((prev) => new Set([...prev, badgeModalMember.name]));
+      const errMsg = err?.response?.data?.message || err?.message || 'Failed to issue recommendation badge.';
       setFeedback({
-        type: 'success',
-        message: `Badge assigned to ${badgeModalMember.name}!`,
+        type: 'error',
+        message: errMsg,
       });
-      setBadgeModalMember(null);
     } finally {
       setSubmittingBadge(false);
     }
   };
 
-  /* ── Leave as Mentor ── */
-  const handleLeaveMentor = async () => {
-    if (!window.confirm('Are you sure you want to resign as mentor for this project?')) return;
-    try {
-      const requests = await mentorRequestsApi.list({ projectId }).catch(() => []);
-      const myReq = (Array.isArray(requests) ? requests : []).find(
-        (r) => r.mentorId === user?.id || r.projectId === projectId
-      );
-      if (myReq) {
-        await mentorRequestsApi.remove(myReq.id).catch(() => {});
-      }
-      navigate('/mentor/projects');
-    } catch (err) {
-      navigate('/mentor/projects');
-    }
-  };
 
   /* ── Chat Message Handler ── */
-  const handleSendMessage = async (e) => {
-    e.preventDefault();
-    if (!chatInput.trim()) return;
-
-    const messageText = chatInput.trim();
-    setChatInput('');
+  const handleSendMessage = async (text) => {
+    if (!text || !text.trim()) return;
+    const messageText = text.trim();
     setSendingMsg(true);
 
     try {
       const res = await communicationApi.sendMessage({
         projectId,
+        content: messageText,
         text: messageText,
-        sender: user?.name || user?.username || 'Mentor',
-      });
+        senderName: user?.name || user?.username || 'Mentor',
+      }, 'Mentor', user?.id);
 
-      const newMsg = res || {
-        id: `msg-${Date.now()}`,
-        sender: user?.name || 'Mentor',
-        text: messageText,
-        createdAt: new Date().toISOString(),
-      };
+      if (res) {
+        setMessages((prev) => [...prev, res]);
+      }
 
-      setMessages((prev) => [...prev, newMsg]);
+      const fresh = await communicationApi.getMessages(projectId);
+      if (Array.isArray(fresh)) {
+        setMessages(fresh);
+      }
     } catch (err) {
       console.error('Failed to send chat message:', err);
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `msg-${Date.now()}`,
-          sender: user?.name || 'Mentor',
-          text: messageText,
-          createdAt: new Date().toISOString(),
-        },
-      ]);
     } finally {
       setSendingMsg(false);
     }
@@ -296,22 +219,33 @@ const MentorProjectWorkspace = () => {
     );
   }
 
-  // Kanban task grouping
-  const isStatusInList = (task, statuses) => {
-    const s = String(task.status || '').toLowerCase();
-    return statuses.some((st) => s === st.toLowerCase());
-  };
+  const ownerMember = project.owner ? [{
+    id: project.ownerId || 'owner',
+    name: typeof project.owner === 'object' ? (project.owner.name || 'Owner') : project.owner,
+    role: 'Owner',
+    initials: (typeof project.owner === 'object' ? (project.owner.name || 'OW') : project.owner).slice(0, 2).toUpperCase(),
+  }] : [];
+  const collabs = Array.isArray(project.collaborators)
+    ? project.collaborators.map((c) =>
+        typeof c === 'string'
+          ? { id: c, name: c, role: 'Collaborator', initials: c.slice(0, 2).toUpperCase() }
+          : { ...c, role: c.role || 'Collaborator', initials: (c.name || 'CL').slice(0, 2).toUpperCase() }
+      )
+    : [];
+  const membersList = (Array.isArray(project.members) && project.members.length > 0)
+    ? project.members
+    : [...ownerMember, ...collabs];
 
-  const todoTasks = tasks.filter((t) => isStatusInList(t, ['open', 'to do', 'todo', 'pending']));
-  const inProgressTasks = tasks.filter((t) => isStatusInList(t, ['in progress', 'in-progress']));
-  const inReviewTasks = tasks.filter(
-    (t) => isStatusInList(t, ['in review', 'submitted', 'review']) || Boolean(t.proofLink && !isStatusInList(t, ['completed', 'approved']))
-  );
-  const completedTasks = tasks.filter((t) => isStatusInList(t, ['completed', 'done', 'approved']));
-
-  const membersList = Array.isArray(project.members) ? project.members : [];
-  const progressPercent = Number(project.progress) || 0;
-  const isCompleted = project.status === 'Completed' || progressPercent >= 100;
+  const inReviewCount = tasks.filter((t) => {
+    const s = String(t.status || '').toLowerCase();
+    return s === 'in review' || s === 'under review' || s === 'submitted' || Boolean(t.proofLink && s !== 'completed');
+  }).length;
+  const completedCount = tasks.filter((t) => {
+    const s = String(t.status || '').toLowerCase();
+    return s === 'completed' || s === 'approved' || s === 'done';
+  }).length;
+  const progressPercent = calculateProjectProgress(tasks);
+  const isLocked = isProjectLocked(project);
 
   return (
     <div className="tf-mentor-ws-container">
@@ -331,27 +265,23 @@ const MentorProjectWorkspace = () => {
           <div className="tf-mentor-ws-title-row">
             <h1 className="tf-mentor-ws-title">{project.name || project.title}</h1>
             <span className="tf-mentor-ws-badge warning">Mentor View</span>
+            {isLocked && (
+              <span className="tf-mentor-ws-badge" style={{ backgroundColor: '#e2e8f0', color: '#475569' }}>
+                🔒 Locked / Completed
+              </span>
+            )}
           </div>
 
           <p className="tf-mentor-ws-desc">
             {project.desc || project.description || 'Project managed on TeamForge.'}
           </p>
 
-          {!isCompleted && (
-            <button
-              type="button"
-              className="tf-mentor-ws-btn-leave"
-              onClick={handleLeaveMentor}
-            >
-              Leave as Mentor
-            </button>
-          )}
         </div>
 
         <div className="tf-mentor-ws-hero-meta">
           <div className="tf-mentor-ws-metric">{progressPercent}%</div>
           <div className="tf-mentor-ws-metric-sub">
-            {isCompleted ? 'Completed' : 'In progress'}
+            {isLocked ? 'Completed (Locked)' : 'In progress'}
           </div>
         </div>
       </div>
@@ -363,57 +293,41 @@ const MentorProjectWorkspace = () => {
       )}
 
       {/* Tabs */}
-      <div className="tf-mentor-ws-tabs">
-        <button
-          type="button"
-          className={`tf-mentor-ws-tab ${activeTab === 'overview' ? 'active' : ''}`}
-          onClick={() => setActiveTab('overview')}
-        >
-          Overview
-        </button>
-        <button
-          type="button"
-          className={`tf-mentor-ws-tab ${activeTab === 'tasks' ? 'active' : ''}`}
-          onClick={() => setActiveTab('tasks')}
-        >
-          Tasks ({tasks.length})
-        </button>
-        <button
-          type="button"
-          className={`tf-mentor-ws-tab ${activeTab === 'members' ? 'active' : ''}`}
-          onClick={() => setActiveTab('members')}
-        >
-          Members ({membersList.length})
-        </button>
-        <button
-          type="button"
-          className={`tf-mentor-ws-tab ${activeTab === 'chat' ? 'active' : ''}`}
-          onClick={() => setActiveTab('chat')}
-        >
-          Chat
-        </button>
+      <div className="tf-mentor-ws-tabs-wrapper" style={{ margin: '16px 0' }}>
+        <FilterTabs
+          tabs={[
+            { id: 'overview', label: 'Overview' },
+            { id: 'tasks', label: 'Tasks', count: tasks.length },
+            { id: 'members', label: 'Members', count: membersList.length },
+            { id: 'chat', label: 'Chat' },
+          ]}
+          activeTab={activeTab}
+          onChange={setActiveTab}
+          ariaLabel="Mentor workspace sections"
+        />
       </div>
 
       {/* Overview Tab Content */}
       {activeTab === 'overview' && (
         <div>
-          <div className="tf-mentor-ws-stat-grid">
-            <div className="tf-mentor-ws-stat-card">
-              <div className="tf-mentor-ws-stat-value">{tasks.length}</div>
-              <div className="tf-mentor-ws-stat-label">Total Tasks</div>
-            </div>
-            <div className="tf-mentor-ws-stat-card">
-              <div className="tf-mentor-ws-stat-value">{inReviewTasks.length}</div>
-              <div className="tf-mentor-ws-stat-label">Awaiting Review</div>
-            </div>
-            <div className="tf-mentor-ws-stat-card">
-              <div className="tf-mentor-ws-stat-value">{completedTasks.length}</div>
-              <div className="tf-mentor-ws-stat-label">Approved Tasks</div>
-            </div>
-            <div className="tf-mentor-ws-stat-card">
-              <div className="tf-mentor-ws-stat-value">{membersList.length}</div>
-              <div className="tf-mentor-ws-stat-label">Team Members</div>
-            </div>
+          <div className="tf-mentor-ws-stat-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginBottom: '24px' }}>
+            <StatCard
+              label="Total Tasks"
+              value={tasks.length}
+            />
+            <StatCard
+              label="Awaiting Review"
+              value={inReviewCount}
+              subtext={inReviewCount > 0 ? "Pending mentor input" : "All clear"}
+            />
+            <StatCard
+              label="Approved Tasks"
+              value={completedCount}
+            />
+            <StatCard
+              label="Team Members"
+              value={membersList.length}
+            />
           </div>
 
           <div className="tf-mentor-ws-card">
@@ -426,28 +340,29 @@ const MentorProjectWorkspace = () => {
               <p className="text-sm text-muted">No task submissions recorded yet.</p>
             ) : (
               <div>
-                {tasks.slice(0, 6).map((t, idx) => (
-                  <div key={idx} className="tf-mentor-ws-history-row">
-                    <div>
-                      <div className="font-semibold text-sm">{t.title}</div>
-                      <div className="text-xs text-muted">
-                        Assigned to: {t.assignedTo || t.assignee || 'Unassigned'}
-                        {t.proofLink && ' · Proof submitted'}
+                {tasks.slice(0, 6).map((t, idx) => {
+                  const s = String(t.status || '').toLowerCase();
+                  const isDone = s === 'completed' || s === 'approved' || s === 'done';
+                  const isRev = s === 'in review' || s === 'under review' || s === 'submitted';
+                  return (
+                    <div key={idx} className="tf-mentor-ws-history-row">
+                      <div>
+                        <div className="font-semibold text-sm">{t.title}</div>
+                        <div className="text-xs text-muted">
+                          Assigned to: {t.assignedTo || t.assignee || 'Unassigned'}
+                          {t.proofLink && ' · Proof submitted'}
+                        </div>
                       </div>
+                      <span
+                        className={`tf-mentor-ws-badge ${
+                          isDone ? 'success' : isRev ? 'warning' : 'secondary'
+                        }`}
+                      >
+                        {t.status}
+                      </span>
                     </div>
-                    <span
-                      className={`tf-mentor-ws-badge ${
-                        isStatusInList(t, ['completed', 'approved'])
-                          ? 'warning'
-                          : isStatusInList(t, ['in review', 'submitted'])
-                          ? 'warning'
-                          : 'secondary'
-                      }`}
-                    >
-                      {t.status}
-                    </span>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </div>
@@ -458,92 +373,28 @@ const MentorProjectWorkspace = () => {
       {activeTab === 'tasks' && (
         <div className="tf-mentor-ws-card">
           <div className="tf-mentor-ws-card-header">
-            <h2 className="tf-mentor-ws-card-title">Task Board</h2>
+            <h2 className="tf-mentor-ws-card-title">Project Tasks</h2>
             <p className="tf-mentor-ws-card-subtitle">
-              Read-only view of the project workflow · Click any card in review to inspect submissions and approve.
+              Read-only view of deliverables and current task progress for this project.
             </p>
           </div>
 
-          <div className="tf-mentor-ws-kanban">
-            {/* Column 1: To Do */}
-            <div className="tf-mentor-ws-column">
-              <div className="tf-mentor-ws-column-header">
-                <span className="tf-mentor-ws-column-title">To Do</span>
-                <span className="tf-mentor-ws-column-count">{todoTasks.length}</span>
-              </div>
-              {todoTasks.map((task) => (
-                <div key={task.id} className="tf-mentor-ws-task-item">
-                  <h4 className="tf-mentor-ws-task-title">{task.title}</h4>
-                  {task.description && <p className="tf-mentor-ws-task-desc">{task.description}</p>}
-                  <div className="tf-mentor-ws-task-footer">
-                    <span>{task.assignedTo || task.assignee || 'Unassigned'}</span>
-                    <span>{task.priority || 'Medium'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Column 2: In Progress */}
-            <div className="tf-mentor-ws-column">
-              <div className="tf-mentor-ws-column-header">
-                <span className="tf-mentor-ws-column-title">In Progress</span>
-                <span className="tf-mentor-ws-column-count">{inProgressTasks.length}</span>
-              </div>
-              {inProgressTasks.map((task) => (
-                <div key={task.id} className="tf-mentor-ws-task-item">
-                  <h4 className="tf-mentor-ws-task-title">{task.title}</h4>
-                  {task.description && <p className="tf-mentor-ws-task-desc">{task.description}</p>}
-                  <div className="tf-mentor-ws-task-footer">
-                    <span>{task.assignedTo || task.assignee || 'Unassigned'}</span>
-                    <span>{task.priority || 'Medium'}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Column 3: In Review (MENTOR ACTIVE REVIEW ZONE) */}
-            <div className="tf-mentor-ws-column">
-              <div className="tf-mentor-ws-column-header">
-                <span className="tf-mentor-ws-column-title">In Review</span>
-                <span className="tf-mentor-ws-column-count">{inReviewTasks.length}</span>
-              </div>
-              {inReviewTasks.map((task) => (
-                <div key={task.id} className="tf-mentor-ws-task-item">
-                  <h4 className="tf-mentor-ws-task-title">{task.title}</h4>
-                  {task.description && <p className="tf-mentor-ws-task-desc">{task.description}</p>}
-                  <div className="tf-mentor-ws-task-footer">
-                    <span>By: {task.assignedTo || task.assignee || 'Collaborator'}</span>
-                    <span className="font-semibold text-warning">Awaiting Review</span>
-                  </div>
-                  <button
-                    type="button"
-                    className="tf-mentor-ws-btn-review-task"
-                    onClick={() => handleOpenReviewModal(task)}
-                  >
-                    <CheckIcon />
-                    <span>Review Submission</span>
-                  </button>
-                </div>
-              ))}
-            </div>
-
-            {/* Column 4: Completed */}
-            <div className="tf-mentor-ws-column">
-              <div className="tf-mentor-ws-column-header">
-                <span className="tf-mentor-ws-column-title">Completed</span>
-                <span className="tf-mentor-ws-column-count">{completedTasks.length}</span>
-              </div>
-              {completedTasks.map((task) => (
-                <div key={task.id} className="tf-mentor-ws-task-item">
-                  <h4 className="tf-mentor-ws-task-title">{task.title}</h4>
-                  {task.description && <p className="tf-mentor-ws-task-desc">{task.description}</p>}
-                  <div className="tf-mentor-ws-task-footer">
-                    <span>{task.assignedTo || task.assignee || 'Completed'}</span>
-                    <span className="text-success font-semibold">Approved</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+          <div className="tf-mentor-ws-tasks-list">
+            {tasks.length > 0 ? (
+              tasks.map((task) => (
+                <TaskCard
+                  key={task.id}
+                  task={task}
+                  userRole="Mentor"
+                  isLocked={isLocked}
+                />
+              ))
+            ) : (
+              <EmptyState
+                title="No tasks found"
+                message="No deliverables have been created for this project yet."
+              />
+            )}
           </div>
         </div>
       )}
@@ -561,17 +412,28 @@ const MentorProjectWorkspace = () => {
           <div className="tf-mentor-ws-members-list">
             {membersList.map((member, mIdx) => {
               const isOwner = member.name === project.owner;
-              const isSelf = member.name === user?.name;
-              const hasBadge = awardedMembers.has(member.name);
+              const isSelf = member.name === user?.name || String(member.id || member.userId) === String(user?.id);
+              const mName = String(member.name || '').toLowerCase();
+              const mId = String(member.id || member.userId || '').toLowerCase();
+              const hasBadge = awardedMembers.has(mName) || (mId && awardedMembers.has(mId));
 
               return (
                 <div key={mIdx} className="tf-mentor-ws-member-row">
                   <div className="tf-mentor-ws-member-info">
-                    <div className="tf-mentor-ws-avatar">
-                      {member.initials || (member.name ? member.name.slice(0, 2).toUpperCase() : 'TF')}
-                    </div>
+                    <Avatar name={member.name} size="md" />
                     <div>
-                      <div className="tf-mentor-ws-member-name">{member.name}</div>
+                      <div className="tf-mentor-ws-member-name" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <span>{member.name}</span>
+                        {hasBadge && (
+                          <span
+                            className="tf-mentor-ws-badge warning"
+                            style={{ fontSize: '0.72rem', padding: '2px 8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
+                            title="Recommendation badge awarded for this project"
+                          >
+                            <AwardIcon /> Badge Awarded
+                          </span>
+                        )}
+                      </div>
                       <div className="tf-mentor-ws-member-role">{member.role || 'Collaborator'}</div>
                     </div>
                   </div>
@@ -579,7 +441,7 @@ const MentorProjectWorkspace = () => {
                   {!isOwner && !isSelf && (
                     <div>
                       {hasBadge ? (
-                        <span className="tf-mentor-ws-badge warning">
+                        <span className="tf-mentor-ws-badge warning" style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
                           <AwardIcon /> Badge Assigned
                         </span>
                       ) : (
@@ -603,141 +465,16 @@ const MentorProjectWorkspace = () => {
 
       {/* Chat Tab Content */}
       {activeTab === 'chat' && (
-        <div className="tf-mentor-ws-chat-container">
-          <div className="tf-mentor-ws-chat-messages">
-            {messages.length === 0 ? (
-              <p className="text-sm text-muted text-center" style={{ margin: 'auto' }}>
-                No messages yet. Start the conversation with the project team!
-              </p>
-            ) : (
-              messages.map((m, idx) => {
-                const isMine = m.sender === (user?.name || 'Mentor');
-                return (
-                  <div
-                    key={m.id || idx}
-                    className={`tf-mentor-ws-chat-msg ${isMine ? 'mine' : 'theirs'}`}
-                  >
-                    <div className="tf-mentor-ws-msg-header">
-                      <span>{m.sender}</span>
-                      <span>
-                        {m.createdAt ? new Date(m.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : 'Now'}
-                      </span>
-                    </div>
-                    <div>{m.text}</div>
-                  </div>
-                );
-              })
-            )}
-            <div ref={chatBottomRef} />
-          </div>
-
-          <form className="tf-mentor-ws-chat-input-bar" onSubmit={handleSendMessage}>
-            <input
-              type="text"
-              className="tf-mentor-ws-chat-input"
-              placeholder="Send guidance or feedback to the team..."
-              value={chatInput}
-              onChange={(e) => setChatInput(e.target.value)}
-            />
-            <button
-              type="submit"
-              className="tf-mentor-ws-chat-send-btn"
-              disabled={sendingMsg || !chatInput.trim()}
-            >
-              <SendIcon />
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* ── Review Submission Action Modal ── */}
-      {reviewModalTask && (
-        <div
-          className="tf-mentor-ws-modal-overlay"
-          onClick={() => setReviewModalTask(null)}
-        >
-          <div
-            className="tf-mentor-ws-modal-box"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="tf-mentor-ws-modal-header">
-              <h3 className="tf-mentor-ws-modal-title">Review Task Submission</h3>
-              <button
-                type="button"
-                className="tf-mentor-ws-modal-close"
-                onClick={() => setReviewModalTask(null)}
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="tf-mentor-ws-modal-body">
-              <h4 style={{ margin: '0 0 6px 0', fontSize: '1rem', color: 'var(--tf-ink-900, #111827)' }}>
-                {reviewModalTask.title}
-              </h4>
-              <p className="text-sm text-muted" style={{ margin: '0 0 12px 0' }}>
-                Assigned to: <strong>{reviewModalTask.assignedTo || reviewModalTask.assignee || 'Collaborator'}</strong>
-              </p>
-
-              {reviewModalTask.proofLink && (
-                <div style={{ marginBottom: '14px', background: '#f9fafb', padding: '10px 14px', borderRadius: '8px', border: '1px solid #e5e7eb' }}>
-                  <div style={{ fontSize: '0.8rem', fontWeight: 600, color: '#374151', marginBottom: '4px' }}>
-                    Submitted Proof / Artifact
-                  </div>
-                  <a
-                    href={reviewModalTask.proofLink}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{ fontSize: '0.86rem', color: '#0284c7', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                  >
-                    <span>{reviewModalTask.proofLink}</span>
-                    <ExternalLinkIcon />
-                  </a>
-                </div>
-              )}
-
-              <div style={{ marginTop: '12px' }}>
-                <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                  Feedback / Review Notes
-                </label>
-                <textarea
-                  rows={3}
-                  value={reviewFeedback}
-                  onChange={(e) => setReviewFeedback(e.target.value)}
-                  placeholder="Provide constructive review comments, suggestions, or praise..."
-                  style={{
-                    width: '100%',
-                    padding: '8px 12px',
-                    borderRadius: '8px',
-                    border: '1px solid #d1d5db',
-                    fontSize: '0.88rem',
-                    boxSizing: 'border-box',
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="tf-mentor-ws-modal-footer">
-              <button
-                type="button"
-                className="tf-mentor-ws-btn-leave"
-                onClick={handleRejectTask}
-                disabled={submittingReview}
-              >
-                <XIcon />
-                <span>Request Revision</span>
-              </button>
-              <button
-                type="button"
-                className="tf-mentor-ws-chat-send-btn"
-                onClick={handleApproveTask}
-                disabled={submittingReview}
-              >
-                <CheckIcon />
-                <span>{submittingReview ? 'Updating...' : 'Approve Submission'}</span>
-              </button>
-            </div>
-          </div>
+        <div className="tf-mentor-ws-card" style={{ padding: '1.25rem' }}>
+          <ChatBox
+            messages={messages}
+            currentUserId={user?.id}
+            currentUserName={user?.name || user?.username || 'Mentor'}
+            currentUserRole="Mentor"
+            onSendMessage={handleSendMessage}
+            onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
+            sending={sendingMsg}
+          />
         </div>
       )}
 
@@ -815,7 +552,7 @@ const MentorProjectWorkspace = () => {
               <div className="tf-mentor-ws-modal-footer">
                 <button
                   type="button"
-                  className="tf-mentor-ws-btn-leave"
+                  className="tf-mentor-ws-btn-cancel"
                   onClick={() => setBadgeModalMember(null)}
                 >
                   Cancel
