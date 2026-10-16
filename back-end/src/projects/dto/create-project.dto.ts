@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsNotEmpty, IsOptional, IsNumber } from 'class-validator';
+import { IsString, IsArray, IsNotEmpty, IsOptional, IsNumber, IsBoolean } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum ProjectDifficulty {
@@ -88,4 +88,41 @@ export class CreateProjectDto {
   @IsOptional()
   @IsArray()
   tasks?: any[];
+
+  @ApiPropertyOptional({ example: false })
+  @IsOptional()
+  @IsBoolean()
+  isCompleted?: boolean;
+
+  @ApiPropertyOptional({ example: '2026-03-01T00:00:00.000Z' })
+  @IsOptional()
+  completedAt?: Date | string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/example/repo' })
+  @IsOptional()
+  @IsString()
+  finalLink?: string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/example/repo' })
+  @IsOptional()
+  @IsString()
+  finishedLink?: string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/example/repo' })
+  @IsOptional()
+  @IsString()
+  finalProjectUrl?: string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/example/repo' })
+  @IsOptional()
+  @IsString()
+  projectLink?: string;
+
+  @ApiPropertyOptional({ example: '7' })
+  @IsOptional()
+  mentorId?: string | null;
+
+  @ApiPropertyOptional({ example: 'Neha Gupta' })
+  @IsOptional()
+  mentor?: any;
 }

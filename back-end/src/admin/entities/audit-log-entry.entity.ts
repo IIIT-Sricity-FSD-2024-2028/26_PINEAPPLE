@@ -21,4 +21,13 @@ export class AuditLogEntry {
 
   @ApiProperty({ description: 'Optional details for the audit entry', type: Object })
   details!: Record<string, any>;
+
+  @ApiProperty({ description: 'Actor who performed the action', required: false })
+  actor?: string;
+
+  @ApiProperty({ description: 'Target of the action', required: false })
+  target?: string;
+
+  @ApiProperty({ description: 'Human readable event summary', required: false })
+  event?: string;
 }

@@ -43,21 +43,28 @@ export class MentorshipController {
   }
 
   @Post('badge')
-  @Roles('Mentor', 'Administrator')
-  @ApiOperation({ summary: 'Issue a recommendation badge (Mentor/Admin only)' })
+  @Roles('Mentor', 'Administrator', 'Super User')
   @ApiHeader({ name: 'x-user-id', description: 'ID of the mentor', required: true })
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
+  @ApiOperation({ summary: 'Issue a recommendation badge (Mentor/Admin only)' })
   issueBadge(
     @Headers('x-user-id') mentorId: string,
+    @Headers('x-user-role') role: string,
     @Body() dto: IssueBadgeDto,
   ) {
     if (!mentorId) throw new UnauthorizedException('x-user-id header is missing.');
-    return this.mentorshipService.issueBadge(mentorId, dto);
+    return this.mentorshipService.issueBadge(mentorId, dto, role);
   }
 
   @Get('badges/:userId')
   @ApiOperation({ summary: 'Get all badges for a user' })
   getBadgesByUserId(@Param('userId') userId: string) {
     return this.mentorshipService.getBadgesByUserId(userId);
+  }
+
+  @Get('badges/project/:projectId')
+  @ApiOperation({ summary: 'Get all badges for a project' })
+  getBadgesByProjectId(@Param('projectId') projectId: string) {
+    return this.mentorshipService.getBadgesByProjectId(projectId);
   }
 }

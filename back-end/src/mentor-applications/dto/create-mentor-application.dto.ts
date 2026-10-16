@@ -24,8 +24,40 @@ export class CreateMentorApplicationDto {
   @ApiProperty({ description: 'Applicant experience summary', example: '7 years in software engineering with leadership and mentoring roles.', required: false })
   @IsOptional()
   @IsString()
-  @MinLength(10)
   experience?: string;
+
+  @ApiProperty({ description: 'Years of professional experience', example: 5, required: false })
+  @IsOptional()
+  years?: number;
+
+  @ApiProperty({ description: 'Years of professional experience', example: 5, required: false })
+  @IsOptional()
+  yearsOfExperience?: number;
+
+  @ApiProperty({ description: 'Applicant LinkedIn URL', example: 'https://linkedin.com/in/mentor', required: false })
+  @IsOptional()
+  @IsString()
+  linkedin?: string;
+
+  @ApiProperty({ description: 'Applicant portfolio URL', example: 'https://portfolio.dev', required: false })
+  @IsOptional()
+  @IsString()
+  portfolio?: string;
+
+  @ApiProperty({ description: 'Applicant motivation statement', example: 'I enjoy mentoring...', required: false })
+  @IsOptional()
+  @IsString()
+  motivation?: string;
+
+  @ApiProperty({ description: 'Area of expertise', example: 'React, Node.js', required: false })
+  @IsOptional()
+  @IsString()
+  expertise?: string;
+
+  @ApiProperty({ description: 'University or institution', example: 'Stanford University', required: false })
+  @IsOptional()
+  @IsString()
+  university?: string;
 
   @ApiProperty({ description: 'Skills or expertise offered by the applicant', example: ['JavaScript', 'Node.js', 'React'], required: false })
   @IsOptional()

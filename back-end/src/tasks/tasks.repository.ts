@@ -10,8 +10,17 @@ export interface Task {
   xpReward?: number;
   status: TaskStatus | string;
   assigneeId?: string;
+  assigneeName?: string;
   assignee?: string;
+  assignedTo?: string;
   difficulty?: string;
+  priority?: string;
+  proofLink?: string;
+  proofUrl?: string;
+  notes?: string;
+  xpAwarded?: boolean;
+  awardedXp?: number;
+  awardedRep?: number;
 }
 
 @Injectable()
@@ -27,7 +36,10 @@ export class TasksRepository {
       description: 'Create the ERD and define the initial data structures.',
       xpReward: 50,
       status: TaskStatus.Completed,
-      assigneeId: '2', // Arjun Sharma
+      assigneeId: '2',
+      assigneeName: 'Arjun Sharma',
+      assignee: 'Arjun Sharma',
+      assignedTo: 'Arjun Sharma',
     });
 
     this.tasks.push({
@@ -37,7 +49,10 @@ export class TasksRepository {
       description: 'Setup JWT and Role Guards for security.',
       xpReward: 100,
       status: TaskStatus.InProgress,
-      assigneeId: '2', 
+      assigneeId: '2',
+      assigneeName: 'Arjun Sharma',
+      assignee: 'Arjun Sharma',
+      assignedTo: 'Arjun Sharma',
     });
 
     this.tasks.push({
@@ -47,6 +62,8 @@ export class TasksRepository {
       description: 'Build the React components for the user dashboard.',
       xpReward: 75,
       status: TaskStatus.ToDo,
+      assigneeName: 'Unassigned',
+      assignee: 'Unassigned',
     });
 
     this.tasks.push({
@@ -57,6 +74,9 @@ export class TasksRepository {
       xpReward: 200,
       status: TaskStatus.InProgress,
       assigneeId: '8', // Vikram Nair
+      assigneeName: 'Vikram Nair',
+      assignee: 'Vikram Nair',
+      assignedTo: 'Vikram Nair',
     });
 
     this.tasks.push({
@@ -67,6 +87,9 @@ export class TasksRepository {
       xpReward: 150,
       status: TaskStatus.ToDo,
       assigneeId: '6', // Aditya Sai
+      assigneeName: 'Aditya Sai',
+      assignee: 'Aditya Sai',
+      assignedTo: 'Aditya Sai',
     });
 
     this.tasks.push({
@@ -77,6 +100,9 @@ export class TasksRepository {
       xpReward: 100,
       status: TaskStatus.Completed,
       assigneeId: '6', // Aditya Sai
+      assigneeName: 'Aditya Sai',
+      assignee: 'Aditya Sai',
+      assignedTo: 'Aditya Sai',
     });
 
     this.tasks.push({
@@ -87,6 +113,9 @@ export class TasksRepository {
       xpReward: 250,
       status: TaskStatus.InProgress,
       assigneeId: '7', // Neha Gupta
+      assigneeName: 'Neha Gupta',
+      assignee: 'Neha Gupta',
+      assignedTo: 'Neha Gupta',
     });
 
     this.tasks.push({
@@ -97,6 +126,9 @@ export class TasksRepository {
       xpReward: 80,
       status: TaskStatus.Completed,
       assigneeId: '1', // Priya Patel
+      assigneeName: 'Priya Patel',
+      assignee: 'Priya Patel',
+      assignedTo: 'Priya Patel',
     });
   }
 
@@ -116,8 +148,20 @@ export class TasksRepository {
     const newTask: Task = {
       id: `task-${Date.now()}`,
       ...createTaskDto,
+      priority: createTaskDto.priority || createTaskDto.difficulty || 'Medium',
+      proofLink: createTaskDto.proofLink || createTaskDto.proofUrl,
+      proofUrl: createTaskDto.proofUrl || createTaskDto.proofLink,
       status: createTaskDto.status || TaskStatus.ToDo,
     };
+    if (newTask.assigneeName && !newTask.assignee) {
+      newTask.assignee = newTask.assigneeName;
+    }
+    if (newTask.assignee && !newTask.assigneeName) {
+      newTask.assigneeName = newTask.assignee;
+    }
+    if (newTask.assignee && !newTask.assignedTo) {
+      newTask.assignedTo = newTask.assignee;
+    }
     this.tasks.push(newTask);
     return newTask;
   }
@@ -128,10 +172,26 @@ export class TasksRepository {
       return undefined;
     }
 
-    this.tasks[index] = {
+    const updated: Task = {
       ...this.tasks[index],
       ...updateTaskDto,
     };
+
+    if (updateTaskDto.assigneeId === undefined && 'assigneeId' in updateTaskDto) {
+      delete updated.assigneeId;
+    }
+
+    if (updated.assigneeName && !updated.assignee) {
+      updated.assignee = updated.assigneeName;
+    }
+    if (updated.assignee && !updated.assigneeName) {
+      updated.assigneeName = updated.assignee;
+    }
+    if (updated.assignee) {
+      updated.assignedTo = updated.assignee;
+    }
+
+    this.tasks[index] = updated;
 
     return this.tasks[index];
   }

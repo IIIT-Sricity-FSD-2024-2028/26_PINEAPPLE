@@ -45,6 +45,16 @@ export class AdminController {
     return this.adminService.getUsers();
   }
 
+  @Get('users/:id')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Get detailed live user profile for administrative review' })
+  @ApiParam({ name: 'id', description: 'User ID to inspect' })
+  @ApiOkResponse({ description: 'User details returned successfully.' })
+  @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
+  getUserDetails(@Param('id') id: string) {
+    return this.adminService.getUserDetails(id);
+  }
+
   @Post('login')
   @ApiOperation({ summary: 'Login as an admin or superuser' })
   @ApiOkResponse({ description: 'Logged in successfully.', type: Object })
@@ -59,8 +69,25 @@ export class AdminController {
   @ApiBody({ type: ModerateUserDto })
   @ApiOkResponse({ description: 'User status updated successfully.', type: Object })
   @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
-  updateUserStatus(@Param('id') id: string, @Body() moderateUserDto: ModerateUserDto) {
-    return this.adminService.updateUserStatus(id, moderateUserDto);
+  updateUserStatus(@Param('id') id: string, @Body() body: any) {
+    const action = String(body.action || body.status || '').toLowerCase();
+    if (action === 'suspend' || action === 'suspended') {
+      return this.adminService.suspendUser(id);
+    }
+    if (action === 'warn' || action === 'warned') {
+      return this.adminService.warnUser(id, { reason: body.reason || 'Admin warning' });
+    }
+    if (action === 'flag' || action === 'flagged') {
+      return this.adminService.flagUser(id);
+    }
+    return this.adminService.updateUserStatus(id, body);
+  }
+
+  @Put('users/:id/status')
+  @Roles('admin')
+  @ApiOperation({ summary: "Update a user's moderation status" })
+  updateUserStatusPut(@Param('id') id: string, @Body() body: any) {
+    return this.updateUserStatus(id, body);
   }
 
   @Put('users/:id/flag')
@@ -111,4 +138,36 @@ export class AdminController {
   getAuditLog() {
     return this.adminService.getAuditLog();
   }
+
+  @Post('audit')
+  @Roles('user')
+  @ApiOperation({ summary: 'Record an audit log entry' })
+  @ApiOkResponse({ description: 'Audit log entry recorded successfully.', type: Object })
+  recordAudit(@Body() entry: any) {
+    return this.adminService.logClientAudit(entry);
+  }
+
+  @Get('config')
+  @Roles('admin', 'superuser')
+  @ApiOperation({ summary: 'Get current platform configuration' })
+  @ApiOkResponse({ description: 'Platform configuration returned successfully.' })
+  getConfig() {
+    return this.adminService.getConfig();
+  }
+
+  @Get('config/public')
+  @ApiOperation({ summary: 'Get public platform configuration' })
+  @ApiOkResponse({ description: 'Public platform configuration returned.' })
+  getPublicConfig() {
+    return this.adminService.getConfig();
+  }
+
+  @Put('config')
+  @Roles('superuser')
+  @ApiOperation({ summary: 'Update platform configuration (Superuser only)' })
+  @ApiOkResponse({ description: 'Platform configuration updated successfully.' })
+  updateConfig(@Body() dto: any) {
+    return this.adminService.updateConfig(dto);
+  }
 }
+

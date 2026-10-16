@@ -14,8 +14,8 @@ export class MentorProfileEntity {
   @ApiProperty({ description: 'Session duration in minutes', enum: [30, 60, 90] }) sessionDuration!: number;
   @ApiPropertyOptional({ type: [String], description: 'Languages spoken' }) languages?: string[];
   @ApiProperty({ enum: ['Weekdays', 'Weekends', 'Anytime'] }) availability!: string;
-  @ApiProperty({ description: 'Average rating 0–5' }) rating!: number;
-  @ApiProperty({ description: 'Total completed sessions' }) totalSessions!: number;
+  @ApiPropertyOptional({ description: 'Average rating 0–5' }) rating?: number;
+  @ApiPropertyOptional({ description: 'Total completed sessions' }) totalSessions?: number;
   @ApiProperty({ description: 'Whether mentor is currently accepting bookings' }) isAvailable!: boolean;
   @ApiProperty() createdAt!: string;
 }
@@ -25,7 +25,8 @@ export type MentorSessionStatus =
   | 'active'
   | 'completed'
   | 'cancelled'
-  | 'refunded';
+  | 'refunded'
+  | 'payout_pending';
 
 // ── A booked mentoring session ───────────────────────────────────────────────
 export class MentorSessionEntity {
@@ -35,9 +36,15 @@ export class MentorSessionEntity {
   @ApiProperty({ description: 'ID of the project owner\'s project this session is for' }) projectId!: string;
   @ApiProperty({ description: 'What the student wants help with' }) projectDescription!: string;
   @ApiProperty({ description: 'Price agreed at booking time (INR)' }) agreedPrice!: number;
+  @ApiPropertyOptional({ description: 'Total funded amount (session fee + platform 15% + gateway 2%)' }) totalAmount?: number;
   @ApiProperty({ description: 'EscrowAccountEntity ID' }) escrowId!: string;
   @ApiProperty({ enum: ['escrow_funded', 'active', 'completed', 'cancelled', 'refunded'] })
   status!: MentorSessionStatus;
+  @ApiPropertyOptional() platformFee?: number;
+  @ApiPropertyOptional() gatewayFee?: number;
+  @ApiPropertyOptional() payout?: number;
+  @ApiPropertyOptional() ownerName?: string;
+  @ApiPropertyOptional() projectName?: string;
   @ApiProperty() createdAt!: string;
   @ApiPropertyOptional() startedAt?: string;
   @ApiPropertyOptional() completedAt?: string;

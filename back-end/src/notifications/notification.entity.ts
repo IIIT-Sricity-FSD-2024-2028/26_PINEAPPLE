@@ -14,15 +14,22 @@ export class Notification {
   userId!: string;
 
   @ApiProperty({
+    description: 'Title of the notification',
+    example: 'Project Membership Ended',
+    required: false,
+  })
+  title?: string;
+
+  @ApiProperty({
     description: 'Type of notification',
-    example: 'PROJECT_INVITATION',
-    enum: ['PROJECT_INVITATION', 'APPLICATION_APPROVED', 'TASK_APPROVED', 'MENTOR_REQUEST', 'NEW_MESSAGE', 'PROJECT_UPDATE'],
+    example: 'APPLICATION_APPROVED',
+    enum: ['APPLICATION_APPROVED', 'TASK_APPROVED', 'MENTOR_REQUEST', 'NEW_MESSAGE', 'PROJECT_UPDATE', 'PROJECT_COMPLETED'],
   })
   type!: string;
 
   @ApiProperty({
     description: 'Notification message content',
-    example: 'You have been invited to join the AI Study Planner project',
+    example: 'Your application to join the AI Study Planner project has been approved',
   })
   message!: string;
 

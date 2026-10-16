@@ -8,11 +8,35 @@ export class NotificationsService {
   private notifications: Notification[] = [];
   private nextId = 1;
 
+  private static readonly DEFAULT_TITLES: Record<string, string> = {
+    PROJECT_MEMBERSHIP_ENDED: 'Project Membership Ended',
+    PROJECT_COMPLETED: 'Project Completed',
+    PROJECT_UPDATE: 'Project Update',
+    APPLICATION_APPROVED: 'Application Approved',
+    TASK_APPROVED: 'Submission Approved',
+    TASK_ASSIGNED: 'Task Assigned',
+    MENTOR_REQUEST: 'Mentor Request',
+    MENTOR_SESSION_BOOKED: 'Mentor Booking Confirmed',
+    MENTOR_SESSION_STARTED: 'Mentor Session Started',
+    MENTOR_SESSION_ACCEPTED: 'Mentor Request Accepted',
+    MENTOR_SESSION_DECLINED: 'Mentor Request Declined',
+    MENTOR_SESSION_COMPLETED: 'Mentor Session Completed',
+    MENTOR_SESSION_CANCELLED: 'Mentor Session Cancelled',
+    NEW_MESSAGE: 'New Message',
+  };
+
   create(createNotificationDto: CreateNotificationDto): Notification {
+    const rawType = createNotificationDto.type || 'NOTIFICATION';
+    const computedTitle =
+      createNotificationDto.title ||
+      NotificationsService.DEFAULT_TITLES[rawType] ||
+      rawType.replace(/_/g, ' ');
+
     const notification: Notification = {
       id: this.generateId(),
-      userId: createNotificationDto.userId,
-      type: createNotificationDto.type,
+      userId: String(createNotificationDto.userId),
+      type: rawType,
+      title: computedTitle,
       message: createNotificationDto.message,
       readStatus: createNotificationDto.readStatus ?? false,
       createdAt: new Date(),
@@ -24,7 +48,9 @@ export class NotificationsService {
   }
 
   findAll(): Notification[] {
-    return [...this.notifications];
+    return [...this.notifications].sort(
+      (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+    );
   }
 
   findOne(id: string): Notification {
@@ -36,7 +62,10 @@ export class NotificationsService {
   }
 
   findByUser(userId: string): Notification[] {
-    return this.notifications.filter((n: Notification) => n.userId === userId);
+    const target = String(userId).trim().toLowerCase();
+    return this.notifications
+      .filter((n: Notification) => String(n.userId).trim().toLowerCase() === target)
+      .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
   }
 
   update(id: string, updateNotificationDto: UpdateNotificationDto): Notification {
@@ -59,7 +88,10 @@ export class NotificationsService {
   }
 
   markAllAsRead(userId?: string): Notification[] {
-    const toUpdate = userId ? this.notifications.filter((n: Notification) => n.userId === userId) : this.notifications;
+    const target = userId ? String(userId).trim().toLowerCase() : null;
+    const toUpdate = target
+      ? this.notifications.filter((n: Notification) => String(n.userId).trim().toLowerCase() === target)
+      : this.notifications;
     toUpdate.forEach((n: Notification) => {
       n.readStatus = true;
     });

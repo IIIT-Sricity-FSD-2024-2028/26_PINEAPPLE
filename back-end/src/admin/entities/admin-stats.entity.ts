@@ -45,4 +45,19 @@ export class AdminStatsEntity {
 
   @ApiProperty({ description: 'Number of approved tasks' })
   approvedTasks!: number;
+
+  @ApiProperty({ description: 'Number of warned users', required: false })
+  warnedUsers?: number;
+
+  @ApiProperty({ description: 'Number of flagged or warned users', required: false })
+  flaggedWarned?: number;
+
+  @ApiProperty({ description: 'Number of pending mentor applications', required: false })
+  pendingMentorApps?: number;
+
+  @ApiProperty({ description: 'Number of active portal admins', required: false })
+  activeAdmins?: number;
+
+  @ApiProperty({ description: 'Number of recorded audit log events', required: false })
+  auditEvents?: number;
 }

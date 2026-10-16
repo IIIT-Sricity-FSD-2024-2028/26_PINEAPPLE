@@ -53,11 +53,15 @@ export class NotificationsController {
     description: 'List of notifications',
     type: [Notification],
   })
-  findAll(@Query('userId') userId?: string): Notification[] {
-    if (userId) {
-      return this.notificationsService.findByUser(userId);
+  findAll(
+    @Query('userId') userId?: string,
+    @Headers('x-user-id') headerUserId?: string,
+  ): Notification[] {
+    const targetUserId = userId || headerUserId;
+    if (targetUserId) {
+      return this.notificationsService.findByUser(targetUserId);
     }
-    return this.notificationsService.findAll();
+    return [];
   }
 
   @Get(':id')
@@ -95,6 +99,28 @@ export class NotificationsController {
   })
   create(@Body() createNotificationDto: CreateNotificationDto): Notification {
     return this.notificationsService.create(createNotificationDto);
+  }
+
+  @Put('read-all')
+  @Roles('admin', 'user')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Mark all notifications as read, optionally filtered by user' })
+  @ApiHeader({
+    name: 'x-user-id',
+    description: 'Optional user ID to mark only that user\'s notifications as read',
+    required: false,
+  })
+  @ApiResponse({
+    status: 200,
+    description: 'Notifications marked as read',
+    type: [Notification],
+  })
+  markAllAsRead(
+    @Query('userId') queryUserId?: string,
+    @Headers('x-user-id') headerUserId?: string,
+  ): Notification[] {
+    const targetUserId = queryUserId || headerUserId;
+    return this.notificationsService.markAllAsRead(targetUserId);
   }
 
   @Put(':id')
@@ -140,24 +166,6 @@ export class NotificationsController {
   })
   markAsRead(@Param('id') id: string): Notification {
     return this.notificationsService.markAsRead(id);
-  }
-
-  @Put('read-all')
-  @Roles('admin', 'user')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Mark all notifications as read, optionally filtered by user' })
-  @ApiHeader({
-    name: 'x-user-id',
-    description: 'Optional user ID to mark only that user\'s notifications as read',
-    required: false,
-  })
-  @ApiResponse({
-    status: 200,
-    description: 'Notifications marked as read',
-    type: [Notification],
-  })
-  markAllAsRead(@Headers('x-user-id') userId?: string): Notification[] {
-    return this.notificationsService.markAllAsRead(userId);
   }
 
   @Delete(':id')

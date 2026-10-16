@@ -10,6 +10,7 @@ import { TasksModule } from './tasks/tasks.module';
 
 // Orphaned Modules added:
 import { AdminModule } from './admin/admin.module';
+import { AuditModule } from './audit/audit.module';
 import { CommunicationModule } from './communication/communication.module';
 import { GovernanceModule } from './governance/governance.module';
 import { JoinRequestsModule } from './join-requests/join-requests.module';
@@ -27,6 +28,8 @@ import { PayoutsModule } from './payouts/payouts.module';
 import { MentorMarketplaceModule } from './mentor-marketplace/mentor-marketplace.module';
 
 
+import { PlatformConfigModule } from './platform-config/platform-config.module';
+
 // Middleware imports:
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
 import { SecurityMiddleware } from './core/middleware/security.middleware';
@@ -37,11 +40,13 @@ import { UploadsModule } from './uploads/uploads.module';
 @Module({
   imports: [
     CoreModule,
+    PlatformConfigModule,
     UsersModule,
     GamificationModule,
     ProjectsModule,
     TasksModule,
     AdminModule,
+    AuditModule,
     CommunicationModule,
     GovernanceModule,
     JoinRequestsModule,
@@ -124,27 +129,13 @@ export class AppModule implements NestModule {
       );
 
     // ──────────────────────────────────────────────────────────
-    // 4. ROUTE-SPECIFIC: Rate limiting on sensitive routes
-    //    Applied to /users, /projects, /tasks, /admin, /support,
-    //    /uploads, /governance
+    // 4. Rate limiting: 5,000 requests per 1-hour window per client
+    //    Identifies clients by x-user-id header or IP address.
+    //    Covers all application routes (including uploads and escrow).
+    //    Docs and health routes are automatically bypassed inside the middleware.
     // ──────────────────────────────────────────────────────────
     consumer
       .apply(RateLimiterMiddleware)
-      .forRoutes(
-        { path: 'users', method: RequestMethod.ALL },
-        { path: 'users/*', method: RequestMethod.ALL },
-        { path: 'projects', method: RequestMethod.ALL },
-        { path: 'projects/*', method: RequestMethod.ALL },
-        { path: 'tasks', method: RequestMethod.ALL },
-        { path: 'tasks/*', method: RequestMethod.ALL },
-        { path: 'admin', method: RequestMethod.ALL },
-        { path: 'admin/*', method: RequestMethod.ALL },
-        { path: 'support', method: RequestMethod.ALL },
-        { path: 'support/*', method: RequestMethod.ALL },
-        { path: 'uploads', method: RequestMethod.ALL },
-        { path: 'uploads/*', method: RequestMethod.ALL },
-        { path: 'governance', method: RequestMethod.ALL },
-        { path: 'governance/*', method: RequestMethod.ALL },
-      );
+      .forRoutes('*');
   }
 }

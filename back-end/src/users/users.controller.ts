@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, Query, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
@@ -8,7 +8,9 @@ import { Roles } from '../core/decorators/roles.decorator';
 @ApiTags('Users')
 @Controller('users')
 export class UsersController {
-  constructor(private readonly usersService: UsersService) {}
+  constructor(
+    private readonly usersService: UsersService,
+  ) {}
 
   @Post()
   @ApiOperation({ summary: 'Create a new user' })
@@ -18,11 +20,38 @@ export class UsersController {
     return this.usersService.create(createUserDto);
   }
 
+  @Post('login')
+  @ApiOperation({ summary: 'Login user' })
+  login(@Body() credentials: { email?: string; username?: string; password?: string }) {
+    return this.usersService.login(credentials);
+  }
+
   @Get()
   @ApiOperation({ summary: 'Get all users' })
   @ApiResponse({ status: 200, description: 'Returns an array of users.' })
   findAll() {
     return this.usersService.findAll();
+  }
+
+  @Get('username-available')
+  @ApiOperation({ summary: 'Check if a username is available' })
+  @ApiResponse({ status: 200, description: 'Returns whether the username is available.' })
+  checkUsernameAvailable(
+    @Query('username') username: string,
+    @Query('excludeUserId') excludeUserId?: string,
+    @Headers('x-user-id') headerUserId?: string,
+  ) {
+    const exclude = excludeUserId || headerUserId;
+    const available = this.usersService.isUsernameAvailable(username, exclude);
+    return { available };
+  }
+
+  @Get(':id/badges')
+  @ApiOperation({ summary: 'Get all recommendation badges awarded to a user' })
+  @ApiResponse({ status: 200, description: 'Returns an array of recommendation badges.' })
+  getBadges(@Param('id') id: string) {
+    const user = this.usersService.findById(id);
+    return user?.data?.mentorRecommendations || [];
   }
 
   @Get(':id')

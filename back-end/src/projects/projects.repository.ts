@@ -2,12 +2,21 @@ import { Injectable } from '@nestjs/common';
 import { CreateProjectDto, ProjectStatus, ProjectDifficulty } from './dto/create-project.dto';
 import { UpdateProjectDto } from './dto/update-project.dto';
 
+export interface RemovedUserRecord {
+  userId: string;
+  userName?: string;
+  reason: string;
+  removedAt: string;
+}
+
 export interface Project {
   id: string;
   ownerId: string;
   owner?: string;
   title: string;
+  name?: string;
   description: string;
+  desc?: string;
   objectives?: string;
   difficulty: ProjectDifficulty | string;
   requiredSkills: string[];
@@ -17,6 +26,16 @@ export interface Project {
   status: ProjectStatus | string;
   progress?: number;
   collaborators: any[];
+  isCompleted?: boolean;
+  completedAt?: Date | string;
+  finalLink?: string;
+  finishedLink?: string;
+  finalProjectUrl?: string;
+  projectLink?: string;
+  mentorId?: string;
+  mentor?: any;
+  members?: any[];
+  removedUsers?: RemovedUserRecord[];
 }
 
 @Injectable()
@@ -34,9 +53,11 @@ export class ProjectsRepository {
       requiredSkills: ['React', 'Python', 'ML'],
       duration: '3 Months',
       status: ProjectStatus.Open,
+      mentorId: '3',
+      mentor: 'Kiran Bose',
       collaborators: [
-        { id: '5', name: 'Vikram Nair', role: 'Contributor' },
-        { id: '6', name: 'Priya Patel', role: 'Contributor' }
+        { id: '2', name: 'Arjun Sharma', role: 'Collaborator' },
+        { id: '8', name: 'Vikram Nair', role: 'Collaborator' }
       ],
     });
 
@@ -49,23 +70,32 @@ export class ProjectsRepository {
       requiredSkills: ['React', 'Node.js', 'Firebase'],
       duration: '2 Months',
       status: ProjectStatus.InProgress,
+      mentorId: '4',
+      mentor: 'Rohan Mehta',
       collaborators: [
-        { id: '3', name: 'Rohan Mehta', role: 'Contributor' },
-        { id: '4', name: 'TeamForge User', role: 'Contributor' }
+        { id: '6', name: 'Aditya Sai', role: 'Collaborator' },
+        { id: '8', name: 'Vikram Nair', role: 'Collaborator' }
       ],
     });
 
     this.projects.push({
       id: 'proj-3',
-      ownerId: '3', // Rohan Mehta
+      ownerId: '3', // Kiran Bose
       title: 'Smart City Traffic Optimizer',
       description: 'An IoT and AI based platform to analyze traffic flow and optimize signal timings dynamically.',
       difficulty: ProjectDifficulty.Hard,
       requiredSkills: ['Python', 'IoT', 'Data Science'],
       duration: '4 Months',
       status: ProjectStatus.Completed,
+      isCompleted: true,
+      completedAt: new Date('2026-03-01T00:00:00.000Z'),
+      finalLink: 'https://github.com/teamforge/traffic-optimizer',
+      finishedLink: 'https://github.com/teamforge/traffic-optimizer',
+      mentorId: '7',
+      mentor: 'Neha Gupta',
       collaborators: [
-        { id: '1', name: 'Priya Patel', role: 'Contributor' }
+        { id: '2', name: 'Arjun Sharma', role: 'Collaborator' },
+        { id: '6', name: 'Aditya Sai', role: 'Collaborator' }
       ],
     });
 
@@ -134,6 +164,10 @@ export class ProjectsRepository {
       requiredSkills: ['Java', 'Spring Boot', 'SQL'],
       duration: '1 Month',
       status: ProjectStatus.Completed,
+      isCompleted: true,
+      completedAt: new Date('2026-03-05T00:00:00.000Z'),
+      finalLink: 'https://github.com/teamforge/ecommerce-api-engine',
+      finishedLink: 'https://github.com/teamforge/ecommerce-api-engine',
       collaborators: [
         { id: '1', name: 'Priya Patel', role: 'Contributor' }
       ],
@@ -145,11 +179,11 @@ export class ProjectsRepository {
   }
 
   findById(id: string): Project | undefined {
-    return this.projects.find((project) => project.id === id);
+    return this.projects.find((project) => String(project.id) === String(id));
   }
 
   findByOwnerId(ownerId: string): Project[] {
-    return this.projects.filter((project) => project.ownerId === ownerId);
+    return this.projects.filter((project) => String(project.ownerId) === String(ownerId));
   }
 
   create(ownerId: string, createProjectDto: CreateProjectDto, status: ProjectStatus): Project {
@@ -162,13 +196,18 @@ export class ProjectsRepository {
       difficulty: createProjectDto.difficulty || ProjectDifficulty.Medium,
       status: (createProjectDto.status as any) || status,
       collaborators: createProjectDto.collaborators || [],
+      isCompleted: createProjectDto.isCompleted ?? false,
+      completedAt: createProjectDto.completedAt,
+      finalLink: createProjectDto.finalLink || createProjectDto.finishedLink,
+      finishedLink: createProjectDto.finishedLink || createProjectDto.finalLink,
+      removedUsers: (createProjectDto as any).removedUsers || [],
     };
     this.projects.push(newProject);
     return newProject;
   }
 
   update(id: string, updateProjectDto: UpdateProjectDto): Project | undefined {
-    const index = this.projects.findIndex((project) => project.id === id);
+    const index = this.projects.findIndex((project) => String(project.id) === String(id));
     if (index === -1) {
       return undefined;
     }
@@ -179,6 +218,22 @@ export class ProjectsRepository {
     };
 
     return this.projects[index];
+  }
+
+  addCollaborator(projectId: string, collaborator: { id: string; name: string; role: string }): Project | undefined {
+    const project = this.findById(projectId);
+    if (!project) {
+      return undefined;
+    }
+    const existing = Array.isArray(project.collaborators) ? project.collaborators : [];
+    const exists = existing.some((c: any) =>
+      typeof c === 'string' ? c === collaborator.id || c === collaborator.name : c.id === collaborator.id
+    );
+    if (!exists) {
+      existing.push(collaborator);
+      project.collaborators = existing;
+    }
+    return project;
   }
 
   delete(id: string): boolean {

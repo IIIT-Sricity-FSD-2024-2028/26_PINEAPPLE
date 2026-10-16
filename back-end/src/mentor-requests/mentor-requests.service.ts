@@ -1,14 +1,63 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
 import { BaseService } from '../common/abstracts/base.service';
 import { MentorRequestEntity } from './entities/mentor-request.entity';
 import { CreateMentorRequestDto } from './dto/create-mentor-request.dto';
 import { UpdateMentorRequestDto } from './dto/update-mentor-request.dto';
+import { ProjectsService } from '../projects/projects.service';
+import { UsersService } from '../users/users.service';
+import { MentorApplicationsService } from '../mentor-applications/mentor-applications.service';
+import { UserRole } from '../users/dto/create-user.dto';
 
 @Injectable()
 export class MentorRequestsService extends BaseService<MentorRequestEntity> {
+  constructor(
+    private readonly projectsService: ProjectsService,
+    private readonly usersService: UsersService,
+    private readonly mentorApplicationsService: MentorApplicationsService,
+  ) {
+    super();
+  }
+
+  isApprovedMentor(userId?: string): boolean {
+    if (!userId) return false;
+    let userEmail: string | undefined;
+    try {
+      const user = this.usersService.findById(userId);
+      if (user) {
+        userEmail = user.email;
+        if (user.role === UserRole.Mentor || user.profile?.mentorUnlocked) {
+          return true;
+        }
+      }
+    } catch {
+      // User not found in repository
+    }
+
+    try {
+      const apps = this.mentorApplicationsService.findByUser(userId);
+      if (apps && apps.some((a) => a.status === 'approved')) {
+        return true;
+      }
+      if (userEmail) {
+        const approved = this.mentorApplicationsService.findByStatus('approved');
+        if (approved.some((a) => a.email && a.email.toLowerCase() === userEmail.toLowerCase())) {
+          return true;
+        }
+      }
+    } catch {
+      // Lookup failure
+    }
+
+    return false;
+  }
+
   create(createMentorRequestDto: CreateMentorRequestDto): MentorRequestEntity {
     if (!createMentorRequestDto.mentorId && !createMentorRequestDto.mentorEmail) {
       throw new BadRequestException('mentorId or mentorEmail is required when creating a mentor request');
+    }
+
+    if (createMentorRequestDto.projectId && this.projectsService.isLocked(createMentorRequestDto.projectId)) {
+      throw new BadRequestException('Project is locked. Mentor requests cannot be created.');
     }
 
     return super.create({
@@ -26,6 +75,14 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       throw new BadRequestException('Invalid status value');
     }
 
+    const current = this.findOne(id);
+    if (current?.status === 'accepted' && updateMentorRequestDto.status && updateMentorRequestDto.status !== 'accepted') {
+      throw new ForbiddenException('A mentor cannot leave or be removed once a project has started.');
+    }
+    if (current?.projectId && this.projectsService.isLocked(current.projectId)) {
+      throw new BadRequestException('Project is locked. Mentor requests cannot be modified.');
+    }
+
     return super.update(id, updateMentorRequestDto as any);
   }
 
@@ -37,7 +94,30 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
     return this.items.filter((request: MentorRequestEntity) => request.mentorId === mentorIdOrEmail || request.mentorEmail === mentorIdOrEmail);
   }
 
-  accept(id: string): MentorRequestEntity {
+  accept(id: string, userId?: string, role?: string): MentorRequestEntity {
+    const isPrivileged = ['admin', 'superuser', 'administrator', 'super user'].includes(
+      String(role || '').toLowerCase(),
+    );
+    if (!isPrivileged) {
+      if (!this.isApprovedMentor(userId)) {
+        throw new ForbiddenException('Only approved mentors can accept mentor requests.');
+      }
+      const current = this.findOne(id);
+      let userEmail: string | undefined;
+      try {
+        if (userId) userEmail = this.usersService.findById(userId)?.email?.toLowerCase();
+      } catch { /* ignored */ }
+
+      const reqMentorId = current.mentorId?.trim();
+      const reqMentorEmail = current.mentorEmail?.trim().toLowerCase();
+      if ((reqMentorId || reqMentorEmail) && userId) {
+        const matches = (reqMentorId && reqMentorId === userId) || (userEmail && reqMentorEmail === userEmail);
+        if (!matches) {
+          throw new ForbiddenException('This mentor request was not assigned to you.');
+        }
+      }
+    }
+
     return super.update(id, {
       status: 'accepted',
       acceptedAt: new Date().toISOString(),
@@ -45,11 +125,48 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
     });
   }
 
-  decline(id: string): MentorRequestEntity {
+  decline(id: string, userId?: string, role?: string): MentorRequestEntity {
+    const current = this.findOne(id);
+    if (current?.status === 'accepted') {
+      throw new ForbiddenException('A mentor cannot leave or be removed once a project has started.');
+    }
+    const isPrivileged = ['admin', 'superuser', 'administrator', 'super user'].includes(
+      String(role || '').toLowerCase(),
+    );
+    if (!isPrivileged) {
+      if (!this.isApprovedMentor(userId)) {
+        throw new ForbiddenException('Only approved mentors can decline mentor requests.');
+      }
+      let userEmail: string | undefined;
+      try {
+        if (userId) userEmail = this.usersService.findById(userId)?.email?.toLowerCase();
+      } catch { /* ignored */ }
+
+      const reqMentorId = current.mentorId?.trim();
+      const reqMentorEmail = current.mentorEmail?.trim().toLowerCase();
+      if ((reqMentorId || reqMentorEmail) && userId) {
+        const matches = (reqMentorId && reqMentorId === userId) || (userEmail && reqMentorEmail === userEmail);
+        if (!matches) {
+          throw new ForbiddenException('This mentor request was not assigned to you.');
+        }
+      }
+    }
+
     return super.update(id, {
       status: 'declined',
       declinedAt: new Date().toISOString(),
       acceptedAt: undefined,
     });
+  }
+
+  override remove(id: string): void {
+    const current = this.findOne(id);
+    if (current?.status === 'accepted') {
+      throw new ForbiddenException('A mentor cannot leave or be removed once a project has started.');
+    }
+    if (current?.projectId && this.projectsService.isLocked(current.projectId)) {
+      throw new BadRequestException('Project is locked. Mentor requests cannot be removed.');
+    }
+    super.remove(id);
   }
 }

@@ -7,8 +7,8 @@ import { CreateNotificationDto } from './dto/create-notification.dto';
 export class CommunicationService {
   constructor(private readonly communicationRepository: CommunicationRepository) {}
 
-  sendMessage(senderId: string, dto: SendMessageDto): Message {
-    return this.communicationRepository.sendMessage(senderId, dto);
+  sendMessage(senderId: string, roleHeader: string | undefined, dto: SendMessageDto): Message {
+    return this.communicationRepository.sendMessage(senderId, roleHeader, dto);
   }
 
   getMessagesByProjectId(projectId: string): Message[] {

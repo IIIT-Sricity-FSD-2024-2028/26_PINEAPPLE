@@ -2,10 +2,10 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
 
 export class CreateJoinRequestDto {
-  @ApiProperty({ description: 'User ID making the request' })
+  @ApiPropertyOptional({ description: 'User ID making the request' })
   @IsString()
-  @IsNotEmpty()
-  userId!: string;
+  @IsOptional()
+  userId?: string;
 
   @ApiPropertyOptional({ description: 'User display name' })
   @IsString()

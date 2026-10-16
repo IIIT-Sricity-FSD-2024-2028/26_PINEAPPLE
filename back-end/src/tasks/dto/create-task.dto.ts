@@ -42,10 +42,52 @@ export class CreateTaskDto {
   @ApiPropertyOptional({ example: 'Arjun Sharma' })
   @IsString()
   @IsOptional()
+  assigneeName?: string;
+
+  @ApiPropertyOptional({ example: 'Arjun Sharma' })
+  @IsString()
+  @IsOptional()
   assignee?: string;
+
+  @ApiPropertyOptional({ example: 'Arjun Sharma' })
+  @IsString()
+  @IsOptional()
+  assignedTo?: string;
 
   @ApiPropertyOptional({ example: 'Medium' })
   @IsString()
   @IsOptional()
   difficulty?: string;
+
+  @ApiPropertyOptional({ example: 'High', enum: ['Low', 'Medium', 'High'] })
+  @IsString()
+  @IsOptional()
+  priority?: string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/pr/1' })
+  @IsString()
+  @IsOptional()
+  proofLink?: string;
+
+  @ApiPropertyOptional({ example: 'https://github.com/pr/1' })
+  @IsString()
+  @IsOptional()
+  proofUrl?: string;
+
+  @ApiPropertyOptional({ example: 'Implemented deliverables with tests' })
+  @IsString()
+  @IsOptional()
+  notes?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  xpAwarded?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  awardedXp?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  awardedRep?: number;
 }

@@ -1,5 +1,5 @@
-import { IsString, IsNotEmpty } from 'class-validator';
-import { ApiProperty } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsOptional } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SendMessageDto {
   @ApiProperty({ example: 'proj-1' })
@@ -7,8 +7,18 @@ export class SendMessageDto {
   @IsNotEmpty()
   projectId: string;
 
-  @ApiProperty({ example: 'Hey team, I just pushed the new database schema.' })
+  @ApiPropertyOptional({ example: 'Hey team, I just pushed the new database schema.' })
+  @IsOptional()
   @IsString()
-  @IsNotEmpty()
-  content: string;
+  content?: string;
+
+  @ApiPropertyOptional({ example: 'Hey team, I just pushed the new database schema.' })
+  @IsOptional()
+  @IsString()
+  text?: string;
+
+  @ApiPropertyOptional({ example: 'Priya' })
+  @IsOptional()
+  @IsString()
+  senderName?: string;
 }

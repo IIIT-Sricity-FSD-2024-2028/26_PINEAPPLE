@@ -17,6 +17,7 @@ export class CreateMentorProfileDto {
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() languages?: string[];
   @ApiProperty({ enum: ['Weekdays', 'Weekends', 'Anytime'] })
   @IsEnum(['Weekdays', 'Weekends', 'Anytime']) availability!: string;
+  @ApiPropertyOptional() @IsOptional() @IsBoolean() isAvailable?: boolean;
 }
 
 // ── Book a session (student) ─────────────────────────────────────────────────
@@ -48,9 +49,8 @@ export class FilterMentorsDto {
   @ApiPropertyOptional() @IsOptional() maxPrice?: number;
   @ApiPropertyOptional() @IsOptional() minExp?: number;
   @ApiPropertyOptional({ enum: ['Weekdays', 'Weekends', 'Anytime'] }) @IsOptional() availability?: string;
-  @ApiPropertyOptional() @IsOptional() minRating?: number;
   @ApiPropertyOptional({
-    enum: ['price_asc', 'price_desc', 'rating', 'sessions'],
+    enum: ['price_asc', 'price_desc'],
     description: 'Sort order',
   }) @IsOptional() sort?: string;
 }

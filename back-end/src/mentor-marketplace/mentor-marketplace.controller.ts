@@ -6,7 +6,7 @@ import {
   ApiOperation, ApiParam, ApiQuery, ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { RolesGuard, normalizeRole } from '../common/guards/roles.guard';
 import { MentorMarketplaceService } from './mentor-marketplace.service';
 import {
   BookSessionDto,
@@ -35,8 +35,7 @@ export class MentorMarketplaceController {
   @ApiQuery({ name: 'maxPrice',     required: false, type: Number })
   @ApiQuery({ name: 'minExp',       required: false, type: Number })
   @ApiQuery({ name: 'availability', required: false })
-  @ApiQuery({ name: 'minRating',    required: false, type: Number })
-  @ApiQuery({ name: 'sort',         required: false, enum: ['price_asc', 'price_desc', 'rating', 'sessions'] })
+  @ApiQuery({ name: 'sort',         required: false, enum: ['price_asc', 'price_desc'] })
   @ApiOkResponse({ description: 'List of verified mentor profiles' })
   listMentors(@Query() query: FilterMentorsDto) {
     return this.svc.listMentors(query);
@@ -70,7 +69,7 @@ export class MentorMarketplaceController {
   }
 
   @Patch('mentors/availability')
-  @Roles('mentor')
+  @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor toggles their availability on/off' })
   @ApiBody({ type: UpdateAvailabilityDto })
   updateAvailability(
@@ -88,7 +87,7 @@ export class MentorMarketplaceController {
   }
 
   @Patch('mentors/profile')
-  @Roles('mentor')
+  @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor edits their own listing (e.g. change price)' })
   @ApiBody({ type: UpdateMentorProfileDto })
   updateProfile(
@@ -135,8 +134,12 @@ export class MentorMarketplaceController {
   @Get('sessions/mentor-view')
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor: sessions assigned to me' })
-  mySessionsMentor(@Headers('x-user-id') mentorUserId: string) {
-    return this.svc.getSessionsByMentor(mentorUserId);
+  mySessionsMentor(
+    @Headers('x-user-id') mentorUserId: string,
+    @Headers('x-user-role') role: string,
+  ) {
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
+    return this.svc.getSessionsByMentor(mentorUserId, isPrivileged);
   }
 
   @Post('sessions/:id/start')
@@ -151,16 +154,26 @@ export class MentorMarketplaceController {
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor accepts a booking request — grants project workspace access' })
   @ApiParam({ name: 'id' })
-  acceptSession(@Param('id') id: string, @Headers('x-user-id') mentorUserId: string) {
-    return this.svc.acceptSession(id, mentorUserId);
+  acceptSession(
+    @Param('id') id: string,
+    @Headers('x-user-id') mentorUserId: string,
+    @Headers('x-user-role') role: string,
+  ) {
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
+    return this.svc.acceptSession(id, mentorUserId, isPrivileged);
   }
 
   @Post('sessions/:id/decline')
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor declines a booking request — escrow is refunded' })
   @ApiParam({ name: 'id' })
-  declineSession(@Param('id') id: string, @Headers('x-user-id') mentorUserId: string) {
-    return this.svc.declineSession(id, mentorUserId);
+  declineSession(
+    @Param('id') id: string,
+    @Headers('x-user-id') mentorUserId: string,
+    @Headers('x-user-role') role: string,
+  ) {
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
+    return this.svc.declineSession(id, mentorUserId, isPrivileged);
   }
 
   @Post('sessions/:id/complete')
@@ -172,16 +185,21 @@ export class MentorMarketplaceController {
     @Headers('x-user-id') requesterId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(String(role || '').toLowerCase());
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
     return this.svc.completeSession(id, requesterId, isPrivileged);
   }
 
   @Post('sessions/:id/cancel')
-  @Roles('admin', 'superuser')
-  @ApiOperation({ summary: 'Admin: cancel session and refund student' })
+  @Roles('admin', 'superuser', 'project-owner')
+  @ApiOperation({ summary: 'Admin/Owner: cancel session and refund student' })
   @ApiParam({ name: 'id' })
-  cancelSession(@Param('id') id: string) {
-    return this.svc.cancelSession(id);
+  cancelSession(
+    @Param('id') id: string,
+    @Headers('x-user-id') userId: string,
+    @Headers('x-user-role') role: string,
+  ) {
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
+    return this.svc.cancelSession(id, userId, isPrivileged);
   }
 
   @Post('sessions/:id/review')
@@ -195,5 +213,13 @@ export class MentorMarketplaceController {
     @Body() dto: SubmitReviewDto,
   ) {
     return this.svc.submitReview(sessionId, studentId, dto);
+  }
+
+  @Post('sessions/:id/retry-payout')
+  @Roles('admin', 'superuser', 'project-owner', 'mentor')
+  @ApiOperation({ summary: 'Retry releasing escrow for a session with payout_pending status' })
+  @ApiParam({ name: 'id' })
+  retryPayout(@Param('id') id: string) {
+    return this.svc.retryPayout(id);
   }
 }

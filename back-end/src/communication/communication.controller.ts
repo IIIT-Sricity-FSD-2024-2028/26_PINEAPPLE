@@ -18,16 +18,18 @@ export class CommunicationController {
   @Post('messages')
   @ApiOperation({ summary: 'Send a message to a project chat board' })
   @ApiHeader({ name: 'x-user-id', description: 'ID of the user sending the message', required: true })
+  @ApiHeader({ name: 'x-user-role', description: 'Role of the user sending the message', required: false })
   @ApiResponse({ status: 201, description: 'The message has been successfully sent.' })
   @ApiResponse({ status: 401, description: 'Unauthorized: missing x-user-id header.' })
   sendMessage(
     @Headers('x-user-id') senderId: string,
+    @Headers('x-user-role') roleHeader: string,
     @Body() dto: SendMessageDto,
   ) {
     if (!senderId) {
       throw new UnauthorizedException('x-user-id header is missing.');
     }
-    return this.communicationService.sendMessage(senderId, dto);
+    return this.communicationService.sendMessage(senderId, roleHeader, dto);
   }
 
   @Get('notifications')

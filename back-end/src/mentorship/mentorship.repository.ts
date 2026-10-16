@@ -14,11 +14,18 @@ export interface MentorApplication {
 
 export interface RecommendationBadge {
   id: string;
+  recipientId: string;
+  recipientName: string;
   mentorId: string;
-  collaboratorId: string;
-  badgeType: BadgeType;
-  comment: string;
-  timestamp: Date;
+  mentorName: string;
+  badgeName: string;
+  projectId: string;
+  projectTitle: string;
+  comment?: string;
+  awardedAt: string;
+  collaboratorId?: string;
+  badgeType?: string;
+  timestamp?: Date;
 }
 
 @Injectable()
@@ -40,14 +47,21 @@ export class MentorshipRepository {
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 48), // 2 days ago
     });
 
-    // Seed test badge issued by User '1' (Priya/Admin) to User '2' (Arjun)
+    // Seed test badge issued by User '1' (Priya Patel) to User '2' (Arjun Sharma)
     this.badges.push({
       id: 'badge-1',
+      recipientId: '2',
+      recipientName: 'Arjun Sharma',
       mentorId: '1',
-      collaboratorId: '2',
-      badgeType: BadgeType.TechnicalExcellence,
+      mentorName: 'Priya Patel',
+      badgeName: 'Technical Excellence',
+      projectId: 'proj-1',
+      projectTitle: 'AI Study Planner',
       comment: 'Arjun demonstrated exceptional problem-solving during the database schema design phase.',
-      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 5), // 5 hours ago
+      awardedAt: new Date(now.getTime() - 1000 * 60 * 60 * 5).toISOString(),
+      collaboratorId: '2',
+      badgeType: 'Technical Excellence',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 5),
     });
 
     this.applications.push({
@@ -60,13 +74,21 @@ export class MentorshipRepository {
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 30), // 30 days ago
     });
 
+    // Seed test badge issued by User '7' (Neha Gupta) to User '6' (Aditya Sai)
     this.badges.push({
       id: 'badge-2',
-      mentorId: '7', // Neha Gupta
-      collaboratorId: '6', // Aditya Sai
-      badgeType: BadgeType.TeamPlayer,
+      recipientId: '6',
+      recipientName: 'Aditya Sai',
+      mentorId: '7',
+      mentorName: 'Neha Gupta',
+      badgeName: 'Team Player',
+      projectId: 'proj-1',
+      projectTitle: 'AI Study Planner',
       comment: 'Aditya is an excellent team player, always helping others debug their issues.',
-      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2), // 2 days ago
+      awardedAt: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+      collaboratorId: '6',
+      badgeType: 'Team Player',
+      timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
     });
   }
 
@@ -95,22 +117,45 @@ export class MentorshipRepository {
     return this.applications[index];
   }
 
-  issueBadge(mentorId: string, dto: IssueBadgeDto): RecommendationBadge {
-    const newBadge: RecommendationBadge = {
-      id: `badge-${Date.now()}`,
-      mentorId,
-      collaboratorId: dto.collaboratorId,
-      badgeType: dto.badgeType,
-      comment: dto.comment,
-      timestamp: new Date(),
-    };
-    this.badges.push(newBadge);
-    return newBadge;
+  saveBadge(badge: RecommendationBadge): RecommendationBadge {
+    this.badges.unshift(badge);
+    return badge;
   }
 
   getBadgesByUserId(userId: string): RecommendationBadge[] {
+    const target = String(userId || '').trim().toLowerCase();
     return this.badges
-      .filter((badge) => badge.collaboratorId === userId)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Reverse Chronological
+      .filter((b) =>
+        String(b.recipientId || '').toLowerCase() === target ||
+        String(b.collaboratorId || '').toLowerCase() === target ||
+        String(b.recipientName || '').toLowerCase() === target
+      )
+      .sort((a, b) => new Date(b.awardedAt || b.timestamp || 0).getTime() - new Date(a.awardedAt || a.timestamp || 0).getTime());
+  }
+
+  getBadgesByProjectId(projectId: string): RecommendationBadge[] {
+    const target = String(projectId || '').trim().toLowerCase();
+    return this.badges
+      .filter((b) => String(b.projectId || '').toLowerCase() === target)
+      .sort((a, b) => new Date(b.awardedAt || b.timestamp || 0).getTime() - new Date(a.awardedAt || a.timestamp || 0).getTime());
+  }
+
+  findExistingBadge(mentorId: string, recipientId: string, projectId: string): RecommendationBadge | undefined {
+    const mTarget = String(mentorId || '').trim().toLowerCase();
+    const rTarget = String(recipientId || '').trim().toLowerCase();
+    const pTarget = String(projectId || '').trim().toLowerCase();
+    return this.badges.find((b) => {
+      const matchMentor = String(b.mentorId || '').toLowerCase() === mTarget;
+      const matchRecipient =
+        String(b.recipientId || '').toLowerCase() === rTarget ||
+        String(b.collaboratorId || '').toLowerCase() === rTarget ||
+        String(b.recipientName || '').toLowerCase() === rTarget;
+      const matchProject = String(b.projectId || '').toLowerCase() === pTarget;
+      return matchMentor && matchRecipient && matchProject;
+    });
+  }
+
+  getAllBadges(): RecommendationBadge[] {
+    return [...this.badges];
   }
 }

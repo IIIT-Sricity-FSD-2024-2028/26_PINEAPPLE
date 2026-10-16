@@ -25,6 +25,7 @@ export interface UserProfile {
   rep: number;
   skills: string[];
   mentorUnlocked: boolean;
+  hasMentorBadge?: boolean;
   title?: string;
   uni?: string;
   joined?: string;
@@ -51,6 +52,10 @@ export interface User {
   flags: boolean;
   profile: UserProfile;
   data: UserData;
+  password?: string;
+  username?: string;
+  xp?: number;
+  rep?: number;
 }
 
 @Injectable()
@@ -348,14 +353,17 @@ export class UsersRepository {
 
     // Deep merge to ensure profile updates don't obliterate other nested properties
     const existingUser = this.users[userIndex];
+    const updatedProfile = {
+      ...existingUser.profile,
+      ...(updateUserDto.profile || {}),
+    };
     
     this.users[userIndex] = {
       ...existingUser,
       ...updateUserDto,
-      profile: {
-        ...existingUser.profile,
-        ...(updateUserDto.profile || {})
-      },
+      profile: updatedProfile,
+      xp: updatedProfile.xp,
+      rep: updatedProfile.rep,
       // Keep data intact since updating data usually happens via separate endpoints
     };
 

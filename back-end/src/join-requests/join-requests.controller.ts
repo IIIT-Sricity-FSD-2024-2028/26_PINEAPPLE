@@ -9,6 +9,7 @@ import {
   Query,
   UseGuards,
   NotFoundException,
+  Headers,
 } from '@nestjs/common';
 import {
   ApiCreatedResponse,
@@ -90,11 +91,15 @@ export class JoinRequestsController {
   @Post()
   @Roles('admin', 'user')
   @ApiOperation({ summary: 'Create a new join request' })
+  @ApiHeader({ name: 'x-user-id', description: 'ID of the user making the request', required: false })
   @ApiBody({ type: CreateJoinRequestDto })
   @ApiCreatedResponse({ description: 'Join request created successfully.', type: JoinRequestEntity })
   @ApiForbiddenResponse({ description: 'Forbidden - Insufficient permissions' })
-  create(@Body() createJoinRequestDto: CreateJoinRequestDto): JoinRequestEntity {
-    return this.joinRequestsService.create(createJoinRequestDto);
+  create(
+    @Headers('x-user-id') userId: string,
+    @Body() createJoinRequestDto: CreateJoinRequestDto,
+  ): JoinRequestEntity {
+    return this.joinRequestsService.create(createJoinRequestDto, userId);
   }
 
   @Put(':id')
@@ -114,6 +119,15 @@ export class JoinRequestsController {
       }
       throw error;
     }
+  }
+
+  @Put(':id/status')
+  @Roles('admin', 'user')
+  @ApiOperation({ summary: 'Update an existing join request status' })
+  @ApiParam({ name: 'id', description: 'Join request ID', type: 'string' })
+  @ApiBody({ type: UpdateJoinRequestDto })
+  updateStatus(@Param('id') id: string, @Body() updateJoinRequestDto: UpdateJoinRequestDto): JoinRequestEntity {
+    return this.update(id, updateJoinRequestDto);
   }
 
   @Delete(':id')

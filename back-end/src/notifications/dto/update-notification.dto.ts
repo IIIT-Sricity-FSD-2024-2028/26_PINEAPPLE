@@ -10,4 +10,12 @@ export class UpdateNotificationDto {
   @IsOptional()
   @IsBoolean()
   readStatus?: boolean;
+
+  @ApiProperty({
+    description: 'Title of the notification',
+    example: 'Project Membership Ended',
+    required: false,
+  })
+  @IsOptional()
+  title?: string;
 }

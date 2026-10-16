@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Controller, Get, Post, Put, Body, Patch, Param, Delete, Headers } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { TasksService } from './tasks.service';
 import { CreateTaskDto } from './dto/create-task.dto';
@@ -27,7 +27,7 @@ export class TasksController {
   }
 
   @Post()
-  @Roles('Project Owner', 'Collaborator', 'Administrator')
+  @Roles('Project Owner', 'Collaborator', 'Mentor', 'Administrator')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
   @ApiOperation({ summary: 'Create a new task' })
   @ApiResponse({ status: 201, description: 'The task has been successfully created.' })
@@ -37,39 +37,63 @@ export class TasksController {
   }
 
   @Patch(':id')
-  @Roles('Project Owner', 'Collaborator', 'Administrator')
+  @Roles('Project Owner', 'Collaborator', 'Mentor', 'Administrator')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
   @ApiOperation({ summary: 'Update a task' })
   @ApiResponse({ status: 200, description: 'The task has been successfully updated.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Task not found.' })
-  update(@Param('id') id: string, @Body() updateTaskDto: UpdateTaskDto) {
-    return this.tasksService.update(id, updateTaskDto);
+  update(
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
+  ) {
+    return this.tasksService.update(id, updateTaskDto, userId, role);
+  }
+
+  @Put(':id')
+  @Roles('Project Owner', 'Collaborator', 'Mentor', 'Administrator')
+  updatePut(
+    @Param('id') id: string,
+    @Body() updateTaskDto: UpdateTaskDto,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
+  ) {
+    return this.update(id, updateTaskDto, userId, role);
   }
 
   /**
-   * Kanban board endpoint — dedicated status transition.
+   * Dedicated status transition endpoint.
    *
-   * Accepts either a canonical/aliased `status` string or a Kanban
-   * `column` key. Delegates to the same service path as the generic
-   * PATCH so gamification (XP on completion) still runs unchanged.
-   *
-   * Existing PATCH /tasks/:id continues to work — this endpoint is
-   * purely additive and does not affect any current workflow.
+   * Accepts a canonical/aliased `status` string.
    */
   @Patch(':id/status')
-  @Roles('Project Owner', 'Collaborator', 'Administrator')
+  @Roles('Project Owner', 'Collaborator', 'Mentor', 'Administrator')
   @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Move a task between Kanban columns (status transition)' })
+  @ApiOperation({ summary: 'Update a task status' })
   @ApiResponse({ status: 200, description: 'The task status has been updated.' })
-  @ApiResponse({ status: 400, description: 'Invalid status or column value.' })
+  @ApiResponse({ status: 400, description: 'Invalid status value.' })
   @ApiResponse({ status: 403, description: 'Forbidden.' })
   @ApiResponse({ status: 404, description: 'Task not found.' })
   updateStatus(
     @Param('id') id: string,
     @Body() updateTaskStatusDto: UpdateTaskStatusDto,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
   ) {
-    return this.tasksService.updateStatus(id, updateTaskStatusDto);
+    return this.tasksService.updateStatus(id, updateTaskStatusDto, userId, role);
+  }
+
+  @Put(':id/status')
+  @Roles('Project Owner', 'Collaborator', 'Mentor', 'Administrator')
+  updateStatusPut(
+    @Param('id') id: string,
+    @Body() updateTaskStatusDto: UpdateTaskStatusDto,
+    @Headers('x-user-id') userId?: string,
+    @Headers('x-user-role') role?: string,
+  ) {
+    return this.updateStatus(id, updateTaskStatusDto, userId, role);
   }
 
   @Delete(':id')

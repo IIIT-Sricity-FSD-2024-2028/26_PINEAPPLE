@@ -7,8 +7,8 @@ export class ProjectMember {
   @ApiProperty({ description: 'Member initials' })
   initials!: string;
 
-  @ApiProperty({ description: 'Member role in the project', enum: ['Owner', 'Developer', 'Designer', 'QA', 'Contributor'] })
-  role!: 'Owner' | 'Developer' | 'Designer' | 'QA' | 'Contributor';
+  @ApiProperty({ description: 'Member role in the project', enum: ['Owner', 'Developer', 'Designer', 'QA', 'Contributor', 'Mentor'] })
+  role!: 'Owner' | 'Developer' | 'Designer' | 'QA' | 'Contributor' | 'Mentor' | string;
 }
 
 export class ProjectTask {
@@ -85,6 +85,18 @@ export class ProjectEntity {
   @ApiProperty({ description: 'Project status', enum: ['open', 'in-progress', 'completed', 'cancelled'] })
   status!: 'open' | 'in-progress' | 'completed' | 'cancelled';
 
+  @ApiProperty({ description: 'Whether the project is completed/locked', default: false })
+  isCompleted!: boolean;
+
+  @ApiPropertyOptional({ description: 'Completion timestamp' })
+  completedAt?: Date | string;
+
+  @ApiPropertyOptional({ description: 'Final published project link' })
+  finalLink?: string;
+
+  @ApiPropertyOptional({ description: 'Alias for final published project link' })
+  finishedLink?: string;
+
   @ApiProperty({ description: 'Creation timestamp' })
   createdAt!: Date;
 
@@ -100,6 +112,6 @@ export class ProjectEntity {
   @ApiProperty({ description: 'Pending join requests', type: [JoinRequest] })
   requests!: JoinRequest[];
 
-  @ApiProperty({ description: 'Invited user emails', type: [String] })
-  invites!: string[];
+  @ApiPropertyOptional({ description: 'Users removed by owner with stored reason' })
+  removedUsers?: any[];
 }

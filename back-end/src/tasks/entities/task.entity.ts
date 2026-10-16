@@ -10,11 +10,17 @@ export class TaskEntity {
   @ApiPropertyOptional({ description: 'Task description' })
   description?: string;
 
-  @ApiProperty({ description: 'Assigned user (email or name)' })
-  assignedTo!: string;
+  @ApiPropertyOptional({ description: 'Assignee User ID' })
+  assigneeId?: string;
 
-  @ApiProperty({ description: 'Assignee (duplicate for redundancy)' })
-  assignee!: string;
+  @ApiPropertyOptional({ description: 'Assignee Display Name' })
+  assigneeName?: string;
+
+  @ApiPropertyOptional({ description: 'Assigned user (email or name)' })
+  assignedTo?: string;
+
+  @ApiPropertyOptional({ description: 'Assignee (duplicate for redundancy)' })
+  assignee?: string;
 
   @ApiProperty({ description: 'Task status', enum: ['pending', 'in-progress', 'submitted', 'approved'] })
   status!: 'pending' | 'in-progress' | 'submitted' | 'approved';
@@ -39,4 +45,13 @@ export class TaskEntity {
 
   @ApiProperty({ description: 'XP points awarded for completion', minimum: 0 })
   points!: number;
+
+  @ApiPropertyOptional({ description: 'Whether XP and reputation have been awarded for this task' })
+  xpAwarded?: boolean;
+
+  @ApiPropertyOptional({ description: 'Amount of XP awarded' })
+  awardedXp?: number;
+
+  @ApiPropertyOptional({ description: 'Amount of reputation awarded' })
+  awardedRep?: number;
 }

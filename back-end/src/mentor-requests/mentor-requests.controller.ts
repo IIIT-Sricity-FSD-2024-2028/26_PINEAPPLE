@@ -3,12 +3,14 @@ import {
   Controller,
   Delete,
   Get,
+  Headers,
   Param,
   Post,
   Put,
   Query,
   UseGuards,
   NotFoundException,
+  ForbiddenException,
 } from '@nestjs/common';
 import {
   ApiBody,
@@ -53,7 +55,16 @@ export class MentorRequestsController {
     @Query('projectId') projectId?: string,
     @Query('mentorId') mentorId?: string,
     @Query('status') status?: string,
+    @Headers('x-user-role') role?: string,
+    @Headers('x-user-id') userId?: string,
   ): MentorRequestEntity[] {
+    const normRole = String(role || '').toLowerCase();
+    if (normRole === 'mentor') {
+      if (!this.mentorRequestsService.isApprovedMentor(userId)) {
+        throw new ForbiddenException('Only approved mentors can access mentor requests.');
+      }
+    }
+
     let requests = this.mentorRequestsService.findAll();
 
     if (projectId) {
@@ -76,7 +87,18 @@ export class MentorRequestsController {
   @ApiOkResponse({ description: 'Mentor request returned successfully.', type: MentorRequestEntity })
   @ApiNotFoundResponse({ description: 'Mentor request not found.' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  getOne(@Param('id') id: string): MentorRequestEntity {
+  getOne(
+    @Param('id') id: string,
+    @Headers('x-user-role') role?: string,
+    @Headers('x-user-id') userId?: string,
+  ): MentorRequestEntity {
+    const normRole = String(role || '').toLowerCase();
+    if (normRole === 'mentor') {
+      if (!this.mentorRequestsService.isApprovedMentor(userId)) {
+        throw new ForbiddenException('Only approved mentors can access mentor requests.');
+      }
+    }
+
     try {
       return this.mentorRequestsService.findOne(id);
     } catch (error) {
@@ -126,8 +148,12 @@ export class MentorRequestsController {
   @ApiOkResponse({ description: 'Mentor request accepted successfully.', type: MentorRequestEntity })
   @ApiNotFoundResponse({ description: 'Mentor request not found.' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  accept(@Param('id') id: string): MentorRequestEntity {
-    return this.mentorRequestsService.accept(id);
+  accept(
+    @Param('id') id: string,
+    @Headers('x-user-role') role?: string,
+    @Headers('x-user-id') userId?: string,
+  ): MentorRequestEntity {
+    return this.mentorRequestsService.accept(id, userId, role);
   }
 
   @Put(':id/decline')
@@ -137,8 +163,12 @@ export class MentorRequestsController {
   @ApiOkResponse({ description: 'Mentor request declined successfully.', type: MentorRequestEntity })
   @ApiNotFoundResponse({ description: 'Mentor request not found.' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  decline(@Param('id') id: string): MentorRequestEntity {
-    return this.mentorRequestsService.decline(id);
+  decline(
+    @Param('id') id: string,
+    @Headers('x-user-role') role?: string,
+    @Headers('x-user-id') userId?: string,
+  ): MentorRequestEntity {
+    return this.mentorRequestsService.decline(id, userId, role);
   }
 
   @Delete(':id')

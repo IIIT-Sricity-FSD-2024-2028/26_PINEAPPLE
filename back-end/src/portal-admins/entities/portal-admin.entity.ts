@@ -24,4 +24,7 @@ export class PortalAdminEntity {
 
   @ApiPropertyOptional({ description: 'Last login timestamp in ISO format' })
   lastLogin?: string;
+
+  @ApiPropertyOptional({ description: 'Status of admin account (active or suspended)' })
+  status?: string;
 }

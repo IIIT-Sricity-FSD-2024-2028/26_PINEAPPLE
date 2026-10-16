@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsArray, IsEmail, IsIn, IsNotEmpty, IsString, Matches, MinLength } from 'class-validator';
+import { IsArray, IsEmail, IsIn, IsNotEmpty, IsOptional, IsString, Matches, MinLength } from 'class-validator';
 
 export class CreatePortalAdminDto {
   @ApiProperty({ description: 'Display name of the portal admin' })
@@ -19,13 +19,17 @@ export class CreatePortalAdminDto {
   })
   password!: string;
 
-  @ApiProperty({ description: 'Portal admin role', enum: ['admin', 'superuser'], default: 'admin' })
+  @ApiProperty({ description: 'Portal admin role', enum: ['admin', 'superuser'], default: 'admin', required: false })
+  @IsOptional()
   @IsString()
   @IsIn(['admin', 'superuser'])
-  portalRole!: 'admin' | 'superuser';
+  portalRole?: 'admin' | 'superuser';
 
   @ApiProperty({ description: 'Permissions granted to the portal admin', type: [String] })
   @IsArray()
   @IsString({ each: true })
   permissions!: string[];
+
+  @ApiProperty({ description: 'Account status', required: false })
+  status?: string;
 }
