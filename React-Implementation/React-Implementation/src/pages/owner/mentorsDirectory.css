@@ -31,75 +31,6 @@
   gap: 18px;
 }
 
-.tf-mentors-card {
-  background: var(--card, #ffffff);
-  border: 1px solid var(--border, #e5e7eb);
-  border-radius: 12px;
-  padding: 20px;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
-}
-
-.tf-mentors-card-top {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  margin-bottom: 14px;
-}
-
-.tf-mentors-avatar {
-  width: 46px;
-  height: 46px;
-  border-radius: 50%;
-  background: var(--tf-accent, #f59e0b);
-  color: #ffffff;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-weight: 700;
-  font-size: 0.95rem;
-}
-
-.tf-mentors-info h3 {
-  font-size: 0.96rem;
-  font-weight: 600;
-  color: var(--tf-ink-900, #111827);
-  margin: 0 0 2px 0;
-}
-
-.tf-mentors-info p {
-  font-size: 0.8rem;
-  color: var(--tf-ink-500, #6b7280);
-  margin: 0;
-}
-
-.tf-mentors-skills-wrap {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.tf-mentors-skill-tag {
-  font-size: 0.72rem;
-  padding: 2px 8px;
-  border-radius: 999px;
-  background: var(--tf-ink-100, #f3f4f6);
-  color: var(--tf-ink-700, #374151);
-  font-weight: 500;
-}
-
-.tf-mentors-stats-row {
-  display: flex;
-  gap: 16px;
-  font-size: 0.78rem;
-  color: var(--tf-ink-600, #4b5563);
-  margin-bottom: 16px;
-  border-top: 1px solid var(--border, #f3f4f6);
-  padding-top: 12px;
-}
 
 .tf-mentors-btn-primary {
   padding: 8px 16px;
@@ -171,8 +102,8 @@
   width: 100%;
   padding: 10px 14px;
   border-radius: 8px;
-  border: 1px solid var(--border, #d1d5db);
-  background: #ffffff;
+  border: 1px solid var(--input-border, var(--border, #d1d5db));
+  background: var(--input-bg, #ffffff);
   color: var(--fg, #111827);
   font-size: 0.88rem;
   box-sizing: border-box;
@@ -181,4 +112,43 @@
 
 .tf-mentors-input:focus {
   border-color: var(--tf-brand, #5f513f);
+}
+
+
+.tf-mentors-escrow-breakdown {
+  background-color: var(--surface-alt, var(--secondary, #f9fafb));
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 8px;
+  padding: 12px 14px;
+  margin: 14px 0;
+  font-size: 0.85rem;
+}
+
+.tf-escrow-breakdown-row {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 6px;
+  color: var(--muted-fg, #4b5563);
+}
+
+.tf-escrow-breakdown-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid var(--border, #d1d5db);
+  font-weight: 700;
+  color: var(--fg, #111827);
+  font-size: 0.95rem;
+}
+
+.tf-escrow-badge {
+  font-size: 0.78rem;
+  color: #22c55e;
+  background-color: rgba(22, 163, 74, 0.15);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  padding: 6px 10px;
+  border-radius: 6px;
+  margin-top: 8px;
+  display: block;
+  line-height: 1.4;
 }
