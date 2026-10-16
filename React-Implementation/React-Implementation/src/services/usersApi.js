@@ -19,6 +19,13 @@ export const usersApi = {
     apiRequest(`/users/${id}`, "DELETE", null, {
       role: role || "Administrator",
     }),
+  checkUsernameAvailable: (username, excludeUserId) => {
+    const params = new URLSearchParams({ username: username || '' });
+    if (excludeUserId) {
+      params.append('excludeUserId', excludeUserId);
+    }
+    return apiRequest(`/users/username-available?${params.toString()}`, 'GET');
+  },
 };
 
 export default usersApi;
