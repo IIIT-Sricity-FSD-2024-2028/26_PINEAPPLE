@@ -2,6 +2,7 @@ import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import usersApi from '../services/usersApi';
+import { recordPortalAuditEntry } from '../services/adminApi';
 import './Auth.css';
 
 const EyeIcon = () => (
@@ -39,6 +40,7 @@ const Signup = () => {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
+  const [usernameError, setUsernameError] = useState('');
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -46,9 +48,32 @@ const Signup = () => {
   const { login } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  const handleUsernameBlur = async () => {
+    const trimmed = (username || '').trim();
+    if (!trimmed) {
+      setUsernameError('');
+      return;
+    }
+    try {
+      const res = await usersApi.checkUsernameAvailable(trimmed);
+      if (res && res.available === false) {
+        setUsernameError('This username is already taken');
+      } else {
+        setUsernameError('');
+      }
+    } catch (e) {
+      console.warn('Error checking username availability:', e);
+    }
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+
+    if (usernameError) {
+      setError(usernameError);
+      return;
+    }
 
     if (password !== confirmPassword) {
       setError("Passwords don't match!");
@@ -61,22 +86,49 @@ const Signup = () => {
     }
 
     try {
+      const avail = await usersApi.checkUsernameAvailable((username || '').trim());
+      if (avail && avail.available === false) {
+        setUsernameError('This username is already taken');
+        setError('This username is already taken');
+        return;
+      }
+    } catch (availErr) {
+      console.warn('Username availability pre-check failed:', availErr);
+    }
+
+    try {
       if (email && password && username) {
         // Send actual creation request to backend API
+        const cleanedUsername = username.trim();
         const newUser = await usersApi.create({
-          name: username,
-          email,
+          name: cleanedUsername,
+          username: cleanedUsername,
+          email: email.trim(),
           password,
           role: "Collaborator"
         });
         
+        recordPortalAuditEntry({
+          action: 'signup',
+          actor: cleanedUsername,
+          target: 'Account Registration',
+          event: `New user "${cleanedUsername}" signed up (${email})`,
+          details: { role: 'Collaborator' },
+        });
+
         login(newUser);
         navigate('/dashboard');
       } else {
         setError('Please fill in all fields.');
       }
     } catch (err) {
-      setError(err.message || 'Signup failed');
+      const msg = err.message || 'Signup failed';
+      if (msg.toLowerCase().includes('already taken') || err.status === 409) {
+        setUsernameError('This username is already taken');
+        setError('This username is already taken');
+      } else {
+        setError(msg);
+      }
     }
   };
 
@@ -108,9 +160,18 @@ const Signup = () => {
                   type="text" 
                   placeholder="deniel123"
                   value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+                  onChange={(e) => {
+                    setUsername(e.target.value);
+                    if (usernameError) setUsernameError('');
+                  }}
+                  onBlur={handleUsernameBlur}
                   required
                 />
+                {usernameError && (
+                  <span className="field-error-text" style={{ color: 'var(--destructive, #ef4444)', fontSize: '0.82rem', marginTop: '4px', display: 'block' }}>
+                    {usernameError}
+                  </span>
+                )}
               </div>
 
               <div className="input-group">
@@ -171,7 +232,9 @@ const Signup = () => {
                 </label>
               </div>
 
-              <button type="submit" className="btn-primary">Create account</button>
+              <button type="submit" className="btn-primary">
+                Create account
+              </button>
             </form>
 
             <div className="divider">
