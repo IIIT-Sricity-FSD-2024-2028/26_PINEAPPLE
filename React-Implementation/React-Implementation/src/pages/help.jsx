@@ -1,4 +1,5 @@
 import { useState } from "react";
+import SearchBar from "../components/common/SearchBar";
 import "./help.css"; // Import page-specific stylesheet
 
 // --- SVGs ---
@@ -161,6 +162,16 @@ const FaqCategory = ({ category }) => {
 
 
 const Help = () => {
+  const [search, setSearch] = useState("");
+
+  const filteredFaqs = FAQS.map((cat) => {
+    if (!search.trim()) return cat;
+    const q = search.toLowerCase();
+    const matchingItems = cat.items.filter(
+      (item) => item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q)
+    );
+    return matchingItems.length > 0 ? { ...cat, items: matchingItems } : null;
+  }).filter(Boolean);
 
   return (
     <div className="help-page">
@@ -171,10 +182,34 @@ const Help = () => {
         <p className="help-subtitle">Find answers or reach out to us.</p>
       </div>
 
+      <div style={{ marginBottom: "2rem", maxWidth: "500px" }}>
+        <SearchBar
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onClear={() => setSearch("")}
+          placeholder="Search FAQs and help topics..."
+        />
+      </div>
+
       {/* FAQ Sections */}
-      {FAQS.map((cat, index) => (
-        <FaqCategory key={index} category={cat} />
-      ))}
+      {filteredFaqs.length > 0 ? (
+        filteredFaqs.map((cat, index) => (
+          <FaqCategory key={index} category={cat} />
+        ))
+      ) : (
+        <p style={{ color: "#6b7280" }}>No FAQs match "{search}".</p>
+      )}
+
+      {/* Support Contact */}
+      <div className="help-glass-card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
+        <div className="help-icon-box"><MailIcon /></div>
+        <div>
+          <h4 style={{ margin: 0, fontWeight: 700 }}>Still have questions?</h4>
+          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.88rem' }}>
+            Reach out to our platform administration team at <a href="mailto:support@teamforge.edu" style={{ color: '#5f513f', fontWeight: 600 }}>support@teamforge.edu</a>
+          </p>
+        </div>
+      </div>
     </div>
   );
 };
