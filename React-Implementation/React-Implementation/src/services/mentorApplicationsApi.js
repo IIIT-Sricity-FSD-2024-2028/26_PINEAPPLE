@@ -12,6 +12,7 @@ export const mentorApplicationsApi = {
       null,
       {
         role: role || getCurrentUserRole(),
+        userId: params?.userId,
       },
     );
   },
