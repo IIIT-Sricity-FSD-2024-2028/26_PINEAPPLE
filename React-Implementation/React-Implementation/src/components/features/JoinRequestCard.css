@@ -1,0 +1,94 @@
+.tf-join-req-card {
+  background: var(--card, #ffffff);
+  border-radius: 10px;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.85rem;
+}
+
+.tf-join-req-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.75rem;
+}
+
+.tf-join-req-user {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.tf-join-req-avatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background-color: var(--secondary, #eee5da);
+  color: var(--primary, #5f513f);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 0.95rem;
+}
+
+.tf-join-req-name {
+  margin: 0;
+  font-size: 0.96rem;
+  font-weight: 700;
+  color: var(--fg, #111827);
+}
+
+.tf-join-req-role {
+  font-size: 0.78rem;
+  color: var(--muted-fg, #6b7280);
+}
+
+.tf-join-req-msg {
+  font-size: 0.88rem;
+  font-style: italic;
+  color: var(--fg, #4b5563);
+  margin: 0 0 1rem 0;
+  line-height: 1.45;
+}
+
+.tf-join-req-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #f3f4f6);
+}
+
+.tf-join-req-btn {
+  padding: 0.4rem 0.9rem;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.tf-join-req-btn--accept {
+  background-color: #16a34a;
+  color: #ffffff;
+}
+
+.tf-join-req-btn--accept:hover {
+  background-color: #15803d;
+}
+
+.tf-join-req-btn--reject {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.tf-join-req-btn--reject:hover {
+  background-color: #fecaca;
+}
