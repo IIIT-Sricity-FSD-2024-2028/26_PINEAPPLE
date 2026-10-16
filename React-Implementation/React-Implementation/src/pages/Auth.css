@@ -6,7 +6,7 @@
   width: 100%;
   padding: 2rem;
   box-sizing: border-box;
-  background: linear-gradient(135deg, #f4efe7 0%, #e1d8c7 100%);
+  background: var(--bg, linear-gradient(135deg, #f4efe7 0%, #e1d8c7 100%));
   font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
 }
 
@@ -15,7 +15,8 @@
   width: 100%;
   max-width: 900px;
   min-height: 550px;
-  background: #ffffff;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, transparent);
   border-radius: 24px;
   box-shadow: 0 10px 40px rgba(0, 0, 0, 0.08);
   overflow: hidden;
@@ -73,24 +74,24 @@
   margin: 0;
   font-size: 1.1rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fg, #1a1a1a);
 }
 
 .home-btn {
   width: 36px;
   height: 36px;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border, #e5e7eb);
   border-radius: 8px;
-  background: white;
+  background: var(--secondary, white);
   display: flex;
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  color: #6b7280;
+  color: var(--fg, #6b7280);
   transition: background 0.2s;
 }
 .home-btn:hover {
-  background: #f9fafb;
+  background: var(--hover-bg, #f9fafb);
 }
 
 .view-section {
@@ -103,7 +104,7 @@
   font-size: 2.25rem;
   font-weight: 800;
   margin: 0 0 0.5rem 0;
-  color: #0f172a;
+  color: var(--fg, #0f172a);
 }
 
 .main-title.uppercase {
@@ -112,12 +113,12 @@
 
 .subtitle {
   margin: 0 0 2rem 0;
-  color: #6b7280;
+  color: var(--muted-fg, #6b7280);
   font-size: 0.95rem;
 }
 
 .subtitle a {
-  color: #514639;
+  color: var(--primary, #514639);
   font-weight: 700;
   text-decoration: none;
 }
@@ -130,14 +131,16 @@
   display: block;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #6b7280;
+  color: var(--muted-fg, #6b7280);
   margin-bottom: 0.5rem;
 }
 
 .input-group input {
   width: 100%;
   padding: 0.875rem 1rem;
-  border: 1px solid #e5e7eb;
+  background: var(--input-bg, #ffffff);
+  color: var(--fg, #111827);
+  border: 1px solid var(--input-border, var(--border, #e5e7eb));
   border-radius: 10px;
   font-size: 0.9rem;
   box-sizing: border-box;
@@ -146,7 +149,7 @@
 }
 
 .input-group input:focus {
-  border-color: #514639;
+  border-color: var(--primary, #514639);
 }
 
 .password-wrapper {
@@ -161,7 +164,7 @@
   background: none;
   border: none;
   cursor: pointer;
-  color: #9ca3af;
+  color: var(--muted-fg, #9ca3af);
   padding: 0;
   display: flex;
   align-items: center;
@@ -184,7 +187,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  color: #6b7280;
+  color: var(--muted-fg, #6b7280);
   cursor: pointer;
 }
 
@@ -192,25 +195,25 @@
   appearance: none;
   width: 16px;
   height: 16px;
-  border: 1px solid #9ca3af;
+  border: 1px solid var(--border, #9ca3af);
   border-radius: 50%;
   margin: 0;
   cursor: pointer;
 }
 .remember-me input[type="radio"]:checked {
-  background: #514639;
-  border-color: #514639;
+  background: var(--primary, #514639);
+  border-color: var(--primary, #514639);
 }
 
 .forgot-password {
-  color: #514639;
+  color: var(--primary, #514639);
   text-decoration: none;
   font-weight: 700;
 }
 
 .btn-primary {
   width: 100%;
-  background: #514639;
+  background: var(--primary, #514639);
   color: white;
   border: none;
   padding: 0.875rem;
@@ -223,7 +226,7 @@
 }
 
 .btn-primary:hover {
-  background: #3a3228;
+  background: var(--tf-brand-600, #3a3228);
 }
 
 .divider {
@@ -231,7 +234,7 @@
   align-items: center;
   text-align: center;
   margin-bottom: 1.5rem;
-  color: #9ca3af;
+  color: var(--muted-fg, #9ca3af);
   font-size: 0.8rem;
 }
 
@@ -239,7 +242,7 @@
 .divider::after {
   content: '';
   flex: 1;
-  border-bottom: 1px solid #e5e7eb;
+  border-bottom: 1px solid var(--border, #e5e7eb);
 }
 
 .divider span {
@@ -258,18 +261,18 @@
   justify-content: center;
   gap: 0.5rem;
   padding: 0.75rem;
-  border: 1px solid #e5e7eb;
+  border: 1px solid var(--border, #e5e7eb);
   border-radius: 10px;
-  background: white;
+  background: var(--secondary, white);
   font-size: 0.85rem;
   font-weight: 700;
-  color: #1a1a1a;
+  color: var(--fg, #1a1a1a);
   cursor: pointer;
   transition: background-color 0.2s;
 }
 
 .btn-social:hover {
-  background: #f9fafb;
+  background: var(--hover-bg, #f9fafb);
 }
 
 .btn-social svg, .btn-social img {
