@@ -1,0 +1,228 @@
+.tf-mentor-app-container {
+  padding: 2rem;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.tf-mentor-app-header {
+  margin-bottom: 1.5rem;
+}
+
+.tf-mentor-app-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--fg, #0f172a);
+  margin-bottom: 0.25rem;
+}
+
+.tf-mentor-app-subtitle {
+  font-size: 0.95rem;
+  color: var(--muted-fg, #64748b);
+  margin: 0;
+}
+
+.tf-mentor-app-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 12px;
+  padding: 2rem;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+}
+
+.tf-mentor-app-notice {
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 1.5rem;
+  font-size: 0.875rem;
+  color: #b45309;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.tf-mentor-app-status-box {
+  border-radius: 10px;
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+}
+
+.tf-mentor-app-status-box.pending {
+  background: rgba(245, 158, 11, 0.06);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.tf-mentor-app-status-box.rejected {
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+}
+
+.tf-mentor-app-status-box.approved {
+  background: rgba(22, 163, 74, 0.06);
+  border: 1px solid rgba(22, 163, 74, 0.25);
+}
+
+.tf-mentor-app-status-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.75rem;
+}
+
+.tf-mentor-app-status-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  margin: 0;
+  color: var(--fg, #0f172a);
+}
+
+.tf-mentor-app-status-desc {
+  font-size: 0.9rem;
+  color: var(--muted-fg, #475569);
+  line-height: 1.5;
+  margin-bottom: 1rem;
+}
+
+.tf-mentor-app-details-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 12px;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border, #e2e8f0);
+}
+
+.tf-mentor-app-detail-item {
+  font-size: 0.85rem;
+}
+
+.tf-mentor-app-detail-label {
+  color: var(--muted-fg, #64748b);
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.tf-mentor-app-detail-val {
+  color: var(--fg, #0f172a);
+  font-weight: 600;
+}
+
+.tf-mentor-app-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1.25rem;
+  background-color: var(--primary, #2563eb);
+  color: #ffffff;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.tf-mentor-app-btn-primary:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.tf-mentor-app-btn-primary:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.tf-mentor-app-btn-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.65rem 1.25rem;
+  background-color: transparent;
+  color: var(--fg, #0f172a);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+}
+
+.tf-mentor-app-btn-outline:hover {
+  background-color: rgba(0, 0, 0, 0.04);
+}
+
+.tf-mentor-app-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.25rem;
+}
+
+.tf-mentor-app-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tf-mentor-app-label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--fg, #1e293b);
+}
+
+.tf-mentor-app-input,
+.tf-mentor-app-textarea {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  background-color: var(--input-bg, #ffffff);
+  color: var(--fg, #0f172a);
+  font-size: 0.9rem;
+  font-family: inherit;
+  box-sizing: border-box;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
+}
+
+.tf-mentor-app-input:focus,
+.tf-mentor-app-textarea:focus {
+  outline: none;
+  border-color: var(--primary, #2563eb);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+
+.tf-mentor-app-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.tf-mentor-app-hint {
+  font-size: 0.8rem;
+  color: var(--muted-fg, #64748b);
+}
+
+.tf-mentor-app-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.tf-mentor-app-error {
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  color: #dc2626;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
+.tf-mentor-app-success {
+  background: rgba(22, 163, 74, 0.1);
+  border: 1px solid rgba(22, 163, 74, 0.3);
+  color: #16a34a;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  margin-bottom: 1rem;
+}
+
