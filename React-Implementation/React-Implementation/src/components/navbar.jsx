@@ -1,13 +1,16 @@
-import React, { useState, useRef, useEffect, useContext } from 'react';
+import { useState, useRef, useEffect, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { RoleContext } from '../context/RoleContext';
+import { NotificationContext } from '../context/NotificationContext';
+import Avatar from './common/Avatar';
 import './navbar.css';
 
 const Navbar = ({ onMenuClick }) => {
   const navigate = useNavigate();
   const { user, logout } = useContext(AuthContext);
-  const { currentRole, switchRole } = useContext(RoleContext);
+  const { currentRole, switchRole, isMentorApproved, mentorAppStatus } = useContext(RoleContext);
+  const { unreadCount } = useContext(NotificationContext) || {};
 
   const [roleOpen, setRoleOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -39,8 +42,17 @@ const Navbar = ({ onMenuClick }) => {
   }, []);
 
   const handleRoleSelect = (newRole) => {
-    switchRole(newRole);
+    if (newRole === 'Mentor' && !isMentorApproved) {
+      setRoleOpen(false);
+      navigate('/mentor/apply');
+      return;
+    }
+    const success = switchRole(newRole);
     setRoleOpen(false);
+    if (!success && newRole === 'Mentor') {
+      navigate('/mentor/apply');
+      return;
+    }
     if (newRole === 'Mentor') {
       navigate('/mentor/projects');
     } else if (newRole === 'Project Owner') {
@@ -59,7 +71,6 @@ const Navbar = ({ onMenuClick }) => {
   const roleClassModifier = activeRoleName.toLowerCase().replace(/\s+/g, '-');
 
   const displayName = user?.name || user?.profile?.fullName || user?.username || 'User';
-  const userInitials = displayName.slice(0, 1).toUpperCase();
   const avatarUrl = user?.avatarUrl || user?.profile?.avatarUrl;
   const apiBase = 'http://localhost:3000';
   const fullAvatarUrl = avatarUrl
@@ -124,16 +135,28 @@ const Navbar = ({ onMenuClick }) => {
               className={`dropdown-item ${activeRoleName === 'Mentor' ? 'active' : ''}`}
               onClick={() => handleRoleSelect('Mentor')}
             >
-              <span className="star-icon">
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5b041">
-                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
-                </svg>
-              </span>
+              {isMentorApproved ? (
+                <span className="star-icon">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="#f5b041">
+                    <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+                  </svg>
+                </span>
+              ) : (
+                <span className="star-icon" style={{ fontSize: '13px' }}>🔒</span>
+              )}
               <span className="role-name">Mentor</span>
               {activeRoleName === 'Mentor' ? (
                 <span className="status-text">Active</span>
-              ) : (
+              ) : isMentorApproved ? (
                 <span className="status-text brown-text">Unlocked</span>
+              ) : (
+                <span className="status-text" style={{ color: '#94a3b8' }}>
+                  {mentorAppStatus === 'pending'
+                    ? 'Pending'
+                    : mentorAppStatus === 'rejected'
+                    ? 'Rejected'
+                    : 'Locked'}
+                </span>
               )}
             </div>
           </div>
@@ -145,12 +168,17 @@ const Navbar = ({ onMenuClick }) => {
             type="button"
             className="icon-btn notification-btn"
             onClick={() => navigate('/notifications')}
-            title="Notifications"
+            title={unreadCount > 0 ? `${unreadCount} unread notification${unreadCount === 1 ? '' : 's'}` : "Notifications"}
+            aria-label={unreadCount > 0 ? `${unreadCount} unread notifications` : "Notifications"}
           >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9M13.73 21a2 2 0 0 1-3.46 0" />
             </svg>
-            <span className="badge"></span>
+            {unreadCount > 0 && (
+              <span className="nav-notif-badge" title={`${unreadCount} unread`}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
           </button>
 
           {/* Profile Dropdown */}
@@ -162,13 +190,12 @@ const Navbar = ({ onMenuClick }) => {
                 setRoleOpen(false);
               }}
             >
-              <div className="avatar">
-                {fullAvatarUrl ? (
-                  <img src={fullAvatarUrl} alt={displayName} className="navbar-avatar-img" />
-                ) : (
-                  userInitials
-                )}
-              </div>
+              <Avatar
+                src={fullAvatarUrl}
+                name={displayName}
+                size="sm"
+                alt={displayName}
+              />
               <span className="username">{displayName}</span>
               <svg className={`chevron-down small ${profileOpen ? 'rotated' : ''}`} viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
