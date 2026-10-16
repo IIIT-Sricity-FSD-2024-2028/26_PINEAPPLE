@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import adminApi from '../../services/adminApi';
+import StatCard from '../../components/common/StatCard';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
@@ -17,39 +18,76 @@ const AdminDashboard = () => {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    let isMounted = true;
     const fetchDashboardData = async () => {
       try {
-        setLoading(true);
-        // Using Promise.all to fetch stats and audit logs concurrently
         const [statsData, auditData] = await Promise.all([
           adminApi.getStats(),
           adminApi.getAuditLog()
         ]);
         
-        // Populate stats (fallback to 0 if API fields differ)
-        setStats({
-          totalUsers: statsData?.totalUsers || 0,
-          activeUsers: statsData?.activeUsers || 0,
-          pendingMentorApps: statsData?.pendingMentorApps || 0,
-          flaggedWarned: statsData?.flaggedWarned || 0,
-          suspendedUsers: statsData?.suspendedUsers || 0,
-          auditEvents: statsData?.auditEvents || (auditData?.length || 0)
-        });
+        if (isMounted) {
+          setStats({
+            totalUsers: statsData?.totalUsers || 0,
+            activeUsers: statsData?.activeUsers || 0,
+            pendingMentorApps: statsData?.pendingMentorApps || 0,
+            flaggedWarned: statsData?.flaggedWarned || 0,
+            suspendedUsers: statsData?.suspendedUsers || 0,
+            auditEvents: statsData?.auditEvents || (auditData?.length || 0)
+          });
 
-        // Set recent events (top 5 from the audit log)
-        setRecentEvents((auditData || []).slice(0, 5));
+          setRecentEvents((auditData || []).slice(0, 5));
+        }
       } catch (error) {
         console.error("Failed to fetch admin dashboard data", error);
       } finally {
-        setLoading(false);
+        if (isMounted) {
+          setLoading(false);
+        }
       }
     };
 
     fetchDashboardData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
   const getPercentage = (count) => {
     return stats.totalUsers > 0 ? Math.round((count / stats.totalUsers) * 100) : 0;
+  };
+
+  const formatEventText = (entry) => {
+    if (!entry) return '';
+    if (typeof entry.event === 'string' && entry.event.trim()) return entry.event;
+    if (typeof entry.details === 'string' && entry.details.trim()) return entry.details;
+    if (entry.details && typeof entry.details === 'object') {
+      if (entry.details.reason) return `${entry.action || 'Action'}: ${entry.details.reason}`;
+      if (entry.details.message) return entry.details.message;
+      try {
+        return JSON.stringify(entry.details);
+      } catch {
+        return String(entry.details);
+      }
+    }
+    if (entry.action && entry.target) {
+      return `${entry.actor || 'User'} performed ${entry.action} on ${entry.target}`;
+    }
+    return entry.action || 'System event';
+  };
+
+  const formatTime = (entry) => {
+    if (entry?.timestamp) return entry.timestamp;
+    if (entry?.createdAt) {
+      try {
+        const d = new Date(entry.createdAt);
+        return isNaN(d.getTime()) ? 'Just now' : d.toLocaleString();
+      } catch {
+        return 'Just now';
+      }
+    }
+    return 'Just now';
   };
 
   const getAuditChipClass = (type) => {
@@ -57,7 +95,10 @@ const AdminDashboard = () => {
       task: 'task',
       mentor: 'mentor',
       warning: 'warning',
+      suspension: 'warning',
       xp: 'xp',
+      reputation: 'xp',
+      project: 'task',
       system: 'system'
     };
     return `admin-event-chip ${types[type] || 'system'}`;
@@ -74,41 +115,36 @@ const AdminDashboard = () => {
         <p className="page-subtitle mt-1">Real-time snapshot of TeamForge activity.</p>
       </div>
 
+      {/* KPI Cards using reusable StatCard component */}
       <div className="admin-dash-grid-top mt-3">
-        <div className="admin-kpi-card">
-          <div className="admin-kpi-row">
-            <div className="admin-kpi-icon info">👥</div>
-            <span className="admin-kpi-meta" id="admin-kpi-users-active">{stats.activeUsers} active</span>
-          </div>
-          <div className="admin-kpi-value" id="admin-kpi-users-total">{stats.totalUsers}</div>
-          <div className="admin-kpi-label">Total Users</div>
-        </div>
-
-        <div className="admin-kpi-card">
-          <div className="admin-kpi-row">
-            <div className="admin-kpi-icon">📖</div>
-            <span className="admin-kpi-meta">Awaiting review</span>
-          </div>
-          <div className="admin-kpi-value" id="admin-kpi-mentor-pending">{stats.pendingMentorApps}</div>
-          <div className="admin-kpi-label">Pending Mentor Apps</div>
-        </div>
-
-        <div className="admin-kpi-card">
-          <div className="admin-kpi-row">
-            <div className="admin-kpi-icon">⚠️</div>
-            <span className="admin-kpi-meta" id="admin-kpi-suspended-meta">{stats.suspendedUsers} suspended</span>
-          </div>
-          <div className="admin-kpi-value" id="admin-kpi-flagged-warned">{stats.flaggedWarned}</div>
-          <div className="admin-kpi-label">Flagged / Warned</div>
-        </div>
-
-        <div className="admin-kpi-card">
-          <div className="admin-kpi-row">
-            <div className="admin-kpi-icon">📜</div>
-          </div>
-          <div className="admin-kpi-value" id="admin-kpi-audit-events">{stats.auditEvents}</div>
-          <div className="admin-kpi-label">Audit Events</div>
-        </div>
+        <StatCard
+          icon="👥"
+          label="Total Users"
+          value={stats.totalUsers}
+          meta={`${stats.activeUsers} active`}
+          onClick={() => navigate('/admin/users')}
+        />
+        <StatCard
+          icon="📖"
+          label="Pending Mentor Apps"
+          value={stats.pendingMentorApps}
+          meta="Awaiting review"
+          onClick={() => navigate('/admin/mentor-apps')}
+        />
+        <StatCard
+          icon="⚠️"
+          label="Flagged / Warned"
+          value={stats.flaggedWarned}
+          meta={`${stats.suspendedUsers} suspended`}
+          onClick={() => navigate('/admin/users')}
+        />
+        <StatCard
+          icon="📜"
+          label="Audit Events"
+          value={stats.auditEvents}
+          meta="Recorded events"
+          onClick={() => navigate('/admin/audit')}
+        />
       </div>
 
       <div className="admin-dash-grid-actions mt-3">
@@ -180,8 +216,8 @@ const AdminDashboard = () => {
                 <div className="admin-event-row" key={index}>
                   <span className={getAuditChipClass(entry.type || 'system')}>{String(entry.type || 'system').toUpperCase()}</span>
                   <div>
-                    <div className="admin-event-text">{entry.event || entry.details}</div>
-                    <div className="admin-event-time">{entry.timestamp || new Date(entry.createdAt).toLocaleString()}</div>
+                    <div className="admin-event-text">{formatEventText(entry)}</div>
+                    <div className="admin-event-time">{formatTime(entry)}</div>
                   </div>
                 </div>
               ))
