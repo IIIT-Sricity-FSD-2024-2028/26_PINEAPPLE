@@ -1,13 +1,16 @@
-import React, { useState, useContext } from 'react';
+import { useState, useContext, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
 import projectsApi from '../../services/projectsApi';
+import adminApi from '../../services/adminApi';
+import FormInput from '../../components/common/FormInput';
 import './createProject.css';
 
 const CreateProject = () => {
   const { user } = useContext(AuthContext);
   const navigate = useNavigate();
 
+  const [maxCapacityLimit, setMaxCapacityLimit] = useState(20);
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -18,25 +21,56 @@ const CreateProject = () => {
     difficulty: 'Beginner',
   });
 
+  const [errors, setErrors] = useState({});
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
+
+  useEffect(() => {
+    adminApi.getPublicConfig()
+      .then((cfg) => {
+        if (cfg?.maxCollaboratorsPerProject) {
+          setMaxCapacityLimit(cfg.maxCollaboratorsPerProject);
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData((prev) => ({ ...prev, [name]: value }));
+    // Clear validation error when user begins typing
+    if (errors[name]) {
+      setErrors((prev) => ({ ...prev, [name]: '' }));
+    }
+  };
+
+  const validate = () => {
+    const newErrors = {};
+    if (!formData.title.trim()) {
+      newErrors.title = 'Project title is required.';
+    } else if (formData.title.trim().length < 3) {
+      newErrors.title = 'Title must be at least 3 characters.';
+    }
+
+    if (!formData.description.trim()) {
+      newErrors.description = 'Description is required.';
+    } else if (formData.description.trim().length < 10) {
+      newErrors.description = 'Description must be at least 10 characters.';
+    }
+
+    if (Number(formData.maxCollaborators) > maxCapacityLimit) {
+      newErrors.maxCollaborators = `Max collaborators cannot exceed platform limit of ${maxCapacityLimit}.`;
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setFeedback(null);
 
-    if (!formData.title.trim()) {
-      setFeedback({ type: 'error', message: 'Project title is required.' });
-      return;
-    }
-
-    if (!formData.description.trim()) {
-      setFeedback({ type: 'error', message: 'Description is required.' });
+    if (!validate()) {
       return;
     }
 
@@ -103,121 +137,77 @@ const CreateProject = () => {
         )}
 
         <form onSubmit={handleSubmit} className="tf-create-proj-form">
-          <div className="tf-create-proj-group">
-            <label htmlFor="create-project-title" className="tf-create-proj-label">
-              Project Title
-            </label>
-            <input
-              id="create-project-title"
-              name="title"
-              type="text"
-              className="tf-create-proj-input"
-              placeholder="e.g. AI Campus Navigator"
-              value={formData.title}
-              onChange={handleChange}
-              required
-            />
-          </div>
+          <FormInput
+            label="Project Title"
+            name="title"
+            value={formData.title}
+            onChange={handleChange}
+            placeholder="e.g. AI Campus Navigator"
+            error={errors.title}
+            required
+          />
 
-          <div className="tf-create-proj-group">
-            <label htmlFor="create-project-desc" className="tf-create-proj-label">
-              Description
-            </label>
-            <textarea
-              id="create-project-desc"
-              name="description"
-              className="tf-create-proj-input tf-create-proj-textarea"
-              rows={3}
-              placeholder="What is this project about?"
-              value={formData.description}
-              onChange={handleChange}
-              required
-            />
-          </div>
+          <FormInput
+            label="Description"
+            name="description"
+            value={formData.description}
+            onChange={handleChange}
+            placeholder="What is this project about? Describe the mission and target outcomes..."
+            multiline
+            rows={3}
+            error={errors.description}
+            required
+          />
 
-          <div className="tf-create-proj-group">
-            <label htmlFor="create-project-objectives" className="tf-create-proj-label">
-              Objectives
-            </label>
-            <textarea
-              id="create-project-objectives"
-              name="objectives"
-              className="tf-create-proj-input tf-create-proj-textarea"
-              rows={2}
-              placeholder="Key goals and deliverables..."
-              value={formData.objectives}
+          <FormInput
+            label="Objectives"
+            name="objectives"
+            value={formData.objectives}
+            onChange={handleChange}
+            placeholder="Key milestones and deliverables..."
+            multiline
+            rows={2}
+          />
+
+          <div className="tf-create-proj-grid-2">
+            <FormInput
+              label="Skills Required (comma-separated)"
+              name="skills"
+              value={formData.skills}
               onChange={handleChange}
+              placeholder="React, Node.js, Python..."
+              helperText="Separate multiple skills with commas."
+            />
+
+            <FormInput
+              label="Est. Duration"
+              name="duration"
+              value={formData.duration}
+              onChange={handleChange}
+              options={['1 month', '2 months', '3 months', '6 months']}
             />
           </div>
 
           <div className="tf-create-proj-grid-2">
-            <div className="tf-create-proj-group">
-              <label htmlFor="create-project-skills" className="tf-create-proj-label">
-                Skills Required (comma-separated)
-              </label>
-              <input
-                id="create-project-skills"
-                name="skills"
-                type="text"
-                className="tf-create-proj-input"
-                placeholder="React, Python, Node.js..."
-                value={formData.skills}
-                onChange={handleChange}
-              />
-            </div>
+            <FormInput
+              label="Max Collaborators"
+              name="maxCollaborators"
+              type="number"
+              min="1"
+              max={maxCapacityLimit}
+              value={formData.maxCollaborators}
+              onChange={handleChange}
+              error={errors.maxCollaborators}
+              helperText={`Platform maximum: ${maxCapacityLimit}`}
+            />
 
-            <div className="tf-create-proj-group">
-              <label htmlFor="create-project-duration" className="tf-create-proj-label">
-                Est. Duration
-              </label>
-              <select
-                id="create-project-duration"
-                name="duration"
-                className="tf-create-proj-input"
-                value={formData.duration}
-                onChange={handleChange}
-              >
-                <option value="1 month">1 month</option>
-                <option value="2 months">2 months</option>
-                <option value="3 months">3 months</option>
-                <option value="6 months">6 months</option>
-              </select>
-            </div>
-          </div>
-
-          <div className="tf-create-proj-grid-2">
-            <div className="tf-create-proj-group">
-              <label htmlFor="create-project-collaborators" className="tf-create-proj-label">
-                Max Collaborators
-              </label>
-              <input
-                id="create-project-collaborators"
-                name="maxCollaborators"
-                type="number"
-                min={1}
-                max={20}
-                className="tf-create-proj-input"
-                value={formData.maxCollaborators}
-                onChange={handleChange}
-              />
-            </div>
-
-            <div className="tf-create-proj-group">
-              <label htmlFor="create-project-difficulty" className="tf-create-proj-label">
-                Difficulty
-              </label>
-              <select
-                id="create-project-difficulty"
-                name="difficulty"
-                className="tf-create-proj-input"
-                value={formData.difficulty}
-                onChange={handleChange}
-              >
-                <option value="Beginner">Beginner</option>
-                <option value="Intermediate">Intermediate</option>
-                <option value="Advanced">Advanced</option>
-              </select>
-            </div>
+            <FormInput
+              label="Difficulty"
+              name="difficulty"
+              value={formData.difficulty}
+              onChange={handleChange}
+              options={['Beginner', 'Intermediate', 'Advanced']}
+            />
           </div>
 
           <button
