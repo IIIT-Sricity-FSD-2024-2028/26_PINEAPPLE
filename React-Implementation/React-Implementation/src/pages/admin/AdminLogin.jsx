@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import adminApi from '../../services/adminApi';
+import FormInput from '../../components/common/FormInput';
 import './AdminLogin.css';
 
 const TeamForgeLogo = () => (
@@ -33,6 +34,8 @@ const AdminLogin = () => {
       sessionStorage.setItem('teamforge.adminToken', response.token || 'mock_admin_token');
       sessionStorage.setItem('teamforge.portalRole', response.role || 'admin');
       sessionStorage.setItem('teamforge.adminEmail', email);
+      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(response.permissions || []));
+      sessionStorage.setItem('teamforge.adminName', response.name || 'Admin');
       
       // Redirect to admin dashboard
       navigate('/admin');
@@ -56,30 +59,26 @@ const AdminLogin = () => {
         {error && <div className="admin-login-error">{error}</div>}
         
         <form className="admin-login-form" onSubmit={handleLogin}>
-          <div className="admin-form-group">
-            <label htmlFor="admin-email">Admin Email</label>
-            <input
-              id="admin-email"
-              type="email"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              placeholder="admin@teamforge.io"
-              autoComplete="email"
-              required
-            />
-          </div>
-          <div className="admin-form-group">
-            <label htmlFor="admin-password">Password</label>
-            <input
-              id="admin-password"
-              type="password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              placeholder="••••••••"
-              autoComplete="current-password"
-              required
-            />
-          </div>
+          <FormInput
+            id="admin-email"
+            type="email"
+            label="Admin Email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@teamforge.io"
+            autoComplete="email"
+            required
+          />
+          <FormInput
+            id="admin-password"
+            type="password"
+            label="Password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="••••••••"
+            autoComplete="current-password"
+            required
+          />
           <button type="submit" className="admin-login-btn" disabled={loading}>
             {loading ? 'Authenticating...' : 'Secure Sign In'}
           </button>
