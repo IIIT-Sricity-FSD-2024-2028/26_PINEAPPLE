@@ -1,5 +1,11 @@
-import React, { useState, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import portalAdminsApi from '../../services/portalAdminsApi';
+import Modal from '../../components/common/Modal';
+import FormInput from '../../components/common/FormInput';
+import Avatar from '../../components/common/Avatar';
+import Badge from '../../components/common/Badge';
+import DataTable from '../../components/common/DataTable';
+import ConfirmModal from '../../components/common/ConfirmModal';
 import './SuperuserAdmins.css';
 
 const permOptions = [
@@ -60,72 +66,90 @@ const AdminModal = ({ admin, onClose, onSuccess }) => {
         await portalAdminsApi.update(admin.id, payload);
       } else {
         payload.status = 'active';
+        payload.portalRole = 'admin';
         await portalAdminsApi.create(payload);
       }
       onSuccess();
     } catch (err) {
-      setError(err.message || 'An error occurred while saving.');
+      const msg = err.message || 'An error occurred while saving.';
+      setError(msg.replace(/^Validation Error:\s*/i, ''));
     } finally {
       setSaving(false);
     }
   };
 
   return (
-    <div id="su-admin-modal" className="su-admin-modal-wrapper">
-      <div className="su-modal-backdrop" onClick={onClose}></div>
-      <div className="su-modal-card">
-        <div className="su-modal-header">
-          <h2 className="su-modal-title">{isEdit ? "Edit Admin Instance" : "Provision New Admin"}</h2>
-          <button className="su-modal-close" onClick={onClose}>✕</button>
+    <Modal
+      isOpen={true}
+      title={isEdit ? "Edit Admin Instance" : "Provision New Admin"}
+      onClose={onClose}
+      footer={
+        <div style={{ display: 'flex', gap: '12px', width: '100%' }}>
+          <button className="btn btn-outline" style={{ flex: 1, height: '44px', borderRadius: '10px' }} onClick={onClose} disabled={saving}>Discard</button>
+          <button className="btn btn-primary" style={{ flex: 2, height: '44px', borderRadius: '10px' }} onClick={handleSave} disabled={saving}>
+            {saving ? 'Saving...' : (isEdit ? "Save Protocol" : "Authorize Admin")}
+          </button>
         </div>
+      }
+    >
+      <div id="su-admin-modal">
+        {error && <div id="su-admin-form-error" className="su-form-error" style={{ marginBottom: '16px' }}>{error}</div>}
 
-        {error && <div id="su-admin-form-error" className="su-form-error">{error}</div>}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <FormInput
+            label="Display Identity"
+            name="name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Operations Lead"
+            maxLength={60}
+            required
+          />
 
-        <div className="su-form-body" style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+          <FormInput
+            label="Network Email"
+            name="email"
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="admin@teamforge.io"
+            maxLength={254}
+            required
+          />
+
+          <FormInput
+            label={`Secure Access Key ${isEdit ? '(optional)' : ''}`}
+            name="password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder={isEdit ? "Enter to rotate key" : "Min 8 chars, 1 upper, 1 digit"}
+            maxLength={72}
+            required={!isEdit}
+          />
+
           <div className="input-group">
-            <label className="label" style={{ fontWeight: 700 }}>Display Identity <span className="su-required">*</span></label>
-            <input className="input su-modal-input" type="text" maxLength="60"
-              placeholder="e.g. Operations Lead"
-              value={name} onChange={e => setName(e.target.value)} />
-          </div>
-
-          <div className="input-group">
-            <label className="label" style={{ fontWeight: 700 }}>Network Email <span className="su-required">*</span></label>
-            <input className="input su-modal-input" type="email" maxLength="254"
-              placeholder="admin@teamforge.io"
-              value={email} onChange={e => setEmail(e.target.value)} />
-          </div>
-
-          <div className="input-group">
-            <label className="label" style={{ fontWeight: 700 }}>Secure Access Key {isEdit ? "(optional)" : <span className="su-required">*</span>}</label>
-            <input className="input su-modal-input" type="password" maxLength="72"
-              placeholder={isEdit ? "Enter to rotate key" : "Min 8 chars, 1 upper, 1 digit"}
-              value={password} onChange={e => setPassword(e.target.value)} />
-          </div>
-
-          <div className="input-group">
-            <label className="label" style={{ fontWeight: 700 }}>Permission Protocol <span className="su-required">*</span></label>
+            <label className="label" style={{ fontWeight: 700, marginBottom: '6px', display: 'block' }}>
+              Permission Protocol <span className="su-required">*</span>
+            </label>
             <div className="su-perm-grid">
               {permOptions.map((p) => (
                 <label key={p.key} className="su-perm-item">
-                  <input type="checkbox" className="su-perm-cb" value={p.key}
+                  <input
+                    type="checkbox"
+                    className="su-perm-cb"
+                    value={p.key}
                     checked={permissions.includes(p.key)}
-                    onChange={() => togglePermission(p.key)} />
+                    onChange={() => togglePermission(p.key)}
+                  />
                   <span>{p.label}</span>
                 </label>
               ))}
             </div>
           </div>
         </div>
-
-        <div className="su-modal-footer" style={{ display: 'flex', gap: '12px', marginTop: '8px' }}>
-          <button className="btn btn-outline" style={{ flex: 1, height: '48px', borderRadius: '14px' }} onClick={onClose} disabled={saving}>Discard</button>
-          <button className="btn btn-primary" style={{ flex: 2, height: '48px', borderRadius: '14px' }} onClick={handleSave} disabled={saving}>
-            {saving ? 'Saving...' : (isEdit ? "Save Protocol" : "Authorize Admin")}
-          </button>
-        </div>
       </div>
-    </div>
+    </Modal>
   );
 };
 
@@ -137,22 +161,34 @@ const SuperuserAdmins = () => {
   const [modalOpen, setModalOpen] = useState(false);
   const [editingAdmin, setEditingAdmin] = useState(null);
 
-  const fetchAdmins = async () => {
-    try {
-      setLoading(true);
-      const data = await portalAdminsApi.list();
-      setAdmins(Array.isArray(data) ? data : []);
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Failed to load admins');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [refreshKey, setRefreshKey] = useState(0);
 
   useEffect(() => {
-    fetchAdmins();
-  }, []);
+    let isMounted = true;
+    const loadAdmins = async () => {
+      try {
+        const data = await portalAdminsApi.list();
+        if (isMounted) {
+          setAdmins(Array.isArray(data) ? data : []);
+          setError(null);
+        }
+      } catch (err) {
+        if (isMounted) {
+          setError(err.message || 'Failed to load admins');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadAdmins();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [refreshKey]);
 
   const handleOpenModal = (admin = null) => {
     setEditingAdmin(admin);
@@ -166,7 +202,7 @@ const SuperuserAdmins = () => {
 
   const handleModalSuccess = () => {
     handleCloseModal();
-    fetchAdmins();
+    setRefreshKey((k) => k + 1);
   };
 
   const handleToggleStatus = async (admin) => {
@@ -174,28 +210,113 @@ const SuperuserAdmins = () => {
       alert("Default admin status cannot be changed");
       return;
     }
+    const newStatus = admin.status === "active" ? "suspended" : "active";
     try {
-      const newStatus = admin.status === "active" ? "suspended" : "active";
       await portalAdminsApi.update(admin.id, { status: newStatus });
-      fetchAdmins();
+      setAdmins((prev) => prev.map((a) => a.id === admin.id ? { ...a, status: newStatus } : a));
     } catch (err) {
       alert(err.message || "Failed to update status");
     }
   };
 
-  const handleDelete = async (admin) => {
+  const [adminToErase, setAdminToErase] = useState(null);
+  const [erasing, setErasing] = useState(false);
+
+  const handleDelete = (admin) => {
     if (admin.email === "admin@teamforge.io") {
       alert("Default admin account cannot be deleted");
       return;
     }
-    if (!window.confirm(`Are you sure you want to erase "${admin.name}"?`)) return;
+    setAdminToErase(admin);
+  };
+
+  const handleConfirmErase = async () => {
+    if (!adminToErase) return;
+    setErasing(true);
     try {
-      await portalAdminsApi.remove(admin.id);
-      fetchAdmins();
+      await portalAdminsApi.remove(adminToErase.id);
+      setAdmins((prev) => prev.filter((a) => a.id !== adminToErase.id));
+      setAdminToErase(null);
     } catch (err) {
       alert(err.message || "Failed to delete admin");
+    } finally {
+      setErasing(false);
     }
   };
+
+  const columns = [
+    {
+      header: 'Identity',
+      key: 'name',
+      render: (a) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <Avatar name={a.name} size="sm" />
+          <div style={{ fontWeight: 700, color: 'var(--fg)' }}>{a.name}</div>
+        </div>
+      ),
+    },
+    {
+      header: 'Network Endpoint',
+      key: 'email',
+      render: (a) => <span style={{ color: 'var(--muted-fg)' }}>{a.email}</span>,
+    },
+    {
+      header: 'Operational Scope',
+      key: 'permissions',
+      render: (a) => (
+        <div className="su-perm-tags">
+          {Array.isArray(a.permissions) && a.permissions.map(p => (
+            <span key={p} className="su-perm-tag">{permLabels[p] || p}</span>
+          ))}
+        </div>
+      ),
+    },
+    {
+      header: 'Authorized Since',
+      key: 'createdAt',
+      render: (a) => (
+        <span style={{ color: 'var(--muted-fg)' }}>
+          {a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}
+        </span>
+      ),
+    },
+    {
+      header: 'State',
+      key: 'status',
+      render: (a) => {
+        const isSuspended = a.status !== "active";
+        return (
+          <Badge variant={!isSuspended ? "active" : "locked"}>
+            {!isSuspended ? "Active" : "Suspended"}
+          </Badge>
+        );
+      },
+    },
+    {
+      header: 'Operations',
+      key: 'actions',
+      align: 'right',
+      render: (a) => {
+        const isSuspended = a.status !== "active";
+        const isProtected = a.email === "admin@teamforge.io";
+        return (
+          <div className="su-row-actions">
+            <button className="btn btn-outline btn-xs su-action-btn" onClick={() => handleOpenModal(a)}>Edit</button>
+            {!isProtected ? (
+              <>
+                <button className="btn btn-outline btn-xs su-action-btn" onClick={() => handleToggleStatus(a)}>
+                  {!isSuspended ? "Suspend" : "Activate"}
+                </button>
+                <button className="btn btn-xs su-btn-danger su-action-btn" onClick={() => handleDelete(a)}>Erase</button>
+              </>
+            ) : (
+              <span style={{ fontSize: '0.7rem', color: 'var(--muted-fg)', fontStyle: 'italic' }}>Protected</span>
+            )}
+          </div>
+        );
+      },
+    },
+  ];
 
   return (
     <div id="su-admins" className="admin-page su-admins-page">
@@ -211,75 +332,30 @@ const SuperuserAdmins = () => {
 
       <div className="card mt-4 su-card-container">
         <div id="su-admins-list" className="overflow-x-auto">
-          {loading ? (
-            <div style={{ padding: '24px', textAlign: 'center' }}>Loading admins...</div>
-          ) : admins.length === 0 ? (
-            <div className="admin-users-empty">No administrator instances identified.</div>
-          ) : (
-            <div className="su-table-container">
-              <table className="su-table">
-                <thead>
-                  <tr>
-                    <th style={{ borderRadius: '16px 0 0 0' }}>Identity</th>
-                    <th>Network Endpoint</th>
-                    <th>Operational Scope</th>
-                    <th>Authorized Since</th>
-                    <th>State</th>
-                    <th style={{ textAlign: 'right', borderRadius: '0 16px 0 0' }}>Operations</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {admins.map((a) => {
-                    const isSuspended = a.status !== "active";
-                    const statusClass = !isSuspended ? "status-active" : "status-rejected";
-                    const isProtected = a.email === "admin@teamforge.io";
-                    
-                    return (
-                      <tr key={a.id} style={{ opacity: isSuspended ? 0.75 : 1 }}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <div className="su-avatar">
-                              {(a.name || "A").charAt(0).toUpperCase()}
-                            </div>
-                            <div style={{ fontWeight: 700, color: 'var(--fg)' }}>{a.name}</div>
-                          </div>
-                        </td>
-                        <td style={{ color: 'var(--muted-fg)' }}>{a.email}</td>
-                        <td>
-                          <div className="su-perm-tags">
-                            {Array.isArray(a.permissions) && a.permissions.map(p => (
-                              <span key={p} className="su-perm-tag">{permLabels[p] || p}</span>
-                            ))}
-                          </div>
-                        </td>
-                        <td style={{ color: 'var(--muted-fg)' }}>{a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—'}</td>
-                        <td><span className={`status-badge ${statusClass}`}>{!isSuspended ? "Active" : "Suspended"}</span></td>
-                        <td>
-                          <div className="su-row-actions">
-                            <button className="btn btn-outline btn-xs su-action-btn" onClick={() => handleOpenModal(a)}>Edit</button>
-                            {!isProtected ? (
-                              <>
-                                <button className="btn btn-outline btn-xs su-action-btn" onClick={() => handleToggleStatus(a)}>
-                                  {!isSuspended ? "Suspend" : "Activate"}
-                                </button>
-                                <button className="btn btn-xs su-btn-danger su-action-btn" onClick={() => handleDelete(a)}>Erase</button>
-                              </>
-                            ) : (
-                              <span style={{ fontSize: '0.7rem', color: 'var(--muted-fg)', fontStyle: 'italic' }}>Protected</span>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
+          <DataTable
+            columns={columns}
+            data={admins}
+            loading={loading}
+            loadingRows={3}
+            emptyTitle="No administrator instances identified."
+            emptyMessage="No administrators match the criteria or have been created yet."
+            tableClassName="su-table"
+          />
         </div>
       </div>
 
       {modalOpen && <AdminModal admin={editingAdmin} onClose={handleCloseModal} onSuccess={handleModalSuccess} />}
+
+      <ConfirmModal
+        isOpen={Boolean(adminToErase)}
+        title="Erase Administrator"
+        message={`Are you sure you want to permanently erase admin "${adminToErase?.name}" (${adminToErase?.email})? All associated permissions will be revoked.`}
+        confirmLabel="Erase Admin"
+        variant="danger"
+        loading={erasing}
+        onConfirm={handleConfirmErase}
+        onCancel={() => setAdminToErase(null)}
+      />
     </div>
   );
 };
