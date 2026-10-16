@@ -1,5 +1,10 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import mentorApplicationsApi from '../../services/mentorApplicationsApi';
+import Badge from '../../components/common/Badge';
+import SearchBar from '../../components/common/SearchBar';
+import FilterTabs from '../../components/common/FilterTabs';
+import Avatar from '../../components/common/Avatar';
+import EmptyState from '../../components/common/EmptyState';
 import './AdminMentorApps.css';
 
 // ─── Componentized SVGs ──────────────────────────────────────────
@@ -36,7 +41,7 @@ function normalizeMentorApp(source = {}, index = 0) {
     .trim()
     .toUpperCase();
 
-  let years = Number(source.years || 0);
+  let years = Number(source.years ?? source.yearsOfExperience ?? 0);
   if (!years && source.experience) {
     const match = String(source.experience).match(/\d+/);
     if (match) years = parseInt(match[0], 10);
@@ -84,8 +89,9 @@ function normalizeMentorApp(source = {}, index = 0) {
     submittedAt,
     expertise,
     specialization,
-    linkedin: String(source.linkedin || "#"),
+    linkedin: String(source.linkedin || source.portfolio || "#"),
     years,
+    experienceText: typeof source.experience === 'string' ? source.experience : '',
     motivation,
     status: String(source.status || "pending").toLowerCase(),
   };
@@ -96,12 +102,6 @@ function toTitleCase(str) {
   return str.charAt(0).toUpperCase() + str.slice(1).toLowerCase();
 }
 
-function getMentorStatusBadgeClass(status) {
-  if (status === "approved") return "status-active";
-  if (status === "rejected") return "status-rejected";
-  return "status-pending";
-}
-
 // ─── Main Component ──────────────────────────────────────────────
 
 const AdminMentorApps = () => {
@@ -109,26 +109,37 @@ const AdminMentorApps = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('pending');
+  const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState({});
   const [processingId, setProcessingId] = useState(null);
 
-  const fetchApplications = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const data = await mentorApplicationsApi.list();
-      setApplications(Array.isArray(data) ? data : []);
-    } catch (err) {
-      console.error('Failed to load mentor applications:', err);
-      setError(err.message || 'Failed to load mentor applications.');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    fetchApplications();
-  }, [fetchApplications]);
+    let isMounted = true;
+    const loadApplications = async () => {
+      try {
+        const data = await mentorApplicationsApi.list();
+        if (isMounted) {
+          setApplications(Array.isArray(data) ? data : []);
+          setError(null);
+        }
+      } catch (err) {
+        console.error('Failed to load mentor applications:', err);
+        if (isMounted) {
+          setError(err.message || 'Failed to load mentor applications.');
+        }
+      } finally {
+        if (isMounted) {
+          setLoading(false);
+        }
+      }
+    };
+
+    loadApplications();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const handleToggleDetails = (id, currentStatus) => {
     setExpandedIds((prev) => {
@@ -188,10 +199,17 @@ const AdminMentorApps = () => {
   const rejectedCount = normalizedApps.filter((a) => a.status === 'rejected').length;
   const totalCount = normalizedApps.length;
 
-  const filteredApps =
-    filter === 'all'
-      ? normalizedApps
-      : normalizedApps.filter((a) => a.status === filter);
+  const filteredApps = normalizedApps.filter((a) => {
+    const matchesFilter = filter === 'all' || a.status === filter;
+    if (!matchesFilter) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      a.name.toLowerCase().includes(q) ||
+      a.expertise.toLowerCase().includes(q) ||
+      a.university.toLowerCase().includes(q)
+    );
+  });
 
   return (
     <div id="admin-mentor-apps" className="admin-page">
@@ -223,32 +241,24 @@ const AdminMentorApps = () => {
             </div>
           </div>
 
-          {/* Filter Chips */}
-          <div className="admin-mentor-filters mt-3">
-            <button
-              className={`admin-users-filter-chip${filter === 'pending' ? ' active' : ''}`}
-              onClick={() => setFilter('pending')}
-            >
-              Pending ({pendingCount})
-            </button>
-            <button
-              className={`admin-users-filter-chip${filter === 'approved' ? ' active' : ''}`}
-              onClick={() => setFilter('approved')}
-            >
-              Approved ({approvedCount})
-            </button>
-            <button
-              className={`admin-users-filter-chip${filter === 'rejected' ? ' active' : ''}`}
-              onClick={() => setFilter('rejected')}
-            >
-              Rejected ({rejectedCount})
-            </button>
-            <button
-              className={`admin-users-filter-chip${filter === 'all' ? ' active' : ''}`}
-              onClick={() => setFilter('all')}
-            >
-              All ({totalCount})
-            </button>
+          {/* Filter and Search Toolbar */}
+          <div className="admin-mentor-toolbar mt-3" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <SearchBar
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              onClear={() => setSearchQuery('')}
+              placeholder="Search mentor applicants..."
+            />
+            <FilterTabs
+              tabs={[
+                { id: 'pending', label: 'Pending', count: pendingCount },
+                { id: 'approved', label: 'Approved', count: approvedCount },
+                { id: 'rejected', label: 'Rejected', count: rejectedCount },
+                { id: 'all', label: 'All', count: totalCount }
+              ]}
+              activeTab={filter}
+              onChange={setFilter}
+            />
           </div>
 
           {/* Applications List */}
@@ -260,7 +270,10 @@ const AdminMentorApps = () => {
                 {error}
               </div>
             ) : filteredApps.length === 0 ? (
-              <div className="admin-users-empty">No mentor applications in this status.</div>
+              <EmptyState
+                title="No mentor applications"
+                message={searchQuery ? `No applications found matching "${searchQuery}".` : "No applications in this category."}
+              />
             ) : (
               filteredApps.map((app) => {
                 const isExpanded =
@@ -268,7 +281,6 @@ const AdminMentorApps = () => {
                     ? expandedIds[app.id]
                     : app.status === 'pending';
                 const statusText = toTitleCase(app.status);
-                const statusClass = getMentorStatusBadgeClass(app.status);
                 const meetsCriteria = app.years >= 4;
                 const isProcessing = processingId === app.id;
 
@@ -283,7 +295,7 @@ const AdminMentorApps = () => {
                       onClick={() => handleToggleDetails(app.id, app.status)}
                     >
                       <div className="admin-mentor-left">
-                        <div className="admin-mentor-avatar">{app.initials}</div>
+                        <Avatar name={app.name} size="md" />
                         <div>
                           <div className="admin-mentor-name">{app.name}</div>
                           <div className="admin-mentor-sub">
@@ -293,7 +305,7 @@ const AdminMentorApps = () => {
                       </div>
                       <div className="admin-mentor-right">
                         <div className="admin-mentor-spec">{app.specialization}</div>
-                        <span className={`status-badge ${statusClass}`}>{statusText}</span>
+                        <Badge variant={app.status}>{statusText}</Badge>
                         <span className="admin-mentor-chevron">
                           {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
                         </span>
@@ -310,17 +322,18 @@ const AdminMentorApps = () => {
                           <div className="admin-mentor-label">Experience</div>
                           <div className="admin-mentor-value">
                             {app.years} years
-                            <span
-                              className={`admin-mentor-criteria-pill ${
-                                meetsCriteria ? 'pass' : 'fail'
-                              }`}
-                            >
-                              <span className="admin-mentor-icon">
+                            <Badge variant={meetsCriteria ? 'criteria-met' : 'criteria-unmet'}>
+                              <span className="admin-mentor-icon" style={{ display: 'inline-flex', marginRight: '4px' }}>
                                 {meetsCriteria ? <CheckIcon /> : <CrossIcon />}
                               </span>
                               {meetsCriteria ? 'Meets criteria' : 'Below criteria'}
-                            </span>
+                            </Badge>
                           </div>
+                          {app.experienceText && !app.experienceText.startsWith(`${app.years} years of professional experience`) && (
+                            <div style={{ fontSize: '0.8rem', color: '#64748b', marginTop: '4px' }}>
+                              {app.experienceText}
+                            </div>
+                          )}
                         </div>
                         <div>
                           <div className="admin-mentor-label">LinkedIn</div>
