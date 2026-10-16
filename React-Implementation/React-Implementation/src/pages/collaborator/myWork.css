@@ -48,8 +48,8 @@
 }
 
 .tf-mywork-switch-btn.active {
-  background: #ffffff;
-  color: var(--tf-ink-900, #111827);
+  background: var(--card, #ffffff);
+  color: var(--fg, #111827);
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
 }
 
@@ -149,7 +149,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 8px 12px;
-  background: #ffffff;
+  background: var(--card, #ffffff);
   border: 1px solid var(--border, #e5e7eb);
   border-radius: 6px;
   font-size: 0.84rem;
@@ -322,3 +322,110 @@
   color: var(--tf-ink-500, #6b7280);
   margin-top: 4px;
 }
+
+/* Metrics Row */
+.tf-mywork-metrics-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.tf-mywork-metric-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 16px 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.tf-mywork-metric-label {
+  font-size: 0.78rem;
+  color: var(--tf-ink-500, #6b7280);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 6px;
+}
+
+.tf-mywork-metric-val {
+  font-size: 1.8rem;
+  font-weight: 800;
+  color: var(--tf-ink-900, #111827);
+  line-height: 1.2;
+}
+
+/* Controls Bar */
+.tf-mywork-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.tf-mywork-project-select {
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--border, #d1d5db);
+  background: var(--input-bg, #ffffff);
+  font-size: 0.88rem;
+  color: var(--fg, #1f2937);
+  cursor: pointer;
+  min-width: 220px;
+}
+
+/* Tasks Grid & Cards */
+.tf-mywork-tasks-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tf-mywork-task-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 18px 22px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tf-mywork-task-card:hover {
+  border-color: var(--primary, #cbd5e1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+
+.tf-mywork-task-info {
+  flex: 1;
+  min-width: 250px;
+}
+
+.tf-mywork-task-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--fg, #111827);
+  margin: 0 0 6px 0;
+}
+
+.tf-mywork-task-meta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  font-size: 0.85rem;
+  color: var(--muted-fg, #6b7280);
+  flex-wrap: wrap;
+}
+
+.tf-mywork-task-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
