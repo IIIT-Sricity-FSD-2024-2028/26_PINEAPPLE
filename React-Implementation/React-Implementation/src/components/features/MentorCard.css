@@ -1,0 +1,150 @@
+/* ==========================================================================
+   MentorCard Component Styles (Shared across Directory & Profile Preview)
+   ========================================================================== */
+
+.tf-mentor-card {
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #e5e7eb);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.05);
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  box-sizing: border-box;
+}
+
+.tf-mentor-card:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+}
+
+.tf-mentor-card-body {
+  display: flex;
+  flex-direction: column;
+}
+
+.tf-mentor-card-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+}
+
+.tf-mentor-card-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.tf-mentor-card-name-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.tf-mentor-card-name {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--tf-ink-900, #111827);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tf-mentor-card-headline {
+  font-size: 0.82rem;
+  color: var(--tf-ink-500, #6b7280);
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tf-mentor-card-bio {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-size: 0.84rem;
+  color: var(--tf-ink-600, #4b5563);
+  margin: 8px 0 12px 0;
+  line-height: 1.45;
+  min-height: 2.45em;
+}
+
+.tf-mentor-card-skills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.tf-mentor-skill-badge {
+  font-size: 0.72rem;
+  font-weight: 500;
+}
+
+.tf-mentor-card-meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.78rem;
+  color: var(--tf-ink-600, #4b5563);
+  margin-bottom: 16px;
+  border-top: 1px solid var(--border, #f3f4f6);
+  padding-top: 12px;
+}
+
+.tf-mentor-card-meta strong {
+  color: var(--tf-ink-900, #111827);
+}
+
+.tf-mentor-card-footer {
+  margin-top: auto;
+}
+
+.tf-mentor-card-price-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-top: 12px;
+  border-top: 1px solid var(--border, #f3f4f6);
+  margin-bottom: 12px;
+}
+
+.tf-mentor-card-price-label {
+  font-size: 0.8rem;
+  color: var(--tf-ink-500, #6b7280);
+}
+
+.tf-mentor-card-price-val {
+  font-size: 1.15rem;
+  font-weight: 700;
+  color: var(--tf-brand, #5f513f);
+}
+
+.tf-mentor-card-btn {
+  padding: 8px 16px;
+  background: var(--tf-brand, #5f513f);
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s ease, opacity 0.15s ease;
+  width: 100%;
+}
+
+.tf-mentor-card-btn:hover:not(:disabled) {
+  background: var(--tf-brand-600, #4a3f31);
+}
+
+.tf-mentor-card-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  background: #9ca3af;
+}
