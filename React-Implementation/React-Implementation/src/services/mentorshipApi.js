@@ -24,6 +24,11 @@ export const mentorshipApi = {
     apiRequest(`/mentorship/badges/${userId}`, 'GET', null, {
       role: role || getCurrentUserRole(),
     }),
+  getBadgesByProject: (projectId, role) =>
+    apiRequest(`/mentorship/badges/project/${projectId}`, 'GET', null, {
+      role: role || getCurrentUserRole(),
+      userId: getCurrentUserId(),
+    }),
 };
 
 export default mentorshipApi;
