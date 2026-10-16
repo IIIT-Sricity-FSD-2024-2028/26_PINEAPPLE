@@ -28,24 +28,44 @@ export const tasksApi = {
     apiRequest(`/tasks/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  create: (payload, role) =>
-    apiRequest("/tasks", "POST", payload, {
+  create: async (payload, role) => {
+    const res = await apiRequest("/tasks", "POST", payload, {
       role: role || getCurrentUserRole(),
-    }),
-  update: (id, payload, role) =>
-    apiRequest(`/tasks/${id}`, "PATCH", payload, {
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
+  update: async (id, payload, role) => {
+    const res = await apiRequest(`/tasks/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
-    }),
-  // Kanban-friendly status transition. Accepts { status } or { column }.
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
+  // Status transition. Accepts { status }.
   // Falls back gracefully if the backend is unreachable (frontend catches).
-  updateStatus: (id, payload, role) =>
-    apiRequest(`/tasks/${id}/status`, "PATCH", payload, {
+  updateStatus: async (id, payload, role) => {
+    const res = await apiRequest(`/tasks/${id}/status`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
-    }),
-  remove: (id, role) =>
-    apiRequest(`/tasks/${id}`, "DELETE", null, {
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
+  remove: async (id, role) => {
+    const res = await apiRequest(`/tasks/${id}`, "DELETE", null, {
       role: role || getCurrentUserRole(),
-    }),
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
 };
 
 export default tasksApi;
