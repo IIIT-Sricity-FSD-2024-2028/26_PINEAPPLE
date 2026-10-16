@@ -1,0 +1,131 @@
+.tf-task-card {
+  background: var(--card, #ffffff);
+  border-radius: 10px;
+  padding: 1.15rem 1.25rem;
+  border: 1px solid var(--border, #e5e7eb);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 0.85rem;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.tf-task-card:hover {
+  border-color: var(--primary, #cbd5e1);
+  box-shadow: 0 4px 12px -2px rgba(17, 24, 39, 0.06);
+}
+
+.tf-task-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin-bottom: 0.45rem;
+}
+
+.tf-task-card-title {
+  margin: 0;
+  font-size: 0.98rem;
+  font-weight: 700;
+  color: var(--fg, #111827);
+  line-height: 1.35;
+}
+
+.tf-task-card-badges {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  flex-shrink: 0;
+}
+
+.tf-task-card-desc {
+  font-size: 0.86rem;
+  color: var(--muted-fg, #4b5563);
+  line-height: 1.45;
+  margin: 0 0 0.85rem 0;
+}
+
+.tf-task-card-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: auto;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border, #f3f4f6);
+}
+
+.tf-task-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.8rem;
+  color: var(--muted-fg, #6b7280);
+}
+
+.tf-task-card-xp {
+  font-weight: 600;
+  color: var(--tf-accent-600, #b45309);
+}
+
+.tf-task-card-assignee {
+  font-weight: 500;
+}
+
+.tf-task-card-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tf-task-card-review-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.tf-task-btn {
+  padding: 0.4rem 0.85rem;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: all 0.15s ease;
+}
+
+.tf-task-btn--start {
+  background-color: #2563eb;
+  color: #ffffff;
+}
+
+.tf-task-btn--start:hover {
+  background-color: #1d4ed8;
+}
+
+.tf-task-btn--submit {
+  background-color: var(--primary, #5f513f);
+  color: #ffffff;
+}
+
+.tf-task-btn--submit:hover {
+  background-color: #4a3f31;
+}
+
+.tf-task-btn--approve {
+  background-color: #16a34a;
+  color: #ffffff;
+}
+
+.tf-task-btn--approve:hover {
+  background-color: #15803d;
+}
+
+.tf-task-btn--reject {
+  background-color: #fee2e2;
+  color: #dc2626;
+  border-color: #fecaca;
+}
+
+.tf-task-btn--reject:hover {
+  background-color: #fecaca;
+}
