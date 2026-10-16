@@ -20,22 +20,49 @@ export const notificationsApi = {
     apiRequest(`/notifications/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  create: (payload, role) =>
-    apiRequest("/notifications", "POST", payload, {
+  create: async (payload, role) => {
+    const res = await apiRequest("/notifications", "POST", payload, {
       role: role || getCurrentUserRole(),
-    }),
-  markAsRead: (id, role) =>
-    apiRequest(`/notifications/${id}/read`, "PUT", null, {
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
+    }
+    return res;
+  },
+  markAsRead: async (id, role) => {
+    const res = await apiRequest(`/notifications/${id}/read`, "PUT", null, {
       role: role || getCurrentUserRole(),
-    }),
-  markAllAsRead: (role) =>
-    apiRequest("/notifications/read-all", "PUT", null, {
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
+    }
+    return res;
+  },
+  markAllAsRead: async (role, userId) => {
+    const currentId =
+      userId ||
+      (typeof localStorage !== "undefined"
+        ? localStorage.getItem("teamforge.backendUserId")
+        : "");
+    const query = currentId ? `?userId=${encodeURIComponent(currentId)}` : "";
+    const res = await apiRequest(`/notifications/read-all${query}`, "PUT", null, {
       role: role || getCurrentUserRole(),
-    }),
-  remove: (id, role) =>
-    apiRequest(`/notifications/${id}`, "DELETE", null, {
+      userId: currentId,
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
+    }
+    return res;
+  },
+  remove: async (id, role) => {
+    const res = await apiRequest(`/notifications/${id}`, "DELETE", null, {
       role: role || getCurrentUserRole(),
-    }),
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
+    }
+    return res;
+  },
 };
 
 export default notificationsApi;
