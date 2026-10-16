@@ -7,6 +7,10 @@ export const adminApi = {
     apiRequest("/admin/users", "GET", null, {
       role: role || getCurrentUserRole(),
     }),
+  getUserDetails: (id, role) =>
+    apiRequest(`/admin/users/${id}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
   updateUserStatus: (id, payload, role) =>
     apiRequest(`/admin/users/${id}/status`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
@@ -31,6 +35,27 @@ export const adminApi = {
     apiRequest("/admin/audit", "GET", null, {
       role: role || getCurrentUserRole(),
     }),
+  recordAuditEntry: (entry, role) =>
+    apiRequest("/admin/audit", "POST", entry, {
+      role: role || getCurrentUserRole(),
+    }),
+  getConfig: (role) =>
+    apiRequest("/admin/config", "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
+  getPublicConfig: () =>
+    apiRequest("/admin/config/public", "GET"),
+  updateConfig: (payload, role) =>
+    apiRequest("/admin/config", "PUT", payload, {
+      role: role || getCurrentUserRole(),
+    }),
+};
+
+export const recordPortalAuditEntry = (entry) => {
+  return adminApi.recordAuditEntry(entry).catch((err) => {
+    console.warn("Could not record portal audit entry:", err);
+  });
 };
 
 export default adminApi;
+
