@@ -1,5 +1,4 @@
 import { useState, useEffect, useContext, useRef, useId } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { UIContext } from '../context/UIContext';
 import usersApi from '../services/usersApi';
@@ -7,7 +6,6 @@ import uploadsApi from '../services/uploadsApi';
 import { resolveApiBaseUrl } from '../services/apiClient';
 import FormInput from '../components/common/FormInput';
 import Avatar from '../components/common/Avatar';
-import ConfirmModal from '../components/common/ConfirmModal';
 import './settings.css';
 
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
@@ -31,15 +29,6 @@ const PaletteIcon = () => (
   </svg>
 );
 
-const TrashIcon = () => (
-  <svg width="20" height="20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
-    <polyline points="3 6 5 6 21 6"></polyline>
-    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-    <line x1="10" y1="11" x2="10" y2="17"></line>
-    <line x1="14" y1="11" x2="14" y2="17"></line>
-  </svg>
-);
-
 const UploadIcon = () => (
   <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
     <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
@@ -58,14 +47,11 @@ function getInitials(name) {
 }
 
 export const Settings = () => {
-  const navigate = useNavigate();
   const avatarInputId = useId();
-  const { user, logout, updateUser } = useContext(AuthContext);
+  const { user, updateUser } = useContext(AuthContext);
   const { theme, setTheme } = useContext(UIContext);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
-  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
-  const [deletingAccount, setDeletingAccount] = useState(false);
 
   // Profile State
   const [fullName, setFullName] = useState('');
@@ -124,10 +110,8 @@ export const Settings = () => {
       const sectionMap = {
         profile: 'settings-section-profile',
         appearance: 'settings-section-appearance',
-        danger: 'settings-section-danger',
         'settings-section-profile': 'settings-section-profile',
         'settings-section-appearance': 'settings-section-appearance',
-        'settings-section-danger': 'settings-section-danger',
       };
       const targetId = sectionMap[hash];
       if (targetId) {
@@ -502,41 +486,7 @@ export const Settings = () => {
     }
   };
 
-  // Delete Account
-  const handleConfirmDeleteAccount = async () => {
-    setDeletingAccount(true);
-    try {
-      const userId = localStorage.getItem('teamforge.backendUserId') || user?.id || '';
-      if (userId) {
-        try {
-          await usersApi.remove(userId);
-        } catch (apiErr) {
-          console.warn('Backend delete returned warning:', apiErr);
-        }
-        localStorage.removeItem(`teamforge.userProfile_${userId}`);
-        localStorage.removeItem(`teamforge.notificationSettings_${userId}`);
-        localStorage.removeItem(`teamforge.privacySettings_${userId}`);
-      }
 
-      localStorage.removeItem('teamforge.backendUserId');
-      localStorage.removeItem('teamforge.currentUser');
-      localStorage.removeItem('teamforge.userProfile');
-      localStorage.removeItem('teamforge.notificationSettings');
-      localStorage.removeItem('teamforge.privacySettings');
-      sessionStorage.clear();
-
-      setIsDeleteModalOpen(false);
-      showToast('Account deleted successfully');
-      if (logout) logout();
-      navigate('/login');
-    } catch (err) {
-      console.error('Account deletion failed:', err);
-      showToast('Account deletion failed', 'error');
-      setIsDeleteModalOpen(false);
-    } finally {
-      setDeletingAccount(false);
-    }
-  };
 
   const displayName = fullName || user?.name || user?.profile?.fullName || 'User';
   const initials = getInitials(displayName);
@@ -823,45 +773,7 @@ export const Settings = () => {
         </div>
       </div>
 
-      {/* ═══════════ CARD 5: DANGER ZONE ═══════════ */}
-      <div className="settings-card danger-card" id="settings-section-danger">
-          <div className="settings-section-header">
-            <div className="settings-icon-badge danger">
-              <TrashIcon />
-            </div>
-            <div>
-              <h2 className="settings-section-title danger">Danger Zone</h2>
-              <p className="settings-section-desc">Irreversible account actions.</p>
-            </div>
-          </div>
 
-          <div className="settings-danger-callout">
-            Deleting your account will permanently remove your user profile, active project memberships,
-            tasks, submitted proofs, and earned reputation XP. This action cannot be reversed.
-          </div>
-
-          <button
-            id="delete-account-btn"
-            type="button"
-            className="settings-btn-destructive"
-            onClick={() => setIsDeleteModalOpen(true)}
-          >
-            <TrashIcon /> Delete Account
-          </button>
-        </div>
-
-      {/* ═══════════ MODAL: CONFIRM DELETION ═══════════ */}
-      <ConfirmModal
-        isOpen={isDeleteModalOpen}
-        onClose={() => setIsDeleteModalOpen(false)}
-        onConfirm={handleConfirmDeleteAccount}
-        title="Confirm Account Deletion"
-        message="Are you sure you want to delete your TeamForge account? This action is permanent and cannot be undone. All your records, task submissions, and project associations will be removed."
-        confirmText="Yes, Delete My Account"
-        loading={deletingAccount}
-        variant="danger"
-        icon={<TrashIcon />}
-      />
 
       {/* ═══════════ TOAST NOTIFICATION ═══════════ */}
       {toast.visible && (
