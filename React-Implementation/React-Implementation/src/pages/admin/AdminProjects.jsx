@@ -2,12 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import projectsApi, { isProjectLocked, isProjectActive } from '../../services/projectsApi';
 import { calculateProjectProgress } from '../../utils/progress';
-import { getCurrentUserRole } from '../../services/apiClient';
 import Badge from '../../components/common/Badge';
 import SearchBar from '../../components/common/SearchBar';
 import FilterTabs from '../../components/common/FilterTabs';
 import DataTable from '../../components/common/DataTable';
-import ConfirmModal from '../../components/common/ConfirmModal';
 import './AdminProjects.css';
 
 const OWNER_NAMES = {
@@ -45,62 +43,74 @@ const AdminProjects = () => {
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const [restoringId, setRestoringId] = useState(null);
+
+  const loadProjects = async () => {
+    try {
+      const [activeRes, deletedRes] = await Promise.all([
+        Promise.resolve(projectsApi.list({ status: 'all' })).catch(() => []),
+        Promise.resolve(projectsApi.list({ status: 'deleted' })).catch(() => []),
+      ]);
+      const combined = [
+        ...(Array.isArray(activeRes) ? activeRes : []),
+        ...(Array.isArray(deletedRes) ? deletedRes : []),
+      ];
+      const byId = new Map();
+      for (const p of combined) {
+        if (p && p.id) byId.set(String(p.id), p);
+      }
+      setProjects(Array.from(byId.values()));
+      setError(null);
+    } catch (err) {
+      setError(err.message || 'Failed to fetch projects');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
-    const loadProjects = async () => {
-      try {
-        const data = await projectsApi.list();
-        if (isMounted) {
-          setProjects(Array.isArray(data) ? data : []);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message || 'Failed to fetch projects');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadProjects();
-
+    Promise.resolve().then(async () => {
+      if (isMounted) await loadProjects();
+    });
     return () => {
       isMounted = false;
     };
   }, []);
 
-  const [projectToDelete, setProjectToDelete] = useState(null);
-  const [deleting, setDeleting] = useState(false);
-
-  const handleConfirmDelete = async () => {
-    if (!projectToDelete) return;
-    setDeleting(true);
+  const handleRestoreProject = async (e, project) => {
+    e.stopPropagation();
+    if (restoringId) return;
+    setRestoringId(project.id);
     try {
-      await projectsApi.remove(projectToDelete.id);
-      setProjects((prev) => prev.filter((p) => p.id !== projectToDelete.id));
-      setProjectToDelete(null);
+      await projectsApi.restore(project.id);
+      await loadProjects();
     } catch (err) {
-      alert(err.message || 'Failed to delete project');
+      setError(err?.serverMessage || err?.message || 'Failed to restore project.');
     } finally {
-      setDeleting(false);
+      setRestoringId(null);
     }
   };
 
-  const isCompletedProject = (p) => isProjectLocked(p);
-  const activeProjects = projects.filter(isProjectActive);
+  const isDeletedProject = (p) => Boolean(p?.deletedAt);
+  const isClosedProject = (p) => !isDeletedProject(p) && String(p.status || '').toLowerCase() === 'closed';
+  const isCompletedProject = (p) => !isDeletedProject(p) && !isClosedProject(p) && isProjectLocked(p);
+  const deletedProjects = projects.filter(isDeletedProject);
+  const activeProjects = projects.filter((p) => !isDeletedProject(p) && !isClosedProject(p) && isProjectActive(p));
   const completedProjects = projects
     .filter(isCompletedProject)
     .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+  const closedProjects = projects.filter(isClosedProject);
 
-  let filtered = projects;
+  let filtered = projects.filter((p) => !isDeletedProject(p));
   if (filter === 'active') {
     filtered = activeProjects;
   } else if (filter === 'completed') {
     filtered = completedProjects;
+  } else if (filter === 'closed') {
+    filtered = closedProjects;
+  } else if (filter === 'deleted') {
+    filtered = deletedProjects;
   }
 
   const displayedProjects = filtered.filter((p) => {
@@ -110,9 +120,6 @@ const AdminProjects = () => {
     const owner = getOwnerDisplayName(p).toLowerCase();
     return title.includes(q) || owner.includes(q);
   });
-
-  const role = getCurrentUserRole();
-  const isSuperUser = role === 'Super User' || role === 'superuser' || sessionStorage.getItem('teamforge.isSuperUser') === 'true' || sessionStorage.getItem('teamforge.portalRole') === 'superuser';
 
   const columns = [
     {
@@ -124,11 +131,6 @@ const AdminProjects = () => {
       key: 'owner',
       label: 'Owner',
       render: (p) => getOwnerDisplayName(p),
-    },
-    {
-      key: 'difficulty',
-      label: 'Difficulty',
-      render: (p) => p.difficulty || '—',
     },
     {
       key: 'collaborators',
@@ -149,7 +151,37 @@ const AdminProjects = () => {
       key: 'status',
       label: 'Status',
       render: (p) => {
+        if (isDeletedProject(p)) {
+          return (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+              <Badge variant="danger">Deleted</Badge>
+              <button
+                type="button"
+                data-testid={`admin-restore-btn-${p.id}`}
+                className="btn btn-outline"
+                style={{ padding: '3px 10px', fontSize: '0.78rem' }}
+                disabled={restoringId === p.id}
+                onClick={(e) => handleRestoreProject(e, p)}
+              >
+                {restoringId === p.id ? 'Restoring...' : 'Restore'}
+              </button>
+            </div>
+          );
+        }
+        const isClosed = isClosedProject(p);
         const isCompleted = isCompletedProject(p);
+        if (isClosed) {
+          return (
+            <div>
+              <Badge variant="danger">Closed</Badge>
+              {p.closureReason && (
+                <div style={{ fontSize: '0.75rem', color: '#b91c1c', marginTop: '2px' }}>
+                  {p.closureReason}
+                </div>
+              )}
+            </div>
+          );
+        }
         return (
           <Badge variant={isCompleted ? 'locked' : (p.status?.toLowerCase() || 'active')}>
             {isCompleted ? 'Completed (Locked)' : (p.status || 'Active')}
@@ -174,26 +206,6 @@ const AdminProjects = () => {
         );
       },
     },
-    ...(isSuperUser
-      ? [
-          {
-            key: 'actions',
-            label: 'Actions',
-            align: 'right',
-            render: (p) => (
-              <button
-                className="btn btn-xs su-btn-danger"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setProjectToDelete(p);
-                }}
-              >
-                Delete
-              </button>
-            ),
-          },
-        ]
-      : []),
   ];
 
   return (
@@ -212,9 +224,11 @@ const AdminProjects = () => {
         />
         <FilterTabs
           tabs={[
-            { id: 'all', label: 'All', count: projects.length },
+            { id: 'all', label: 'All', count: projects.filter((p) => !isDeletedProject(p)).length },
             { id: 'active', label: 'Active', count: activeProjects.length },
-            { id: 'completed', label: 'Completed', count: completedProjects.length }
+            { id: 'completed', label: 'Completed', count: completedProjects.length },
+            { id: 'closed', label: 'Closed', count: closedProjects.length },
+            { id: 'deleted', label: 'Deleted', count: deletedProjects.length }
           ]}
           activeTab={filter}
           onChange={setFilter}
@@ -235,17 +249,6 @@ const AdminProjects = () => {
           />
         </div>
       </div>
-
-      <ConfirmModal
-        isOpen={Boolean(projectToDelete)}
-        title="Delete Project"
-        message={`Are you sure you want to delete project "${projectToDelete?.title || projectToDelete?.name || ''}"? This action cannot be undone.`}
-        confirmLabel="Delete Project"
-        variant="danger"
-        loading={deleting}
-        onConfirm={handleConfirmDelete}
-        onCancel={() => setProjectToDelete(null)}
-      />
     </div>
   );
 };

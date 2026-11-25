@@ -1,0 +1,68 @@
+### PHASE 24: PROJECT AND ACCOUNT LIFECYCLE CLEANUP
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer <OWNER_JWT>
+@collabToken = Bearer <COLLABORATOR_JWT>
+@socialToken = Bearer <SOCIAL_ONLY_USER_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Soft Delete Project (Closes pending join requests as system_closed & cancels pending invites)
+DELETE {{baseUrl}}/projects/proj-101
+Authorization: {{ownerToken}}
+
+### 2. Attempt Creating 4th Project After Deleting 3 Within 24h (429 PROJECT_DAILY_LIMIT)
+POST {{baseUrl}}/projects
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "title": "Fourth Project Bypass Attempt",
+  "description": "Deleted projects created in the last 24 hours still count toward the 3-per-day project creation cap.",
+  "teamSize": 4,
+  "dueDate": "2027-03-01T00:00:00.000Z"
+}
+
+### 3. Request Single-Use 6-Digit Email Verification Code for Passwordless Account Deletion (204 No Content, 1/min limit)
+POST {{baseUrl}}/users/me/delete/request-code
+Authorization: {{socialToken}}
+Content-Type: application/json
+
+{}
+
+### 4. Reject Social-Only Deletion Without Email Code or Legacy socialConfirmed Flag (400 REAUTH_REQUIRED)
+POST {{baseUrl}}/users/me/delete
+Authorization: {{socialToken}}
+Content-Type: application/json
+
+{
+  "username": "social_user_handle",
+  "socialConfirmed": true
+}
+
+### 5. Confirm Passwordless Account Deletion With 6-Digit Email Code (Frees Seats, Tasks, CVs & Exports)
+POST {{baseUrl}}/users/me/delete
+Authorization: {{socialToken}}
+Content-Type: application/json
+
+{
+  "username": "social_user_handle",
+  "code": "123456"
+}
+
+### 6. Confirm Password Account Deletion With Wrong Password (400 INVALID_PASSWORD)
+POST {{baseUrl}}/users/me/delete
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "username": "collab_username",
+  "password": "WrongPassword!"
+}
+
+### 7. Trigger Hourly Cron Jobs Tick (Skips Draft/Closed/Completed/Deleted projects via isLiveProject, emits JOB_SKIPPED_NOT_LIVE)
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+
+### 8. Inspect Job Runs Summary
+GET {{baseUrl}}/admin/jobs/runs
+Authorization: {{superUserToken}}

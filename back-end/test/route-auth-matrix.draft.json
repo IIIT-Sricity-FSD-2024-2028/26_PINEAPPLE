@@ -1,0 +1,4351 @@
+{
+  "version": 1,
+  "publicAllowList": [
+    "GET /admin/config/public",
+    "GET /auth/resolve-identifier",
+    "GET /health",
+    "GET /mail/health",
+    "GET /uploads/:filename",
+    "GET /users/:id/response-time",
+    "GET /users/username-available",
+    "POST /admin/login",
+    "POST /auth/forgot-password",
+    "POST /auth/login",
+    "POST /auth/refresh",
+    "POST /auth/reset-password",
+    "POST /auth/signup",
+    "POST /auth/verify-email",
+    "POST /support/tickets"
+  ],
+  "routes": [
+    {
+      "method": "GET",
+      "path": "/admin-test",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "AppController",
+      "handler": "adminTest",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/abandonment-reviews/:id/cancel",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "AdminController",
+      "handler": "cancelAbandonmentReview",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/appeals",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "AppealsController",
+      "handler": "getAdminAppeals",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/appeals/:id/decision",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "AppealsController",
+      "handler": "decideAppeal",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/audit",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "audit",
+      "controller": "AdminController",
+      "handler": "getAuditLog",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/audit",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "user"
+      ],
+      "permission": "audit",
+      "controller": "AdminController",
+      "handler": "recordAudit",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/audit/export",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "audit",
+      "controller": "AdminController",
+      "handler": "exportAuditLog",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/config",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "config",
+      "controller": "AdminController",
+      "handler": "getConfig",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/config",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "permission": "config",
+      "controller": "AdminController",
+      "handler": "updateConfig",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/config/public",
+      "access": "public",
+      "guards": [
+        "RolesGuard"
+      ],
+      "controller": "AdminController",
+      "handler": "getPublicConfig",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/disputes",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "AdminController",
+      "handler": "listDisputes",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/disputes/:id/decide",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "AdminController",
+      "handler": "decideDispute",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/escrow/reconcile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "AdminController",
+      "handler": "reconcileEscrow",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/jobs/runs",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "AdminController",
+      "handler": "getJobRuns",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/jobs/runs/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "AdminController",
+      "handler": "getJobRun",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/jobs/tick",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "AdminController",
+      "handler": "triggerJobsTick",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/login",
+      "access": "public",
+      "guards": [
+        "RolesGuard"
+      ],
+      "controller": "AdminController",
+      "handler": "login",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/mentor-applications",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/mentor-applications",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/admin/mentor-applications/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/mentor-applications/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/mentor-applications/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/mentor-applications/:id/approve",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "approve",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/mentor-applications/:id/reject",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "reject",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/mentor-applications/digilocker/pull-documents",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "pullDigiLockerDocuments",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/mentor-applications/digilocker/status",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getDigiLockerStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/mentor-applications/me",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getMyStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/mentors/:id/feedback",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "AdminController",
+      "handler": "getMentorFeedbackAdmin",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/moderation-actions",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "listModerationActions",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/moderation-actions/:id/approve",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "approveModerationAction",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/moderation-actions/:id/reject",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "rejectModerationAction",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/projects/:id/close",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "projects",
+      "controller": "AdminController",
+      "handler": "closeProject",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/projects/:id/escrow",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "projects",
+      "controller": "AdminController",
+      "handler": "getProjectEscrow",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/projects/:id/restore",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "projects",
+      "controller": "AdminController",
+      "handler": "restoreProject",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reports",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "getAdminReports",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reports/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "getAdminReportById",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/reports/:id/action",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "actionReport",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/admin/reports/:id/status",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "updateReportStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reports/open-count",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "getOpenReportsCount",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reports/owner-patterns",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "reports",
+      "controller": "ReportsController",
+      "handler": "getOwnerRejectionPatterns",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reputation",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "AdminController",
+      "handler": "getAllReputation",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/reputation/reconcile",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "AdminController",
+      "handler": "reconcileReputation",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/stats",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "dashboard",
+      "controller": "AdminController",
+      "handler": "getStats",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/support/assignees",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "listAssignees",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/support/tickets",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "listTickets",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/support/tickets/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "getTicket",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/admin/support/tickets/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "updateTicket",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/support/tickets/:id/close-project",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "closeProjectFromTicket",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/support/tickets/:id/replies",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "support",
+      "controller": "AdminSupportController",
+      "handler": "addReply",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/system/demo-reset-status",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "AdminController",
+      "handler": "getDemoResetStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/system/reset-demo",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "AdminController",
+      "handler": "resetDemoData",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "listUsers",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "getUserDetails",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/users/:id/flag",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "flagUser",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/:id/reactivate",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "reactivateUser",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users/:id/reputation",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "getUserReputation",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/admin/users/:id/status",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "updateUserStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/:id/status",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "updateUserStatusPost",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/admin/users/:id/status",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "updateUserStatusPut",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/:id/suspend",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "suspendUser",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/admin/users/:id/warn",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "warnUser",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users/:id/warnings",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "ModerationController",
+      "handler": "getAdminWarnings",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/admin/users/duplicates",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "AdminController",
+      "handler": "listDuplicateUsers",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/change-password",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "changePassword",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/forgot-password",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "forgotPassword",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/login",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "login",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "logout",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/logout-all",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "logoutAll",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/auth/me",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "getMe",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/profile",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "createProfile",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/refresh",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "refresh",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/resend-verification",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "resendVerification",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/reset-password",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "resetPassword",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/auth/resolve-identifier",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "resolveIdentifier",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/signup",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "signup",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/switch-role",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AuthController",
+      "handler": "switchRole",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/auth/test-set-expiry",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "AuthController",
+      "handler": "testSetExpiry",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/auth/verify-email",
+      "access": "public",
+      "guards": [],
+      "controller": "AuthController",
+      "handler": "verifyEmail",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/communication/messages",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "sendMessage",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/communication/messages/:id/report",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "reportMessage",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/communication/messages/project/:projectId",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "getMessagesByProjectId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/communication/notifications",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "getNotificationsByUserId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/communication/notifications/:id/read",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "markNotificationAsRead",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/communication/projects/:id/read",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "markProjectChatRead",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/communication/unread",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "CommunicationController",
+      "handler": "getUnreadCounts",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/escrow",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "revenue",
+      "controller": "EscrowController",
+      "handler": "findAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/escrow/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "permission": "revenue",
+      "controller": "EscrowController",
+      "handler": "findOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/feedback",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "FeedbackController",
+      "handler": "getEntityFeedback",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/feedback/reasons",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "FeedbackController",
+      "handler": "getReasons",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/gamification/:userId/ledger",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GamificationController",
+      "handler": "getLedgerByUserId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/gamification/:userId/stats",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GamificationController",
+      "handler": "getUserStats",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/gamification/leaderboard",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GamificationController",
+      "handler": "getLeaderboard",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/governance/reports",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GovernanceController",
+      "handler": "getAllReports",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/governance/reports",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GovernanceController",
+      "handler": "createReport",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/governance/reports/:id",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GovernanceController",
+      "handler": "getReportById",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/governance/reports/:id/resolve",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "GovernanceController",
+      "handler": "resolveReport",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/health",
+      "access": "public",
+      "guards": [],
+      "controller": "AppController",
+      "handler": "health",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/invites/:id/accept",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "controller": "InvitesController",
+      "handler": "acceptInvite",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/invites/:id/decline",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "InvitesController",
+      "handler": "declineInvite",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/join-requests",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "getAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/join-requests",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/join-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/join-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "getOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/join-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "patch",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/join-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/join-requests/:id/status",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "patchStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/join-requests/:id/status",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "updateStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/join-requests/mine",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "JoinRequestsController",
+      "handler": "getMyRequests",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/leaderboard",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner"
+      ],
+      "controller": "LeaderboardController",
+      "handler": "getLeaderboard",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/leaderboard/:userId",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner"
+      ],
+      "controller": "LeaderboardController",
+      "handler": "getUserRank",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/leave-requests/:id/approve",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "LeaveRequestsController",
+      "handler": "approve",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/leave-requests/:id/reject",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "LeaveRequestsController",
+      "handler": "reject",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/logs/errors",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "LogViewerController",
+      "handler": "getErrorLogs",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/logs/requests",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin"
+      ],
+      "controller": "LogViewerController",
+      "handler": "getRequestLogs",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mail/health",
+      "access": "public",
+      "guards": [],
+      "controller": "MailController",
+      "handler": "getHealth",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-applications",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-applications",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/mentor-applications/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-applications/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-applications/:id",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-applications/:id/approve",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "approve",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-applications/:id/reject",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "reject",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-applications/digilocker/pull-documents",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "pullDigiLockerDocuments",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-applications/digilocker/status",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getDigiLockerStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-applications/me",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "MentorApplicationsController",
+      "handler": "getMyStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/mentors",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "listMentors",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/mentors/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMentor",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentor-marketplace/mentors/availability",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateAvailability",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentor-marketplace/mentors/confirm-role",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "confirmMentorRole",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/mentors/me",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMyProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/mentors/me/stats",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMyStats",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentor-marketplace/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "createProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "revenue",
+      "controller": "MentorMarketplaceController",
+      "handler": "getAllSessions",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/accept",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "acceptSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/cancel",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "cancelSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/cancel-payment",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "cancelPayment",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/complete",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "completeSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/confirm-payment",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "confirmPayment",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/decline",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "declineSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/dispute",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "openDispute",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/feedback",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "submitFeedback",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/notes",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "addSessionNote",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/pay",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "paySession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/retry-payout",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "retryPayout",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/review",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "submitReview",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/:id/start",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "startSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/admin-stats",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "revenue",
+      "controller": "MentorMarketplaceController",
+      "handler": "getAdminStats",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-marketplace/sessions/book",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "bookSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/mentor-view",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "mySessionsMentor",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/mine",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "mySessionsStudent",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-requests",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "getAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-requests",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/mentor-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "getOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-requests/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-requests/:id/accept",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "accept",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-requests/:id/decline",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "user"
+      ],
+      "controller": "MentorRequestsController",
+      "handler": "decline",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-sessions/:id/dispute",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorSessionsLifecycleController",
+      "handler": "openDispute",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-sessions/:id/feedback",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorSessionsLifecycleController",
+      "handler": "submitFeedback",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor-sessions/:id/notes",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorSessionsLifecycleController",
+      "handler": "addSessionNote",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentor/abandonment-reviews/:id/confirm",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorLifecycleController",
+      "handler": "confirmAbandonmentReview",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentor/abandonment-reviews/mine",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorLifecycleController",
+      "handler": "getMyOpenAbandonmentReviews",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentorship/application",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "MentorshipController",
+      "handler": "getApplicationByUserId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentorship/application/:id/review",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "MentorshipController",
+      "handler": "reviewApplication",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/mentorship/apply",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "MentorshipController",
+      "handler": "applyForMentorship",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/mentorship/badge",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorshipController",
+      "handler": "issueBadge",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentorship/badges",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorshipController",
+      "handler": "issueBadgesAlias",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentorship/badges/:userId",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorshipController",
+      "handler": "getBadgesByUserId",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentorship/badges/project/:projectId",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorshipController",
+      "handler": "getBadgesByProjectId",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/notifications",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "findAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/notifications",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "NotificationsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/notifications/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/notifications/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "findOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/notifications/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/notifications/:id/read",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "patchMarkAsRead",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/notifications/:id/read",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "markAsRead",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/notifications/read-all",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "patchReadAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/notifications/read-all",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "markAllAsRead",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/notifications/unread-count",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser",
+        "user"
+      ],
+      "controller": "NotificationsController",
+      "handler": "getUnreadCount",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/payouts/transactions",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "user"
+      ],
+      "controller": "PayoutsController",
+      "handler": "findAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/ping",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AppController",
+      "handler": "ping",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/portal-admins",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "manage_admins",
+      "controller": "PortalAdminsController",
+      "handler": "list",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/portal-admins",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "manage_admins",
+      "controller": "PortalAdminsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/portal-admins/:id",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "manage_admins",
+      "controller": "PortalAdminsController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/portal-admins/:id",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "manage_admins",
+      "controller": "PortalAdminsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/projects",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "findAll",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner"
+      ],
+      "controller": "ProjectsController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/projects/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "ProjectsController",
+      "handler": "softDeleteProject",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "findById",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/projects/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner"
+      ],
+      "controller": "ProjectsController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/cancel-deletion",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "ProjectsController",
+      "handler": "cancelDeletion",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/close",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "ProjectsController",
+      "handler": "closeProjectAdmin",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/complete",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner"
+      ],
+      "controller": "ProjectsController",
+      "handler": "complete",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/projects/:id/deadline",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "changeDeadline",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/deletion-check",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "ProjectsController",
+      "handler": "checkDeletion",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/invites",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "listProjectInvites",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/invites",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "sendInvite",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/projects/:id/invites/:inviteId",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "cancelInvite",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/leave",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "leave",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/leave-requests",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "listLeaveRequests",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/leave-requests",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "createLeaveRequest",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/leave-requests/:requestId/approve",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "approveLeaveRequest",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/leave-requests/:requestId/reject",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "rejectLeaveRequest",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/projects/:id/leave-requests/mine",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "withdrawLeaveRequest",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/leave-requests/mine",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getMyLeaveRequest",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/match",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getSkillMatch",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/members",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getMembers",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/projects/:id/members/:memberId",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner"
+      ],
+      "controller": "ProjectsController",
+      "handler": "removeMember",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/members/:userId/release-tasks",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "releaseMemberTasks",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/members/:userId/removal-check",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getRemovalCheck",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/mentor/abandonment-review",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getMentorAbandonmentReview",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/mentor/abandonment-review",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "openMentorAbandonmentReview",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/my-request-status",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getMyRequestStatus",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/request-close",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "requestClose",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/:id/task-templates",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getProjectTaskTemplates",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/projects/:id/task-templates/apply",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "applyProjectTaskTemplates",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/projects/collaborator/:userId",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "findCollaboratorWork",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/my-work",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "getMyWork",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/projects/owner/:ownerId",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ProjectsController",
+      "handler": "findByOwnerId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/reports",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "controller": "ReportsController",
+      "handler": "createReport",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/reports/mine",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "ReportsController",
+      "handler": "getMyReports",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/support",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "getAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/support",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/support/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "SupportController",
+      "handler": "remove",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/support/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "getOne",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/support/:id/status",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "SupportController",
+      "handler": "updateStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/support/tickets",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "getMyTickets",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/support/tickets",
+      "access": "public",
+      "guards": [
+        "RolesGuard"
+      ],
+      "controller": "SupportController",
+      "handler": "createTicket",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/support/tickets/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "getMyTicketById",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/support/tickets/:id/replies",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "SupportController",
+      "handler": "replyToMyTicket",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/task-templates",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "TaskTemplatesController",
+      "handler": "getForCategory",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/tasks",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/tasks/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "delete",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/tasks/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "TasksController",
+      "handler": "findById",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/tasks/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/tasks/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "updatePut",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/tasks/:id/comments",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "addComment",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/tasks/:id/review",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "reviewTask",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/tasks/:id/status",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "updateStatus",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/tasks/:id/status",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "updateStatusPut",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/tasks/:id/unassign",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "TasksController",
+      "handler": "unassignTask",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/tasks/project/:projectId",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "TasksController",
+      "handler": "findAllByProjectId",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/uploads",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UploadsController",
+      "handler": "uploadFile",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/uploads/:filename",
+      "access": "public",
+      "guards": [],
+      "controller": "UploadsController",
+      "handler": "serveUploadedFile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/uploads/avatar",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UploadsController",
+      "handler": "uploadAvatar",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/uploads/cv",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "permission": "mentor_apps",
+      "controller": "UploadsController",
+      "handler": "uploadCv",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/uploads/cv/:filename",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "permission": "mentor_apps",
+      "controller": "UploadsController",
+      "handler": "downloadCv",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/uploads/resource",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UploadsController",
+      "handler": "uploadResource",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/uploads/task-proof",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UploadsController",
+      "handler": "uploadTaskProof",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users",
+      "access": "permission",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "UsersController",
+      "handler": "findAll",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/users",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "permission": "users",
+      "controller": "UsersController",
+      "handler": "create",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/:id",
+      "access": "system",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "superuser"
+      ],
+      "controller": "UsersController",
+      "handler": "delete",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "findById",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "SelfAccountUpdateGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "UsersController",
+      "handler": "update",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id/badges",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getBadges",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id/public-profile",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getPublicProfile",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id/response-time",
+      "access": "public",
+      "guards": [],
+      "controller": "UsersController",
+      "handler": "getResponseTime",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/users/:id/trust",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getTrust",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getMe",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/appeals",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AppealsController",
+      "handler": "getMyAppeals",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/delete",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "deleteMyAccount",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/deletion-check",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "checkDeletionEligibility",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/export",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "listDataExports",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/export",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "requestDataExport",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/export/:id",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getDataExportStatus",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/export/:id/download",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "downloadDataExport",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/invites",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getMyInvites",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "DELETE",
+      "path": "/users/me/phone",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "deletePhone",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/phone/failed-attempt",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "recordFailedOtpAttempt",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/phone/otp-status",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getPhoneOtpStatus",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/phone/request-otp",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "requestPhoneOtp",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/phone/verify",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "verifyPhone",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/me/phone/verify-otp",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "verifyPhoneOtp",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/reputation",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getMyReputation",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/settings",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getMySettings",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me/settings",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "updateMySettings",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/trust",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getMyTrust",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "PATCH",
+      "path": "/users/me/username",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "updateUsername",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/me/warnings",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "user"
+      ],
+      "controller": "ModerationController",
+      "handler": "getMyWarnings",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/users/search",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "searchUsers",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/switch-role",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "switchRole",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "POST",
+      "path": "/users/trust-summaries",
+      "access": "authenticated",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "UsersController",
+      "handler": "getTrustSummaries",
+      "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/users/username-available",
+      "access": "public",
+      "guards": [],
+      "controller": "UsersController",
+      "handler": "checkUsernameAvailable",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/warnings/:id/appeal",
+      "access": "owner-or-member",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "controller": "AppealsController",
+      "handler": "createAppeal",
+      "hasExplicitGuardOrRole": false
+    }
+  ]
+}

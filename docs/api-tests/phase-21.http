@@ -1,0 +1,91 @@
+### PHASE 21: LEGACY ROUTE RETIREMENT & ROUTE AUTHORIZATION MATRIX
+
+@baseUrl = http://localhost:3000
+@userToken = Bearer <USER_JWT>
+@mentorToken = Bearer <MENTOR_JWT>
+@adminToken = Bearer <ADMIN_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Retired Governance Report Creation -> 410 LEGACY_ENDPOINT_REMOVED
+POST {{baseUrl}}/governance/reports
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "targetUserId": "3",
+  "reason": "Legacy report endpoint should be retired"
+}
+
+### 2. Retired Governance List -> 410 LEGACY_ENDPOINT_REMOVED
+GET {{baseUrl}}/governance/reports
+Authorization: {{adminToken}}
+
+### 3. Retired Governance Get One -> 410 LEGACY_ENDPOINT_REMOVED
+GET {{baseUrl}}/governance/reports/report-1
+Authorization: {{adminToken}}
+
+### 4. Retired Governance Resolve -> 410 LEGACY_ENDPOINT_REMOVED
+PATCH {{baseUrl}}/governance/reports/report-1/resolve
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "action": "Warn",
+  "resolution": "Legacy resolution bypass"
+}
+
+### 5. Retired Mentorship Apply -> 410 LEGACY_ENDPOINT_REMOVED
+POST {{baseUrl}}/mentorship/apply
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "linkedinURL": "https://linkedin.com/in/example",
+  "experienceYears": 2,
+  "motivation": "Legacy mentor apply bypass"
+}
+
+### 6. Retired Mentorship Application Lookup (with spoofed x-userid) -> 410 LEGACY_ENDPOINT_REMOVED
+GET {{baseUrl}}/mentorship/application
+Authorization: {{userToken}}
+x-user-id: 3
+x-userid: 3
+
+### 7. Retired Mentorship Review -> 410 LEGACY_ENDPOINT_REMOVED
+PATCH {{baseUrl}}/mentorship/application/app-1/review
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "status": "Approved"
+}
+
+### 8. Canonical Replacements Still Enforce Policies
+POST {{baseUrl}}/reports
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "reportedUserId": "3",
+  "reason": "Harassment",
+  "details": "Detailed canonical report exceeding 20 characters."
+}
+
+### 9. Canonical Mentor Application Lookup Ignores Spoofed x-userid / ?userId=
+GET {{baseUrl}}/mentor-applications/me?userId=3
+Authorization: {{userToken}}
+x-user-id: 3
+x-userid: 3
+
+### 10. Kept Mentorship Badge Endpoint Uses Verified JWT Identity
+GET {{baseUrl}}/mentorship/badges/2
+Authorization: {{userToken}}
+
+### 11. Locked Test-Only Expiry Endpoint Rejects Non-SuperUsers (403)
+POST {{baseUrl}}/auth/test-set-expiry
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "expiryMs": 60000
+}

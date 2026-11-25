@@ -1,0 +1,34 @@
+### PHASE 22: SINGLE REPUTATION LEDGER & BADGE FARMING
+
+@baseUrl = http://localhost:3000
+@userToken = Bearer <USER_JWT>
+@adminToken = Bearer <ADMIN_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Reconcile Single Reputation Ledger vs Leaderboard & Profile (Super User only)
+GET {{baseUrl}}/admin/reputation/reconcile
+Authorization: {{superUserToken}}
+
+### 2. Reconcile Rejected for Regular Admin (403)
+GET {{baseUrl}}/admin/reputation/reconcile
+Authorization: {{adminToken}}
+
+### 3. Current User Reputation Ledger & Canonical Total
+GET {{baseUrl}}/users/me/reputation?page=1&limit=20
+Authorization: {{userToken}}
+
+### 4. Leaderboard Reads Directly From Reputation Ledger
+GET {{baseUrl}}/leaderboard?period=alltime
+
+### 5. Complete Project Under 3 Days Old -> Completes with badgeAwarded=false and badgeReason
+POST {{baseUrl}}/projects/proj-young/complete
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "finalLink": "https://github.com/teamforge/demo-project"
+}
+
+### 6. Admin View User Reputation Ledger
+GET {{baseUrl}}/admin/users/2/reputation?page=1&limit=20
+Authorization: {{adminToken}}

@@ -1,0 +1,178 @@
+### TeamForge Phase 15 API Tests (REST Client Format)
+### Collaboration UX: Active Project Cap, Skill-Match Hint, Rejection Suggestions, Direct Invites,
+### Unread Chat Badge, Ranked User Search, Closed/Completed Requirements Export & Clone as Draft
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@outsiderToken = Bearer YOUR_OUTSIDER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. SKILL-MATCH HINT (NEVER BLOCKS APPLYING)
+### --------------------------------------------------------------------------
+
+### 1a. Compute Skill-Match Percentage & Missing Skills for Current User
+# Expected Status: 200 OK -> { percent, shared, missing } (percent: null if project has no skills)
+GET {{baseUrl}}/projects/PROJECT_ID/match
+Authorization: {{collabToken}}
+
+### --------------------------------------------------------------------------
+### 2. ACTIVE PROJECT CAP (MAX 3 NON-FINISHED COLLABORATOR MEMBERSHIPS)
+### --------------------------------------------------------------------------
+
+### 2a. Apply Beyond Active Project Cap (Owning Does Not Count)
+# Expected Status: 409 Conflict (ACTIVE_PROJECT_CAP with currentCount, maxAllowed, projects[])
+POST {{baseUrl}}/join-requests
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "projectId": "PROJECT_ID_4",
+  "userId": "USER_ID",
+  "userName": "User Name",
+  "message": "Excited to contribute!"
+}
+
+### --------------------------------------------------------------------------
+### 3. REJECTION SUGGESTIONS (UP TO 3 SIMILAR OPEN PROJECTS)
+### --------------------------------------------------------------------------
+
+### 3a. Owner Rejects Request -> Returns suggestedProjects on Request & Notification
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/join-requests/REQUEST_ID
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "status": "Rejected",
+  "reason": "Looking for more backend experience on this sprint."
+}
+
+###
+
+### 3b. Collaborator Reads My Requests (Includes suggestedProjects)
+# Expected Status: 200 OK
+GET {{baseUrl}}/join-requests/mine
+Authorization: {{collabToken}}
+
+### --------------------------------------------------------------------------
+### 4. DIRECT PROJECT INVITATIONS
+### --------------------------------------------------------------------------
+
+### 4a. Owner Sends Direct Invite by Username
+# Expected Status: 201 Created (404 USER_NOT_FOUND, 409 ALREADY_MEMBER / INVITE_LIMIT / REINVITE_COOLDOWN)
+POST {{baseUrl}}/projects/PROJECT_ID/invites
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "username": "arjunsharma"
+}
+
+###
+
+### 4b. Non-Owner Attempts to Send Invite
+# Expected Status: 403 Forbidden
+POST {{baseUrl}}/projects/PROJECT_ID/invites
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "username": "kiranbose"
+}
+
+###
+
+### 4c. Owner Lists Project Invites
+# Expected Status: 200 OK
+GET {{baseUrl}}/projects/PROJECT_ID/invites
+Authorization: {{ownerToken}}
+
+###
+
+### 4d. Invited User Lists Their Invites
+# Expected Status: 200 OK
+GET {{baseUrl}}/users/me/invites
+Authorization: {{collabToken}}
+
+###
+
+### 4e. Invited User Accepts Invite (Runs in Project Queue, Checks Capacity & Cap)
+# Expected Status: 200 OK (or 409 PROJECT_FULL / ACTIVE_PROJECT_CAP / INVITE_EXPIRED)
+POST {{baseUrl}}/invites/INVITE_ID/accept
+Authorization: {{collabToken}}
+
+###
+
+### 4f. Invited User Declines Invite (Optional block: true sets 14-day cooldown)
+# Expected Status: 200 OK
+POST {{baseUrl}}/invites/INVITE_ID/decline
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "block": false
+}
+
+###
+
+### 4g. Owner Cancels Pending Invite
+# Expected Status: 200 OK
+DELETE {{baseUrl}}/projects/PROJECT_ID/invites/INVITE_ID
+Authorization: {{ownerToken}}
+
+### --------------------------------------------------------------------------
+### 5. UNREAD CHAT BADGE & READ RECEIPTS
+### --------------------------------------------------------------------------
+
+### 5a. Fetch Unread Chat Summary Across Active Projects
+# Expected Status: 200 OK -> { total, byProject: [...] }
+GET {{baseUrl}}/communication/unread
+Authorization: {{collabToken}}
+
+###
+
+### 5b. Mark Project Chat Read (Zeroes Unread for Caller)
+# Expected Status: 200 OK -> { projectId, userId, lastReadAt }
+POST {{baseUrl}}/communication/projects/PROJECT_ID/read
+Authorization: {{collabToken}}
+
+###
+
+### 5c. Non-Member Attempts to Mark Project Chat Read (Phase 6 Guard)
+# Expected Status: 403 Forbidden (CHAT_MEMBERSHIP_REQUIRED)
+POST {{baseUrl}}/communication/projects/PROJECT_ID/read
+Authorization: {{outsiderToken}}
+
+### --------------------------------------------------------------------------
+### 6. USER SEARCH RANKING (EXACT -> PREFIX -> SUBSTRING)
+### --------------------------------------------------------------------------
+
+### 6a. Search Users for Picker
+# Expected Status: 200 OK (exact username first, then username prefix, name prefix, other substring)
+GET {{baseUrl}}/users/search?q=arjun
+Authorization: {{ownerToken}}
+
+### --------------------------------------------------------------------------
+### 7. CLOSED / COMPLETED EXPORT MARKDOWN & CLONE AS DRAFT
+### --------------------------------------------------------------------------
+
+### 7a. Export Finished Project Requirements & Tasks as Markdown (Owner or Admin)
+# Expected Status: 200 OK (text/markdown) | 409 PROJECT_NOT_FINISHED on active project
+GET {{baseUrl}}/projects/FINISHED_PROJECT_ID/export.md
+Authorization: {{ownerToken}}
+
+###
+
+### 7b. Clone Finished Project as New Draft (Owner Only)
+# Expected Status: 201 Created -> { id, projectId, status: "Draft", ... }
+POST {{baseUrl}}/projects/FINISHED_PROJECT_ID/clone
+Authorization: {{ownerToken}}
+
+###
+
+### 7c. Non-Owner Attempts Export or Clone
+# Expected Status: 403 Forbidden
+POST {{baseUrl}}/projects/FINISHED_PROJECT_ID/clone
+Authorization: {{collabToken}}

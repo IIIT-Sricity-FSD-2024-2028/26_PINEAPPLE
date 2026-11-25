@@ -1,6 +1,7 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useCallback } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
+import { useVisibilityPoll } from '../../hooks/useVisibilityPoll';
 import projectsApi, { isProjectLocked } from '../../services/projectsApi';
 import tasksApi from '../../services/tasksApi';
 import communicationApi from '../../services/communicationApi';
@@ -8,10 +9,13 @@ import mentorshipApi from '../../services/mentorshipApi';
 import TaskCard from '../../components/features/TaskCard';
 import ChatBox from '../../components/features/ChatBox';
 import EmptyState from '../../components/common/EmptyState';
+import Modal from '../../components/common/Modal';
 import Avatar from '../../components/common/Avatar';
 import FilterTabs from '../../components/common/FilterTabs';
 import StatCard from '../../components/common/StatCard';
 import { calculateProjectProgress } from '../../utils/progress';
+import { getProjectRole } from '../../utils/projectRole';
+import ProjectTombstone from '../ProjectTombstone';
 import './mentorProjectWorkspace.css';
 
 /* ── Extracted SVG Functional Components ── */
@@ -35,9 +39,16 @@ const MentorProjectWorkspace = () => {
   const { user } = useContext(AuthContext);
 
   const [project, setProject] = useState(null);
+  const [tombstoneData, setTombstoneData] = useState(null);
   const [tasks, setTasks] = useState([]);
   const [messages, setMessages] = useState([]);
-  const [activeTab, setActiveTab] = useState('overview');
+  const [activeTab, setActiveTab] = useState(() => {
+    if (typeof window !== 'undefined') {
+      const tab = new URLSearchParams(window.location.search).get('tab');
+      if (tab === 'chat' || tab === 'tasks' || tab === 'members' || tab === 'overview') return tab;
+    }
+    return 'overview';
+  });
   const [loading, setLoading] = useState(true);
   const [feedback, setFeedback] = useState(null);
 
@@ -48,6 +59,7 @@ const MentorProjectWorkspace = () => {
   const [submittingBadge, setSubmittingBadge] = useState(false);
   const [awardedMembers, setAwardedMembers] = useState(new Set());
   const [sendingMsg, setSendingMsg] = useState(false);
+  const [chatForbidden, setChatForbidden] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -56,9 +68,21 @@ const MentorProjectWorkspace = () => {
     const fetchWorkspace = async () => {
       try {
         const [projData, tasksData, msgsData, badgesData] = await Promise.all([
-          projectsApi.get(projectId).catch(() => null),
+          projectsApi.get(projectId).catch((err) => {
+            if (err?.statusCode === 410 || err?.code === 'PROJECT_DELETED') {
+              if (isMounted) {
+                setTombstoneData(err.project || err.data?.project || { id: projectId });
+              }
+            }
+            return null;
+          }),
           tasksApi.list({ projectId }).catch(() => []),
-          communicationApi.getMessages(projectId).catch(() => []),
+          communicationApi.getMessages(projectId).catch((err) => {
+            if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
+              if (isMounted) setChatForbidden(true);
+            }
+            return [];
+          }),
           mentorshipApi.getBadgesByProject(projectId).catch(() => []),
         ]);
 
@@ -95,25 +119,40 @@ const MentorProjectWorkspace = () => {
     };
   }, [projectId]);
 
-  // Real-time chat polling (polls every 3 seconds while on chat tab)
-  useEffect(() => {
-    if (!projectId || activeTab !== 'chat') return;
-    let isMounted = true;
-    const interval = setInterval(async () => {
-      try {
-        const fresh = await communicationApi.getMessages(projectId);
-        if (isMounted && Array.isArray(fresh)) {
-          setMessages(fresh);
-        }
-      } catch {
-        /* non-critical background poll */
+  // Real-time chat polling (polls every 6s while active tab, pauses when hidden or forbidden)
+  const pollMentorChat = useCallback(async () => {
+    if (!projectId || activeTab !== 'chat' || chatForbidden) return;
+    try {
+      const fresh = await communicationApi.getMessages(projectId);
+      if (Array.isArray(fresh)) {
+        setMessages(fresh);
       }
-    }, 3000);
+    } catch (err) {
+      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
+        setChatForbidden(true);
+      }
+      console.warn('[MentorProjectWorkspace] Background chat polling error:', err);
+    }
+  }, [projectId, activeTab, chatForbidden]);
 
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
+  useVisibilityPoll(pollMentorChat, 6000, {
+    enabled: Boolean(projectId && activeTab === 'chat' && !chatForbidden),
+    immediate: false,
+    triggerOnVisible: true,
+  });
+
+  useEffect(() => {
+    if (!projectId || activeTab !== 'chat') return undefined;
+    if (typeof communicationApi.markProjectRead === 'function') {
+      communicationApi.markProjectRead(projectId)
+        .then(() => {
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('teamforge:chat_read'));
+          }
+        })
+        .catch(() => {});
+    }
+    return undefined;
   }, [projectId, activeTab]);
 
 
@@ -165,7 +204,7 @@ const MentorProjectWorkspace = () => {
 
   /* ── Chat Message Handler ── */
   const handleSendMessage = async (text) => {
-    if (!text || !text.trim()) return;
+    if (!text || !text.trim() || chatForbidden) return;
     const messageText = text.trim();
     setSendingMsg(true);
 
@@ -186,6 +225,9 @@ const MentorProjectWorkspace = () => {
         setMessages(fresh);
       }
     } catch (err) {
+      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
+        setChatForbidden(true);
+      }
       console.error('Failed to send chat message:', err);
     } finally {
       setSendingMsg(false);
@@ -196,6 +238,22 @@ const MentorProjectWorkspace = () => {
     return (
       <div className="tf-mentor-ws-container">
         <p className="text-sm text-muted">Loading mentor workspace...</p>
+      </div>
+    );
+  }
+
+  if (tombstoneData) {
+    return (
+      <div className="tf-mentor-ws-container">
+        <button
+          type="button"
+          className="tf-mentor-ws-back-btn"
+          onClick={() => navigate('/mentor/projects')}
+        >
+          <BackArrowIcon />
+          <span>Back to Mentored Projects</span>
+        </button>
+        <ProjectTombstone project={tombstoneData} onNavigate={(path) => navigate(path)} />
       </div>
     );
   }
@@ -267,6 +325,32 @@ const MentorProjectWorkspace = () => {
         <BackArrowIcon />
         <span>Back to Mentored Projects</span>
       </button>
+
+      {project.deletionScheduledAt && (
+        <div
+          data-testid="mentor-scheduled-deletion-banner"
+          style={{
+            padding: '14px 18px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            borderRadius: '8px',
+            marginBottom: '16px',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '12px',
+          }}
+        >
+          <span style={{ fontSize: '1.4rem' }}>⏳</span>
+          <div>
+            <strong style={{ color: '#991b1b', fontSize: '0.95rem' }}>
+              This project is scheduled for deletion on {new Date(project.deletionScheduledAt).toLocaleString()} by the owner.
+            </strong>
+            <p style={{ margin: '4px 0 0', fontSize: '0.86rem', color: '#b91c1c' }}>
+              The workspace is currently in a 48-hour notice period and is read-only.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Hero card */}
       <div className="tf-mentor-ws-hero">
@@ -420,8 +504,9 @@ const MentorProjectWorkspace = () => {
 
           <div className="tf-mentor-ws-members-list">
             {membersList.map((member, mIdx) => {
-              const isOwner = member.name === project.owner || member.role === 'Owner';
-              const isMentorRole = member.role === 'Mentor';
+              const projectRole = getProjectRole(project, member.id || member.userId, member.name) || member.role || 'Collaborator';
+              const isOwner = projectRole === 'Owner';
+              const isMentorRole = projectRole === 'Mentor';
               const isSelf = member.name === user?.name || String(member.id || member.userId) === String(user?.id);
               const mName = String(member.name || '').toLowerCase();
               const mId = String(member.id || member.userId || '').toLowerCase();
@@ -444,7 +529,7 @@ const MentorProjectWorkspace = () => {
                           </span>
                         )}
                       </div>
-                      <div className="tf-mentor-ws-member-role">{member.role || 'Collaborator'}</div>
+                      <div className="tf-mentor-ws-member-role">{projectRole}</div>
                     </div>
                   </div>
 
@@ -484,102 +569,99 @@ const MentorProjectWorkspace = () => {
             onSendMessage={handleSendMessage}
             onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
             sending={sendingMsg}
+            isForbidden={chatForbidden}
           />
         </div>
       )}
 
       {/* ── Assign Recommendation Badge Modal ── */}
-      {badgeModalMember && (
-        <div
-          className="tf-mentor-ws-modal-overlay"
-          onClick={() => setBadgeModalMember(null)}
-        >
-          <div
-            className="tf-mentor-ws-modal-box"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="tf-mentor-ws-modal-header">
-              <h3 className="tf-mentor-ws-modal-title">Award Recommendation Badge</h3>
-              <button
-                type="button"
-                className="tf-mentor-ws-modal-close"
-                onClick={() => setBadgeModalMember(null)}
-              >
-                ✕
-              </button>
+      <Modal
+        isOpen={Boolean(badgeModalMember)}
+        title="Award Recommendation Badge"
+        onClose={() => { if (!submittingBadge) setBadgeModalMember(null); }}
+        closeDisabled={submittingBadge}
+        size="sm"
+      >
+        {badgeModalMember && (
+          <form onSubmit={handleIssueBadge}>
+            <div className="tf-mentor-ws-modal-body" style={{ padding: 0 }}>
+              <p className="text-sm text-muted" style={{ margin: '0 0 14px 0' }}>
+                Recognize <strong>{badgeModalMember.name}</strong> for outstanding contribution to {project.name}.
+              </p>
+
+              <div style={{ marginBottom: '14px' }}>
+                <label
+                  htmlFor="mentor-badge-category"
+                  style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}
+                >
+                  Badge Category
+                </label>
+                <select
+                  id="mentor-badge-category"
+                  value={badgeType}
+                  onChange={(e) => setBadgeType(e.target.value)}
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                  }}
+                >
+                  <option value="Technical Excellence">Technical Excellence</option>
+                  <option value="Leadership">Leadership</option>
+                  <option value="Team Player">Team Player</option>
+                  <option value="Innovator">Innovator</option>
+                </select>
+              </div>
+
+              <div>
+                <label
+                  htmlFor="mentor-badge-note"
+                  style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}
+                >
+                  Mentor Recommendation Note
+                </label>
+                <textarea
+                  id="mentor-badge-note"
+                  rows={3}
+                  value={badgeComment}
+                  onChange={(e) => setBadgeComment(e.target.value)}
+                  placeholder="Describe how this member exceeded expectations..."
+                  style={{
+                    width: '100%',
+                    padding: '8px 12px',
+                    borderRadius: '8px',
+                    border: '1px solid #d1d5db',
+                    fontSize: '0.88rem',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
             </div>
 
-            <form onSubmit={handleIssueBadge}>
-              <div className="tf-mentor-ws-modal-body">
-                <p className="text-sm text-muted" style={{ margin: '0 0 14px 0' }}>
-                  Recognize <strong>{badgeModalMember.name}</strong> for outstanding contribution to {project.name}.
-                </p>
-
-                <div style={{ marginBottom: '14px' }}>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                    Badge Category
-                  </label>
-                  <select
-                    value={badgeType}
-                    onChange={(e) => setBadgeType(e.target.value)}
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '0.88rem',
-                      boxSizing: 'border-box',
-                    }}
-                  >
-                    <option value="Technical Excellence">Technical Excellence</option>
-                    <option value="Leadership">Leadership</option>
-                    <option value="Team Player">Team Player</option>
-                    <option value="Innovator">Innovator</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label style={{ display: 'block', fontSize: '0.84rem', fontWeight: 600, color: '#374151', marginBottom: '6px' }}>
-                    Mentor Recommendation Note
-                  </label>
-                  <textarea
-                    rows={3}
-                    value={badgeComment}
-                    onChange={(e) => setBadgeComment(e.target.value)}
-                    placeholder="Describe how this member exceeded expectations..."
-                    style={{
-                      width: '100%',
-                      padding: '8px 12px',
-                      borderRadius: '8px',
-                      border: '1px solid #d1d5db',
-                      fontSize: '0.88rem',
-                      boxSizing: 'border-box',
-                    }}
-                  />
-                </div>
-              </div>
-
-              <div className="tf-mentor-ws-modal-footer">
-                <button
-                  type="button"
-                  className="tf-mentor-ws-btn-cancel"
-                  onClick={() => setBadgeModalMember(null)}
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="tf-mentor-ws-chat-send-btn"
-                  disabled={submittingBadge}
-                >
-                  <AwardIcon />
-                  <span>{submittingBadge ? 'Awarding...' : 'Award Badge'}</span>
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+            <div className="tf-mentor-ws-modal-footer" style={{ padding: '16px 0 0 0' }}>
+              <button
+                type="button"
+                className="tf-mentor-ws-btn-cancel"
+                onClick={() => setBadgeModalMember(null)}
+                disabled={submittingBadge}
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                className="tf-mentor-ws-chat-send-btn"
+                disabled={submittingBadge}
+              >
+                <AwardIcon />
+                <span>{submittingBadge ? 'Awarding...' : 'Award Badge'}</span>
+              </button>
+            </div>
+          </form>
+        )}
+      </Modal>
     </div>
   );
 };

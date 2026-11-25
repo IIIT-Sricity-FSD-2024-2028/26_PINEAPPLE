@@ -7,10 +7,10 @@ import './Badge.css';
  * @param {React.ReactNode} props.children
  * @param {string} [props.className='']
  */
-const Badge = ({ variant = 'info', children, className = '' }) => {
+const Badge = ({ variant = 'info', children, className = '', ...rest }) => {
   const normalizedVariant = String(variant).toLowerCase().replace(/\s+/g, '-');
   return (
-    <span className={`tf-badge tf-badge--${normalizedVariant} ${className}`.trim()}>
+    <span className={`tf-badge tf-badge--${normalizedVariant} ${className}`.trim()} {...rest}>
       {children}
     </span>
   );

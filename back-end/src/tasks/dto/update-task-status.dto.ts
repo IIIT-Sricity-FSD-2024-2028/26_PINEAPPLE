@@ -21,6 +21,11 @@ export class UpdateTaskStatusDto {
   @IsString()
   status!: string;
 
+  @ApiPropertyOptional({ description: 'Optional projectId check to verify task belongs to project' })
+  @IsOptional()
+  @IsString()
+  projectId?: string;
+
   @ApiPropertyOptional({ example: 'https://github.com/pr/1' })
   @IsOptional()
   @IsString()
@@ -35,4 +40,14 @@ export class UpdateTaskStatusDto {
   @IsOptional()
   @IsString()
   notes?: string;
+
+  @ApiPropertyOptional({ example: 'Please add unit tests for the new validation path.' })
+  @IsOptional()
+  @IsString()
+  reason?: string;
+
+  @ApiPropertyOptional({ example: 'Please add unit tests for the new validation path.' })
+  @IsOptional()
+  @IsString()
+  rejectionReason?: string;
 }

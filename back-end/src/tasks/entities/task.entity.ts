@@ -54,4 +54,53 @@ export class TaskEntity {
 
   @ApiPropertyOptional({ description: 'Amount of reputation awarded' })
   awardedRep?: number;
+
+  @ApiPropertyOptional({ description: 'Visible rejection reason when sent back for revision' })
+  rejectionReason?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp of the latest rejection' })
+  rejectedAt?: string;
+
+  @ApiPropertyOptional({ description: 'User ID of who rejected the submission' })
+  rejectedBy?: string;
+
+  @ApiPropertyOptional({ description: 'History of all task rejection reasons' })
+  rejectionHistory?: Array<{ reason: string; at: string; by: string }>;
+
+  @ApiPropertyOptional({ description: 'Whether the task was auto-approved after 7 days' })
+  autoApproved?: boolean;
+
+  @ApiPropertyOptional({ description: 'Timestamp when day-3 review reminder was sent' })
+  reviewReminderSentAt?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when task entered In Review status' })
+  inReviewSince?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when task was approved' })
+  approvedAt?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when task was assigned to the current assignee' })
+  assignedAt?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when task was submitted for review' })
+  submittedAt?: string;
+
+  @ApiPropertyOptional({ description: 'History of task due date changes' })
+  dueDateHistory?: Array<{
+    previousDueDate: string;
+    newDueDate: string;
+    creditMs?: number;
+    reason: string;
+    at: string;
+    extendedProject?: boolean;
+  }>;
+
+  @ApiPropertyOptional({ description: 'Submission timestamp that was last credited for review' })
+  lastCreditedSubmissionAt?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when due-soon notification was sent' })
+  dueSoonNotifiedAt?: string;
+
+  @ApiPropertyOptional({ description: 'Timestamp when overdue notification was sent' })
+  overdueNotifiedAt?: string;
 }

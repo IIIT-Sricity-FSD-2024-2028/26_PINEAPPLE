@@ -34,10 +34,23 @@
 .tf-badge--approved,
 .tf-badge--locked,
 .tf-badge--criteria-met,
+.tf-badge--verified,
 .tf-badge--success {
   background-color: rgba(22, 163, 74, 0.14);
   color: #15803d;
   border-color: rgba(22, 163, 74, 0.28);
+}
+
+.tf-badge--name-mismatch {
+  background-color: rgba(239, 68, 68, 0.14);
+  color: #dc2626;
+  border-color: rgba(239, 68, 68, 0.28);
+}
+
+.tf-badge--unverified {
+  background-color: rgba(100, 116, 139, 0.14);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.28);
 }
 
 .tf-badge--pending,
@@ -52,6 +65,7 @@
 .tf-badge--removed,
 .tf-badge--suspended,
 .tf-badge--criteria-unmet,
+.tf-badge--closed,
 .tf-badge--danger {
   background-color: rgba(239, 68, 68, 0.14);
   color: #dc2626;

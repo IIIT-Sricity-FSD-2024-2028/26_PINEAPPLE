@@ -20,7 +20,8 @@ export const tasksApi = {
         )
       );
       return results.flat();
-    } catch {
+    } catch (err) {
+      console.warn('[tasksApi] Error listing tasks for projects:', err);
       return [];
     }
   },
@@ -50,6 +51,24 @@ export const tasksApi = {
   // Falls back gracefully if the backend is unreachable (frontend catches).
   updateStatus: async (id, payload, role) => {
     const res = await apiRequest(`/tasks/${id}/status`, "PATCH", payload, {
+      role: role || getCurrentUserRole(),
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
+  review: async (id, payload, role) => {
+    const res = await apiRequest(`/tasks/${id}/review`, "POST", payload, {
+      role: role || getCurrentUserRole(),
+    });
+    if (typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
+    }
+    return res;
+  },
+  unassign: async (id, payload = {}, role) => {
+    const res = await apiRequest(`/tasks/${id}/unassign`, "POST", payload, {
       role: role || getCurrentUserRole(),
     });
     if (typeof window !== "undefined") {

@@ -74,4 +74,45 @@ export class CreateNotificationDto {
   @IsOptional()
   @IsString()
   referenceId?: string;
+
+  @ApiProperty({
+    description: 'Optional route or URL linking to the relevant resource/project',
+    example: '/collaborator/workspace/proj-1',
+    required: false,
+  })
+  @IsOptional()
+  @IsString()
+  link?: string;
+
+  @ApiProperty({
+    description: 'Optional metadata associated with the notification',
+    required: false,
+  })
+  @IsOptional()
+  metadata?: Record<string, any>;
+
+  @ApiProperty({
+    description: 'Optional suggested alternative open projects',
+    required: false,
+  })
+  @IsOptional()
+  suggestedProjects?: any[];
+
+  @IsOptional()
+  @IsString()
+  priority?: 'immediate' | 'digest';
+
+  @IsOptional()
+  @IsBoolean()
+  bypassDigest?: boolean;
+
+  @IsOptional()
+  @IsString()
+  groupKey?: string;
+
+  @IsOptional()
+  count?: number;
+
+  @IsOptional()
+  items?: Array<{ label: string; link?: string }>;
 }

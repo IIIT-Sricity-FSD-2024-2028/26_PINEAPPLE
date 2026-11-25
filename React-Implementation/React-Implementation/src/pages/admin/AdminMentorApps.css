@@ -289,3 +289,154 @@
     grid-template-columns: 1fr;
   }
 }
+
+
+/* Phase 8: Admin DigiLocker & CV styles */
+.admin-digilocker-banner {
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 10px;
+  padding: 12px 18px;
+  color: #1e40af;
+  font-size: 0.9rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.admin-cv-box {
+  background: var(--secondary, #f8fafc);
+  border: 1px solid var(--border, #e2e8f0);
+  border-radius: 8px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.admin-doc-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px;
+  margin-top: 8px;
+}
+
+.admin-doc-card {
+  border: 1px solid var(--border, #e2e8f0);
+  background: var(--card, #ffffff);
+  border-radius: 8px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-rejection-alert {
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #b91c1c;
+  font-size: 0.875rem;
+}
+
+/* Toast Notification for Admin Mentor Apps */
+.admin-mentor-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 18px;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--card-fg);
+  border: 1px solid var(--border);
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.25);
+  font-size: 0.92rem;
+  font-weight: 500;
+  max-width: 480px;
+  animation: adminToastSlideUp 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes adminToastSlideUp {
+  from {
+    opacity: 0;
+    transform: translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.admin-mentor-toast.success {
+  border-color: #10b981;
+}
+
+.admin-mentor-toast.success .admin-mentor-toast-icon {
+  color: #10b981;
+  font-weight: 700;
+}
+
+.admin-mentor-toast.error {
+  border-color: #ef4444;
+}
+
+.admin-mentor-toast.error .admin-mentor-toast-icon {
+  color: #ef4444;
+  font-weight: 700;
+}
+
+.admin-mentor-toast.info {
+  border-color: #3b82f6;
+}
+
+.admin-mentor-toast.info .admin-mentor-toast-icon {
+  color: #3b82f6;
+  font-weight: 700;
+}
+
+.admin-mentor-toast-text {
+  flex: 1;
+}
+
+.admin-mentor-toast-close {
+  background: transparent;
+  border: none;
+  color: var(--muted-fg);
+  cursor: pointer;
+  padding: 2px 6px;
+  font-size: 0.9rem;
+  border-radius: 4px;
+}
+
+.admin-mentor-toast-close:hover {
+  color: var(--foreground);
+}
+
+.admin-mentor-cred-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 8px;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(59, 130, 246, 0.1);
+  color: var(--primary, #2563eb);
+  border: 1px solid rgba(59, 130, 246, 0.25);
+  white-space: nowrap;
+}
+
+.admin-override-notice {
+  background: rgba(245, 158, 11, 0.1);
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 0.85rem;
+  color: var(--fg, #0f172a);
+}

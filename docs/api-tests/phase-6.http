@@ -1,0 +1,198 @@
+### TeamForge Phase 6 API Tests (REST Client Format)
+### Security Hardening: Private Chat Guard, URL Security, Incomplete Profile Lock, Self-Report Guard
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@mentorToken = Bearer YOUR_MENTOR_TOKEN_HERE
+@nonMemberToken = Bearer YOUR_NON_MEMBER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@incompleteToken = Bearer YOUR_INCOMPLETE_PROFILE_TOKEN_HERE
+
+### 1. Read Project Chat without Authentication (Rejected)
+# Expected Status: 401 Unauthorized
+# Expected Response: { "statusCode": 401, "error": "Unauthorized", "message": "Missing or invalid Authorization Bearer token." }
+GET {{baseUrl}}/communication/messages/project/proj-1
+Content-Type: application/json
+
+###
+
+### 2. Read Project Chat by Non-Member (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "CHAT_MEMBERSHIP_REQUIRED", "message": "You must be a project member (Owner, Mentor, or Collaborator) or an Admin to access project chat." }
+GET {{baseUrl}}/communication/messages/project/proj-1
+Authorization: {{nonMemberToken}}
+Content-Type: application/json
+
+###
+
+### 3. Read Project Chat by Project Owner (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/communication/messages/project/proj-1
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+###
+
+### 4. Read Project Chat by Project Collaborator (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/communication/messages/project/proj-1
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+###
+
+### 5. Read Project Chat by Assigned Mentor (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/communication/messages/project/proj-1
+Authorization: {{mentorToken}}
+Content-Type: application/json
+
+###
+
+### 6. Read Project Chat by Platform Administrator (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/communication/messages/project/proj-1
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+###
+
+### 7. Post Message to Project Chat by Non-Member (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "CHAT_MEMBERSHIP_REQUIRED", "message": "You must be a project member (Owner, Mentor, or Collaborator) or an Admin to post in project chat." }
+POST {{baseUrl}}/communication/messages
+Authorization: {{nonMemberToken}}
+Content-Type: application/json
+
+{
+  "projectId": "proj-1",
+  "text": "Unauthorized post attempt from an outsider."
+}
+
+###
+
+### 8. Post Message to Project Chat by Member (Allowed)
+# Expected Status: 201 Created
+POST {{baseUrl}}/communication/messages
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "projectId": "proj-1",
+  "text": "Completed the latest module implementation."
+}
+
+###
+
+### 9. Submit Task Proof with Malicious javascript: URI (Rejected)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "INVALID_URL", "message": "Invalid URL for proofLink. URL must start with http:// or https://, be at most 2048 characters, and contain a valid host." }
+PUT {{baseUrl}}/tasks/task-1/status
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "status": "In Review",
+  "proofUrl": "javascript:alert(document.cookie)",
+  "notes": "Attempted XSS vector in proof link."
+}
+
+###
+
+### 10. Submit Task Proof with data: URI (Rejected)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "INVALID_URL", "message": "Invalid URL for proofLink. URL must start with http:// or https://, be at most 2048 characters, and contain a valid host." }
+PUT {{baseUrl}}/tasks/task-1/status
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "status": "In Review",
+  "proofUrl": "data:text/html,<script>alert(1)</script>"
+}
+
+###
+
+### 11. Submit Task Proof with Valid HTTPS URL (Allowed)
+# Expected Status: 200 OK
+PUT {{baseUrl}}/tasks/task-1/status
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "status": "In Review",
+  "proofUrl": "https://github.com/teamforge/ai-planner/pull/42",
+  "notes": "Pull request submitted for code review."
+}
+
+###
+
+### 12. Update User Profile with Invalid LinkedIn URL (Rejected)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "INVALID_URL", "message": "Invalid URL for linkedIn. URL must start with http:// or https://, be at most 2048 characters, and contain a valid host." }
+PATCH {{baseUrl}}/users/2
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "linkedIn": "javascript:void(0)"
+}
+
+###
+
+### 13. Update User Profile with Valid LinkedIn URL (Allowed)
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/users/2
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "linkedIn": "https://www.linkedin.com/in/arjunsharma-verified"
+}
+
+###
+
+### 14. Access Protected Route with Incomplete Profile (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "PROFILE_INCOMPLETE", "message": "Please complete your profile by selecting a username before continuing." }
+GET {{baseUrl}}/projects
+Authorization: {{incompleteToken}}
+Content-Type: application/json
+
+###
+
+### 15. Access Whitelisted Route with Incomplete Profile (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/auth/me
+Authorization: {{incompleteToken}}
+Content-Type: application/json
+
+###
+
+### 16. Self-Report Attempt (Rejected)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "CANNOT_REPORT_SELF", "message": "You cannot report your own account." }
+POST {{baseUrl}}/reports
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "reportedUserId": "2",
+  "reason": "Harassment",
+  "details": "Filing a self-report which must be rejected."
+}
+
+###
+
+### 17. Report Another User (Allowed)
+# Expected Status: 201 Created
+POST {{baseUrl}}/reports
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "reportedUserId": "4",
+  "reason": "Spam",
+  "details": "User has been sending repeated unsolicited spam across team chats."
+}

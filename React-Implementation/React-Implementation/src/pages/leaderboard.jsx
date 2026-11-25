@@ -5,73 +5,16 @@ import { leaderboardApi } from "../services/leaderboardApi";
 import SearchBar from "../components/common/SearchBar";
 import DataTable from "../components/common/DataTable";
 import Avatar from "../components/common/Avatar";
+import { getTrustLabelConfig, getStandingBandConfig } from "../components/features/UserTrustCard";
+import storage from "../utils/storage";
 import "./leaderboard.css";
-
-const renderRankBadge = (rank) => {
-  if (rank === 1) {
-    return (
-      <span className="leaderboard-rank rank-1" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <span className="leaderboard-rank-num">1</span>
-        <span className="leaderboard-medal" role="img" aria-label="1st place">🥇</span>
-      </span>
-    );
-  }
-  if (rank === 2) {
-    return (
-      <span className="leaderboard-rank rank-2" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <span className="leaderboard-rank-num">2</span>
-        <span className="leaderboard-medal" role="img" aria-label="2nd place">🥈</span>
-      </span>
-    );
-  }
-  if (rank === 3) {
-    return (
-      <span className="leaderboard-rank rank-3" style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <span className="leaderboard-rank-num">3</span>
-        <span className="leaderboard-medal" role="img" aria-label="3rd place">🥉</span>
-      </span>
-    );
-  }
-  return <span className="leaderboard-rank-num">{rank}</span>;
-};
-
-const FALLBACK_LEADERBOARD = {
-  weekly: [
-    { rank: 1, user: "Rohan Mehta", initials: "RM", xp: 420, rep: 89, tasks: 7, projects: 2 },
-    { rank: 2, user: "Sneha Iyer", initials: "SI", xp: 380, rep: 82, tasks: 6, projects: 1 },
-    { rank: 3, user: "Priya Patel", initials: "PP", xp: 320, rep: 93, tasks: 5, projects: 2 },
-    { rank: 4, user: "Arjun Sharma", initials: "AS", xp: 280, rep: 87, tasks: 4, projects: 1 },
-    { rank: 5, user: "Vikram Nair", initials: "VN", xp: 220, rep: 78, tasks: 4, projects: 1 },
-    { rank: 6, user: "Ananya Reddy", initials: "AR", xp: 180, rep: 75, tasks: 3, projects: 1 },
-    { rank: 7, user: "Kiran Bose", initials: "KB", xp: 160, rep: 71, tasks: 2, projects: 1 },
-    { rank: 8, user: "Meera Pillai", initials: "MP", xp: 120, rep: 68, tasks: 2, projects: 1 },
-  ],
-  monthly: [
-    { rank: 1, user: "Priya Patel", initials: "PP", xp: 1540, rep: 93, tasks: 18, projects: 4 },
-    { rank: 2, user: "Dr. Divya Krishnan", initials: "DK", xp: 1380, rep: 96, tasks: 16, projects: 5 },
-    { rank: 3, user: "Arjun Sharma", initials: "AS", xp: 1200, rep: 87, tasks: 14, projects: 3 },
-    { rank: 4, user: "Rohan Mehta", initials: "RM", xp: 1050, rep: 89, tasks: 12, projects: 3 },
-    { rank: 5, user: "Sneha Iyer", initials: "SI", xp: 890, rep: 82, tasks: 10, projects: 2 },
-    { rank: 6, user: "Vikram Nair", initials: "VN", xp: 760, rep: 78, tasks: 8, projects: 2 },
-    { rank: 7, user: "Ananya Reddy", initials: "AR", xp: 640, rep: 75, tasks: 7, projects: 2 },
-    { rank: 8, user: "Kiran Bose", initials: "KB", xp: 520, rep: 71, tasks: 5, projects: 1 },
-  ],
-  alltime: [
-    { rank: 1, user: "Dr. Divya Krishnan", initials: "DK", xp: 4200, rep: 96, tasks: 42, projects: 8 },
-    { rank: 2, user: "Priya Patel", initials: "PP", xp: 3850, rep: 93, tasks: 38, projects: 7 },
-    { rank: 3, user: "Rohan Mehta", initials: "RM", xp: 3400, rep: 89, tasks: 35, projects: 6 },
-    { rank: 4, user: "Arjun Sharma", initials: "AS", xp: 2450, rep: 87, tasks: 34, projects: 4 },
-    { rank: 5, user: "Sneha Iyer", initials: "SI", xp: 1980, rep: 82, tasks: 22, projects: 5 },
-    { rank: 6, user: "Vikram Nair", initials: "VN", xp: 1650, rep: 78, tasks: 19, projects: 4 },
-    { rank: 7, user: "Ananya Reddy", initials: "AR", xp: 1420, rep: 75, tasks: 15, projects: 3 },
-    { rank: 8, user: "Kiran Bose", initials: "KB", xp: 1100, rep: 71, tasks: 12, projects: 3 },
-  ],
-};
 
 function Leaderboard() {
   const { user } = useContext(AuthContext) || {};
   const { currentRole } = useContext(RoleContext) || {};
+  const [activeTab, setActiveTab] = useState("xp"); // 'xp' | 'reliable' | 'standing'
   const [searchQuery, setSearchQuery] = useState("");
+  const [period, setPeriod] = useState("alltime");
   const [entries, setEntries] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState("");
@@ -85,18 +28,14 @@ function Leaderboard() {
       setError("");
 
       try {
-        const result = await leaderboardApi.getLeaderboard({ period: "alltime" }, currentRole);
+        const result = await leaderboardApi.getLeaderboard({ period, tab: activeTab }, currentRole);
         if (isCurrentRequest) {
-          if (Array.isArray(result) && result.length > 0) {
-            setEntries(result);
-          } else {
-            setEntries(FALLBACK_LEADERBOARD.alltime);
-          }
+          setEntries(Array.isArray(result) ? result : []);
         }
-      } catch {
+      } catch (err) {
         if (isCurrentRequest) {
-          // Gracefully fallback to alltime benchmarks if network or backend fails
-          setEntries(FALLBACK_LEADERBOARD.alltime);
+          setEntries([]);
+          setError(err?.message || 'Unable to load leaderboard right now.');
         }
       } finally {
         if (isCurrentRequest) setIsLoading(false);
@@ -116,79 +55,227 @@ function Leaderboard() {
       window.removeEventListener("teamforge:task_updated", handleUpdate);
       window.removeEventListener("focus", handleUpdate);
     };
-  }, [currentRole, retryCount]);
+  }, [period, activeTab, currentRole, retryCount]);
 
-  const currentUserId = user?.id || localStorage.getItem("teamforge.backendUserId");
+  const currentUserId = user?.id || storage.getBackendUserId();
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
   const filteredEntries = entries.filter((entry) =>
     `${entry.user || ""} ${entry.initials || ""}`.toLocaleLowerCase().includes(normalizedQuery),
   );
 
-  const columns = [
-    {
-      header: 'Rank',
-      accessor: 'rank',
-      sortable: true,
-      width: '80px',
-      render: (row, index) => {
-        const rawRank = row && typeof row === 'object' ? row.rank : row;
-        const rank = typeof rawRank === 'number' && !isNaN(rawRank) ? rawRank : (Number(rawRank) || (typeof index === 'number' ? index + 1 : 1));
-        return (
-          <span className="leaderboard-rank-cell">
-            {renderRankBadge(rank)}
-          </span>
-        );
-      },
-    },
-    {
+  const getColumns = () => {
+    const contributorCol = {
       header: 'Contributor',
       accessor: 'user',
       sortable: true,
       render: (row) => {
-        const isCurrentUser = currentUserId && String(row.userId) === String(currentUserId);
-        const name = row.user || "Unknown contributor";
+        const isCurrentUser = currentUserId && (String(row.userId) === String(currentUserId) || (user?.email && row.email === user.email));
+        const rawName = row.user || "Unknown contributor";
+        const cleanName = rawName.replace(/\s*\([^)]*\)$/, '').trim();
+        const label = row.trustLabel;
+        const labelCfg = label ? getTrustLabelConfig(label) : null;
+
         return (
-          <div className="leaderboard-person">
-            <Avatar name={name} size="sm" />
-            <span className="leaderboard-person-name">
-              {name}
-              {isCurrentUser && <span className="leaderboard-you">You</span>}
-            </span>
+          <div className="leaderboard-person" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+            <Avatar name={cleanName} size="sm" />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span className="leaderboard-person-name" style={{ fontWeight: 600 }}>
+                  {cleanName}
+                </span>
+                {isCurrentUser && <span className="leaderboard-you">You</span>}
+              </div>
+              {labelCfg && (
+                <span
+                  style={{
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    fontSize: '0.72rem',
+                    fontWeight: 600,
+                    padding: '1px 6px',
+                    borderRadius: '8px',
+                    background: labelCfg.bg,
+                    color: labelCfg.color,
+                    border: `1px solid ${labelCfg.border}`,
+                    width: 'fit-content',
+                  }}
+                >
+                  <span>{labelCfg.icon}</span>
+                  <span>{label}</span>
+                </span>
+              )}
+            </div>
           </div>
         );
       },
-    },
-    {
-      header: 'XP',
-      accessor: 'xp',
-      sortable: true,
-      align: 'right',
-      render: (row) => (
-        <span className="leaderboard-xp">{Number(row.xp || 0).toLocaleString()}</span>
-      ),
-    },
-    {
-      header: 'Reputation',
-      accessor: 'rep',
-      sortable: true,
-      align: 'right',
-      render: (row) => Number(row.rep || 0).toLocaleString(),
-    },
-    {
-      header: 'Tasks',
-      accessor: 'tasks',
-      sortable: true,
-      align: 'right',
-      render: (row) => Number(row.tasks || 0).toLocaleString(),
-    },
-    {
-      header: 'Projects',
-      accessor: 'projects',
-      sortable: true,
-      align: 'right',
-      render: (row) => Number(row.projects || 0).toLocaleString(),
-    },
-  ];
+    };
+
+    if (activeTab === 'reliable') {
+      return [
+        contributorCol,
+        {
+          header: 'On-Time Rate',
+          accessor: 'onTimeRate',
+          sortable: true,
+          align: 'right',
+          render: (row) => (
+            <span style={{ fontWeight: 700, color: '#059669' }}>
+              {row.onTimeRate !== null && row.onTimeRate !== undefined ? `${row.onTimeRate}%` : '—'}
+            </span>
+          ),
+        },
+        {
+          header: 'Verified Tasks',
+          accessor: 'tasks',
+          sortable: true,
+          align: 'right',
+          render: (row) => Number(row.tasks || 0).toLocaleString(),
+        },
+        {
+          header: 'XP',
+          accessor: 'xp',
+          sortable: true,
+          align: 'right',
+          render: (row) => (
+            <span className="leaderboard-xp">{Number(row.xp || 0).toLocaleString()} XP</span>
+          ),
+        },
+        {
+          header: 'Standing',
+          accessor: 'band',
+          sortable: true,
+          align: 'center',
+          render: (row) => {
+            const band = row.band || 'Good standing';
+            const bCfg = getStandingBandConfig(band);
+            return (
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: bCfg.bg,
+                  color: bCfg.color,
+                  border: `1px solid ${bCfg.border}`,
+                }}
+              >
+                {band}
+              </span>
+            );
+          },
+        },
+      ];
+    }
+
+    if (activeTab === 'standing') {
+      return [
+        contributorCol,
+        {
+          header: 'Standing Band',
+          accessor: 'band',
+          sortable: true,
+          align: 'center',
+          render: (row) => {
+            const band = row.band || 'Good standing';
+            const bCfg = getStandingBandConfig(band);
+            return (
+              <span
+                style={{
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  padding: '2px 8px',
+                  borderRadius: '12px',
+                  background: bCfg.bg,
+                  color: bCfg.color,
+                  border: `1px solid ${bCfg.border}`,
+                }}
+              >
+                {band}
+              </span>
+            );
+          },
+        },
+        {
+          header: 'XP',
+          accessor: 'xp',
+          sortable: true,
+          align: 'right',
+          render: (row) => (
+            <span className="leaderboard-xp">{Number(row.xp || 0).toLocaleString()} XP</span>
+          ),
+        },
+        {
+          header: 'Tasks',
+          accessor: 'tasks',
+          sortable: true,
+          align: 'right',
+          render: (row) => Number(row.tasks || 0).toLocaleString(),
+        },
+        {
+          header: 'Projects',
+          accessor: 'projects',
+          sortable: true,
+          align: 'right',
+          render: (row) => Number(row.projects || 0).toLocaleString(),
+        },
+      ];
+    }
+
+    // Default 'xp' tab
+    return [
+      contributorCol,
+      {
+        header: 'XP',
+        accessor: 'xp',
+        sortable: true,
+        align: 'right',
+        render: (row) => (
+          <span className="leaderboard-xp">{Number(row.xp || 0).toLocaleString()} XP</span>
+        ),
+      },
+      {
+        header: 'Standing',
+        accessor: 'band',
+        sortable: true,
+        align: 'center',
+        render: (row) => {
+          const band = row.band || 'Good standing';
+          const bCfg = getStandingBandConfig(band);
+          return (
+            <span
+              style={{
+                fontSize: '0.75rem',
+                fontWeight: 600,
+                padding: '2px 8px',
+                borderRadius: '12px',
+                background: bCfg.bg,
+                color: bCfg.color,
+                border: `1px solid ${bCfg.border}`,
+              }}
+            >
+              {band}
+            </span>
+          );
+        },
+      },
+      {
+        header: 'Tasks',
+        accessor: 'tasks',
+        sortable: true,
+        align: 'right',
+        render: (row) => Number(row.tasks || 0).toLocaleString(),
+      },
+      {
+        header: 'Projects',
+        accessor: 'projects',
+        sortable: true,
+        align: 'right',
+        render: (row) => Number(row.projects || 0).toLocaleString(),
+      },
+    ];
+  };
 
   return (
     <section className="leaderboard-page" aria-labelledby="leaderboard-title">
@@ -197,7 +284,7 @@ function Leaderboard() {
           <p className="leaderboard-eyebrow">COMMUNITY STANDINGS</p>
           <h1 id="leaderboard-title">Leaderboard</h1>
           <p className="leaderboard-description">
-            See how contributors are building momentum across TeamForge.
+            See how contributors are building momentum and verified contributions across TeamForge.
           </p>
         </div>
         <div className="leaderboard-total" aria-live="polite">
@@ -208,6 +295,34 @@ function Leaderboard() {
         </div>
       </header>
 
+      {/* Leaderboard View Tabs */}
+      <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', flexWrap: 'wrap' }}>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'xp' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('xp')}
+          style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'xp' ? 600 : 400 }}
+        >
+          Top by XP
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'reliable' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('reliable')}
+          style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'reliable' ? 600 : 400 }}
+        >
+          Most Reliable (≥80% on-time)
+        </button>
+        <button
+          type="button"
+          className={`btn btn-sm ${activeTab === 'standing' ? 'btn-primary' : 'btn-secondary'}`}
+          onClick={() => setActiveTab('standing')}
+          style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'standing' ? 600 : 400 }}
+        >
+          Highest Standing
+        </button>
+      </div>
+
       <div className="leaderboard-toolbar">
         <div className="leaderboard-controls" style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', flex: 1 }}>
           <div style={{ flex: 1, minWidth: '220px' }}>
@@ -217,6 +332,31 @@ function Leaderboard() {
               onClear={() => setSearchQuery('')}
               placeholder="Search contributors..."
             />
+          </div>
+          <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+            {[
+              { id: 'alltime', label: 'All-Time' },
+              { id: 'monthly', label: 'Monthly (30d)' },
+              { id: 'weekly', label: 'Weekly (7d)' },
+            ].map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                className={`btn btn-sm ${period === p.id ? 'btn-primary' : 'btn-secondary'}`}
+                onClick={() => setPeriod(p.id)}
+                style={{
+                  padding: '6px 14px',
+                  borderRadius: '8px',
+                  fontWeight: period === p.id ? 600 : 400,
+                  cursor: 'pointer',
+                  border: period === p.id ? '1px solid var(--primary, #2563eb)' : '1px solid var(--border-color, #e5e7eb)',
+                  background: period === p.id ? 'var(--primary, #2563eb)' : 'transparent',
+                  color: period === p.id ? '#ffffff' : 'inherit',
+                }}
+              >
+                {p.label}
+              </button>
+            ))}
           </div>
         </div>
       </div>
@@ -235,13 +375,14 @@ function Leaderboard() {
           </div>
         ) : (
           <DataTable
-            columns={columns}
+            columns={getColumns()}
             data={filteredEntries}
             loading={isLoading}
-            loadingMessage="Loading rankings..."
+            tableClassName="leaderboard-table"
+            loadingMessage="Loading contributors..."
             emptyMessage={
               entries.length === 0
-                ? "No rankings to show yet."
+                ? "No contributors to show yet."
                 : `No contributors match: ${searchQuery.trim()}`
             }
             keyField={(row, idx) => row?.userId || row?.id || idx}

@@ -1,16 +1,23 @@
+import { formatMemberSince, formatDateTime } from '../utils/dateFormatter';
 import { useContext, useEffect, useState } from 'react';
 import { AuthContext } from '../context/AuthContext';
 import usersApi from '../services/usersApi';
-import projectsApi, { isProjectActive, isProjectLocked } from '../services/projectsApi';
+import projectsApi, { isProjectActive } from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
 import joinRequestsApi from '../services/joinRequestsApi';
 import mentorshipApi from '../services/mentorshipApi';
+import gamificationApi from '../services/gamificationApi';
 import Avatar from '../components/common/Avatar';
 import Badge from '../components/common/Badge';
 import DataTable from '../components/common/DataTable';
 import StatCard from '../components/common/StatCard';
+import UserTrustCard from '../components/features/UserTrustCard';
+import trustApi from '../services/trustApi';
 import EmptyState from '../components/common/EmptyState';
 import { getTaskReward } from '../utils/workflow';
+import { getProjectRole } from '../utils/projectRole';
+import SafeLink from '../components/common/SafeLink';
+import storage from '../utils/storage';
 import "./profile.css";
 
 // --- SVGs ---
@@ -24,14 +31,6 @@ const BadgeIcon = () => (
 const XPIcon = () => (
   <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
     <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
-  </svg>
-);
-
-const RepIcon = () => (
-  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M8 21h8"></path><path d="M12 17v4"></path><path d="M7 4h10"></path>
-    <path d="M17 4v8a5 5 0 0 1-10 0V4"></path>
-    <path d="M4 4h3v8a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2V4h3"></path>
   </svg>
 );
 
@@ -55,27 +54,114 @@ const LinkIcon = () => (
   </svg>
 );
 
+export const MentoredProjectsCard = ({ mentoredProjects = [], loading = false, isPublic = false }) => {
+  const list = Array.isArray(mentoredProjects) ? mentoredProjects : [];
+  const visibleProjects = isPublic
+    ? list.filter((p) => p?.tab === 'completed' || String(p?.status || '').toLowerCase() === 'completed')
+    : list;
+
+  return (
+    <div className="prof-glass-card" data-testid="profile-mentored-projects-card">
+      <h3 className="prof-sub-title">Mentored Projects</h3>
+      {loading ? (
+        <div className="prof-empty-state">Loading mentored projects...</div>
+      ) : visibleProjects.length > 0 ? (
+        visibleProjects.map((proj, idx) => {
+          const isCompleted =
+            proj?.tab === 'completed' || String(proj?.status || '').toLowerCase() === 'completed';
+          const title = proj?.title || proj?.name || 'Untitled Project';
+          const ownerName = proj?.ownerName || proj?.owner || 'Project Owner';
+          const rawDate = isCompleted
+            ? (proj?.completedAt || proj?.acceptedAt)
+            : (proj?.acceptedAt || proj?.completedAt);
+          const formattedDate = rawDate ? formatMemberSince(rawDate) : '';
+          const datePrefix = isCompleted ? 'Completed' : 'Accepted';
+          const finalLink = isCompleted ? (proj?.finalLink || proj?.deliverableLink || null) : null;
+
+          return (
+            <div key={proj?.projectId || proj?.id || idx} className="prof-proj-row">
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                <div className="prof-proj-title">{title}</div>
+                <Badge variant={isCompleted ? 'completed' : 'active'}>
+                  {isCompleted ? 'Completed' : 'Active'}
+                </Badge>
+              </div>
+              <div className="prof-proj-desc">
+                Owner: {ownerName}
+                {formattedDate ? ` · ${datePrefix} ${formattedDate}` : ''}
+              </div>
+              {finalLink && (
+                <div className="prof-proj-meta">
+                  <SafeLink href={finalLink} className="prof-link">
+                    Final Link <LinkIcon />
+                  </SafeLink>
+                </div>
+              )}
+            </div>
+          );
+        })
+      ) : (
+        <div className="prof-empty-state">No mentored projects yet.</div>
+      )}
+    </div>
+  );
+};
+
 // --- Component ---
 const Profile = () => {
   const { user } = useContext(AuthContext);
   const [profileData, setProfileData] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [ledgerEntries, setLedgerEntries] = useState([]);
+  const [isLedgerExpanded, setIsLedgerExpanded] = useState(true);
+  const [repTypeFilter, setRepTypeFilter] = useState('all');
+  const [repPage, setRepPage] = useState(1);
+  const [repTotal, setRepTotal] = useState(0);
+  const [reputationEntries, setReputationEntries] = useState([]);
+  const [trustSummary, setTrustSummary] = useState(null);
+  const [ledgerGroup, setLedgerGroup] = useState('all');
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchRep = async () => {
+      if (typeof usersApi.getReputation !== 'function') return;
+      try {
+        const res = await usersApi.getReputation({ page: repPage, limit: 20, type: repTypeFilter });
+        if (isMounted && res) {
+          setReputationEntries(Array.isArray(res.items) ? res.items : []);
+          setRepTotal(Number(res.total) || 0);
+        }
+      } catch (err) {
+        console.warn('Failed to fetch reputation entries:', err);
+      }
+    };
+    fetchRep();
+    return () => { isMounted = false; };
+  }, [repPage, repTypeFilter]);
 
   useEffect(() => {
     const fetchProfile = async () => {
       try {
-        const userId = localStorage.getItem("teamforge.backendUserId") || user?.id || "";
+        const userId = user?.id || storage.getBackendUserId() || "";
         if (!userId) {
           setLoading(false);
           return;
         }
 
-        const [data, allProjectsRes, joinRequestsRes, badgesRes] = await Promise.all([
-          usersApi.get(userId).catch(() => ({})),
-          projectsApi.list().catch(() => []),
+        const [data, allProjectsRes, joinRequestsRes, badgesRes, ledgerRes, trustRes] = await Promise.all([
+          usersApi.getMe().catch(() => ({})),
+          projectsApi.list({ status: 'all' }).catch(() => []),
           joinRequestsApi.list({ userId }).catch(() => []),
           mentorshipApi.getBadges(userId).catch(() => []),
+          gamificationApi.getUserLedger(userId).catch(() => []),
+          trustApi.getMyTrust().catch(() => null),
         ]);
+        if (Array.isArray(ledgerRes)) {
+          setLedgerEntries(ledgerRes);
+        }
+        if (trustRes) {
+          setTrustSummary(trustRes);
+        }
 
         const allProjects = Array.isArray(allProjectsRes) ? allProjectsRes : (allProjectsRes?.data || []);
         const userJoinRequests = Array.isArray(joinRequestsRes) ? joinRequestsRes : (joinRequestsRes?.data || []);
@@ -89,26 +175,20 @@ const Profile = () => {
         const projectMap = new Map();
         const ownedProjects = [];
         const joinedProjects = [];
+        const mentoredProjects = [];
 
         allProjects.forEach((p) => {
           const pid = String(p.id);
           projectMap.set(pid, p);
-          const isOwner = String(p.ownerId) === currentUserIdStr || (p.owner && p.owner.toLowerCase() === resolvedName);
-          const isCollab = Array.isArray(p.collaborators) && p.collaborators.some((c) => {
-            if (typeof c === "string") {
-              return c === currentUserIdStr || c.toLowerCase() === resolvedName || c.toLowerCase() === userEmail;
-            }
-            return (
-              String(c.id || c.userId) === currentUserIdStr ||
-              (c.name && c.name.toLowerCase() === resolvedName) ||
-              (c.email && c.email.toLowerCase() === userEmail)
-            );
-          });
-          if (isOwner) {
-            ownedProjects.push(p);
+          const projectRole = getProjectRole(p, currentUserIdStr, resolvedName);
+          if (projectRole === 'Owner') {
+            ownedProjects.push({ ...p, name: p.title || p.name, role: 'Owner', projectRole: 'Owner' });
             relevantProjectIds.add(pid);
-          } else if (isCollab) {
-            joinedProjects.push(p);
+          } else if (projectRole === 'Mentor') {
+            mentoredProjects.push({ ...p, name: p.title || p.name, role: 'Mentor', projectRole: 'Mentor' });
+            relevantProjectIds.add(pid);
+          } else if (projectRole === 'Collaborator') {
+            joinedProjects.push({ ...p, name: p.title || p.name, role: 'Collaborator', projectRole: 'Collaborator' });
             relevantProjectIds.add(pid);
           }
         });
@@ -181,40 +261,89 @@ const Profile = () => {
         });
 
         // 3. Mentored projects
-        if (Array.isArray(data.data?.mentoredProjects)) {
-          data.data.mentoredProjects.forEach((mp, idx) => {
-            const key = `mentor-${idx}`;
-            if (!seenKeys.has(key)) {
-              seenKeys.add(key);
-              contributionList.push({
-                id: key,
-                projectName: mp.name,
-                title: mp.contribution || `Mentored ${mp.owner}'s project`,
-                status: mp.status === "Completed" ? "Approved" : mp.status || "Completed",
-                xp: 0,
-                date: new Date().toISOString(),
-                proofLink: null,
-              });
-            }
-          });
-        }
+        const liveMentoredProjects = Array.isArray(data.mentoredProjects)
+          ? data.mentoredProjects
+          : Array.isArray(data.data?.mentoredProjects)
+            ? data.data.mentoredProjects
+            : [];
+        liveMentoredProjects.forEach((mp, idx) => {
+          const projectTitle = mp.title || mp.name;
+          const ownerLabel = mp.ownerName || mp.owner || 'Owner';
+          const key = `mentor-${mp.projectId || idx}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            contributionList.push({
+              id: key,
+              projectName: projectTitle,
+              title: mp.contribution || `Mentored ${ownerLabel}'s project`,
+              status:
+                mp.tab === 'completed' || String(mp.status || '').toLowerCase() === 'completed'
+                  ? 'Approved'
+                  : mp.status || 'Active',
+              xp: 0,
+              date: mp.completedAt || mp.acceptedAt || new Date().toISOString(),
+              proofLink: mp.finalLink || null,
+            });
+          }
+        });
 
         // Sort by newest first
         contributionList.sort((a, b) => new Date(b.date) - new Date(a.date));
 
-        const totalProjectsCount = ownedProjects.length + joinedProjects.length;
+        const allUserProjects = [...ownedProjects, ...joinedProjects, ...mentoredProjects];
+
+        // Build userCompletedProjects from allUserProjects:
+        // - Match completed projects where status is 'completed', isCompleted === true, or is_completed === true
+        // - Skip projects with deletionScheduledAt, deletedAt, or status === 'deleted'
+        // - Always include Owner and Mentor roles
+        // - For Collaborator, require at least one task in userTasks matching String(t.projectId) === String(p.id) with status completed, approved, or done
+        const userCompletedProjects = allUserProjects
+          .filter((p) => {
+            if (!p) return false;
+            if (p.deletedAt || p.deletionScheduledAt || String(p.status || '').toLowerCase() === 'deleted') {
+              return false;
+            }
+            const statusLower = String(p.status || '').toLowerCase().trim();
+            const isCompleted = p.isCompleted === true || p.is_completed === true || statusLower === 'completed';
+            if (!isCompleted) return false;
+
+            const role = p.projectRole || p.role || getProjectRole(p, currentUserIdStr, resolvedName);
+            if (role === 'Owner' || role === 'Mentor') {
+              return true;
+            }
+
+            if (role === 'Collaborator') {
+              return userTasks.some((t) => {
+                if (String(t.projectId) !== String(p.id)) return false;
+                const ts = String(t.status || '').toLowerCase().trim();
+                return ts === 'completed' || ts === 'approved' || ts === 'done';
+              });
+            }
+
+            return false;
+          })
+          .map((p) => {
+            const role = p.projectRole || p.role || 'Collaborator';
+            return {
+              ...p,
+              name: p.title || p.name || 'Untitled Project',
+              role,
+              projectRole: role,
+              contribution: role === 'Owner' ? 'Project Owner' : (p.contribution || 'Contributor'),
+              finalLink: p.finalLink || p.finishedLink || p.deliverableUrl || null,
+            };
+          });
+
+        const userActiveProjects = allUserProjects.filter(isProjectActive);
+        const verifiedProjectsCount = userActiveProjects.length + userCompletedProjects.length;
+
         const approvedUserTasks = userTasks.filter((t) => {
           const s = (t.status || "").toLowerCase();
           return s === "completed" || s === "approved" || s === "done";
         });
-        const derivedXp = approvedUserTasks.reduce(
-          (sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp,
-          0
-        );
-        const derivedRep = approvedUserTasks.length * 8;
-        const totalXp = userTasks.length > 0 ? derivedXp : Number(data.profile?.xp ?? data.xp ?? 0);
-        const totalRep = userTasks.length > 0 ? derivedRep : Number(data.profile?.rep ?? data.rep ?? 0);
-        const totalApprovedTasksCount = approvedUserTasks.length;
+        const totalXp = Number(data.profile?.xp ?? data.xp ?? 0);
+        const totalRep = Number(data.profile?.rep ?? data.rep ?? 0);
+        const totalApprovedTasksCount = approvedUserTasks.length > 0 ? approvedUserTasks.length : Number(data.profile?.tasksCount ?? 0);
 
         const rawBadges = Array.isArray(badgesRes) && badgesRes.length > 0
           ? badgesRes
@@ -239,22 +368,24 @@ const Profile = () => {
           hasMentorBadge: hasAnyBadge,
           
           title: data.profile?.title || "Team Member",
-          uni: data.profile?.uni || "Unknown Organization",
-          joined: data.profile?.joined || "Unknown Date",
+          uni: data.university || data.profile?.university || data.profile?.uni || user?.university || user?.profile?.university || user?.profile?.uni || "",
+          joined: formatMemberSince(data.createdAt || data.profile?.createdAt || data.profile?.joined || user?.createdAt),
+          phone: data.phone || data.profile?.phone || user?.phone || user?.profile?.phone || "",
+          phoneVerified: Boolean(data.phoneVerified ?? data.profile?.phoneVerified ?? user?.phoneVerified ?? user?.profile?.phoneVerified),
 
           stats: {
             xp: totalXp,
             rep: totalRep,
-            projects: totalProjectsCount || (data.data?.projects?.length || 0),
+            projects: verifiedProjectsCount,
             tasks: totalApprovedTasksCount,
           },
           skills: data.profile?.skills || user?.profile?.skills || [],
           
-          activeProjects: [...ownedProjects, ...joinedProjects].filter(isProjectActive),
-          completedProjects: [...ownedProjects, ...joinedProjects].filter(isProjectLocked),
+          activeProjects: userActiveProjects,
+          completedProjects: userCompletedProjects,
 
           mentorRecommendations: normalizedRecommendations,
-          mentoredProjects: data.data?.mentoredProjects || [],
+          mentoredProjects: liveMentoredProjects,
           contributions: contributionList,
         });
 
@@ -264,8 +395,10 @@ const Profile = () => {
         setProfileData({
           name: user?.name || user?.profile?.fullName || "User",
           title: "Team Member",
-          uni: "Unknown",
-          joined: "N/A",
+          uni: "",
+          joined: "Unknown",
+          phone: user?.phone || user?.profile?.phone || "",
+          phoneVerified: Boolean(user?.phoneVerified ?? user?.profile?.phoneVerified),
           bio: "No bio available.",
           initials: (user?.name || user?.profile?.fullName || "US").substring(0, 2).toUpperCase(),
           hasMentorBadge: false,
@@ -287,11 +420,18 @@ const Profile = () => {
     const handleFocus = () => {
       fetchProfile();
     };
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        fetchProfile();
+      }
+    };
     window.addEventListener("focus", handleFocus);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
     window.addEventListener("teamforge:badge_awarded", handleFocus);
 
     return () => {
       window.removeEventListener("focus", handleFocus);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("teamforge:badge_awarded", handleFocus);
     };
   }, [user]);
@@ -329,40 +469,60 @@ const Profile = () => {
               )}
             </div>
             <div className="prof-title-text">
-              {profileData.title} &middot; {profileData.uni}
+              {profileData.title}{profileData.uni ? ` · ${profileData.uni}` : ""}
             </div>
             <div className="prof-joined-text">
               Member since {profileData.joined}
             </div>
+            {profileData.phone && (
+              <div className="prof-phone-text" style={{ fontSize: '0.85rem', color: '#475569', marginTop: '2px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>📞 {profileData.phone}</span>
+                {profileData.phoneVerified ? (
+                  <span style={{ color: '#16a34a', fontWeight: 600, fontSize: '0.8rem' }} title="Verified Phone Number">
+                    ✓ Verified
+                  </span>
+                ) : (
+                  <span style={{ color: '#94a3b8', fontSize: '0.8rem' }}>
+                    (Not verified)
+                  </span>
+                )}
+              </div>
+            )}
             <p className="prof-bio-text">
               {profileData.bio}
             </p>
           </div>
         </div>
 
-        {/* Stats Row */}
-        <div className="prof-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '20px' }}>
-          <StatCard
-            icon={<XPIcon />}
-            label="XP Points"
-            value={profileData.stats.xp.toLocaleString()}
-          />
-          <StatCard
-            icon={<RepIcon />}
-            label="Reputation"
-            value={profileData.stats.rep}
-          />
-          <StatCard
-            icon={<ProjectsIcon />}
-            label="Projects"
-            value={profileData.stats.projects}
-          />
-          <StatCard
-            icon={<TasksIcon />}
-            label="Tasks"
-            value={profileData.stats.tasks}
-          />
-        </div>
+        {/* User Trust Card */}
+        {trustSummary ? (
+          <div style={{ marginTop: '20px' }}>
+            <UserTrustCard
+              summary={trustSummary}
+              variant="expanded"
+              isSelf={true}
+              isAdminViewer={Boolean(storage.getAdminSession()?.token) || user?.role === 'admin' || user?.role === 'superuser'}
+            />
+          </div>
+        ) : (
+          <div className="prof-stats-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: '16px', marginTop: '20px' }}>
+            <StatCard
+              icon={<XPIcon />}
+              label="XP Points"
+              value={profileData.stats.xp.toLocaleString()}
+            />
+            <StatCard
+              icon={<ProjectsIcon />}
+              label="Projects"
+              value={profileData.stats.projects}
+            />
+            <StatCard
+              icon={<TasksIcon />}
+              label="Tasks"
+              value={profileData.stats.tasks}
+            />
+          </div>
+        )}
       </div>
 
       {/* Row 2: Active Projects & Skills */}
@@ -374,7 +534,7 @@ const Profile = () => {
           {profileData.activeProjects.length ? profileData.activeProjects.map((proj, idx) => (
             <div key={idx} className="prof-proj-row">
               <div className="prof-proj-title">{proj.name}</div>
-              <div className="prof-proj-desc">{proj.role || "Member"} &middot; {proj.contribution || "Contributor"}</div>
+              <div className="prof-proj-desc">{proj.projectRole || proj.role || "Collaborator"} &middot; {proj.contribution || "Contributor"}</div>
             </div>
           )) : (
             <EmptyState
@@ -409,12 +569,12 @@ const Profile = () => {
             <div key={idx} className="prof-proj-row prof-proj-row-flex">
               <div>
                 <div className="prof-proj-title">{proj.name}</div>
-                <div className="prof-proj-desc">{proj.role || "Member"} &middot; {proj.contribution || "Contributor"}</div>
+                <div className="prof-proj-desc">{proj.projectRole || proj.role || "Collaborator"} &middot; {proj.contribution || "Contributor"}</div>
               </div>
               {proj.finalLink && (
-                <a href={proj.finalLink} className="prof-link">
+                <SafeLink href={proj.finalLink} className="prof-link">
                   Final Link <LinkIcon />
-                </a>
+                </SafeLink>
               )}
             </div>
           )) : <div className="prof-empty-state">No completed projects available.</div>}
@@ -465,6 +625,237 @@ const Profile = () => {
 
       </div>
 
+      {/* XP & Reputation Ledger */}
+      <div className="prof-glass-card" data-testid="reputation-ledger-card">
+        <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '12px', marginBottom: '16px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <h3 className="prof-sub-title" style={{ margin: 0 }}>
+              XP & Reputation Ledger ({repTotal || ledgerEntries.length})
+            </h3>
+            <span style={{ fontSize: '0.8rem', color: '#6b7280' }}>
+              Showing {reputationEntries.length > 0 ? `${(repPage - 1) * 20 + 1}-${Math.min(repPage * 20, repTotal)} of ${repTotal}` : `${ledgerEntries.length} entries`}
+            </span>
+          </div>
+
+          <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <label htmlFor="prof-rep-filter" style={{ fontSize: '0.82rem', fontWeight: 500, color: '#4b5563' }}>Type:</label>
+              <select
+                id="prof-rep-filter"
+                data-testid="reputation-type-filter"
+                value={repTypeFilter}
+                onChange={(e) => {
+                  setRepTypeFilter(e.target.value);
+                  setRepPage(1);
+                }}
+                style={{ padding: '4px 8px', borderRadius: '6px', border: '1px solid #d1d5db', fontSize: '0.82rem' }}
+              >
+                <option value="all">All</option>
+                <option value="initial">Initial signup</option>
+                <option value="task_approved">Task approved</option>
+                <option value="project_completed">Project completed</option>
+                <option value="warning">Warning penalty</option>
+                <option value="warning_removed">Appeal accepted</option>
+                <option value="deadline_missed">Deadline penalty</option>
+                <option value="recovery">Good conduct recovery</option>
+                <option value="seed">Starting reputation (Seed)</option>
+              </select>
+            </div>
+            <button
+              type="button"
+              className="btn btn-secondary btn-sm"
+              onClick={() => setIsLedgerExpanded(!isLedgerExpanded)}
+              style={{ fontSize: '0.82rem', padding: '4px 10px', cursor: 'pointer' }}
+            >
+              {isLedgerExpanded ? 'Collapse' : 'Expand'}
+            </button>
+          </div>
+        </div>
+
+        {isLedgerExpanded && (
+          <>
+            {/* Group Tabs: All, Standing Changes, Contribution */}
+            <div style={{ display: 'flex', gap: '8px', marginBottom: '14px', flexWrap: 'wrap' }}>
+              <button
+                type="button"
+                className={`btn btn-sm ${ledgerGroup === 'all' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                onClick={() => setLedgerGroup('all')}
+              >
+                All Entries
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${ledgerGroup === 'standing' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                onClick={() => setLedgerGroup('standing')}
+              >
+                Standing Changes
+              </button>
+              <button
+                type="button"
+                className={`btn btn-sm ${ledgerGroup === 'contribution' ? 'btn-primary' : 'btn-outline'}`}
+                style={{ fontSize: '0.8rem', padding: '4px 12px' }}
+                onClick={() => setLedgerGroup('contribution')}
+              >
+                Contributions (Tasks & Projects)
+              </button>
+            </div>
+
+            <DataTable
+              columns={[
+                {
+                  header: 'Date',
+                  key: 'date',
+                  render: (item) => (
+                    <span>
+                      {formatDateTime(item.createdAt || item.date)}
+                    </span>
+                  ),
+                },
+                {
+                  header: 'Type',
+                  key: 'type',
+                  render: (item) => {
+                    const rawType = item.type || 'xp_ledger';
+                    const typeLabels = {
+                      seed: 'seed',
+                      initial: 'initial',
+                      task_approved: 'task_approved',
+                      project_completed: 'project_completed',
+                      warning: 'warning',
+                      warning_removed: 'warning_removed',
+                      deadline_missed: 'deadline_missed',
+                      recovery: 'recovery',
+                    };
+                    return (
+                      <span
+                        data-testid={`reputation-entry-type-${rawType}`}
+                        style={{
+                          fontSize: '0.75rem',
+                          fontWeight: 600,
+                          color: '#334155',
+                          background: '#f1f5f9',
+                          padding: '2px 8px',
+                          borderRadius: '999px',
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        {typeLabels[rawType] || rawType}
+                      </span>
+                    );
+                  },
+                },
+                {
+                  header: 'Reason',
+                  key: 'reason',
+                  render: (item) => {
+                    const label =
+                      item.type === 'recovery'
+                        ? 'Good conduct recovery'
+                        : item.type === 'seed'
+                        ? 'Starting reputation'
+                        : item.reason || (
+                          item.type === 'task_approved' ? `Task approved: ${item.refId || ''}` :
+                          item.type === 'project_completed' ? `Project completed: ${item.refId || ''}` :
+                          item.type === 'warning' ? `Account warning penalty: ${item.refId || ''}` :
+                          item.type === 'warning_removed' ? `Warning appeal accepted: ${item.refId || ''}` :
+                          item.type === 'deadline_missed' ? `Missed deadline penalty: ${item.refId || ''}` :
+                          item.type === 'initial' ? 'Initial signup reputation' :
+                          item.type || 'Ledger event'
+                        );
+                    const taskId = item.taskId || item.refId;
+                    return (
+                      <div>
+                        <span style={{ fontWeight: 500 }}>{label}</span>
+                        {taskId && (
+                          <span style={{ marginLeft: '8px', fontSize: '0.75rem', color: '#6b7280', background: 'rgba(0,0,0,0.05)', padding: '2px 6px', borderRadius: '4px' }}>
+                            Ref: {taskId}
+                          </span>
+                        )}
+                      </div>
+                    );
+                  },
+                },
+                {
+                  header: 'XP',
+                  key: 'xp',
+                  align: 'right',
+                  render: (item) => {
+                    const xpVal = Number(item.xp || 0);
+                    return (
+                      <span style={{ fontWeight: 600, color: xpVal > 0 ? '#2563eb' : '#6b7280' }}>
+                        {xpVal > 0 ? `+${xpVal}` : xpVal || '—'} XP
+                      </span>
+                    );
+                  },
+                },
+                {
+                  header: 'Reputation',
+                  key: 'rep',
+                  align: 'right',
+                  render: (item) => {
+                    const isContrib =
+                      item.entryClass === 'contribution' ||
+                      item.type === 'task_approved' ||
+                      item.type === 'project_completed';
+                    if (isContrib) {
+                      return <span style={{ color: '#94a3b8' }}>—</span>;
+                    }
+                    const repVal = item.delta !== undefined ? Number(item.delta) : Number(item.rep || 0);
+                    return (
+                      <span style={{ fontWeight: 600, color: repVal > 0 ? '#16a34a' : repVal < 0 ? '#dc2626' : '#6b7280' }}>
+                        {repVal > 0 ? `+${repVal}` : repVal || '0'} Rep
+                      </span>
+                    );
+                  },
+                },
+              ]}
+              data={(reputationEntries.length > 0 || repTypeFilter !== 'all' ? reputationEntries : ledgerEntries).filter((item) => {
+                if (ledgerGroup === 'all') return true;
+                const isContrib =
+                  item.entryClass === 'contribution' ||
+                  item.type === 'task_approved' ||
+                  item.type === 'project_completed';
+                if (ledgerGroup === 'contribution') return isContrib;
+                if (ledgerGroup === 'standing') return !isContrib;
+                return true;
+              })}
+              emptyTitle="No ledger entries recorded yet."
+              emptyMessage="XP and reputation are awarded when submitted tasks are approved by project owners."
+            />
+
+            {(repTotal > 20 || (reputationEntries.length > 0 && repPage > 1)) && (
+              <div style={{ display: 'flex', justifyContent: 'flex-end', alignItems: 'center', gap: '8px', marginTop: '12px' }}>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={repPage <= 1}
+                  onClick={() => setRepPage((p) => Math.max(1, p - 1))}
+                  data-testid="reputation-prev-page"
+                  style={{ cursor: repPage <= 1 ? 'not-allowed' : 'pointer' }}
+                >
+                  Previous
+                </button>
+                <span style={{ fontSize: '0.82rem', color: '#6b7280' }}>
+                  Page {repPage} of {Math.ceil(repTotal / 20) || 1}
+                </span>
+                <button
+                  type="button"
+                  className="btn btn-secondary btn-sm"
+                  disabled={repPage >= Math.ceil(repTotal / 20)}
+                  onClick={() => setRepPage((p) => p + 1)}
+                  data-testid="reputation-next-page"
+                  style={{ cursor: repPage >= Math.ceil(repTotal / 20) ? 'not-allowed' : 'pointer' }}
+                >
+                  Next
+                </button>
+              </div>
+            )}
+          </>
+        )}
+      </div>
+
       {/* Contribution History */}
       <div className="prof-glass-card">
         <h3 className="prof-sub-title">Contribution History</h3>
@@ -495,9 +886,9 @@ const Profile = () => {
               key: 'proofLink',
               render: (item) => (
                 item.proofLink ? (
-                  <a href={item.proofLink} target="_blank" rel="noreferrer" className="prof-link">
+                  <SafeLink href={item.proofLink} className="prof-link">
                     Proof <LinkIcon />
-                  </a>
+                  </SafeLink>
                 ) : <span style={{ color: '#9ca3af' }}>—</span>
               ),
             },
@@ -519,16 +910,11 @@ const Profile = () => {
       </div>
 
       {/* Row 4: Mentored Projects */}
-      <div className="prof-glass-card">
-        <h3 className="prof-sub-title">Mentored Projects</h3>
-        {profileData.mentoredProjects.length ? profileData.mentoredProjects.map((proj, idx) => (
-          <div key={idx} className="prof-proj-row">
-            <div className="prof-proj-title">{proj.name}</div>
-            <div className="prof-proj-desc">Owner: {proj.owner} &middot; {proj.status}</div>
-            <div className="prof-proj-meta">{proj.contribution}</div>
-          </div>
-        )) : <div className="prof-empty-state">No mentored projects yet.</div>}
-      </div>
+      <MentoredProjectsCard
+        mentoredProjects={profileData.mentoredProjects}
+        loading={false}
+        isPublic={false}
+      />
 
     </div>
   );

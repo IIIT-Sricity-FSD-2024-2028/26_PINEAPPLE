@@ -89,14 +89,24 @@ function MaintenanceScreen({ message }) {
 function App() {
   const [maintenance, setMaintenance] = useState(false);
   const [maintenanceMsg, setMaintenanceMsg] = useState('');
+  const [resettingBanner, setResettingBanner] = useState('');
 
   const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
 
   useEffect(() => {
     const handleMaintenanceEvent = (e) => {
+      const detail = e?.detail || {};
+      if (detail.code === 'MAINTENANCE') {
+        if (detail.active === false) {
+          setResettingBanner('');
+          return;
+        }
+        setResettingBanner(detail.message || 'The system is being reset, retrying...');
+        return;
+      }
       if (!window.location.pathname.startsWith('/admin')) {
         setMaintenance(true);
-        if (e.detail?.message) setMaintenanceMsg(e.detail.message);
+        if (detail.message) setMaintenanceMsg(detail.message);
       }
     };
     window.addEventListener('teamforge:maintenance', handleMaintenanceEvent);
@@ -120,6 +130,28 @@ function App() {
 
   return (
     <ErrorBoundary>
+      {resettingBanner && (
+        <div
+          role="status"
+          data-testid="maintenance-retrying-banner"
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            zIndex: 9999,
+            background: '#fef3c7',
+            color: '#92400e',
+            borderBottom: '1px solid #f59e0b',
+            padding: '10px 20px',
+            textAlign: 'center',
+            fontWeight: 600,
+            fontSize: '0.92rem',
+          }}
+        >
+          ⏳ {resettingBanner}
+        </div>
+      )}
       <AuthProvider>
         <RoleProvider>
           <UIProvider>

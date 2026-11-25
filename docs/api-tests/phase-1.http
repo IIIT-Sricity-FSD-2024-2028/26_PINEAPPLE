@@ -1,0 +1,181 @@
+### TeamForge Phase 1 API Tests (REST Client Format)
+### Moderation Core: Warnings, Suspensions, Reactivations, and Reputation
+
+@baseUrl = http://localhost:3000
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@collaboratorToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@targetUserId = 2
+
+### 1. Issue Warning to User (Success)
+# Expected Status: 200 OK
+# Expected Response: User details with warningsCount incremented, warning logged, and reputation decreased by 10
+POST {{baseUrl}}/admin/users/{{targetUserId}}/warn
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "Repeated disruptive comments in project discussion"
+}
+
+###
+
+### 2. Issue Warning - Missing/Invalid Token
+# Expected Status: 401 Unauthorized
+# Expected Response: { "statusCode": 401, "error": "UNAUTHORIZED", "code": "UNAUTHORIZED", "message": "Missing or invalid Authorization Bearer token." }
+POST {{baseUrl}}/admin/users/{{targetUserId}}/warn
+Content-Type: application/json
+
+{
+  "reason": "Repeated disruptive comments in project discussion"
+}
+
+###
+
+### 3. Issue Warning - Forbidden (Non-Admin Role)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "FORBIDDEN", "code": "FORBIDDEN", "message": "You do not have the required permissions to access this resource." }
+POST {{baseUrl}}/admin/users/{{targetUserId}}/warn
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "reason": "Repeated disruptive comments in project discussion"
+}
+
+###
+
+### 4. Issue Warning - Validation Failure (Explanation < 10 Chars)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "BAD_REQUEST", "code": "EXPLANATION_TOO_SHORT", "message": "Explanation must be at least 10 characters." }
+POST {{baseUrl}}/admin/users/{{targetUserId}}/warn
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "bad act"
+}
+
+###
+
+### 5. Suspend User (Success)
+# Expected Status: 200 OK
+# Expected Response: User details with status "suspended", tasks returned to unassigned, owned projects closed, mentor paid/refunded
+POST {{baseUrl}}/admin/users/{{targetUserId}}/suspend
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "Violating community guidelines and harassment policy"
+}
+
+###
+
+### 6. Suspend User - Validation Failure (Explanation < 10 Chars)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "BAD_REQUEST", "code": "EXPLANATION_TOO_SHORT", "message": "Explanation must be at least 10 characters." }
+POST {{baseUrl}}/admin/users/{{targetUserId}}/suspend
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "short"
+}
+
+###
+
+### 7. Reactivate Suspended User (Success)
+# Expected Status: 200 OK
+# Expected Response: User details with status "active", activeWarningsCount reset to 0, notification sent
+POST {{baseUrl}}/admin/users/{{targetUserId}}/reactivate
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "User completed remediation review and appeal accepted"
+}
+
+###
+
+### 8. Reactivate User - Validation Failure (Explanation < 10 Chars)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "BAD_REQUEST", "code": "EXPLANATION_TOO_SHORT", "message": "Explanation must be at least 10 characters." }
+POST {{baseUrl}}/admin/users/{{targetUserId}}/reactivate
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "reactivate"
+}
+
+###
+
+### 9. Moderate User Status Endpoint (Success)
+# Expected Status: 200 OK
+# Expected Response: User details updated to requested status
+POST {{baseUrl}}/admin/users/{{targetUserId}}/status
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "status": "suspended",
+  "reason": "Suspending account pending deeper administrative review"
+}
+
+###
+
+### 10. Query User Warnings (Admin View)
+# Expected Status: 200 OK
+# Expected Response: Array of warnings, newest first, with moderator name
+GET {{baseUrl}}/admin/users/{{targetUserId}}/warnings
+Authorization: {{adminToken}}
+
+###
+
+### 11. Query Own Warnings (User View)
+# Expected Status: 200 OK
+# Expected Response: Array of own warnings with N/4 labels
+GET {{baseUrl}}/users/me/warnings
+Authorization: {{collaboratorToken}}
+
+###
+
+### 12. Self-Moderation Attempt (Forbidden)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "FORBIDDEN", "code": "CANNOT_MODERATE_SELF", "message": "You cannot moderate your own account." }
+POST {{baseUrl}}/admin/users/u-admin/warn
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "Attempting to moderate self"
+}
+
+###
+
+### 13. Admin Moderation Attempt (Forbidden)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "FORBIDDEN", "code": "CANNOT_MODERATE_ADMIN", "message": "You cannot moderate an administrator or superuser account." }
+POST {{baseUrl}}/admin/users/u-superuser/warn
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "reason": "Attempting to moderate super user"
+}
+
+###
+
+### 14. Apply to Closed Project (Conflict)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "CONFLICT", "code": "PROJECT_CLOSED", "message": "This project is closed and no longer accepts applications." }
+POST {{baseUrl}}/join-requests
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "projectId": "proj-2",
+  "role": "Frontend Developer",
+  "message": "Applying to a closed project"
+}
+
+###

@@ -1,0 +1,162 @@
+### TeamForge Phase 8 API Tests (REST Client Format)
+### Decision Finality, Data Integrity & Consolidated Notification Store
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### 1. Submit a User Report
+# Expected Status: 201 Created
+POST {{baseUrl}}/reports
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "reportedUserId": "3",
+  "reason": "Harassment",
+  "details": "User has repeatedly used abusive language in workspace chat channels."
+}
+
+###
+
+### 2. Admin Resolves Report with Warning
+# Expected Status: 201 Created
+POST {{baseUrl}}/admin/reports/rep-1/action
+Authorization: {{adminToken}}
+x-user-id: u-admin
+Content-Type: application/json
+
+{
+  "action": "warn",
+  "reason": "Official warning issued for violating code of conduct."
+}
+
+###
+
+### 3. Second Action on Already Actioned Report (Finality Check)
+# Expected Status: 409 Conflict
+# Expected Code: REPORT_ALREADY_ACTIONED
+POST {{baseUrl}}/admin/reports/rep-1/action
+Authorization: {{adminToken}}
+x-user-id: u-admin
+Content-Type: application/json
+
+{
+  "action": "warn",
+  "reason": "Attempting second action on already resolved report."
+}
+
+###
+
+### 4. Patch Status on Already Actioned Report (Finality Check)
+# Expected Status: 409 Conflict
+# Expected Code: REPORT_ALREADY_ACTIONED
+PATCH {{baseUrl}}/admin/reports/rep-1/status
+Authorization: {{adminToken}}
+x-user-id: u-admin
+Content-Type: application/json
+
+{
+  "status": "Dismissed",
+  "note": "Attempting status override."
+}
+
+###
+
+### 5. Submit an Appeal Against a Warning
+# Expected Status: 201 Created
+POST {{baseUrl}}/warnings/warn-1/appeal
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "explanation": "I apologize for the misunderstanding and request this warning be reviewed."
+}
+
+###
+
+### 6. Admin Rejects Appeal
+# Expected Status: 200/201 OK/Created
+POST {{baseUrl}}/admin/appeals/appeal-1/decision
+Authorization: {{adminToken}}
+x-user-id: u-admin
+Content-Type: application/json
+
+{
+  "decision": "reject",
+  "note": "Violation was explicit. Warning upheld upon administrative review."
+}
+
+###
+
+### 7. Second Decision on Decided Appeal (Finality Check)
+# Expected Status: 409 Conflict
+# Expected Code: APPEAL_ALREADY_DECIDED
+POST {{baseUrl}}/admin/appeals/appeal-1/decision
+Authorization: {{adminToken}}
+x-user-id: u-admin
+Content-Type: application/json
+
+{
+  "decision": "accept",
+  "note": "Attempting to accept previously rejected appeal."
+}
+
+###
+
+### 8. Complete Project with 0 Tasks (Refused)
+# Expected Status: 400 Bad Request
+# Expected Code: PROJECT_NO_TASKS
+POST {{baseUrl}}/projects/proj-zero-tasks/complete
+Authorization: {{ownerToken}}
+x-user-id: 1
+x-user-role: Project Owner
+Content-Type: application/json
+
+{
+  "finalLink": "https://github.com/teamforge/zero-task-repo"
+}
+
+###
+
+### 9. Complete Project with 1 Approved Task (Completes without badge)
+# Expected Status: 201 Created
+# Expected Response: { status: "Completed", isCompleted: true, badgeAwarded: false, badgeReason: "Completed. Badges need at least 3 approved tasks" }
+POST {{baseUrl}}/projects/proj-one-task/complete
+Authorization: {{ownerToken}}
+x-user-id: 1
+x-user-role: Project Owner
+Content-Type: application/json
+
+{
+  "finalLink": "https://github.com/teamforge/one-task-repo"
+}
+
+###
+
+### 10. Approve Join Request (Queued & Serialized)
+# Expected Status: 200 OK (First call) / 409 Conflict (Duplicate / Full)
+# Expected Code on 409: REQUEST_ALREADY_DECIDED or PROJECT_FULL
+PUT {{baseUrl}}/join-requests/req-123/status
+Authorization: {{ownerToken}}
+x-user-id: 1
+x-user-role: Project Owner
+Content-Type: application/json
+
+{
+  "status": "approved"
+}
+
+###
+
+### 11. Fetch Consolidated Notifications
+# Expected Status: 200 OK
+# Expected Response: Seeded notifications array from single store
+GET {{baseUrl}}/notifications
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json

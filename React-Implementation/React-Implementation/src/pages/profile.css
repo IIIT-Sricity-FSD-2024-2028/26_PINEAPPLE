@@ -24,7 +24,11 @@
 .prof-stat-label { font-size: 0.75rem; color: var(--muted-fg, #6b7280); font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; }
 .prof-stat-val { font-size: 1.5rem; font-weight: 800; color: var(--fg, #111827); margin-bottom: 0; line-height: 1.2; }
 
-.prof-grid-400 { display: grid; grid-template-columns: repeat(auto-fit, minmax(400px, 1fr)); gap: 2rem; margin-bottom: 2rem; }
+.prof-grid-400 { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 340px), 1fr)); gap: 2rem; margin-bottom: 2rem; }
+@media (max-width: 640px) {
+  .profile-page { padding: 1rem; }
+  .prof-glass-card { padding: 1.25rem; }
+}
 .prof-sub-title { font-size: 1.15rem; font-weight: 700; color: var(--fg, #111827); margin: 0 0 1.5rem 0; }
 
 .prof-proj-row { padding: 1rem 0; border-bottom: 1px solid var(--border, #f3f4f6); }

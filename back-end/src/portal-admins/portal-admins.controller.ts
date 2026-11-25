@@ -25,6 +25,7 @@ import { CreatePortalAdminDto } from './dto/create-portal-admin.dto';
 import { UpdatePortalAdminDto } from './dto/update-portal-admin.dto';
 import { PortalAdminEntity } from './entities/portal-admin.entity';
 import { PortalAdminsService } from './portal-admins.service';
+import { stripUserSecrets } from '../users/user-serializer';
 
 @ApiTags('Portal Admins')
 @ApiHeader({
@@ -44,7 +45,7 @@ export class PortalAdminsController {
   @ApiOkResponse({ description: 'List of portal admins returned successfully.', type: [PortalAdminEntity] })
   @ApiForbiddenResponse({ description: 'Forbidden - superuser or portal_admin role required' })
   list() {
-    return this.portalAdminsService.findAll();
+    return stripUserSecrets(this.portalAdminsService.findAll());
   }
 
   @Post()
@@ -54,7 +55,7 @@ export class PortalAdminsController {
   @ApiCreatedResponse({ description: 'Portal admin created successfully.', type: PortalAdminEntity })
   @ApiForbiddenResponse({ description: 'Forbidden - superuser or portal_admin role required' })
   create(@Body() dto: CreatePortalAdminDto) {
-    return this.portalAdminsService.create(dto);
+    return stripUserSecrets(this.portalAdminsService.create(dto));
   }
 
   @Put(':id')
@@ -66,7 +67,7 @@ export class PortalAdminsController {
   @ApiNotFoundResponse({ description: 'Portal admin not found' })
   @ApiForbiddenResponse({ description: 'Forbidden - superuser or portal_admin role required' })
   update(@Param('id') id: string, @Body() dto: UpdatePortalAdminDto) {
-    return this.portalAdminsService.update(id, dto);
+    return stripUserSecrets(this.portalAdminsService.update(id, dto));
   }
 
   @Delete(':id')

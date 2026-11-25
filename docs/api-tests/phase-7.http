@@ -1,0 +1,85 @@
+### TeamForge Phase 7 API Tests (REST Client Format)
+### Scheduler, Manual Tick, Run Log & Super User Job Monitor
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### 1. Trigger Job Tick as Collaborator (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "message": "Forbidden - Requires superuser role." }
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+###
+
+### 2. Trigger Job Tick as Regular Admin (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "message": "Forbidden - Requires superuser role." }
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+###
+
+### 3. Trigger Job Tick as Super User (Allowed)
+# Expected Status: 202 Accepted
+# Expected Response: { "runId": "run-..." }
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+###
+
+### 4. Trigger Job Tick while Another Tick is Already Running (Conflict)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "JOB_ALREADY_RUNNING", "message": "A job tick is already in progress.", "runId": "run-..." }
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+###
+
+### 5. List Recent Job Runs as Collaborator (Rejected)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "message": "Forbidden - Requires admin role." }
+GET {{baseUrl}}/admin/jobs/runs?limit=20
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+###
+
+### 6. List Recent Job Runs as Admin (Allowed)
+# Expected Status: 200 OK
+# Expected Response: Array of JobRun objects (newest first)
+GET {{baseUrl}}/admin/jobs/runs?limit=20
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+###
+
+### 7. List Recent Job Runs as Super User (Allowed)
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/jobs/runs?limit=20
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+###
+
+### 8. Get Single Job Run by ID (Allowed)
+# Expected Status: 200 OK
+# Expected Response: Single JobRun with per-job details, itemsProcessed, errors
+GET {{baseUrl}}/admin/jobs/runs/run-12345
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+###
+
+### 9. Get Single Job Run by Non-Existent ID (Rejected)
+# Expected Status: 404 Not Found
+# Expected Response: { "statusCode": 404, "error": "Not Found", "code": "RUN_NOT_FOUND", "message": "Job run with id \"non-existent\" not found" }
+GET {{baseUrl}}/admin/jobs/runs/non-existent-id
+Authorization: {{adminToken}}
+Content-Type: application/json

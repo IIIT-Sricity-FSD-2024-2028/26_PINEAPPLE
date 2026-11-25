@@ -1,0 +1,147 @@
+### TeamForge Phase 5 API Tests (REST Client Format)
+### Username Policy, Profile Completion, and Username Confirmation Flow
+
+@baseUrl = http://localhost:3000
+@collaboratorToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@incompleteToken = Bearer YOUR_INCOMPLETE_PROFILE_TOKEN_HERE
+@flaggedUserToken = Bearer YOUR_FLAGGED_USER_TOKEN_HERE
+
+### 1. Check Username Availability (Available)
+# Expected Status: 200 OK
+# Expected Response: { "available": true }
+GET {{baseUrl}}/users/username-available?username=new_collaborator_dev
+Content-Type: application/json
+
+###
+
+### 2. Check Username Availability (Taken - Case-Insensitive)
+# Expected Status: 200 OK
+# Expected Response: { "available": false }
+GET {{baseUrl}}/users/username-available?username=ADITYA
+Content-Type: application/json
+
+###
+
+### 3. Check Username Availability with Self-Exclusion
+# Expected Status: 200 OK
+# Expected Response: { "available": true }
+GET {{baseUrl}}/users/username-available?username=aditya&excludeUserId=u-collab
+Content-Type: application/json
+
+###
+
+### 4. Create Normal User without Username (Rejected)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "USERNAME_REQUIRED", "message": "Username is required." }
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Jane Doe",
+  "email": "jane.doe@example.com",
+  "password": "Password123!",
+  "role": "Collaborator"
+}
+
+###
+
+### 5. Create Normal User with Duplicate Username (Rejected)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "USERNAME_TAKEN", "message": "This username is already taken." }
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Another Aditya",
+  "email": "aditya.another@example.com",
+  "username": "aditya",
+  "password": "Password123!",
+  "role": "Collaborator"
+}
+
+###
+
+### 6. Incomplete Profile - Allowed Route (GET /users/me)
+# Expected Status: 200 OK
+# Expected Response: { id, email, profileComplete: false, needsUsernameConfirmation: false, ... }
+GET {{baseUrl}}/users/me
+Content-Type: application/json
+Authorization: {{incompleteToken}}
+
+###
+
+### 7. Incomplete Profile - Blocked Route (POST /tasks returns 403)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "PROFILE_INCOMPLETE", "message": "Please complete your profile first." }
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+Authorization: {{incompleteToken}}
+
+{
+  "title": "Blocked task creation",
+  "projectId": "proj-1"
+}
+
+###
+
+### 8. Complete Social Profile via POST /auth/profile
+# Expected Status: 201 Created
+# Expected Response: User profile with profileComplete: true and given username
+POST {{baseUrl}}/auth/profile
+Content-Type: application/json
+Authorization: {{incompleteToken}}
+
+{
+  "name": "Alex Mercer",
+  "username": "alex_mercer",
+  "university": "NYU",
+  "role": "Collaborator"
+}
+
+###
+
+### 9. Flagged Account - Get Me Returns needsUsernameConfirmation: true
+# Expected Status: 200 OK
+# Expected Response: Object containing needsUsernameConfirmation: true and username: "aditya"
+GET {{baseUrl}}/users/me
+Content-Type: application/json
+Authorization: {{flaggedUserToken}}
+
+###
+
+### 10. Flagged Account - Keep Existing Username ({ confirm: true })
+# Expected Status: 200 OK
+# Expected Response: { "success": true, "username": "aditya", "needsUsernameConfirmation": false }
+PATCH {{baseUrl}}/users/me/username
+Content-Type: application/json
+Authorization: {{flaggedUserToken}}
+
+{
+  "confirm": true
+}
+
+###
+
+### 11. Flagged Account - Change to Taken Username (Rejected with 409)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "USERNAME_TAKEN", "message": "This username is already taken." }
+PATCH {{baseUrl}}/users/me/username
+Content-Type: application/json
+Authorization: {{flaggedUserToken}}
+
+{
+  "username": "jathin"
+}
+
+###
+
+### 12. Flagged Account - Change to Valid New Username
+# Expected Status: 200 OK
+# Expected Response: { "success": true, "username": "aditya_pro", "needsUsernameConfirmation": false }
+PATCH {{baseUrl}}/users/me/username
+Content-Type: application/json
+Authorization: {{flaggedUserToken}}
+
+{
+  "username": "aditya_pro"
+}

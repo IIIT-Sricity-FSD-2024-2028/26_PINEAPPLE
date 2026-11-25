@@ -1,3 +1,4 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
   Body,
   Controller,
@@ -55,12 +56,16 @@ export class MentorRequestsController {
     @Query('projectId') projectId?: string,
     @Query('mentorId') mentorId?: string,
     @Query('status') status?: string,
+    @CurrentUser() authUser?: any,
     @Headers('x-user-role') role?: string,
     @Headers('x-user-id') userId?: string,
   ): MentorRequestEntity[] {
-    const normRole = String(role || '').toLowerCase();
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const effectiveUserId = isLegacy ? userId : authUser?.uid;
+    const normRole = String(effectiveRole || '').toLowerCase();
     if (normRole === 'mentor') {
-      if (!this.mentorRequestsService.isApprovedMentor(userId)) {
+      if (!this.mentorRequestsService.isApprovedMentor(effectiveUserId)) {
         throw new ForbiddenException('Only approved mentors can access mentor requests.');
       }
     }
@@ -89,12 +94,16 @@ export class MentorRequestsController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   getOne(
     @Param('id') id: string,
+    @CurrentUser() authUser?: any,
     @Headers('x-user-role') role?: string,
     @Headers('x-user-id') userId?: string,
   ): MentorRequestEntity {
-    const normRole = String(role || '').toLowerCase();
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const effectiveUserId = isLegacy ? userId : authUser?.uid;
+    const normRole = String(effectiveRole || '').toLowerCase();
     if (normRole === 'mentor') {
-      if (!this.mentorRequestsService.isApprovedMentor(userId)) {
+      if (!this.mentorRequestsService.isApprovedMentor(effectiveUserId)) {
         throw new ForbiddenException('Only approved mentors can access mentor requests.');
       }
     }
@@ -150,10 +159,14 @@ export class MentorRequestsController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   accept(
     @Param('id') id: string,
+    @CurrentUser() authUser?: any,
     @Headers('x-user-role') role?: string,
     @Headers('x-user-id') userId?: string,
   ): MentorRequestEntity {
-    return this.mentorRequestsService.accept(id, userId, role);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const effectiveUserId = isLegacy ? userId : (authUser?.uid || authUser?.id);
+    return this.mentorRequestsService.accept(id, effectiveUserId, effectiveRole);
   }
 
   @Put(':id/decline')
@@ -165,10 +178,15 @@ export class MentorRequestsController {
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
   decline(
     @Param('id') id: string,
+    @Body() body?: any,
+    @CurrentUser() authUser?: any,
     @Headers('x-user-role') role?: string,
     @Headers('x-user-id') userId?: string,
   ): MentorRequestEntity {
-    return this.mentorRequestsService.decline(id, userId, role);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const effectiveUserId = isLegacy ? userId : (authUser?.uid || authUser?.id);
+    return this.mentorRequestsService.decline(id, effectiveUserId, effectiveRole, body);
   }
 
   @Delete(':id')

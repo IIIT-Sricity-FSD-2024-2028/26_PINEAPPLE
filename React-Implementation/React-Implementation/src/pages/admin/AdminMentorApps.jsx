@@ -1,11 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import mentorApplicationsApi from '../../services/mentorApplicationsApi';
+import uploadsApi from '../../services/uploadsApi';
+import adminApi from '../../services/adminApi';
 import Badge from '../../components/common/Badge';
 import SearchBar from '../../components/common/SearchBar';
 import FilterTabs from '../../components/common/FilterTabs';
+import ConfirmModal from '../../components/common/ConfirmModal';
+import Modal from '../../components/common/Modal';
+import UniversalReasonModal from '../../components/common/UniversalReasonModal';
+import SafeLink from '../../components/common/SafeLink';
 import Avatar from '../../components/common/Avatar';
 import EmptyState from '../../components/common/EmptyState';
+import { CREDENTIAL_STATUS } from '../../constants/credentialStatus';
 import './AdminMentorApps.css';
+
+function formatBytes(bytes) {
+  if (!bytes || isNaN(bytes)) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+}
 
 // ─── Componentized SVGs ──────────────────────────────────────────
 
@@ -47,7 +61,9 @@ function normalizeMentorApp(source = {}, index = 0) {
     if (match) years = parseInt(match[0], 10);
   }
 
-  let expertise = source.expertise || "";
+  let expertise = Array.isArray(source.expertise)
+    ? source.expertise.join(", ")
+    : (source.expertise || "");
   if (!expertise && Array.isArray(source.skills)) {
     expertise = source.skills.join(", ");
   }
@@ -73,6 +89,30 @@ function normalizeMentorApp(source = {}, index = 0) {
     source.specialization || (expertise ? expertise.split(",")[0].trim() : "General")
   );
 
+  const certificates = Array.isArray(source.certificates) ? source.certificates : [];
+  const excludedCertificates = Array.isArray(source.excludedCertificates) ? source.excludedCertificates : [];
+
+  const verifiedCertificates = certificates.filter(
+    (c) => c.status === CREDENTIAL_STATUS.VERIFIED || c.verificationStatus === 'verified'
+  );
+  const unverifiedCertificates = [
+    ...certificates.filter((c) => !(c.status === CREDENTIAL_STATUS.VERIFIED || c.verificationStatus === 'verified')),
+    ...excludedCertificates,
+  ];
+
+  const verifiedCount = verifiedCertificates.length;
+  const unverifiedCount = unverifiedCertificates.length;
+  const totalCredentials = verifiedCount + unverifiedCount;
+
+  let verificationStatusCategory = 'no_verified';
+  if (verifiedCount > 0 && unverifiedCount === 0) {
+    verificationStatusCategory = 'fully_verified';
+  } else if (verifiedCount > 0 && unverifiedCount > 0) {
+    verificationStatusCategory = 'has_unverified';
+  } else if (verifiedCount === 0) {
+    verificationStatusCategory = 'no_verified';
+  }
+
   return {
     id: String(source.id || `mentor-app-${index + 1}`),
     name,
@@ -85,7 +125,7 @@ function normalizeMentorApp(source = {}, index = 0) {
         .join("")
         .slice(0, 2)
         .toUpperCase() || "MA",
-    university: String(source.university || source.institution || "Unknown University"),
+    university: String(source.university || source.institution || ""),
     submittedAt,
     expertise,
     specialization,
@@ -94,6 +134,18 @@ function normalizeMentorApp(source = {}, index = 0) {
     experienceText: typeof source.experience === 'string' ? source.experience : '',
     motivation,
     status: String(source.status || "pending").toLowerCase(),
+    cvFileName: source.cvFileName,
+    cvOriginalName: source.cvOriginalName,
+    cvFileSize: source.cvFileSize,
+    cvUrl: source.cvUrl,
+    certificates,
+    excludedCertificates,
+    verifiedCount,
+    unverifiedCount,
+    totalCredentials,
+    verificationStatusCategory,
+    approvalOverrideNote: source.approvalOverrideNote || '',
+    rejectionReason: source.rejectionReason,
   };
 }
 
@@ -109,9 +161,31 @@ const AdminMentorApps = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [filter, setFilter] = useState('pending');
+  const [verificationFilter, setVerificationFilter] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [expandedIds, setExpandedIds] = useState({});
   const [processingId, setProcessingId] = useState(null);
+  const [minYearsRequired, setMinYearsRequired] = useState(4);
+
+  // Reject Reason Modal State
+  const [rejectModalApp, setRejectModalApp] = useState(null);
+
+  // Override Verification Modal State
+  const [overrideModalApp, setOverrideModalApp] = useState(null);
+  const [overrideNoteInput, setOverrideNoteInput] = useState('');
+  const [overrideError, setOverrideError] = useState('');
+
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'info' });
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'info') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ visible: true, message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 4500);
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -134,12 +208,21 @@ const AdminMentorApps = () => {
       }
     };
 
+    adminApi.getPublicConfig()
+      .then((cfg) => {
+        if (isMounted && cfg?.mentorMinYearsExperience !== undefined) {
+          setMinYearsRequired(cfg.mentorMinYearsExperience);
+        }
+      })
+      .catch(() => {});
+
     loadApplications();
 
     return () => {
       isMounted = false;
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
-  }, []);
+  }, [refreshKey]);
 
   const handleToggleDetails = (id, currentStatus) => {
     setExpandedIds((prev) => {
@@ -152,43 +235,105 @@ const AdminMentorApps = () => {
     });
   };
 
-  const handleApprove = async (app) => {
+  const handleApprove = async (app, override = false, overrideNote = '') => {
     const normalized = normalizeMentorApp(app);
-    if (normalized.years < 4) {
-      alert("❌ Cannot approve: Applicant has less than 4 years of experience");
+    if (normalized.years < minYearsRequired) {
+      showToast(`❌ Cannot approve: Applicant has less than ${minYearsRequired} years of experience`, 'error');
+      return;
+    }
+
+    // Require verified credentials unless explicitly overridden with a note
+    if (normalized.verifiedCount === 0 && !override) {
+      setOverrideModalApp(app);
+      setOverrideNoteInput('');
+      setOverrideError('');
       return;
     }
 
     setProcessingId(app.id);
     try {
-      await mentorApplicationsApi.approve(app.id);
-      setApplications((prev) =>
-        prev.map((item) =>
-          item.id === app.id ? { ...item, status: 'approved' } : item
-        )
+      const payload = override
+        ? { overrideVerification: true, overrideNote: overrideNote.trim() }
+        : undefined;
+      await mentorApplicationsApi.approve(app.id, payload);
+      showToast(
+        override
+          ? `Mentor application for ${normalized.name} approved with administrative verification override.`
+          : `Mentor application for ${normalized.name} approved successfully.`,
+        'success'
       );
+      setOverrideModalApp(null);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error('Failed to approve mentor application:', err);
-      alert(err.message || 'Failed to approve mentor application');
+      if (
+        err.message &&
+        (err.message.includes('0 verified') || err.message.includes('override') || err.message.includes('409'))
+      ) {
+        setOverrideModalApp(app);
+        setOverrideNoteInput('');
+        setOverrideError(err.message);
+      } else {
+        showToast(err.message || 'Failed to approve mentor application', 'error');
+      }
     } finally {
       setProcessingId(null);
     }
   };
 
-  const handleReject = async (app) => {
-    setProcessingId(app.id);
+  const handleConfirmOverride = async () => {
+    if (!overrideModalApp) return;
+    if (!overrideNoteInput.trim()) {
+      setOverrideError('A justification note is required to approve an applicant without verified credentials.');
+      return;
+    }
+    await handleApprove(overrideModalApp, true, overrideNoteInput.trim());
+  };
+
+  const handleOpenRejectModal = (app) => {
+    setRejectModalApp(app);
+  };
+
+  const handleConfirmReject = async ({ reasons, explanation }) => {
+    if (!rejectModalApp) return;
+    setProcessingId(rejectModalApp.id);
     try {
-      await mentorApplicationsApi.reject(app.id);
-      setApplications((prev) =>
-        prev.map((item) =>
-          item.id === app.id ? { ...item, status: 'rejected' } : item
-        )
-      );
+      const reason = explanation || reasons.join(', ');
+      const payload = {
+        reasons,
+        explanation,
+        reason,
+        feedback: {
+          reasons,
+          explanation,
+        },
+      };
+      await mentorApplicationsApi.reject(rejectModalApp.id, payload);
+      showToast(`Mentor application for ${rejectModalApp.name} rejected.`, 'info');
+      setRejectModalApp(null);
+      setRefreshKey((k) => k + 1);
     } catch (err) {
       console.error('Failed to reject mentor application:', err);
-      alert(err.message || 'Failed to reject mentor application');
+      showToast(err.message || 'Failed to reject mentor application', 'error');
+      throw err;
     } finally {
       setProcessingId(null);
+    }
+  };
+
+  const handleDownloadCv = async (filename, originalName) => {
+    try {
+      const blob = await uploadsApi.downloadCv(filename);
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = originalName || filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+    } catch (err) {
+      showToast(err.message || 'Failed to download CV file.', 'error');
     }
   };
 
@@ -199,9 +344,18 @@ const AdminMentorApps = () => {
   const rejectedCount = normalizedApps.filter((a) => a.status === 'rejected').length;
   const totalCount = normalizedApps.length;
 
+  const fullyVerifiedCount = normalizedApps.filter((a) => a.verificationStatusCategory === 'fully_verified').length;
+  const hasUnverifiedCount = normalizedApps.filter((a) => a.verificationStatusCategory === 'has_unverified').length;
+  const noVerifiedCount = normalizedApps.filter((a) => a.verificationStatusCategory === 'no_verified').length;
+
   const filteredApps = normalizedApps.filter((a) => {
     const matchesFilter = filter === 'all' || a.status === filter;
     if (!matchesFilter) return false;
+
+    const matchesVerification =
+      verificationFilter === 'all' || a.verificationStatusCategory === verificationFilter;
+    if (!matchesVerification) return false;
+
     if (!searchQuery.trim()) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -216,6 +370,17 @@ const AdminMentorApps = () => {
       <h1>Mentor Applications</h1>
       <p className="page-subtitle mt-1">Review and approve mentor applications</p>
 
+      {/* DigiLocker Sandbox Active Notice */}
+      <div className="admin-digilocker-banner mt-3">
+        <span style={{ fontSize: '1.25rem' }}>🛡️</span>
+        <div>
+          <strong>Simulated DigiLocker Verification Active (Demo Mode)</strong>
+          <div style={{ fontSize: '0.8rem', opacity: 0.9 }}>
+            Credential verification and issuer records are simulated against the DigiLocker Sandbox API for testing and viva demonstration.
+          </div>
+        </div>
+      </div>
+
       <div className="card mt-4">
         <div id="admin-mentor-list">
           {/* Eligibility Criteria */}
@@ -228,15 +393,15 @@ const AdminMentorApps = () => {
               </span>
               <span className="admin-mentor-criteria-tag">
                 <span className="admin-mentor-icon"><CheckIcon /></span>
-                Complete &amp; authentic LinkedIn profile
+                Verified CV (.pdf, &le; 5MB, verified %PDF-)
               </span>
               <span className="admin-mentor-criteria-tag">
                 <span className="admin-mentor-icon"><CheckIcon /></span>
-                Consistent relevant career history
+                At least 1 verified DigiLocker credential
               </span>
               <span className="admin-mentor-criteria-tag">
                 <span className="admin-mentor-icon"><CheckIcon /></span>
-                Professional conduct - no misconduct record
+                Complete LinkedIn / Portfolio URL
               </span>
             </div>
           </div>
@@ -261,6 +426,23 @@ const AdminMentorApps = () => {
             />
           </div>
 
+          {/* Verification Status Filter Tabs */}
+          <div className="admin-mentor-toolbar mt-2" style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--muted-fg)' }}>
+              Verification:
+            </span>
+            <FilterTabs
+              tabs={[
+                { id: 'all', label: 'All', count: totalCount },
+                { id: 'fully_verified', label: 'Fully verified', count: fullyVerifiedCount },
+                { id: 'has_unverified', label: 'Has unverified', count: hasUnverifiedCount },
+                { id: 'no_verified', label: 'No verified', count: noVerifiedCount },
+              ]}
+              activeTab={verificationFilter}
+              onChange={setVerificationFilter}
+            />
+          </div>
+
           {/* Applications List */}
           <div className="admin-mentor-list-wrap mt-3">
             {loading ? (
@@ -281,7 +463,7 @@ const AdminMentorApps = () => {
                     ? expandedIds[app.id]
                     : app.status === 'pending';
                 const statusText = toTitleCase(app.status);
-                const meetsCriteria = app.years >= 4;
+                const meetsCriteria = app.years >= minYearsRequired;
                 const isProcessing = processingId === app.id;
 
                 return (
@@ -299,12 +481,15 @@ const AdminMentorApps = () => {
                         <div>
                           <div className="admin-mentor-name">{app.name}</div>
                           <div className="admin-mentor-sub">
-                            {app.university} · Submitted {app.submittedAt}
+                            {app.university ? `${app.university} · ` : ''}Submitted {app.submittedAt}
                           </div>
                         </div>
                       </div>
                       <div className="admin-mentor-right">
                         <div className="admin-mentor-spec">{app.specialization}</div>
+                        <span className="admin-mentor-cred-chip" title={`${app.verifiedCount} of ${app.totalCredentials} credentials verified`}>
+                          🛡️ {app.totalCredentials > 0 ? `${app.verifiedCount} of ${app.totalCredentials} verified` : '0 verified'}
+                        </span>
                         <Badge variant={app.status}>{statusText}</Badge>
                         <span className="admin-mentor-chevron">
                           {isExpanded ? <ChevronUpIcon /> : <ChevronDownIcon />}
@@ -321,7 +506,7 @@ const AdminMentorApps = () => {
                         <div>
                           <div className="admin-mentor-label">Experience</div>
                           <div className="admin-mentor-value">
-                            {app.years} years
+                            {app.years} years (Min. {minYearsRequired} required)
                             <Badge variant={meetsCriteria ? 'criteria-met' : 'criteria-unmet'}>
                               <span className="admin-mentor-icon" style={{ display: 'inline-flex', marginRight: '4px' }}>
                                 {meetsCriteria ? <CheckIcon /> : <CrossIcon />}
@@ -337,18 +522,16 @@ const AdminMentorApps = () => {
                         </div>
                         <div>
                           <div className="admin-mentor-label">LinkedIn</div>
-                          <a
+                          <SafeLink
                             className="admin-mentor-link"
                             href={app.linkedin}
-                            target="_blank"
-                            rel="noopener noreferrer"
                           >
                             View Profile ↗
-                          </a>
+                          </SafeLink>
                         </div>
                         <div>
                           <div className="admin-mentor-label">University</div>
-                          <div className="admin-mentor-value">{app.university}</div>
+                          <div className="admin-mentor-value">{app.university || 'Not specified'}</div>
                         </div>
                       </div>
 
@@ -356,6 +539,151 @@ const AdminMentorApps = () => {
                       <blockquote className="admin-mentor-quote">
                         "{app.motivation}"
                       </blockquote>
+
+                      {/* Rejection Reason Notice if rejected */}
+                      {app.status === 'rejected' && app.rejectionReason && (
+                        <div className="admin-rejection-alert mt-3">
+                          <strong>Rejection Reason:</strong> {app.rejectionReason}
+                        </div>
+                      )}
+
+                      {/* Administrative Exception Note if approved without verification */}
+                      {app.approvalOverrideNote && (
+                        <div className="admin-override-notice mt-3">
+                          <strong>⚠️ Administrative Exception Note:</strong> {app.approvalOverrideNote}
+                        </div>
+                      )}
+
+                      {/* Verified CV Section */}
+                      <div className="mt-3">
+                        <div className="admin-mentor-label">Submitted Curriculum Vitae (CV)</div>
+                        {app.cvFileName ? (
+                          <div className="admin-cv-box mt-1">
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              <span style={{ fontSize: '1.2rem' }}>📄</span>
+                              <div>
+                                <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+                                  {app.cvOriginalName || app.cvFileName}
+                                </span>
+                                {app.cvFileSize && (
+                                  <span style={{ fontSize: '0.8rem', color: 'var(--muted-fg)', marginLeft: '8px' }}>
+                                    ({formatBytes(app.cvFileSize)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div style={{ display: 'flex', gap: '8px' }}>
+                              <button
+                                type="button"
+                                className="btn btn-outline"
+                                style={{ padding: '4px 10px', fontSize: '0.8rem' }}
+                                onClick={() => handleDownloadCv(app.cvFileName, app.cvOriginalName)}
+                              >
+                                View / Download CV
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)', marginTop: '4px' }}>
+                            No CV file attached or file was removed for privacy.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* DigiLocker Verified Credentials Section */}
+                      <div className="mt-3">
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                          <div className="admin-mentor-label">
+                            🛡️ DigiLocker Verified Credentials ({app.verifiedCount})
+                          </div>
+                          <Badge variant={app.verifiedCount > 0 ? 'verified' : 'unverified'}>
+                            {app.verifiedCount > 0 ? `${app.verifiedCount} of ${app.totalCredentials} Verified` : '0 Verified'}
+                          </Badge>
+                        </div>
+                        {app.certificates.length > 0 ? (
+                          <div className="admin-doc-grid">
+                            {app.certificates.map((cert, idx) => {
+                              const isDocVerified =
+                                cert.status === CREDENTIAL_STATUS.VERIFIED ||
+                                cert.verificationStatus === 'verified';
+                              return (
+                                <div key={idx} className="admin-doc-card">
+                                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                    <strong style={{ fontSize: '0.85rem' }}>{cert.title || cert.name || cert.documentType}</strong>
+                                    <Badge variant={isDocVerified ? 'verified' : 'name-mismatch'} style={{ fontSize: '0.7rem' }}>
+                                      {isDocVerified ? '✓ Verified' : '⚠️ Name Mismatch'}
+                                    </Badge>
+                                  </div>
+                                  <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg)' }}>
+                                    <strong>Issuer:</strong> {cert.issuer}
+                                  </div>
+                                  <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg)' }}>
+                                    <strong>Holder:</strong> {cert.holderName}
+                                  </div>
+                                  <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                    Doc #{cert.documentNumber} · Issued {cert.issueDate}
+                                  </div>
+                                  {cert.verificationId && (
+                                    <div style={{ fontSize: '0.72rem', color: 'var(--muted-fg)', marginTop: '2px' }}>
+                                      Verif ID: {cert.verificationId}
+                                    </div>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        ) : (
+                          <div style={{ fontSize: '0.85rem', color: 'var(--muted-fg)', marginTop: '4px' }}>
+                            No verified credentials linked.
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Excluded / Unverified Credentials Section */}
+                      {app.excludedCertificates.length > 0 && (
+                        <div className="mt-3">
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <div className="admin-mentor-label" style={{ color: '#b91c1c' }}>
+                              ⚠️ Excluded / Unverified Credentials ({app.excludedCertificates.length})
+                            </div>
+                            <Badge variant="name-mismatch">
+                              Excluded
+                            </Badge>
+                          </div>
+                          <div className="admin-doc-grid">
+                            {app.excludedCertificates.map((cert, idx) => (
+                              <div
+                                key={`ex-${idx}`}
+                                className="admin-doc-card"
+                                style={{ borderColor: 'rgba(239, 68, 68, 0.4)', background: 'rgba(239, 68, 68, 0.04)' }}
+                              >
+                                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                                  <strong style={{ fontSize: '0.85rem' }}>{cert.title || cert.name || cert.documentType}</strong>
+                                  <Badge variant="name-mismatch" style={{ fontSize: '0.7rem' }}>
+                                    {cert.status === CREDENTIAL_STATUS.NAME_MISMATCH || cert.verificationStatus === 'mismatch'
+                                      ? '⚠️ Name Mismatch'
+                                      : 'Unverified'}
+                                  </Badge>
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg)' }}>
+                                  <strong>Issuer:</strong> {cert.issuer}
+                                </div>
+                                <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg)' }}>
+                                  <strong>Holder:</strong> {cert.holderName}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                  Doc #{cert.documentNumber} · Issued {cert.issueDate}
+                                </div>
+                                {cert.mismatchReason && (
+                                  <div style={{ fontSize: '0.75rem', color: '#dc2626', marginTop: '4px' }}>
+                                    ⚠️ {cert.mismatchReason}
+                                  </div>
+                                )}
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {app.status === 'pending' && (
                         <div className="admin-mentor-actions mt-3">
@@ -370,10 +698,10 @@ const AdminMentorApps = () => {
                           <button
                             type="button"
                             className="btn btn-outline"
-                            onClick={() => handleReject(app)}
+                            onClick={() => handleOpenRejectModal(app)}
                             disabled={isProcessing}
                           >
-                            {isProcessing ? 'Processing...' : 'Reject'}
+                            {isProcessing ? 'Processing...' : 'Reject Application'}
                           </button>
                         </div>
                       )}
@@ -385,6 +713,86 @@ const AdminMentorApps = () => {
           </div>
         </div>
       </div>
+
+      {/* Reject Reason Modal */}
+      {toast.visible && (
+        <div className={`admin-mentor-toast ${toast.type}`}>
+          <span className="admin-mentor-toast-icon">
+            {toast.type === 'success' && '✓'}
+            {toast.type === 'error' && '✕'}
+            {toast.type === 'info' && 'ℹ'}
+          </span>
+          <span className="admin-mentor-toast-text">{toast.message}</span>
+          <button
+            type="button"
+            className="admin-mentor-toast-close"
+            onClick={() => setToast((prev) => ({ ...prev, visible: false }))}
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
+      {/* Universal Reason Modal for Rejecting Mentor Applications */}
+      <UniversalReasonModal
+        isOpen={Boolean(rejectModalApp)}
+        onClose={() => { if (processingId !== rejectModalApp?.id) setRejectModalApp(null); }}
+        onConfirm={handleConfirmReject}
+        actionType="ADMIN_REJECT_MENTOR_APP"
+        entityName={rejectModalApp ? `${rejectModalApp.name}'s Mentor Application` : 'Mentor Application'}
+      />
+
+      {/* Override Verification Approval Modal */}
+      {overrideModalApp && (
+        <ConfirmModal
+          isOpen={Boolean(overrideModalApp)}
+          title="Approve Without Verification"
+          variant="warning"
+          confirmLabel="Approve with Exception"
+          cancelLabel="Cancel"
+          loading={processingId === overrideModalApp.id}
+          onConfirm={handleConfirmOverride}
+          onCancel={() => {
+            setOverrideModalApp(null);
+            setOverrideError('');
+          }}
+          message={
+            <div style={{ textAlign: 'left' }}>
+              <p style={{ margin: '0 0 10px 0', fontSize: '0.875rem', color: 'var(--fg, #0f172a)' }}>
+                <strong>{overrideModalApp.name}</strong> has <strong>0 verified credentials</strong>. Platform policy strictly refuses approval without verified credentials unless granted an explicit administrative exception.
+              </p>
+              {overrideError && (
+                <div style={{ color: '#dc2626', fontSize: '0.85rem', marginBottom: '8px' }}>
+                  {overrideError}
+                </div>
+              )}
+              <label style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600, marginBottom: '6px', color: 'var(--fg, #0f172a)' }}>
+                Administrative Override Note (Required) <span style={{ color: '#dc2626' }}>*</span>
+              </label>
+              <textarea
+                style={{
+                  width: '100%',
+                  minHeight: '80px',
+                  padding: '8px 10px',
+                  borderRadius: '6px',
+                  border: '1px solid var(--border, #cbd5e1)',
+                  background: 'var(--card, #ffffff)',
+                  color: 'var(--fg, #0f172a)',
+                  fontSize: '0.875rem',
+                  fontFamily: 'inherit',
+                  boxSizing: 'border-box',
+                }}
+                placeholder="State the justification note for approving without verified credentials (recorded in audit log)..."
+                value={overrideNoteInput}
+                onChange={(e) => {
+                  setOverrideNoteInput(e.target.value);
+                  if (e.target.value.trim()) setOverrideError('');
+                }}
+              />
+            </div>
+          }
+        />
+      )}
     </div>
   );
 };

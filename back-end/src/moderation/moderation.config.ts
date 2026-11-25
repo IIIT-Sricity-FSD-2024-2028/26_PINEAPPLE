@@ -1,0 +1,7 @@
+export const WARNING_LIMIT = 4;
+export const MIN_REASON_LENGTH = 10;
+export const MAX_REASON_LENGTH = 500;
+export const SECOND_APPROVAL_MIN_AGE_DAYS = 90;
+export const SECOND_APPROVAL_MIN_REP = 150;
+export const PENDING_MODERATION_EXPIRY_HOURS = 72;
+export const WARNING_DECAY_DAYS = 90;

@@ -1,7 +1,10 @@
 import { useState, useContext } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
+import { auth, googleProvider, githubProvider } from '../services/firebase.js';
 import { AuthContext } from '../context/AuthContext';
-import usersApi from '../services/usersApi';
+import authApi from '../services/authApi';
+import { getAuthMode, setAccessToken } from '../services/apiClient';
 import { recordPortalAuditEntry } from '../services/adminApi';
 import './Auth.css';
 
@@ -35,45 +38,94 @@ const GithubIcon = () => (
 );
 
 const Signup = () => {
-  const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState('');
-  const [usernameError, setUsernameError] = useState('');
   
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-  const { login } = useContext(AuthContext);
+  const { login, signup } = useContext(AuthContext);
   const navigate = useNavigate();
+  const mode = getAuthMode();
 
-  const handleUsernameBlur = async () => {
-    const trimmed = (username || '').trim();
-    if (!trimmed) {
-      setUsernameError('');
-      return;
-    }
+  const handleGoogleSignIn = async () => {
+    setError('');
+    setLoading(true);
     try {
-      const res = await usersApi.checkUsernameAvailable(trimmed);
-      if (res && res.available === false) {
-        setUsernameError('This username is already taken');
-      } else {
-        setUsernameError('');
+      if (mode === 'legacy') {
+        setError('Google Sign-In is only supported under Firebase mode.');
+        setLoading(false);
+        return;
       }
-    } catch (e) {
-      console.warn('Error checking username availability:', e);
+      const result = await signInWithPopup(auth, googleProvider);
+      const fbUser = result.user;
+      const token = await fbUser.getIdToken();
+      setAccessToken(token);
+
+      const me = await authApi.getMe().catch(() => null);
+      if (me && me.profileComplete !== false) {
+        navigate('/dashboard');
+      } else {
+        navigate('/complete-profile', {
+          state: {
+            name: fbUser.displayName || '',
+            email: fbUser.email || '',
+          },
+        });
+      }
+    } catch (err) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        setLoading(false);
+        return;
+      }
+      setError(err.message || 'Google sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleGithubSignIn = async () => {
+    setError('');
+    setLoading(true);
+    try {
+      if (mode === 'legacy') {
+        setError('GitHub Sign-In is only supported under Firebase mode.');
+        setLoading(false);
+        return;
+      }
+      const result = await signInWithPopup(auth, githubProvider);
+      const fbUser = result.user;
+      const token = await fbUser.getIdToken();
+      setAccessToken(token);
+
+      const me = await authApi.getMe().catch(() => null);
+      if (me && me.profileComplete !== false) {
+        navigate('/dashboard');
+      } else {
+        navigate('/complete-profile', {
+          state: {
+            name: fbUser.displayName || '',
+            email: fbUser.email || '',
+          },
+        });
+      }
+    } catch (err) {
+      if (err.code === 'auth/popup-closed-by-user') {
+        setLoading(false);
+        return;
+      }
+      setError(err.message || 'GitHub sign-in failed. Please try again.');
+    } finally {
+      setLoading(false);
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-
-    if (usernameError) {
-      setError(usernameError);
-      return;
-    }
 
     if (password !== confirmPassword) {
       setError("Passwords don't match!");
@@ -85,50 +137,115 @@ const Signup = () => {
       return;
     }
 
-    try {
-      const avail = await usersApi.checkUsernameAvailable((username || '').trim());
-      if (avail && avail.available === false) {
-        setUsernameError('This username is already taken');
-        setError('This username is already taken');
-        return;
-      }
-    } catch (availErr) {
-      console.warn('Username availability pre-check failed:', availErr);
+    const cleanedEmail = email.trim();
+    const emailPrefix = cleanedEmail.split('@')[0]?.trim() || 'User';
+
+    if (!cleanedEmail || !password) {
+      setError('Please fill in all fields.');
+      return;
     }
 
-    try {
-      if (email && password && username) {
-        // Send actual creation request to backend API
-        const cleanedUsername = username.trim();
-        const newUser = await usersApi.create({
-          name: cleanedUsername,
-          username: cleanedUsername,
-          email: email.trim(),
-          password,
-          role: "Collaborator"
-        });
-        
-        recordPortalAuditEntry({
-          action: 'signup',
-          actor: cleanedUsername,
-          target: 'Account Registration',
-          event: `New user "${cleanedUsername}" signed up (${email})`,
-          details: { role: 'Collaborator' },
-        });
+    setLoading(true);
 
-        login(newUser);
-        navigate('/dashboard');
+    try {
+      // 1. JWT Mode
+      if (mode === 'jwt') {
+        try {
+          const createdUser = await signup({
+            email: cleanedEmail,
+            password,
+            role: "Collaborator",
+          });
+          if (createdUser?.profileComplete === false) {
+            navigate('/complete-profile', {
+              state: { email: cleanedEmail, name: createdUser?.name || emailPrefix },
+            });
+          } else {
+            navigate('/dashboard');
+          }
+          return;
+        } catch (jwtErr) {
+          setError(jwtErr?.message || 'Signup failed');
+          return;
+        }
+      }
+
+      // 2. Firebase Mode
+      if (mode === 'firebase') {
+        let userCred;
+        try {
+          userCred = await createUserWithEmailAndPassword(auth, cleanedEmail, password);
+        } catch (fbErr) {
+          if (fbErr.code === 'auth/email-already-in-use') {
+            setError('An account with this email already exists.');
+          } else {
+            setError(fbErr.message || 'Signup failed');
+          }
+          return;
+        }
+
+        try {
+          if (auth.currentUser) {
+            await updateProfile(auth.currentUser, { displayName: emailPrefix });
+          }
+
+          recordPortalAuditEntry({
+            action: 'signup',
+            actor: emailPrefix,
+            target: 'Account Registration',
+            event: `New user "${cleanedEmail}" signed up (${cleanedEmail})`,
+            details: { role: 'Collaborator' },
+          });
+
+          navigate('/complete-profile', {
+            state: { email: cleanedEmail, name: emailPrefix },
+          });
+          return;
+        } catch (profileErr) {
+          console.warn('Post-signup step failed; deleting Firebase user to prevent orphan account:', profileErr);
+          try {
+            if (userCred?.user) {
+              await userCred.user.delete();
+            }
+          } catch (delErr) {
+            console.error('Failed to rollback Firebase user:', delErr);
+          }
+          setError(profileErr.message || 'Signup failed');
+          return;
+        }
+      }
+
+      // 3. Fallback / Auth Signup
+      const signupRes = await authApi.signup({
+        email: cleanedEmail,
+        password,
+        role: "Collaborator",
+      });
+      if (signupRes?.accessToken) {
+        setAccessToken(signupRes.accessToken);
+      }
+      const createdUser = signupRes?.user || signupRes;
+
+      recordPortalAuditEntry({
+        action: 'signup',
+        actor: createdUser?.name || emailPrefix,
+        target: 'Account Registration',
+        event: `New user "${createdUser?.name || cleanedEmail}" signed up (${cleanedEmail})`,
+        details: { role: 'Collaborator' },
+      });
+
+      login(createdUser);
+      if (createdUser?.profileComplete === false) {
+        navigate('/complete-profile', {
+          state: { email: cleanedEmail, name: createdUser?.name || emailPrefix },
+        });
       } else {
-        setError('Please fill in all fields.');
+        navigate('/dashboard');
       }
     } catch (err) {
-      const msg = err.message || 'Signup failed';
-      if (msg.toLowerCase().includes('already taken') || err.status === 409) {
-        setUsernameError('This username is already taken');
-        setError('This username is already taken');
-      } else {
-        setError(msg);
-      }
+      setError(err.message || 'Signup failed');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -149,35 +266,16 @@ const Signup = () => {
           
           <div id="signup-view" className="view-section">
             <h1 className="main-title">New User?</h1>
-            <div style={{ marginBottom: "1rem" }}></div> {/* small spacing equivalent to subtitle */}
+            <div style={{ marginBottom: "1rem" }}></div>
             
             {error && <div className="error-message">{error}</div>}
 
             <form className="auth-form" onSubmit={handleSubmit}>
               <div className="input-group">
-                <label>Username</label>
-                <input 
-                  type="text" 
-                  placeholder="deniel123"
-                  value={username}
-                  onChange={(e) => {
-                    setUsername(e.target.value);
-                    if (usernameError) setUsernameError('');
-                  }}
-                  onBlur={handleUsernameBlur}
-                  required
-                />
-                {usernameError && (
-                  <span className="field-error-text" style={{ color: 'var(--destructive, #ef4444)', fontSize: '0.82rem', marginTop: '4px', display: 'block' }}>
-                    {usernameError}
-                  </span>
-                )}
-              </div>
-
-              <div className="input-group">
-                <label>Email</label>
+                <label>Email Address</label>
                 <input 
                   type="email" 
+                  autoComplete="email"
                   placeholder="name@example.com"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
@@ -186,11 +284,11 @@ const Signup = () => {
               </div>
 
               <div className="input-group">
-                <label>Enter New Password</label>
+                <label>Password</label>
                 <div className="password-wrapper">
                   <input 
                     type={showPassword ? "text" : "password"} 
-                    placeholder="••••••"
+                    placeholder="••••••••"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
                     required
@@ -210,7 +308,7 @@ const Signup = () => {
                 <div className="password-wrapper">
                   <input 
                     type={showConfirmPassword ? "text" : "password"} 
-                    placeholder="••••••"
+                    placeholder="••••••••"
                     value={confirmPassword}
                     onChange={(e) => setConfirmPassword(e.target.value)}
                     required
@@ -225,41 +323,31 @@ const Signup = () => {
                 </div>
               </div>
 
-              <div className="options-row center-options">
-                <label className="remember-me">
-                  <input type="radio" name="remember_new" />
-                  <span>Remember me</span>
-                </label>
-              </div>
-
-              <button type="submit" className="btn-primary">
-                Create account
+              <button type="submit" className="btn-primary" disabled={loading}>
+                {loading ? 'Creating Account...' : 'Sign Up'}
               </button>
             </form>
 
             <div className="divider">
-              <span>or continue with</span>
+              <span>or sign up with</span>
             </div>
 
             <div className="social-login">
-              <button className="btn-social">
+              <button type="button" className="btn-social" onClick={handleGoogleSignIn} disabled={loading}>
                 <GoogleIcon /> Sign up with google
               </button>
-              <button className="btn-social">
+              <button type="button" className="btn-social" onClick={handleGithubSignIn} disabled={loading}>
                 <GithubIcon /> Sign up with github
               </button>
             </div>
 
-            <div className="back-to-login">
-              <span onClick={() => navigate('/login')} className="link-brown" style={{ cursor: 'pointer' }}>
-                &larr; Back to Sign In
-              </span>
-            </div>
+            <p className="subtitle" style={{ marginTop: '1.5rem', textAlign: 'center' }}>
+              Already have an account? <span onClick={() => navigate('/login')} style={{ cursor: 'pointer', color: '#514639', fontWeight: 700 }}>Log In</span>
+            </p>
           </div>
         </div>
         
         <div className="image-section">
-          {/* Note: Ensure the image path is correct */}
           <img src="/Assets/login_sin.jpg" alt="Developer Illustration" />
         </div>
       </div>

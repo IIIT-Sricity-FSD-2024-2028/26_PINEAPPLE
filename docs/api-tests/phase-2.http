@@ -1,0 +1,196 @@
+### TeamForge Phase 2 API Tests (REST Client Format)
+### Appeals and Reports: User Reporting, Admin Review, Actions, Warnings Appeals, and Audit Filter
+
+@baseUrl = http://localhost:3000
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@collaboratorToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@targetUserId = 4
+@warningId = YOUR_ACTIVE_WARNING_ID_HERE
+@reportId = YOUR_REPORT_ID_HERE
+@appealId = YOUR_APPEAL_ID_HERE
+
+### 1. Search Users for Reporting (Success - Safe Public Fields Only)
+# Expected Status: 200 OK
+# Expected Response: Array of [{ id, name, username, university }] (Never email or private fields)
+GET {{baseUrl}}/users/search?q=ro
+Authorization: {{collaboratorToken}}
+
+###
+
+### 2. Search Users - Query < 2 Characters
+# Expected Status: 200 OK
+# Expected Response: []
+GET {{baseUrl}}/users/search?q=r
+Authorization: {{collaboratorToken}}
+
+###
+
+### 3. Submit Report Against User (Success)
+# Expected Status: 201 Created
+# Expected Response: { id, reporterId, reportedUserId, reason, details, status: "Open", ... }
+POST {{baseUrl}}/reports
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "reportedUserId": "{{targetUserId}}",
+  "reason": "Harassment",
+  "details": "User has repeatedly posted derogatory messages in the project channels."
+}
+
+###
+
+### 4. Submit Report - Cannot Report Self
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "CANNOT_REPORT_SELF", "message": "You cannot report your own account." }
+POST {{baseUrl}}/reports
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "reportedUserId": "2",
+  "reason": "Spam",
+  "details": "Testing self reporting prevention guard."
+}
+
+###
+
+### 5. Submit Report - Cannot Report Admin
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "CANNOT_REPORT_ADMIN", "message": "You cannot report an administrator or superuser account." }
+POST {{baseUrl}}/reports
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "reportedUserId": "1",
+  "reason": "Spam",
+  "details": "Attempting to report platform administrator."
+}
+
+###
+
+### 6. Submit Report - Duplicate Open Report Conflict
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "DUPLICATE_OPEN_REPORT", "message": "You already have an open report pending review against this user." }
+POST {{baseUrl}}/reports
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "reportedUserId": "{{targetUserId}}",
+  "reason": "Spam",
+  "details": "Second open report while first report is still pending review."
+}
+
+###
+
+### 7. Get Current User Submitted Reports (Outcome Line Only)
+# Expected Status: 200 OK
+# Expected Response: Array of own reports with status and outcome summary
+GET {{baseUrl}}/reports/mine
+Authorization: {{collaboratorToken}}
+
+###
+
+### 8. Admin List Reports (Filtered & Paginated)
+# Expected Status: 200 OK (Requires "reports" permission)
+GET {{baseUrl}}/admin/reports?status=Open&page=1&limit=10
+Authorization: {{adminToken}}
+
+###
+
+### 9. Admin Get Report Details (With Earlier Warnings & Reports)
+# Expected Status: 200 OK
+# Expected Response: Full details, reporter, reported user, earlier warnings, earlier reports
+GET {{baseUrl}}/admin/reports/{{reportId}}
+Authorization: {{adminToken}}
+
+###
+
+### 10. Admin Update Report Status
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/admin/reports/{{reportId}}/status
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "status": "Under review",
+  "note": "Investigation opened by admin."
+}
+
+###
+
+### 11. Admin Action on Report (Warn Action)
+# Expected Status: 201 Created
+# Expected Response: Resolves report, issues warning via Phase 1 ModerationService, notifies reporter
+POST {{baseUrl}}/admin/reports/{{reportId}}/action
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "action": "warn",
+  "reason": "Official warning issued for community guidelines breach."
+}
+
+###
+
+### 12. Submit Appeal for Active Warning (Success)
+# Expected Status: 201 Created
+# Expected Response: { id, warningId, userId, explanation, status: "pending", ... }
+POST {{baseUrl}}/warnings/{{warningId}}/appeal
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "explanation": "I had an unexpected power outage and posted notice in Discord as soon as power returned."
+}
+
+###
+
+### 13. Submit Appeal - Already Appealed Conflict
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "ALREADY_APPEALED", "message": "This warning has already been appealed. Only one appeal is permitted per warning." }
+POST {{baseUrl}}/warnings/{{warningId}}/appeal
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "explanation": "Second appeal attempt for the exact same warning."
+}
+
+###
+
+### 14. Get Current User Appeals
+# Expected Status: 200 OK
+GET {{baseUrl}}/users/me/appeals
+Authorization: {{collaboratorToken}}
+
+###
+
+### 15. Admin List Appeals
+# Expected Status: 200 OK (Requires "reports" permission)
+GET {{baseUrl}}/admin/appeals?status=pending
+Authorization: {{adminToken}}
+
+###
+
+### 16. Admin Decide on Appeal (Accept Decision)
+# Expected Status: 201 Created
+# Expected Response: Appeal accepted, warning removed, +10 reputation restored once, active count lowered
+POST {{baseUrl}}/admin/appeals/{{appealId}}/decision
+Content-Type: application/json
+Authorization: {{adminToken}}
+
+{
+  "decision": "accept",
+  "note": "Documentation reviewed and confirmed. Warning removed from record."
+}
+
+###
+
+### 17. Admin Audit Log Filtered by User ID
+# Expected Status: 200 OK
+# Expected Response: Audit log entries where actor or target matches the specified user ID
+GET {{baseUrl}}/admin/audit?userId={{targetUserId}}
+Authorization: {{adminToken}}

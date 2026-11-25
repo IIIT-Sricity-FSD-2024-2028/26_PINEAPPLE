@@ -1,68 +1,90 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Controller, Get, Post, Body, Patch, Param, Headers, UnauthorizedException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader, ApiBody } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
 import { MentorshipService } from './mentorship.service';
-import { CreateApplicationDto, ApplicationStatus } from './dto/create-application.dto';
 import { IssueBadgeDto } from './dto/issue-badge.dto';
 import { Roles } from '../core/decorators/roles.decorator';
+import { throwLegacyEndpointRemoved } from '../common/utils/legacy-route.util';
 
 @ApiTags('Mentorship')
+@ApiBearerAuth()
 @Controller('mentorship')
 export class MentorshipController {
   constructor(private readonly mentorshipService: MentorshipService) {}
 
   @Post('apply')
-  @ApiOperation({ summary: 'Submit a mentorship application' })
-  @ApiHeader({ name: 'x-user-id', required: true })
-  @ApiResponse({ status: 201, description: 'Application submitted successfully.' })
-  applyForMentorship(
-    @Headers('x-user-id') userId: string,
-    @Body() dto: CreateApplicationDto,
-  ) {
-    if (!userId) throw new UnauthorizedException('x-user-id header is missing.');
-    return this.mentorshipService.applyForMentorship(userId, dto);
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use POST /mentor-applications)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  applyForMentorship(): never {
+    return throwLegacyEndpointRemoved('POST /mentorship/apply', 'POST /mentor-applications');
   }
 
   @Get('application')
-  @ApiOperation({ summary: 'Get current user application status' })
-  @ApiHeader({ name: 'x-user-id', required: true })
-  getApplicationByUserId(@Headers('x-user-id') userId: string) {
-    if (!userId) throw new UnauthorizedException('x-user-id header is missing.');
-    return this.mentorshipService.getApplicationByUserId(userId);
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use GET /mentor-applications/me)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  getApplicationByUserId(): never {
+    return throwLegacyEndpointRemoved('GET /mentorship/application', 'GET /mentor-applications/me');
   }
 
   @Patch('application/:id/review')
-  @Roles('Administrator')
-  @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Review an application (Admin only)' })
-  @ApiBody({ schema: { type: 'object', properties: { status: { type: 'string', example: 'Approved' } } } })
-  reviewApplication(
-    @Param('id') id: string,
-    @Body('status') status: ApplicationStatus,
-  ) {
-    return this.mentorshipService.reviewApplication(id, status);
+  @ApiOperation({
+    deprecated: true,
+    summary:
+      'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use PUT /mentor-applications/:id/approve or PUT /mentor-applications/:id/reject)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  reviewApplication(): never {
+    return throwLegacyEndpointRemoved(
+      'PATCH /mentorship/application/:id/review',
+      'PUT /mentor-applications/:id/approve or PUT /mentor-applications/:id/reject',
+    );
   }
 
   @Post('badge')
   @Roles('Mentor', 'Administrator', 'Super User')
-  @ApiHeader({ name: 'x-user-id', description: 'ID of the mentor', required: true })
-  @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
+  @ApiHeader({ name: 'x-user-id', description: 'Legacy-mode mentor user ID (ignored in JWT mode)', required: false })
+  @ApiHeader({ name: 'x-user-role', description: 'Legacy-mode user role (ignored in JWT mode)', required: false })
   @ApiOperation({ summary: 'Issue a recommendation badge (Mentor/Admin only)' })
   issueBadge(
-    @Headers('x-user-id') mentorId: string,
-    @Headers('x-user-role') role: string,
+    @CurrentUser() user: any,
+    @Headers('x-user-id') headerUserId: string,
+    @Headers('x-user-role') headerRole: string,
     @Body() dto: IssueBadgeDto,
   ) {
-    if (!mentorId) throw new UnauthorizedException('x-user-id header is missing.');
-    return this.mentorshipService.issueBadge(mentorId, dto, role);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveMentorId = isLegacy ? headerUserId : (user?.uid || user?.id);
+    const effectiveRole = isLegacy ? headerRole : user?.role;
+    if (!effectiveMentorId) throw new UnauthorizedException('Authentication required.');
+    return this.mentorshipService.issueBadge(effectiveMentorId, dto, effectiveRole);
+  }
+
+  @Post('badges')
+  @Roles('Mentor', 'Administrator', 'Super User')
+  @ApiOperation({ summary: 'Issue a recommendation badge (alias for POST /mentorship/badge)' })
+  issueBadgesAlias(
+    @CurrentUser() user: any,
+    @Headers('x-user-id') headerUserId: string,
+    @Headers('x-user-role') headerRole: string,
+    @Body() dto: IssueBadgeDto,
+  ) {
+    return this.issueBadge(user, headerUserId, headerRole, dto);
   }
 
   @Get('badges/:userId')
+  @Roles('user', 'project-owner', 'collaborator', 'mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Get all badges for a user' })
   getBadgesByUserId(@Param('userId') userId: string) {
     return this.mentorshipService.getBadgesByUserId(userId);
   }
 
   @Get('badges/project/:projectId')
+  @Roles('user', 'project-owner', 'collaborator', 'mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Get all badges for a project' })
   getBadgesByProjectId(@Param('projectId') projectId: string) {
     return this.mentorshipService.getBadgesByProjectId(projectId);

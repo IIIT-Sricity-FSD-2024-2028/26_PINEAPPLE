@@ -74,6 +74,17 @@
   transition: all 0.15s ease;
 }
 
+.tf-join-req-btn--view-profile {
+  background-color: #f1f5f9;
+  color: #334155;
+  border-color: #cbd5e1;
+}
+
+.tf-join-req-btn--view-profile:hover {
+  background-color: #e2e8f0;
+  color: #0f172a;
+}
+
 .tf-join-req-btn--accept {
   background-color: #16a34a;
   color: #ffffff;

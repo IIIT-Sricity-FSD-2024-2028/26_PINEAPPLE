@@ -1,0 +1,189 @@
+### TeamForge Phase 3 API Tests (REST Client Format)
+### Joining and Leaving: Join Request Limits, Rejection Reasons, Member Leave, Auto-Close 5-Day Empty Projects
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@applicantToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@nonMemberToken = Bearer YOUR_NON_MEMBER_TOKEN_HERE
+@mentorToken = Bearer YOUR_MENTOR_TOKEN_HERE
+@projectId = proj-1
+@joinRequestId = YOUR_JOIN_REQUEST_ID_HERE
+
+### 1. Check My Join Request Status on Project (Initial State: "none")
+# Expected Status: 200 OK
+# Expected Response: { "state": "none", "requestsUsed": 0, "requestsLeft": 2 }
+GET {{baseUrl}}/projects/{{projectId}}/my-request-status
+Authorization: {{applicantToken}}
+
+###
+
+### 2. Submit 1st Join Request (Success)
+# Expected Status: 201 Created
+# Expected Response: { id, projectId, userId, status: "pending", message: "..." }
+POST {{baseUrl}}/join-requests
+Content-Type: application/json
+Authorization: {{applicantToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "message": "Excited to contribute to the frontend UI of this project!"
+}
+
+###
+
+### 3. Submit Duplicate Pending Request (Refused: 409 ALREADY_PENDING)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "ALREADY_PENDING", "message": "You already have a pending join request for this project." }
+POST {{baseUrl}}/join-requests
+Content-Type: application/json
+Authorization: {{applicantToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "message": "Second attempt while pending."
+}
+
+###
+
+### 4. Check My Request Status While Pending
+# Expected Status: 200 OK
+# Expected Response: { "state": "pending", "requestsUsed": 1, "requestsLeft": 1 }
+GET {{baseUrl}}/projects/{{projectId}}/my-request-status
+Authorization: {{applicantToken}}
+
+###
+
+### 5. Owner Rejects Join Request Without Valid Reason (< 10 chars)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "REASON_REQUIRED", "message": "A rejection reason between 10 and 500 characters is required." }
+PATCH {{baseUrl}}/join-requests/{{joinRequestId}}
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "status": "rejected",
+  "reason": "Too short"
+}
+
+###
+
+### 6. Non-Owner Tries to Reject Join Request
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "message": "Only the project owner can approve or reject join requests." }
+PATCH {{baseUrl}}/join-requests/{{joinRequestId}}
+Content-Type: application/json
+Authorization: {{nonMemberToken}}
+
+{
+  "status": "rejected",
+  "reason": "Imposter attempting to reject."
+}
+
+###
+
+### 7. Owner Rejects Join Request with Valid Reason (Success)
+# Expected Status: 200 OK
+# Expected Response: { id, status: "rejected", rejectionReason: "Need candidate with more React experience." }
+PATCH {{baseUrl}}/join-requests/{{joinRequestId}}
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "status": "rejected",
+  "reason": "Need candidate with more production React experience for this milestone."
+}
+
+###
+
+### 8. Check Status After 1st Rejection ("rejected_can_retry")
+# Expected Status: 200 OK
+# Expected Response: { "state": "rejected_can_retry", "requestsUsed": 1, "requestsLeft": 1, "lastReason": "..." }
+GET {{baseUrl}}/projects/{{projectId}}/my-request-status
+Authorization: {{applicantToken}}
+
+###
+
+### 9. View My Applied Projects & Requests
+# Expected Status: 200 OK
+# Expected Response: Array of requests with rejectionReason, requestsUsed, requestsLeft
+GET {{baseUrl}}/join-requests/mine
+Authorization: {{applicantToken}}
+
+###
+
+### 10. Withdraw a Join Request
+# Expected Status: 200 OK (status updated to 'withdrawn')
+DELETE {{baseUrl}}/join-requests/{{joinRequestId}}
+Authorization: {{applicantToken}}
+
+###
+
+### 11. Collaborator Leaves Project - Missing/Invalid Reason (< 10 chars)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "REASON_REQUIRED", "message": "An explanation between 10 and 500 characters is required." }
+POST {{baseUrl}}/projects/{{projectId}}/leave
+Content-Type: application/json
+Authorization: {{applicantToken}}
+
+{
+  "category": "Too busy",
+  "reason": "Too short"
+}
+
+###
+
+### 12. Project Owner Attempts to Leave Own Project
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "OWNER_CANNOT_LEAVE", "message": "Project owner cannot leave their own project." }
+POST {{baseUrl}}/projects/{{projectId}}/leave
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "category": "Personal reasons",
+  "reason": "Project owner attempting to leave own project."
+}
+
+###
+
+### 13. Mentor Attempts to Leave Project
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "MENTOR_CANNOT_LEAVE", "message": "A mentor cannot leave or be removed once a project has started." }
+POST {{baseUrl}}/projects/{{projectId}}/leave
+Content-Type: application/json
+Authorization: {{mentorToken}}
+
+{
+  "category": "Other",
+  "reason": "Mentor attempting to leave project."
+}
+
+###
+
+### 14. Non-Member Attempts to Leave Project
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "NOT_A_MEMBER", "message": "You are not a member of this project." }
+POST {{baseUrl}}/projects/{{projectId}}/leave
+Content-Type: application/json
+Authorization: {{nonMemberToken}}
+
+{
+  "category": "Conflict with the team",
+  "reason": "Non-member attempting to leave project."
+}
+
+###
+
+### 15. Collaborator Successfully Leaves Project
+# Expected Status: 200 OK (or 201)
+# Tasks reset to ToDo/Unassigned, owner notified with category & reason, slot freed
+POST {{baseUrl}}/projects/{{projectId}}/leave
+Content-Type: application/json
+Authorization: {{applicantToken}}
+
+{
+  "category": "Too busy",
+  "reason": "Due to unexpected academic exams, I am unable to meet the upcoming milestones."
+}
+
+###

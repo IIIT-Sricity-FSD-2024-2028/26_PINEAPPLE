@@ -8,12 +8,6 @@ export class LeaderboardEntryDto {
   userId?: string;
 
   @ApiProperty({
-    description: 'User ranking position',
-    example: 1,
-  })
-  rank!: number;
-
-  @ApiProperty({
     description: 'User full name',
     example: 'Rohan Mehta',
   })
@@ -32,10 +26,18 @@ export class LeaderboardEntryDto {
   xp!: number;
 
   @ApiProperty({
-    description: 'User reputation score',
+    description: 'User reputation score (visible to self or admins)',
     example: 89,
+    required: false,
   })
-  rep!: number;
+  rep?: number;
+
+  @ApiProperty({
+    description: 'Standing band (Good standing, Fair standing, Low standing)',
+    example: 'Good standing',
+    required: false,
+  })
+  band?: string;
 
   @ApiProperty({
     description: 'Number of completed tasks',
@@ -48,4 +50,18 @@ export class LeaderboardEntryDto {
     example: 8,
   })
   projects!: number;
+
+  @ApiProperty({
+    description: 'On-time delivery percentage (if >= 3 tasks with due date)',
+    example: 88,
+    required: false,
+  })
+  onTimeRate?: number | null;
+
+  @ApiProperty({
+    description: 'Trust label',
+    example: 'Trusted contributor',
+    required: false,
+  })
+  trustLabel?: string;
 }

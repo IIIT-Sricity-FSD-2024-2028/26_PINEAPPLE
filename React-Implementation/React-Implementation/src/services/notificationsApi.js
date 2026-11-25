@@ -1,4 +1,4 @@
-import { apiRequest, getCurrentUserRole } from './apiClient.js';
+import { apiRequest, getCurrentUserRole, getCurrentUserId } from './apiClient.js';
 
 export const notificationsApi = {
   list: (params, role) => {
@@ -20,15 +20,6 @@ export const notificationsApi = {
     apiRequest(`/notifications/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  create: async (payload, role) => {
-    const res = await apiRequest("/notifications", "POST", payload, {
-      role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
-    }
-    return res;
-  },
   markAsRead: async (id, role) => {
     const res = await apiRequest(`/notifications/${id}/read`, "PUT", null, {
       role: role || getCurrentUserRole(),
@@ -39,13 +30,9 @@ export const notificationsApi = {
     return res;
   },
   markAllAsRead: async (role, userId) => {
-    const currentId =
-      userId ||
-      (typeof localStorage !== "undefined"
-        ? localStorage.getItem("teamforge.backendUserId")
-        : "");
+    const currentId = userId || getCurrentUserId() || "";
     const query = currentId ? `?userId=${encodeURIComponent(currentId)}` : "";
-    const res = await apiRequest(`/notifications/read-all${query}`, "PUT", null, {
+    const res = await apiRequest(`/notifications/read-all${query}`, "PATCH", null, {
       role: role || getCurrentUserRole(),
       userId: currentId,
     });
@@ -53,6 +40,14 @@ export const notificationsApi = {
       window.dispatchEvent(new CustomEvent("teamforge:notification_updated"));
     }
     return res;
+  },
+  getUnreadCount: async (role, userId) => {
+    const currentId = userId || getCurrentUserId() || "";
+    const query = currentId ? `?userId=${encodeURIComponent(currentId)}` : "";
+    return apiRequest(`/notifications/unread-count${query}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+      userId: currentId,
+    });
   },
   remove: async (id, role) => {
     const res = await apiRequest(`/notifications/${id}`, "DELETE", null, {

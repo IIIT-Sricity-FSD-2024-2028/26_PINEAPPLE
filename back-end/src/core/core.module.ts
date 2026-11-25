@@ -7,12 +7,18 @@ import { LoggerMiddleware } from './middleware/logger.middleware';
 import { SecurityMiddleware } from './middleware/security.middleware';
 import { RateLimiterMiddleware } from './middleware/rate-limiter.middleware';
 import { SanitizerMiddleware } from './middleware/sanitizer.middleware';
+import { ClockService } from '../common/services/clock.service';
+import { ContentFilterService } from '../common/services/content-filter.service';
+import { FileCleanupService } from '../common/services/file-cleanup.service';
+import { ContentFilterPipe, ContentFilterInterceptor } from '../common/pipes/content-filter.pipe';
 
 /**
  * CoreModule — Global Module for Cross-Cutting Concerns
  *
  * Registers and exports:
  *  - RolesGuard: RBAC authorization guard
+ *  - ClockService: Central injectable clock service for time travel & scheduled jobs
+ *  - ContentFilterService / Pipe / Interceptor: Phase 16 automated content filter
  *  - LogManagerService: Central buffered log writer with periodic flush
  *  - LogViewerController: Admin API to view recent logs
  *  - Middleware providers: Logger, Security, RateLimiter, Sanitizer
@@ -26,6 +32,11 @@ import { SanitizerMiddleware } from './middleware/sanitizer.middleware';
   controllers: [LogViewerController],
   providers: [
     RolesGuard,
+    ClockService,
+    ContentFilterService,
+    FileCleanupService,
+    ContentFilterPipe,
+    ContentFilterInterceptor,
     LogManagerService,
     LoggerMiddleware,
     SecurityMiddleware,
@@ -34,6 +45,11 @@ import { SanitizerMiddleware } from './middleware/sanitizer.middleware';
   ],
   exports: [
     RolesGuard,
+    ClockService,
+    ContentFilterService,
+    FileCleanupService,
+    ContentFilterPipe,
+    ContentFilterInterceptor,
     LogManagerService,
     LoggerMiddleware,
     SecurityMiddleware,

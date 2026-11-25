@@ -58,4 +58,14 @@ export class UpdateMentorApplicationDto {
   @IsOptional()
   @IsIn(['pending', 'approved', 'rejected', 'Pending', 'Approved', 'Rejected'])
   status?: string;
+
+  @ApiPropertyOptional({ description: 'Verified certificates list' })
+  @IsOptional()
+  @IsArray()
+  certificates?: any[];
+
+  @ApiPropertyOptional({ description: 'Excluded credentials list' })
+  @IsOptional()
+  @IsArray()
+  excludedCertificates?: any[];
 }

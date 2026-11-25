@@ -1,6 +1,14 @@
-import { useState } from "react";
+import { useState, useEffect, useRef, useContext, useCallback } from "react";
+import { useLocation } from "react-router-dom";
 import SearchBar from "../components/common/SearchBar";
-import "./help.css"; // Import page-specific stylesheet
+import usersApi from "../services/usersApi";
+import reportsApi from "../services/reportsApi";
+import supportApi from "../services/supportApi";
+import { AuthContext } from "../context/AuthContext";
+import { highlightMatch } from "../utils/highlightMatch";
+import VerifyEmailBanner from "../components/common/VerifyEmailBanner";
+import { formatDateTime } from "../utils/dateFormatter";
+import "./help.css";
 
 // --- SVGs ---
 const RocketIcon = () => (
@@ -47,6 +55,24 @@ const ChevronDownIcon = () => (
   </svg>
 );
 
+const FlagIcon = () => (
+  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+    <line x1="4" y1="22" x2="4" y2="15"></line>
+  </svg>
+);
+
+// --- Allowed Report Reasons ---
+const REPORT_REASONS = [
+  "Harassment",
+  "Spam",
+  "Cheating or plagiarism",
+  "Fake proof",
+  "Abandoned work",
+  "Inappropriate content",
+  "Other",
+];
+
 // --- Data ---
 const FAQS = [
   {
@@ -55,7 +81,7 @@ const FAQS = [
     items: [
       {
         q: "How do I create a project?",
-        a: "Switch your role to 'Project Owner' from the role switcher in the header. Then navigate to 'Create Project' in the sidebar, fill in your project details including title, description, objectives, skills required, and estimated duration, and submit.",
+        a: "Switch your role to 'Project Owner' from the role switcher in the header. Then navigate to 'Create Project' in the sidebar, fill in your project details including title, description, objectives, skills required, and due date, and submit.",
       },
       {
         q: "How do I apply to join a project?",
@@ -123,8 +149,7 @@ const FAQS = [
   },
 ];
 
-
-// --- Component ---
+// --- Subcomponent: FAQ Category ---
 const FaqCategory = ({ category }) => {
   const [openIndex, setOpenIndex] = useState(null);
 
@@ -160,56 +185,1111 @@ const FaqCategory = ({ category }) => {
   );
 };
 
-
+// --- Main Help Component ---
 const Help = () => {
-  const [search, setSearch] = useState("");
+  const { user: currentUser } = useContext(AuthContext) || {};
+  const location = useLocation();
+  const [activeTab, setActiveTab] = useState(() => {
+    const params = new URLSearchParams(location?.search || "");
+    const tabParam = params.get("tab");
+    const ticketParam = params.get("ticket");
+    if (tabParam === "tickets" || ticketParam) return "tickets";
+    if (tabParam === "my-reports" || tabParam === "reports" || tabParam === "myreports") return "my-reports";
+    if (tabParam === "report") return "report";
+    return "support";
+  }); // "support" | "tickets" | "report" | "my-reports"
+  const [faqSearch, setFaqSearch] = useState("");
 
+  // My Tickets & New Ticket state (Phase 27)
+  const [myTickets, setMyTickets] = useState([]);
+  const [ticketsLoading, setTicketsLoading] = useState(false);
+  const [ticketsError, setTicketsError] = useState("");
+  const [selectedTicket, setSelectedTicket] = useState(null);
+  const [ticketDetailLoading, setTicketDetailLoading] = useState(false);
+
+  const [ticketCategory, setTicketCategory] = useState("Help Inquiry");
+  const [ticketPriority, setTicketPriority] = useState("normal");
+  const [ticketSubject, setTicketSubject] = useState("");
+  const [ticketMessage, setTicketMessage] = useState("");
+  const [parentTicket, setParentTicket] = useState(null);
+  const [ticketSubmitting, setTicketSubmitting] = useState(false);
+  const [ticketSubmitError, setTicketSubmitError] = useState("");
+  const [ticketSubmitSuccess, setTicketSubmitSuccess] = useState("");
+
+  const [myReplyBody, setMyReplyBody] = useState("");
+  const [sendingMyReply, setSendingMyReply] = useState(false);
+  const [myReplyError, setMyReplyError] = useState("");
+
+  // Report form state
+  const [searchQuery, setSearchQuery] = useState("");
+  const [searchResults, setSearchResults] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
+  const [emailNotVerifiedError, setEmailNotVerifiedError] = useState(false);
+
+  // My Reports list state
+  const [myReports, setMyReports] = useState([]);
+  const [loadingReports, setLoadingReports] = useState(false);
+
+  const searchDebounceRef = useRef(null);
+  const comboboxRef = useRef(null);
+
+  // Close dropdown on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e) => {
+      if (comboboxRef.current && !comboboxRef.current.contains(e.target)) {
+        setDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleOutsideClick);
+    return () => document.removeEventListener("mousedown", handleOutsideClick);
+  }, []);
+
+  // Fetch my reports when switching to report tab
+  const fetchMyReports = async () => {
+    setLoadingReports(true);
+    try {
+      const res = await reportsApi.getMyReports();
+      const list = Array.isArray(res) ? res : res?.data || [];
+      setMyReports(list);
+    } catch (err) {
+      console.warn("Could not load user reports:", err);
+    } finally {
+      setLoadingReports(false);
+    }
+  };
+
+  useEffect(() => {
+    if (activeTab === "report" || activeTab === "my-reports") {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      fetchMyReports();
+    }
+  }, [activeTab]);
+
+  const fetchMyTickets = useCallback(async () => {
+    setTicketsLoading(true);
+    setTicketsError("");
+    try {
+      const res = await supportApi.listMyTickets();
+      const list = Array.isArray(res) ? res : res?.data || [];
+      setMyTickets(list);
+    } catch (err) {
+      setTicketsError(err?.serverMessage || err?.message || "Failed to load your support tickets.");
+    } finally {
+      setTicketsLoading(false);
+    }
+  }, []);
+
+  const openMyTicketDetail = useCallback(async (ticketId) => {
+    setTicketDetailLoading(true);
+    setMyReplyError("");
+    try {
+      const detail = await supportApi.getMyTicket(ticketId);
+      setSelectedTicket(detail);
+    } catch (err) {
+      setTicketsError(err?.serverMessage || err?.message || "Could not load support ticket.");
+    } finally {
+      setTicketDetailLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (activeTab !== "tickets") return undefined;
+    let active = true;
+    supportApi.listMyTickets()
+      .then((res) => {
+        if (!active) return;
+        setTicketsError("");
+        const list = Array.isArray(res) ? res : res?.data || [];
+        setMyTickets(list);
+      })
+      .catch((err) => {
+        if (active) {
+          setTicketsError(err?.serverMessage || err?.message || "Failed to load your support tickets.");
+        }
+      })
+      .finally(() => {
+        if (active) setTicketsLoading(false);
+      });
+    return () => {
+      active = false;
+    };
+  }, [activeTab]);
+
+  useEffect(() => {
+    const params = new URLSearchParams(location?.search || "");
+    const tabParam = params.get("tab");
+    const ticketParam = params.get("ticket");
+    if (tabParam === "my-reports" || tabParam === "reports" || tabParam === "myreports") {
+      setActiveTab("my-reports");
+    } else if (tabParam === "report") {
+      setActiveTab("report");
+    } else if (tabParam === "tickets" || ticketParam) {
+      setActiveTab("tickets");
+    }
+    if (!ticketParam) return undefined;
+    let active = true;
+    supportApi.getMyTicket(ticketParam)
+      .then((detail) => {
+        if (!active) return;
+        setMyReplyError("");
+        setSelectedTicket(detail);
+      })
+      .catch((err) => {
+        if (active) {
+          setTicketsError(err?.serverMessage || err?.message || "Could not load support ticket.");
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [location?.search]);
+
+  const handleSubmitNewTicket = async (e) => {
+    e.preventDefault();
+    const s = ticketSubject.trim();
+    const m = ticketMessage.trim();
+    if (s.length < 5 || s.length > 120 || m.length < 10 || m.length > 2000) return;
+
+    setTicketSubmitting(true);
+    setTicketSubmitError("");
+    setTicketSubmitSuccess("");
+    try {
+      const created = await supportApi.createTicket({
+        type: "help",
+        category: ticketCategory,
+        priority: ticketPriority,
+        subject: s,
+        message: m,
+        ...(parentTicket?.id ? { parentTicketId: parentTicket.id } : {}),
+      });
+      setTicketSubmitSuccess("Support ticket submitted successfully.");
+      setTicketSubject("");
+      setTicketMessage("");
+      setParentTicket(null);
+      await fetchMyTickets();
+      if (created?.id) {
+        setSelectedTicket(created);
+      }
+    } catch (err) {
+      setTicketSubmitError(err?.serverMessage || err?.message || "Failed to submit ticket.");
+    } finally {
+      setTicketSubmitting(false);
+    }
+  };
+
+  const handleSendMyReply = async (e) => {
+    e.preventDefault();
+    if (!selectedTicket || !myReplyBody.trim()) return;
+    setSendingMyReply(true);
+    setMyReplyError("");
+    try {
+      const updated = await supportApi.replyToMyTicket(selectedTicket.id, myReplyBody.trim());
+      setSelectedTicket(updated);
+      setMyReplyBody("");
+      fetchMyTickets();
+    } catch (err) {
+      if (err?.code === 'TICKET_CLOSED' || /read-only|ticket_closed/i.test(err?.serverMessage || err?.message || '')) {
+        try {
+          const fresh = await supportApi.getMyTicket(selectedTicket.id);
+          setSelectedTicket(fresh);
+        } catch {}
+        setMyReplyError('This ticket is closed and can no longer receive replies. Please open a follow-up ticket.');
+        fetchMyTickets();
+      } else {
+        setMyReplyError(err?.serverMessage || err?.message || "Failed to send reply.");
+      }
+    } finally {
+      setSendingMyReply(false);
+    }
+  };
+
+  // Debounced search for users (min 2 chars, never returns email)
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    setErrorMessage("");
+
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (!val || val.trim().length < 2) {
+      setSearchResults([]);
+      setDropdownOpen(false);
+      setIsSearching(false);
+      return;
+    }
+
+    setIsSearching(true);
+    searchDebounceRef.current = setTimeout(async () => {
+      try {
+        const users = await usersApi.searchUsers(val.trim());
+        const rawList = Array.isArray(users) ? users : users?.data || [];
+        // Filter out current user from search results (cannot report self)
+        const list = rawList.filter((u) => {
+          if (!currentUser?.id && !currentUser?.email) return true;
+          const matchId = currentUser?.id && String(u.id) === String(currentUser.id);
+          const matchUsername =
+            currentUser?.username &&
+            u.username &&
+            String(u.username).toLowerCase() === String(currentUser.username).toLowerCase();
+          return !matchId && !matchUsername;
+        });
+        setSearchResults(list);
+        setDropdownOpen(true);
+      } catch (err) {
+        console.warn("User search error:", err);
+        setSearchResults([]);
+      } finally {
+        setIsSearching(false);
+      }
+    }, 300);
+  };
+
+  const handleSelectUser = (user) => {
+    setSelectedUser(user);
+    setSearchQuery("");
+    setSearchResults([]);
+    setDropdownOpen(false);
+    setErrorMessage("");
+  };
+
+  const handleClearSelectedUser = () => {
+    setSelectedUser(null);
+    setSearchQuery("");
+    setSearchResults([]);
+    setDropdownOpen(false);
+  };
+
+  const isSelf = Boolean(
+    currentUser?.id && selectedUser?.id && String(selectedUser.id) === String(currentUser.id)
+  );
+
+  const handleSubmitReport = async (e) => {
+    e.preventDefault();
+    if (!selectedUser || !reason || details.trim().length < 20 || details.length > 1000) {
+      return;
+    }
+
+    if (isSelf) {
+      setErrorMessage("You cannot report yourself.");
+      return;
+    }
+
+    setSubmitting(true);
+    setErrorMessage("");
+    setSuccessMessage("");
+    setEmailNotVerifiedError(false);
+
+    try {
+      await reportsApi.createReport({
+        reportedUserId: selectedUser.id,
+        reason,
+        details: details.trim(),
+      });
+      setSuccessMessage(
+        "Your report has been submitted. Platform moderators will review it promptly. Thank you for helping keep TeamForge safe."
+      );
+      setSelectedUser(null);
+      setReason("");
+      setDetails("");
+      setSearchQuery("");
+      fetchMyReports();
+    } catch (err) {
+      if (err?.code === 'EMAIL_NOT_VERIFIED' || /verify your email/i.test(err?.serverMessage || err?.message || '')) {
+        setEmailNotVerifiedError(true);
+      }
+      const msg = err?.serverMessage || err?.message || err?.error || "Failed to submit report.";
+      setErrorMessage(msg);
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  // Filtered FAQs
   const filteredFaqs = FAQS.map((cat) => {
-    if (!search.trim()) return cat;
-    const q = search.toLowerCase();
+    if (!faqSearch.trim()) return cat;
+    const q = faqSearch.toLowerCase();
     const matchingItems = cat.items.filter(
       (item) => item.q.toLowerCase().includes(q) || item.a.toLowerCase().includes(q)
     );
     return matchingItems.length > 0 ? { ...cat, items: matchingItems } : null;
   }).filter(Boolean);
 
+  const isFormValid =
+    Boolean(selectedUser) &&
+    !isSelf &&
+    Boolean(reason) &&
+    details.trim().length >= 20 &&
+    details.length <= 1000 &&
+    !submitting;
+
   return (
     <div className="help-page">
-      
       {/* Header */}
       <div className="help-header">
         <h1 className="help-title-main">Help & Support</h1>
-        <p className="help-subtitle">Find answers or reach out to us.</p>
+        <p className="help-subtitle">Find answers, reach out to us, or report platform violations.</p>
       </div>
 
-      <div style={{ marginBottom: "2rem", maxWidth: "500px" }}>
-        <SearchBar
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onClear={() => setSearch("")}
-          placeholder="Search FAQs and help topics..."
-        />
+      {/* Tabs */}
+      <div className="help-tabs-header">
+        <button
+          className={`help-tab-button ${activeTab === "support" ? "active" : ""}`}
+          onClick={() => setActiveTab("support")}
+          data-testid="tab-contact"
+        >
+          Contact Support & FAQs
+        </button>
+        <button
+          className={`help-tab-button ${activeTab === "tickets" ? "active" : ""}`}
+          onClick={() => setActiveTab("tickets")}
+          data-testid="tab-tickets"
+        >
+          My Tickets
+        </button>
+        <button
+          className={`help-tab-button ${activeTab === "report" ? "active" : ""}`}
+          onClick={() => setActiveTab("report")}
+          data-testid="tab-report"
+        >
+          Report a User
+        </button>
+        <button
+          className={`help-tab-button ${activeTab === "my-reports" ? "active" : ""}`}
+          onClick={() => setActiveTab("my-reports")}
+          data-testid="tab-my-reports"
+        >
+          My reports
+        </button>
       </div>
 
-      {/* FAQ Sections */}
-      {filteredFaqs.length > 0 ? (
-        filteredFaqs.map((cat, index) => (
-          <FaqCategory key={index} category={cat} />
-        ))
-      ) : (
-        <p style={{ color: "#6b7280" }}>No FAQs match "{search}".</p>
-      )}
+      {activeTab === "support" ? (
+        <>
+          <div style={{ marginBottom: "2rem", maxWidth: "500px" }}>
+            <SearchBar
+              value={faqSearch}
+              onChange={(e) => setFaqSearch(e.target.value)}
+              onClear={() => setFaqSearch("")}
+              placeholder="Search FAQs and help topics..."
+            />
+          </div>
 
-      {/* Support Contact */}
-      <div className="help-glass-card" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', gap: '1rem' }}>
-        <div className="help-icon-box"><MailIcon /></div>
-        <div>
-          <h4 style={{ margin: 0, fontWeight: 700 }}>Still have questions?</h4>
-          <p style={{ margin: '0.25rem 0 0', color: '#6b7280', fontSize: '0.88rem' }}>
-            Reach out to our platform administration team at <a href="mailto:support@teamforge.edu" style={{ color: '#5f513f', fontWeight: 600 }}>support@teamforge.edu</a>
-          </p>
+          {/* FAQ Sections */}
+          {filteredFaqs.length > 0 ? (
+            filteredFaqs.map((cat, index) => (
+              <FaqCategory key={index} category={cat} />
+            ))
+          ) : (
+            <p style={{ color: "#6b7280" }}>No FAQs match "{faqSearch}".</p>
+          )}
+
+          {/* Support Contact & Direct Ticket Link */}
+          <div className="help-glass-card" style={{ marginTop: "1.5rem", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "1rem" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
+              <div className="help-icon-box"><MailIcon /></div>
+              <div>
+                <h4 style={{ margin: 0, fontWeight: 700 }}>Still have questions?</h4>
+                <p style={{ margin: "0.25rem 0 0", color: "#6b7280", fontSize: "0.88rem" }}>
+                  Open a support ticket directly or reach our team at{" "}
+                  <a href="mailto:support@teamforge.edu" style={{ color: "#5f513f", fontWeight: 600 }}>
+                    support@teamforge.edu
+                  </a>
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              className="help-btn-primary"
+              data-testid="open-my-tickets-link"
+              onClick={() => setActiveTab("tickets")}
+            >
+              Open a Ticket / My Tickets
+            </button>
+          </div>
+        </>
+      ) : activeTab === "tickets" ? (
+        <div data-testid="my-tickets-section">
+          {/* New Ticket Form */}
+          <div className="help-glass-card">
+            <div className="help-card-title">
+              <div className="help-icon-box"><MailIcon /></div>
+              New Support Ticket
+            </div>
+            <p style={{ fontSize: "0.9rem", color: "#6b7280", marginTop: "-0.4rem", marginBottom: "1.2rem" }}>
+              Submit an inquiry to platform support. You can open up to 5 tickets per day.
+            </p>
+
+            {parentTicket && (
+              <div
+                style={{
+                  marginBottom: "1rem",
+                  padding: "10px 12px",
+                  borderRadius: "8px",
+                  background: "#eff6ff",
+                  border: "1px solid #bfdbfe",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  alignItems: "center",
+                  fontSize: "0.86rem",
+                }}
+              >
+                <span>
+                  Follow-up linked to closed ticket: <strong>{parentTicket.subject}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setParentTicket(null)}
+                  style={{ background: "none", border: "none", color: "#1d4ed8", cursor: "pointer", fontWeight: 600 }}
+                >
+                  Clear
+                </button>
+              </div>
+            )}
+
+            {ticketSubmitSuccess && (
+              <div className="help-banner-success" data-testid="ticket-success" role="alert">
+                {ticketSubmitSuccess}
+              </div>
+            )}
+            {ticketSubmitError && (
+              <div className="help-banner-error" data-testid="ticket-error" role="alert">
+                {ticketSubmitError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitNewTicket} data-testid="new-ticket-form">
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: "12px", marginBottom: "1rem" }}>
+                <div>
+                  <label className="help-label" htmlFor="ticket-category-select">Category</label>
+                  <select
+                    id="ticket-category-select"
+                    className="help-input"
+                    value={ticketCategory}
+                    onChange={(e) => setTicketCategory(e.target.value)}
+                  >
+                    <option value="Help Inquiry">Help Inquiry</option>
+                    <option value="Bug Report">Bug Report</option>
+                    <option value="Feature Request">Feature Request</option>
+                    <option value="Account Issue">Account Issue</option>
+                    <option value="Other">Other</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="help-label" htmlFor="ticket-priority-select">Priority</label>
+                  <select
+                    id="ticket-priority-select"
+                    className="help-input"
+                    value={ticketPriority}
+                    onChange={(e) => setTicketPriority(e.target.value)}
+                  >
+                    <option value="low">Low</option>
+                    <option value="normal">Normal</option>
+                    <option value="high">High</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="help-input-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.4rem" }}>
+                  <label className="help-label" htmlFor="ticket-subject-input" style={{ margin: 0 }}>
+                    Subject * (5–120 chars)
+                  </label>
+                  <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>
+                    {ticketSubject.trim().length} / 120
+                  </span>
+                </div>
+                <input
+                  id="ticket-subject-input"
+                  data-testid="ticket-subject-input"
+                  type="text"
+                  className="help-input"
+                  maxLength={120}
+                  value={ticketSubject}
+                  onChange={(e) => setTicketSubject(e.target.value)}
+                  placeholder="Briefly describe your question or issue..."
+                />
+              </div>
+
+              <div className="help-input-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.4rem" }}>
+                  <label className="help-label" htmlFor="ticket-message-input" style={{ margin: 0 }}>
+                    Message * (10–2000 chars)
+                  </label>
+                  <span style={{ fontSize: "0.78rem", color: "#6b7280" }}>
+                    {ticketMessage.trim().length} / 2000
+                  </span>
+                </div>
+                <textarea
+                  id="ticket-message-input"
+                  data-testid="ticket-message-input"
+                  className="help-input help-textarea"
+                  maxLength={2000}
+                  value={ticketMessage}
+                  onChange={(e) => setTicketMessage(e.target.value)}
+                  placeholder="Provide detailed information so our support team can assist you..."
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="help-btn-primary"
+                data-testid="submit-ticket-btn"
+                disabled={
+                  ticketSubmitting ||
+                  ticketSubject.trim().length < 5 ||
+                  ticketSubject.trim().length > 120 ||
+                  ticketMessage.trim().length < 10 ||
+                  ticketMessage.trim().length > 2000
+                }
+              >
+                {ticketSubmitting ? "Submitting..." : "Submit Ticket"}
+              </button>
+            </form>
+          </div>
+
+          {/* My Tickets List & Detail */}
+          <div className="help-glass-card" style={{ marginTop: "2rem" }}>
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+              <h3 style={{ margin: 0, fontWeight: 700 }}>My Support Tickets</h3>
+              <button
+                type="button"
+                className="btn btn-outline"
+                onClick={fetchMyTickets}
+                disabled={ticketsLoading}
+              >
+                Refresh
+              </button>
+            </div>
+
+            {ticketsError && (
+              <div className="help-banner-error" role="alert">
+                {ticketsError}
+              </div>
+            )}
+
+            {ticketsLoading ? (
+              <p style={{ color: "#6b7280" }}>Loading your tickets...</p>
+            ) : myTickets.length === 0 ? (
+              <p style={{ color: "#6b7280" }}>You have not submitted any support tickets yet.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="help-reports-table" data-testid="my-tickets-list">
+                  <thead>
+                    <tr>
+                      <th>Subject</th>
+                      <th>Type</th>
+                      <th>Priority</th>
+                      <th>Status</th>
+                      <th>Created</th>
+                      <th></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myTickets.map((t) => (
+                      <tr key={t.id} data-testid={`my-ticket-row-${t.id}`}>
+                        <td><strong>{t.subject}</strong></td>
+                        <td>{t.type === "project_closure" ? "Closure Request" : "Help"}</td>
+                        <td style={{ textTransform: "capitalize" }}>{t.priority || "normal"}</td>
+                        <td style={{ textTransform: "capitalize" }}>{String(t.status || "open").replace("_", " ")}</td>
+                        <td style={{ color: "#6b7280" }}>{formatDateTime(t.createdAt)}</td>
+                        <td>
+                          <button
+                            type="button"
+                            className="btn btn-outline"
+                            data-testid={`view-my-ticket-${t.id}`}
+                            onClick={() => openMyTicketDetail(t.id)}
+                          >
+                            View Thread
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {ticketDetailLoading && (
+              <p style={{ color: "#6b7280", marginTop: "1rem" }}>Loading ticket thread...</p>
+            )}
+
+            {selectedTicket && !ticketDetailLoading && (
+              <div
+                data-testid="my-ticket-detail"
+                style={{
+                  marginTop: "1.5rem",
+                  padding: "16px",
+                  borderRadius: "10px",
+                  border: "1px solid #e2e8f0",
+                  background: "#f8fafc",
+                }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px", marginBottom: "8px" }}>
+                  <div>
+                    <h4 style={{ margin: 0 }}>{selectedTicket.subject}</h4>
+                    <div style={{ fontSize: "0.82rem", color: "#64748b", marginTop: "2px" }}>
+                      Status: <strong>{String(selectedTicket.status || "open").replace("_", " ")}</strong> · Priority: {selectedTicket.priority}
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    className="btn btn-outline"
+                    onClick={() => setSelectedTicket(null)}
+                  >
+                    Close Detail
+                  </button>
+                </div>
+
+                <p style={{ margin: "10px 0", whiteSpace: "pre-wrap", fontSize: "0.92rem" }}>
+                  {selectedTicket.message}
+                </p>
+
+                {selectedTicket.resolutionNote && (
+                  <div
+                    data-testid="my-ticket-resolution-note"
+                    style={{
+                      padding: "10px 12px",
+                      borderRadius: "8px",
+                      background: selectedTicket.status === "rejected" ? "#fef2f2" : "#ecfdf5",
+                      border: `1px solid ${selectedTicket.status === "rejected" ? "#fecaca" : "#a7f3d0"}`,
+                      marginBottom: "12px",
+                      fontSize: "0.88rem",
+                    }}
+                  >
+                    <strong>Resolution Note:</strong> {selectedTicket.resolutionNote}
+                  </div>
+                )}
+
+                <div data-testid="my-ticket-replies" style={{ display: "flex", flexDirection: "column", gap: "8px", marginTop: "10px" }}>
+                  {(selectedTicket.replies || []).map((r) => (
+                    <div
+                      key={r.id}
+                      style={{
+                        padding: "8px 12px",
+                        borderRadius: "8px",
+                        background: r.authorRole === "admin" ? "#eff6ff" : "#ffffff",
+                        border: "1px solid #e2e8f0",
+                      }}
+                    >
+                      <div style={{ fontSize: "0.78rem", color: "#64748b", marginBottom: "2px" }}>
+                        <strong>{r.authorName}</strong> · {formatDateTime(r.createdAt)}
+                      </div>
+                      <div style={{ fontSize: "0.88rem", whiteSpace: "pre-wrap" }}>{r.body}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {["resolved", "rejected"].includes(selectedTicket.status) ? (
+                  <div style={{ marginTop: "12px", display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
+                    <span style={{ fontSize: "0.85rem", color: "#64748b" }}>
+                      This ticket is {selectedTicket.status} and cannot receive further replies.
+                    </span>
+                    <button
+                      type="button"
+                      className="help-btn-primary"
+                      data-testid="open-followup-ticket-btn"
+                      onClick={() => {
+                        setParentTicket(selectedTicket);
+                        setTicketSubject(`Follow-up: ${selectedTicket.subject}`.slice(0, 120));
+                      }}
+                    >
+                      Open Follow-Up Ticket
+                    </button>
+                  </div>
+                ) : (
+                  <form onSubmit={handleSendMyReply} style={{ marginTop: "12px" }}>
+                    {myReplyError && (
+                      <div className="help-banner-error" role="alert" style={{ marginBottom: "8px" }}>
+                        {myReplyError}
+                      </div>
+                    )}
+                    <textarea
+                      data-testid="my-ticket-reply-input"
+                      rows={2}
+                      className="help-input"
+                      maxLength={2000}
+                      value={myReplyBody}
+                      onChange={(e) => setMyReplyBody(e.target.value)}
+                      placeholder="Write a reply (1–2000 chars)..."
+                    />
+                    <div style={{ marginTop: "8px", display: "flex", justifyContent: "flex-end" }}>
+                      <button
+                        type="submit"
+                        className="help-btn-primary"
+                        data-testid="send-my-reply-btn"
+                        disabled={sendingMyReply || !myReplyBody.trim()}
+                      >
+                        {sendingMyReply ? "Sending..." : "Send Reply"}
+                      </button>
+                    </div>
+                  </form>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      </div>
+      ) : activeTab === "report" ? (
+        <div>
+          {/* Report User Form Card */}
+          <div className="help-glass-card">
+            <div className="help-card-title">
+              <div className="help-icon-box"><FlagIcon /></div>
+              Report a User
+            </div>
+            <p style={{ fontSize: "0.92rem", color: "var(--muted-fg, #6b7280)", marginTop: "-0.5rem", marginBottom: "1.5rem" }}>
+              Help us maintain a respectful community. All reports are confidential; the reported user will never see your identity.
+            </p>
+
+            {successMessage && (
+              <div className="help-banner-success" data-testid="report-success" role="alert">
+                {successMessage}
+              </div>
+            )}
+
+            {emailNotVerifiedError && <VerifyEmailBanner forceShow />}
+
+            {errorMessage && (
+              <div className="help-banner-error" data-testid="report-error" role="alert">
+                {errorMessage}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmitReport}>
+              {/* User Selector Combobox */}
+              <div className="help-input-group" ref={comboboxRef}>
+                <label className="help-label" htmlFor="user-search-input">
+                  User to Report *
+                </label>
+                {selectedUser ? (
+                  <div className="help-selected-user-box" data-testid="selected-user-box">
+                    <div>
+                      <strong style={{ color: "#111827", fontSize: "0.95rem" }}>{selectedUser.name}</strong>
+                      <span style={{ color: "#6b7280", marginLeft: "8px", fontSize: "0.88rem" }}>
+                        @{selectedUser.username}
+                      </span>
+                      {selectedUser.university && (
+                        <span style={{ color: "#9ca3af", marginLeft: "8px", fontSize: "0.82rem" }}>
+                          · {selectedUser.university}
+                        </span>
+                      )}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearSelectedUser}
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: "pointer",
+                        color: "#dc2626",
+                        fontSize: "0.85rem",
+                        fontWeight: 600,
+                      }}
+                    >
+                      ✕ Change
+                    </button>
+                  </div>
+                ) : (
+                  <div className="help-combobox-wrapper">
+                    <input
+                      id="user-search-input"
+                      data-testid="user-search-input"
+                      type="text"
+                      className="help-input"
+                      placeholder="Type name or @username to search (min 2 letters)..."
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      onFocus={() => {
+                        if (searchResults.length > 0) setDropdownOpen(true);
+                      }}
+                      autoComplete="off"
+                    />
+                    {isSearching && (
+                      <span style={{ position: "absolute", right: "12px", top: "12px", fontSize: "0.82rem", color: "#6b7280" }}>
+                        Searching...
+                      </span>
+                    )}
+                    {dropdownOpen && (
+                      <div className="help-search-results-dropdown" data-testid="user-search-results">
+                        {searchResults.length === 0 ? (
+                          <div style={{ padding: "0.75rem 1rem", color: "#9ca3af", fontSize: "0.88rem" }}>
+                            {searchQuery.trim().length >= 2 ? "No users found" : "Type at least 2 characters"}
+                          </div>
+                        ) : (
+                          searchResults.map((u) => (
+                            <div
+                              key={u.id}
+                              className="help-search-result-item"
+                              data-testid={`search-result-${u.id}`}
+                              onClick={() => handleSelectUser(u)}
+                            >
+                              <div style={{ fontWeight: 600, color: "#111827" }}>{highlightMatch(u.name, searchQuery)}</div>
+                              <div style={{ fontSize: "0.82rem", color: "#6b7280", display: "flex", gap: "8px" }}>
+                                <span>@{highlightMatch(u.username, searchQuery)}</span>
+                                {u.university && <span>· {u.university}</span>}
+                              </div>
+                            </div>
+                          ))
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Reason Selector */}
+              <div className="help-input-group">
+                <label className="help-label" htmlFor="report-reason">
+                  Reason for Report *
+                </label>
+                <select
+                  id="report-reason"
+                  data-testid="reason-select"
+                  className="help-input"
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                >
+                  <option value="">Select a reason...</option>
+                  {REPORT_REASONS.map((r) => (
+                    <option key={r} value={r}>
+                      {r}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Details Textarea */}
+              <div className="help-input-group">
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: "0.5rem" }}>
+                  <label className="help-label" htmlFor="report-details" style={{ margin: 0 }}>
+                    Details & Context *
+                  </label>
+                  <span
+                    style={{
+                      fontSize: "0.8rem",
+                      color: details.length > 0 && details.length < 20 ? "#d97706" : details.length > 1000 ? "#dc2626" : "#6b7280",
+                    }}
+                  >
+                    {details.length} / 1000 characters (min. 20)
+                  </span>
+                </div>
+                <textarea
+                  id="report-details"
+                  data-testid="details-textarea"
+                  className="help-input help-textarea"
+                  placeholder="Provide specific details about the behavior, incident, or project context (20 to 1,000 characters)..."
+                  value={details}
+                  onChange={(e) => setDetails(e.target.value)}
+                  maxLength={1000}
+                />
+              </div>
+
+              <button
+                type="submit"
+                className="help-btn-primary"
+                data-testid="submit-report-btn"
+                disabled={!isFormValid}
+              >
+                {submitting ? "Submitting..." : "Submit Report"}
+              </button>
+            </form>
+          </div>
+
+          {/* My Reports List */}
+          <div className="help-glass-card" style={{ marginTop: "2rem" }}>
+            <div className="help-card-title">
+              <div className="help-icon-box">📋</div>
+              My reports
+            </div>
+            <p style={{ fontSize: "0.9rem", color: "var(--muted-fg, #6b7280)", marginTop: "-0.5rem", marginBottom: "1.25rem" }}>
+              Track the status and outcome of reports you have submitted.
+            </p>
+
+            {loadingReports ? (
+              <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>Loading reports...</p>
+            ) : myReports.length === 0 ? (
+              <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>You have not submitted any reports.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="help-reports-table" data-testid="my-reports-list">
+                  <thead>
+                    <tr>
+                      <th>Reported User</th>
+                      <th>Reason</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th>Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myReports.map((r) => {
+                      const isChat = r.type === "chat_message";
+                      const displayStatus =
+                        r.status === "Open" ? "Received" : (r.status || "Received");
+                      const statusClass =
+                        displayStatus === "Open" || displayStatus === "Received"
+                          ? "help-status-open"
+                          : displayStatus === "Under review"
+                          ? "help-status-under-review"
+                          : displayStatus === "Resolved"
+                          ? "help-status-resolved"
+                          : "help-status-dismissed";
+
+                      return (
+                        <tr key={r.id} data-testid={`my-report-row-${r.id}`}>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <strong>{r.reportedUserName || "User"}</strong>
+                              {isChat && (
+                                <span
+                                  data-testid={`my-report-chat-badge-${r.id}`}
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: "999px",
+                                    background: "#ede9fe",
+                                    color: "#5b21b6",
+                                  }}
+                                >
+                                  Chat message
+                                </span>
+                              )}
+                            </div>
+                            {r.reportedUserUsername && (
+                              <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                                @{r.reportedUserUsername}
+                              </div>
+                            )}
+                            {(r.projectName || r.projectId) && (
+                              <div style={{ fontSize: "0.78rem", color: "#475569", marginTop: "2px" }}>
+                                Project: {r.projectName || r.projectId}
+                              </div>
+                            )}
+                          </td>
+                          <td>{r.reason}</td>
+                          <td style={{ color: "#6b7280" }}>
+                            {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "-"}
+                          </td>
+                          <td>
+                            <span className={`help-status-badge ${statusClass}`} data-testid={`my-report-status-${r.id}`}>
+                              {displayStatus}
+                            </span>
+                          </td>
+                          <td style={{ color: "#4b5563", fontStyle: r.outcome ? "normal" : "italic" }}>
+                            {r.outcome || "Pending review"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : activeTab === "my-reports" ? (
+        <div className="help-section-container" data-testid="my-reports-section">
+          <div className="help-glass-card">
+            <div className="help-card-title">
+              <div className="help-icon-box">📋</div>
+              My reports
+            </div>
+            <p style={{ fontSize: "0.9rem", color: "var(--muted-fg, #6b7280)", marginTop: "-0.5rem", marginBottom: "1.25rem" }}>
+              Track the status and outcome of reports you have submitted.
+            </p>
+
+            {loadingReports ? (
+              <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>Loading reports...</p>
+            ) : myReports.length === 0 ? (
+              <p style={{ color: "#6b7280", fontSize: "0.9rem" }}>You have not submitted any reports.</p>
+            ) : (
+              <div style={{ overflowX: "auto" }}>
+                <table className="help-reports-table" data-testid="my-reports-list-standalone">
+                  <thead>
+                    <tr>
+                      <th>Reported User</th>
+                      <th>Reason</th>
+                      <th>Date</th>
+                      <th>Status</th>
+                      <th>Outcome</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {myReports.map((r) => {
+                      const isChat = r.type === "chat_message";
+                      const displayStatus =
+                        r.status === "Open" ? "Received" : (r.status || "Received");
+                      const statusClass =
+                        displayStatus === "Open" || displayStatus === "Received"
+                          ? "help-status-open"
+                          : displayStatus === "Under review"
+                          ? "help-status-under-review"
+                          : displayStatus === "Resolved"
+                          ? "help-status-resolved"
+                          : "help-status-dismissed";
+
+                      return (
+                        <tr key={r.id} data-testid={`standalone-my-report-row-${r.id}`}>
+                          <td>
+                            <div style={{ display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                              <strong>{r.reportedUserName || "User"}</strong>
+                              {isChat && (
+                                <span
+                                  data-testid={`standalone-my-report-chat-badge-${r.id}`}
+                                  style={{
+                                    fontSize: "0.7rem",
+                                    fontWeight: 700,
+                                    padding: "1px 6px",
+                                    borderRadius: "999px",
+                                    background: "#ede9fe",
+                                    color: "#5b21b6",
+                                  }}
+                                >
+                                  Chat message
+                                </span>
+                              )}
+                            </div>
+                            {r.reportedUserUsername && (
+                              <div style={{ fontSize: "0.8rem", color: "#6b7280" }}>
+                                @{r.reportedUserUsername}
+                              </div>
+                            )}
+                            {(r.projectName || r.projectId) && (
+                              <div style={{ fontSize: "0.78rem", color: "#475569", marginTop: "2px" }}>
+                                Project: {r.projectName || r.projectId}
+                              </div>
+                            )}
+                          </td>
+                          <td>{r.reason}</td>
+                          <td style={{ color: "#6b7280" }}>
+                            {r.createdAt ? new Date(r.createdAt).toLocaleDateString() : "-"}
+                          </td>
+                          <td>
+                            <span className={`help-status-badge ${statusClass}`} data-testid={`standalone-my-report-status-${r.id}`}>
+                              {displayStatus}
+                            </span>
+                          </td>
+                          <td style={{ color: "#4b5563", fontStyle: r.outcome ? "normal" : "italic" }}>
+                            {r.outcome || "Pending review"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
     </div>
   );
 };

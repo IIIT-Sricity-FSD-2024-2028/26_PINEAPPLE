@@ -1,0 +1,309 @@
+.complete-profile-wrapper {
+  min-height: 100vh;
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg, linear-gradient(135deg, #f4efe7 0%, #e1d8c7 100%));
+  padding: 24px;
+  box-sizing: border-box;
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
+}
+
+.complete-profile-card {
+  max-width: 480px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 20px;
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.08);
+  border: 1px solid #e2e8f0;
+  padding: 36px 32px;
+  box-sizing: border-box;
+}
+
+.complete-profile-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.complete-profile-badge {
+  display: inline-block;
+  padding: 4px 12px;
+  background-color: #eff6ff;
+  color: #2563eb;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  border-radius: 999px;
+  margin-bottom: 12px;
+}
+
+.complete-profile-title {
+  font-size: 24px;
+  font-weight: 800;
+  color: #1e293b;
+  margin: 0 0 8px 0;
+}
+
+.complete-profile-subtitle {
+  font-size: 14px;
+  color: #64748b;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.complete-profile-error {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #b91c1c;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  margin-bottom: 20px;
+  line-height: 1.4;
+}
+
+.complete-profile-form {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.form-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.required-star {
+  color: #ef4444;
+}
+
+.optional-tag {
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 400;
+}
+
+/* Unified flex row container for the username field */
+.username-input-box,
+.input-with-status {
+  position: relative;
+  display: flex;
+  align-items: center;
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  background-color: #f8fafc;
+  padding: 0 12px 0 14px;
+  box-sizing: border-box;
+  transition: border-color 0.2s ease, background-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* @ prefix: normal in-flow flex item */
+.username-input-box .username-at,
+.input-with-status .username-at {
+  position: static;
+  color: #94a3b8;
+  font-weight: 600;
+  font-size: 15px;
+  line-height: 1;
+  user-select: none;
+  flex-shrink: 0;
+  margin-right: 4px;
+  pointer-events: none;
+}
+
+/* Base form input */
+.form-input {
+  width: 100%;
+  padding: 12px 14px;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  font-size: 15px;
+  color: #1e293b;
+  background-color: #f8fafc;
+  transition: all 0.2s ease;
+  box-sizing: border-box;
+}
+
+/* Username input control inside the flex container: no overlap and no state-dependent padding */
+.username-input-box .username-field,
+.username-input-box input.username-field,
+.input-with-status .username-field,
+.input-with-status input.username-field {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  border: none !important;
+  outline: none !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  padding: 12px 6px !important;
+  font-size: 15px;
+  color: #1e293b;
+  box-sizing: border-box;
+}
+
+.username-input-box .username-field:focus,
+.input-with-status .username-field:focus {
+  outline: none !important;
+  border: none !important;
+  box-shadow: none !important;
+  background: transparent !important;
+}
+
+.form-input:focus {
+  outline: none;
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Container focus-within state */
+.username-input-box:focus-within,
+.input-with-status:focus-within {
+  outline: none;
+  border-color: #3b82f6;
+  background-color: #ffffff;
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+/* Container status states */
+.username-input-box.is-checking,
+.input-with-status.is-checking {
+  border-color: #94a3b8;
+}
+
+.username-input-box.is-valid,
+.input-with-status.is-valid,
+.form-input.is-valid {
+  border-color: #10b981;
+}
+
+.username-input-box.is-valid:focus-within,
+.input-with-status.is-valid:focus-within {
+  border-color: #10b981;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.15);
+}
+
+.username-input-box.is-invalid,
+.input-with-status.is-invalid,
+.form-input.is-invalid {
+  border-color: #ef4444;
+}
+
+.username-input-box.is-invalid:focus-within,
+.input-with-status.is-invalid:focus-within {
+  border-color: #ef4444;
+  box-shadow: 0 0 0 3px rgba(239, 68, 68, 0.15);
+}
+
+.username-input-box.is-disabled,
+.input-with-status.is-disabled {
+  opacity: 0.65;
+  background-color: #f1f5f9;
+  cursor: not-allowed;
+}
+
+.username-input-box.is-disabled input,
+.input-with-status.is-disabled input {
+  cursor: not-allowed;
+}
+
+/* Status indicator icon: in-flow flex item at end of box */
+.status-indicator {
+  position: static;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 700;
+  flex-shrink: 0;
+  margin-left: 6px;
+}
+
+.status-indicator.valid {
+  background-color: #d1fae5;
+  color: #059669;
+}
+
+.status-indicator.invalid {
+  background-color: #fee2e2;
+  color: #dc2626;
+}
+
+.status-indicator.checking {
+  color: #64748b;
+  animation: cp-spin 1s linear infinite;
+}
+
+@keyframes cp-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.field-hint {
+  font-size: 12px;
+  line-height: 1.4;
+  margin-top: 2px;
+}
+
+.hint-success {
+  color: #059669;
+}
+
+.hint-error {
+  color: #dc2626;
+}
+
+.hint-checking {
+  color: #64748b;
+}
+
+.btn-complete-profile {
+  margin-top: 10px;
+  padding: 13px 20px;
+  background-color: #2563eb;
+  color: #ffffff;
+  border: none;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+}
+
+.btn-complete-profile:hover:not(:disabled) {
+  background-color: #1d4ed8;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.btn-complete-profile:disabled {
+  background-color: #94a3b8;
+  cursor: not-allowed;
+  opacity: 0.7;
+}
+
+.complete-profile-loading {
+  font-size: 16px;
+  color: #64748b;
+  font-weight: 500;
+}

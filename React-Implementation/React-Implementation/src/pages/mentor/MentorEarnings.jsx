@@ -3,12 +3,17 @@ import { mentorMarketApi } from '../../services/mentorMarketplaceApi';
 import StatCard from '../../components/common/StatCard';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
+import Modal from '../../components/common/Modal';
 import './mentorEarnings.css';
 
 const MentorEarnings = () => {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [disputeSession, setDisputeSession] = useState(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeError, setDisputeError] = useState('');
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -50,7 +55,7 @@ const MentorEarnings = () => {
   const totalEarned = completedSessions.reduce((sum, s) => sum + (s.payout || s.agreedPrice || 0), 0);
   const pendingInEscrow = activeSessions.reduce((sum, s) => sum + (s.payout || s.agreedPrice || 0), 0);
 
-  const renderStatusBadge = (status, sessionId) => {
+  const renderStatusBadge = (status, sessionId, sess = {}) => {
     const map = {
       escrow_funded: ['Awaiting Response', 'warning'],
       active: ['Active', 'success'],
@@ -58,23 +63,42 @@ const MentorEarnings = () => {
       refunded: ['Refunded', 'danger'],
       cancelled: ['Cancelled', 'danger'],
       payout_pending: ['Payout Pending', 'warning'],
+      disputed: ['Disputed (Frozen)', 'danger'],
+      split: ['Split Settled', 'info'],
     };
     const [label, variant] = map[status] || [status, 'info'];
 
     return (
-      <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-        <Badge variant={variant}>{label}</Badge>
-        {status === 'payout_pending' && (
-          <button
-            className="btn btn-xs btn-outline"
-            style={{ padding: '2px 6px', fontSize: '11px' }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRetryPayout(sessionId);
-            }}
-          >
-            Retry
-          </button>
+      <div style={{ display: 'inline-flex', flexDirection: 'column', gap: '2px' }}>
+        <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
+          <Badge variant={variant}>{label}</Badge>
+          {status === 'payout_pending' && !sess.disputed && (
+            <button
+              className="btn btn-xs btn-outline"
+              style={{ padding: '2px 6px', fontSize: '11px' }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetryPayout(sessionId);
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+        {(status === 'disputed' || sess.disputed) && (
+          <div style={{ fontSize: '11px', color: '#b91c1c', fontWeight: 600 }}>
+            Payout frozen pending admin dispute ruling
+          </div>
+        )}
+        {sess.dispute?.status === 'decided' && (
+          <div style={{ fontSize: '11px', color: '#334155' }}>
+            {sess.dispute.decision}: {sess.dispute.decisionReason}
+          </div>
+        )}
+        {(status === 'refunded' || status === 'cancelled') && sess.declineReason && (
+          <div style={{ fontSize: '11px', color: '#b91c1c' }}>
+            &ldquo;{sess.declineReason}&rdquo;
+          </div>
         )}
       </div>
     );
@@ -127,12 +151,33 @@ const MentorEarnings = () => {
     {
       key: 'status',
       header: 'Status',
-      render: (s) => renderStatusBadge(s.status, s.id),
+      render: (s) => renderStatusBadge(s.status, s.id, s),
     },
     {
       key: 'date',
       header: 'Date',
       render: (s) => (s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'),
+    },
+    {
+      key: 'disputeAction',
+      header: 'Actions',
+      render: (s) =>
+        ['escrow_funded', 'active', 'payout_pending'].includes(s.status) && !s.disputed ? (
+          <button
+            type="button"
+            className="btn btn-outline btn-sm"
+            style={{ color: '#b91c1c', borderColor: '#fecaca', padding: '4px 10px', fontSize: '0.78rem' }}
+            onClick={() => {
+              setDisputeSession(s);
+              setDisputeReason('');
+              setDisputeError('');
+            }}
+          >
+            Open Dispute
+          </button>
+        ) : (
+          null
+        ),
     },
   ];
 
@@ -192,6 +237,60 @@ const MentorEarnings = () => {
           />
         </div>
       </div>
+
+      <Modal
+        isOpen={Boolean(disputeSession)}
+        title="Open Escrow Dispute"
+        onClose={() => !disputeSubmitting && setDisputeSession(null)}
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+            <button
+              type="button"
+              className="btn btn-outline"
+              disabled={disputeSubmitting}
+              onClick={() => setDisputeSession(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="btn btn-danger"
+              disabled={disputeSubmitting || disputeReason.trim().length < 10}
+              onClick={async () => {
+                if (!disputeSession) return;
+                setDisputeSubmitting(true);
+                setDisputeError('');
+                try {
+                  await mentorMarketApi.openDispute(disputeSession.id, disputeReason.trim());
+                  setDisputeSession(null);
+                  setRefreshKey((k) => k + 1);
+                } catch (err) {
+                  setDisputeError(err?.serverMessage || err?.message || 'Failed to open dispute.');
+                } finally {
+                  setDisputeSubmitting(false);
+                }
+              }}
+            >
+              {disputeSubmitting ? 'Submitting...' : 'Freeze Payout & Open Dispute'}
+            </button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569' }}>
+            Provide a reason (10 to 1000 characters). Payout and refund will remain frozen until an administrator reviews the session.
+          </p>
+          <textarea
+            rows={4}
+            maxLength={1000}
+            value={disputeReason}
+            onChange={(e) => setDisputeReason(e.target.value)}
+            placeholder="Describe the dispute reason..."
+            style={{ width: '100%', padding: '8px 12px', borderRadius: '8px', border: '1px solid #cbd5e1', boxSizing: 'border-box' }}
+          />
+          {disputeError && <div style={{ color: '#dc2626', fontSize: '0.85rem' }}>⚠️ {disputeError}</div>}
+        </div>
+      </Modal>
     </div>
   );
 };

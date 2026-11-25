@@ -1,6 +1,20 @@
 import { apiRequest, getCurrentUserRole } from './apiClient.js';
 
 export const mentorApplicationsApi = {
+  getMyStatus: (params, role) => {
+    const queryParams = new URLSearchParams();
+    if (params?.userId) queryParams.append("userId", params.userId);
+    const query = queryParams.toString();
+    return apiRequest(
+      `/mentor-applications/me${query ? `?${query}` : ""}`,
+      "GET",
+      null,
+      {
+        role: role || getCurrentUserRole(),
+        userId: params?.userId,
+      },
+    );
+  },
   list: (params, role) => {
     const queryParams = new URLSearchParams();
     if (params?.userId) queryParams.append("userId", params.userId);
@@ -28,12 +42,26 @@ export const mentorApplicationsApi = {
     apiRequest(`/mentor-applications/${id}`, "PUT", payload, {
       role: role || getCurrentUserRole(),
     }),
-  approve: (id, role) =>
-    apiRequest(`/mentor-applications/${id}/approve`, "PUT", null, {
+  approve: (id, payload, role) => {
+    const body = (payload && typeof payload === 'object' && !Array.isArray(payload)) ? payload : {};
+    const effectiveRole = typeof payload === 'string' ? payload : (role || getCurrentUserRole());
+    return apiRequest(`/mentor-applications/${id}/approve`, "PUT", body, {
+      role: effectiveRole,
+    });
+  },
+  reject: (id, payload, role) => {
+    const body = (payload && typeof payload === 'object' && !Array.isArray(payload)) ? payload : {};
+    const effectiveRole = typeof payload === 'string' ? payload : (role || getCurrentUserRole());
+    return apiRequest(`/mentor-applications/${id}/reject`, "PUT", body, {
+      role: effectiveRole,
+    });
+  },
+  getDigiLockerStatus: (role) =>
+    apiRequest("/mentor-applications/digilocker/status", "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  reject: (id, role) =>
-    apiRequest(`/mentor-applications/${id}/reject`, "PUT", null, {
+  pullDigiLockerDocuments: (applicantName, role) =>
+    apiRequest("/mentor-applications/digilocker/pull-documents", "POST", { applicantName }, {
       role: role || getCurrentUserRole(),
     }),
   remove: (id, role) =>

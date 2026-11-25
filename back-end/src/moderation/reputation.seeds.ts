@@ -1,0 +1,15 @@
+export const SEED_USER_REPUTATION: Record<string, number> = {
+  '1': 93,
+  '2': 87,
+  '3': 71,
+  '4': 89,
+  '5': 82,
+  '6': 40,
+  '7': 85,
+  '8': 78,
+  'u-collab': 40,
+  'u-owner': 80,
+  'u-mentor': 95,
+  'u-admin': 99,
+  'u-superuser': 100,
+};

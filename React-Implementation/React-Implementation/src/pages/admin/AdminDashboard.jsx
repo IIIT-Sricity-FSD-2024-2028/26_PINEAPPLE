@@ -1,11 +1,13 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import adminApi from '../../services/adminApi';
+import reportsApi from '../../services/reportsApi';
 import StatCard from '../../components/common/StatCard';
 import './AdminDashboard.css';
 
 const AdminDashboard = () => {
   const navigate = useNavigate();
+  const [openReportsCount, setOpenReportsCount] = useState(0);
   const [stats, setStats] = useState({
     totalUsers: 0,
     activeUsers: 0,
@@ -21,9 +23,10 @@ const AdminDashboard = () => {
     let isMounted = true;
     const fetchDashboardData = async () => {
       try {
-        const [statsData, auditData] = await Promise.all([
+        const [statsData, auditData, reportsData] = await Promise.all([
           adminApi.getStats(),
-          adminApi.getAuditLog()
+          adminApi.getAuditLog(),
+          reportsApi.getOpenCount().catch(() => ({ count: 0 })),
         ]);
         
         if (isMounted) {
@@ -35,6 +38,14 @@ const AdminDashboard = () => {
             suspendedUsers: statsData?.suspendedUsers || 0,
             auditEvents: statsData?.auditEvents || (auditData?.length || 0)
           });
+
+          setOpenReportsCount(
+            typeof reportsData?.count === 'number'
+              ? reportsData.count
+              : typeof reportsData?.openCount === 'number'
+              ? reportsData.openCount
+              : 0
+          );
 
           setRecentEvents((auditData || []).slice(0, 5));
         }
@@ -49,8 +60,19 @@ const AdminDashboard = () => {
 
     fetchDashboardData();
 
+    const handleReportUpdate = () => {
+      reportsApi.getOpenCount().then((res) => {
+        if (isMounted) {
+          const count = typeof res?.count === 'number' ? res.count : typeof res?.openCount === 'number' ? res.openCount : 0;
+          setOpenReportsCount(count);
+        }
+      }).catch(() => {});
+    };
+    window.addEventListener('teamforge:report_updated', handleReportUpdate);
+
     return () => {
       isMounted = false;
+      window.removeEventListener('teamforge:report_updated', handleReportUpdate);
     };
   }, []);
 
@@ -179,6 +201,17 @@ const AdminDashboard = () => {
             </div>
           </div>
           <div className="admin-action-count" id="admin-action-audit-count">{stats.auditEvents}</div>
+        </button>
+
+        <button className="admin-action-card" data-testid="admin-action-reports-card" onClick={() => navigate('/admin/reports')}>
+          <div className="admin-action-left">
+            <div className="admin-action-icon">🚩</div>
+            <div>
+              <div className="admin-action-title">Open Reports &amp; Appeals</div>
+              <div className="admin-action-sub" id="admin-action-reports-sub">{openReportsCount} open reports</div>
+            </div>
+          </div>
+          <div className="admin-action-count" id="admin-action-reports-count" data-testid="admin-action-reports-count">{openReportsCount}</div>
         </button>
       </div>
 

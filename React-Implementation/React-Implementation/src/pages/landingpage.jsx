@@ -1,10 +1,52 @@
 import "./landingpage.css";
-import { useNavigate } from "react-router-dom";
+import { useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
+import storage from "../utils/storage";
 
 function LandingPage() {
   const navigate = useNavigate();
+  const location = useLocation();
+  const [deletedBanner, setDeletedBanner] = useState(() => {
+    if (location.state?.accountDeletedMessage) return location.state.accountDeletedMessage;
+    return storage.consumeAccountDeletedNotice() || '';
+  });
+
   return (
     <>
+      {deletedBanner && (
+        <div
+          role="status"
+          data-testid="account-deleted-banner"
+          style={{
+            background: '#fef2f2',
+            borderBottom: '1px solid #fecaca',
+            color: '#991b1b',
+            padding: '10px 20px',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            fontSize: '0.92rem',
+            fontWeight: 500,
+          }}
+        >
+          <span>{deletedBanner}</span>
+          <button
+            type="button"
+            onClick={() => setDeletedBanner('')}
+            style={{
+              background: 'transparent',
+              border: 'none',
+              color: '#991b1b',
+              cursor: 'pointer',
+              fontWeight: 700,
+              fontSize: '1rem',
+            }}
+            aria-label="Dismiss notification"
+          >
+            ×
+          </button>
+        </div>
+      )}
       {/* =========================================================
 HEADER
   ========================================================== */}
@@ -170,7 +212,7 @@ HEADER
             <header className="features__header">
               <p className="section-label">Features</p>
               <h2 className="section-title" id="features-heading">
-                Everything you need to level up
+                Everything you need to collaborate and ship
               </h2>
               <p className="section-subtitle">
                 From project discovery to verified contributions — one platform
@@ -186,6 +228,8 @@ HEADER
                     src="/Assets/Project-Collaboration.jpg"
                     alt="Project Collaboration interface"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -224,6 +268,8 @@ HEADER
                     src="/Assets/Expert-Mentorship.jpg"
                     alt="Expert Mentorship interface"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -262,6 +308,8 @@ HEADER
                     src="/Assets/Planning_and_Scheduling.jpg"
                     alt="Planning and Scheduling interface screenshot"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -303,6 +351,8 @@ HEADER
                     src="/Assets/XP-System.png"
                     alt="XP System and Personal Dashboard screenshot"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -338,6 +388,8 @@ HEADER
                     src="/Assets/Contribution_Report.jpg"
                     alt="Contribution Report screenshot"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -379,6 +431,8 @@ HEADER
                     src="/Assets/Real_time_com.jpg"
                     alt="Real-Time Communication interface screenshot"
                     className="features__image"
+                    loading="lazy"
+                    decoding="async"
                   />
                 </div>
                 <div className="features__content">
@@ -664,8 +718,7 @@ HEADER
                     </li>
                   </ul>
                   <p className="gamification__card-note">
-                    Ratings are awarded across effort. Task appraisal is used to
-                    increase level in the system.
+                    XP is a continuous counter of your verified work, tasks completed, and deliverable reviews across projects.
                   </p>
                 </div>
               </article>
@@ -689,32 +742,32 @@ HEADER
                       <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2" />
                     </svg>
                   </div>
-                  <h3 className="gamification__card-title">Reputation</h3>
+                  <h3 className="gamification__card-title">Conduct Score</h3>
                 </div>
                 <div className="gamification__card-body">
                   <ul
                     className="gamification__list"
-                    aria-label="Reputation score changes"
+                    aria-label="Reputation conduct score rules"
                   >
                     <li className="gamification__list-item">
                       <span className="gamification__list-label">
-                        Task Approved
+                        Starting Score (New accounts)
                       </span>
                       <span className="gamification__list-value gamification__list-value--positive">
-                        +20
+                        100
                       </span>
                     </li>
                     <li className="gamification__list-item">
                       <span className="gamification__list-label">
-                        Mentor Badge
+                        Good Conduct Recovery (14 clean days)
                       </span>
                       <span className="gamification__list-value gamification__list-value--positive">
-                        +20
+                        +2
                       </span>
                     </li>
                     <li className="gamification__list-item">
                       <span className="gamification__list-label">
-                        Revision Required
+                        Missed Deadline Penalty
                       </span>
                       <span className="gamification__list-value gamification__list-value--negative">
                         -5
@@ -722,23 +775,15 @@ HEADER
                     </li>
                     <li className="gamification__list-item">
                       <span className="gamification__list-label">
-                        Missed Deadline
+                        Conduct Warning Penalty
                       </span>
                       <span className="gamification__list-value gamification__list-value--negative">
-                        -5
-                      </span>
-                    </li>
-                    <li className="gamification__list-item">
-                      <span className="gamification__list-label">
-                        Leaving Project
-                      </span>
-                      <span className="gamification__list-value gamification__list-value--negative">
-                        -20
+                        -10
                       </span>
                     </li>
                   </ul>
                   <p className="gamification__card-note">
-                    30 Days inactive = Reputation × 0.95 decay
+                    Score reflects conduct only (0 to 100). Work contributions earn XP without inflating conduct.
                   </p>
                 </div>
               </article>

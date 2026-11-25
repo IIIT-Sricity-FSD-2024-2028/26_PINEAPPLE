@@ -2,51 +2,55 @@ import { Injectable, NestMiddleware, HttpStatus, Logger } from '@nestjs/common';
 import { Request, Response, NextFunction } from 'express';
 
 /**
- * ============================================================================
- * RATE LIMITER CONFIGURATION (Phase 8, Part C)
- * ============================================================================
- * Easily configurable window duration and request limit.
- * Change these constants to adjust the rate limit across the backend.
- */
-export const RATE_LIMIT_WINDOW_MS = 60 * 60 * 1000; // 1 hour (in milliseconds)
-export const RATE_LIMIT_MAX_REQUESTS = 5000; // 5,000 requests per client per window
-
-/**
- * RateLimiterMiddleware — Client-aware Sliding Window Rate Limiter
+ * RateLimiterMiddleware
  *
- * Identifies clients by the `x-user-id` header when present and by IP address otherwise.
- * Covers all application routes including `/uploads` and `/escrow`.
- * Automatically bypasses documentation (`/api`, `/swagger`, `/api-json`) and
- * health check (`/ping`, `/health`) routes.
+ * Implements an in-memory sliding-window rate limiter per client.
+ * Identifies clients by req.user.uid, x-user-id header when present, and by IP address otherwise.
  *
- * When exceeded:
- *   - HTTP Status: 429 Too Many Requests
- *   - Response Header: `Retry-After` (in seconds)
- *   - Additional Headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
+ * Defaults:
+ *   - Window: 1 hour (3,600,000 ms)
+ *   - Max requests: 5,000 requests per window
+ *   - Response: HTTP 429 Too Many Requests with Retry-After header
  */
 @Injectable()
 export class RateLimiterMiddleware implements NestMiddleware {
   private readonly logger = new Logger(RateLimiterMiddleware.name);
 
-  // Sliding window configuration
-  public static readonly WINDOW_MS = RATE_LIMIT_WINDOW_MS;
-  public static readonly MAX_REQUESTS = RATE_LIMIT_MAX_REQUESTS;
-
-  private readonly windowMs = RATE_LIMIT_WINDOW_MS;
-  private readonly maxRequests = RATE_LIMIT_MAX_REQUESTS;
-
-  // In-memory store: Client Key (user:<id> or ip:<address>) → array of request timestamps
+  // Map of client identifier -> array of request timestamps (epoch ms)
   private readonly requestMap = new Map<string, number[]>();
 
-  // Periodic cleanup to prevent memory leaks (every 10 minutes)
-  private readonly CLEANUP_INTERVAL = 10 * 60 * 1000;
+  // Configuration
+  private readonly windowMs: number = 60 * 60 * 1000; // 1 hour
+  private maxRequests: number = 5000; // requests per window
 
   constructor() {
-    setInterval(() => this.cleanup(), this.CLEANUP_INTERVAL);
+    // Periodically prune stale keys every 10 minutes to prevent memory leaks
+    setInterval(() => this.pruneStaleEntries(), 10 * 60 * 1000).unref();
+  }
+
+  /**
+   * Override maxRequests for testing purposes.
+   */
+  setMaxRequestsForTesting(limit: number): void {
+    this.maxRequests = limit;
+  }
+
+  /**
+   * Reset maxRequests to default after testing.
+   */
+  resetMaxRequestsForTesting(): void {
+    this.maxRequests = 5000;
+  }
+
+  /**
+   * Clear all tracked request records (for test isolation).
+   */
+  clearRecordsForTesting(): void {
+    this.requestMap.clear();
   }
 
   use(req: Request, res: Response, next: NextFunction): void {
-    const rawPath = (req.originalUrl || req.url || '').split('?')[0];
+    const rawPath = req.baseUrl || req.path || req.originalUrl || '';
     const path = rawPath.toLowerCase();
 
     // Health or docs routes must not be blocked by the rate limiter
@@ -62,8 +66,9 @@ export class RateLimiterMiddleware implements NestMiddleware {
       return next();
     }
 
-    // Identify client by x-user-id header when present, and by IP otherwise
-    const rawUserId = req.headers['x-user-id'];
+    // Identify client by uid when present, x-user-id header, and by IP otherwise
+    const authUser = (req as any).user;
+    const rawUserId = authUser?.uid || req.headers['x-user-id'];
     const userId = Array.isArray(rawUserId) ? rawUserId[0] : rawUserId;
     const clientKey =
       typeof userId === 'string' && userId.trim()
@@ -103,33 +108,29 @@ export class RateLimiterMiddleware implements NestMiddleware {
     timestamps.push(now);
     this.requestMap.set(clientKey, timestamps);
 
-    // Set rate limit headers
+    // Decorate response with standard rate limit headers
     res.setHeader('X-RateLimit-Limit', String(this.maxRequests));
     res.setHeader('X-RateLimit-Remaining', String(this.maxRequests - timestamps.length));
+    res.setHeader(
+      'X-RateLimit-Reset',
+      new Date(timestamps[0] + this.windowMs).toISOString(),
+    );
 
     next();
   }
 
   /**
-   * Cleans up expired entries to prevent memory leaks.
+   * Prune expired timestamps and clean up map entries with no active requests.
    */
-  private cleanup(): void {
-    const now = Date.now();
-    const windowStart = now - this.windowMs;
-    let cleaned = 0;
-
+  private pruneStaleEntries(): void {
+    const windowStart = Date.now() - this.windowMs;
     for (const [key, timestamps] of this.requestMap.entries()) {
-      const valid = timestamps.filter((ts) => ts > windowStart);
-      if (valid.length === 0) {
+      const active = timestamps.filter((ts) => ts > windowStart);
+      if (active.length === 0) {
         this.requestMap.delete(key);
-        cleaned++;
       } else {
-        this.requestMap.set(key, valid);
+        this.requestMap.set(key, active);
       }
-    }
-
-    if (cleaned > 0) {
-      this.logger.debug(`Rate limiter cleanup: removed ${cleaned} expired client entries`);
     }
   }
 }

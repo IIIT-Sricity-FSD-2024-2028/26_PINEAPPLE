@@ -55,22 +55,29 @@ const Avatar = ({
   className = '',
   style = {},
   status = null,
+  isDeleted = false,
   children,
   ...rest
 }) => {
   const [imgError, setImgError] = useState(false);
 
-  const initials = useMemo(() => getInitials(name), [name]);
-  const bgClass = useMemo(() => getBgClass(name), [name]);
+  const deletedAccount = Boolean(isDeleted || String(name || '').trim().toLowerCase() === 'deleted user');
+  const displayName = deletedAccount ? 'Deleted user' : name;
+  const initials = useMemo(() => (deletedAccount ? 'DU' : getInitials(displayName)), [deletedAccount, displayName]);
+  const bgClass = useMemo(() => (deletedAccount ? '' : getBgClass(displayName)), [deletedAccount, displayName]);
 
-  const hasValidImage = Boolean(src) && !imgError;
+  const hasValidImage = !deletedAccount && Boolean(src) && !imgError;
+  const effectiveStyle = deletedAccount
+    ? { backgroundColor: '#94a3b8', color: '#ffffff', ...style }
+    : style;
 
   return (
     <div
       className={`tf-avatar tf-avatar--${size} ${!hasValidImage ? bgClass : ''} ${className}`.trim()}
-      style={style}
-      title={name || alt}
-      aria-label={alt || name || 'Avatar'}
+      style={effectiveStyle}
+      title={displayName || alt}
+      aria-label={alt || displayName || 'Avatar'}
+      data-deleted={deletedAccount ? 'true' : undefined}
       {...rest}
     >
       {hasValidImage ? (

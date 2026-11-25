@@ -8,12 +8,9 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { randomUUID } from 'crypto';
-import { MentorshipRepository, MentorApplication, RecommendationBadge } from './mentorship.repository';
-import { CreateApplicationDto, ApplicationStatus } from './dto/create-application.dto';
+import { MentorshipRepository, RecommendationBadge } from './mentorship.repository';
 import { IssueBadgeDto } from './dto/issue-badge.dto';
 import { UsersService } from '../users/users.service';
-import { GamificationService } from '../gamification/gamification.service';
-import { CommunicationService } from '../communication/communication.service';
 import { ProjectsService } from '../projects/projects.service';
 import { MentorMarketplaceService } from '../mentor-marketplace/mentor-marketplace.service';
 import { NotificationsService } from '../notifications/notifications.service';
@@ -24,54 +21,17 @@ export class MentorshipService {
   constructor(
     private readonly mentorshipRepository: MentorshipRepository,
     private readonly usersService: UsersService,
-    private readonly gamificationService: GamificationService,
-    private readonly communicationService: CommunicationService,
     @Inject(forwardRef(() => ProjectsService))
-    private readonly projectsService: ProjectsService,
+    private readonly projectsService: any,
     @Inject(forwardRef(() => MentorMarketplaceService))
-    private readonly mentorMarketplaceService: MentorMarketplaceService,
+    private readonly mentorMarketplaceService: any,
     private readonly notificationsService: NotificationsService,
     private readonly auditService: AuditService,
   ) {}
 
-  applyForMentorship(userId: string, dto: CreateApplicationDto): MentorApplication {
-    const existingApp = this.mentorshipRepository.getApplicationByUserId(userId);
-    if (existingApp) {
-      throw new BadRequestException('An application already exists for this user.');
-    }
-    return this.mentorshipRepository.createApplication(userId, dto, ApplicationStatus.Pending);
-  }
-
-  getApplicationByUserId(userId: string): MentorApplication {
-    const app = this.mentorshipRepository.getApplicationByUserId(userId);
-    if (!app) {
-      throw new NotFoundException('Mentorship application not found.');
-    }
-    return app;
-  }
-
-  reviewApplication(applicationId: string, status: ApplicationStatus): MentorApplication {
-    const updatedApp = this.mentorshipRepository.updateApplicationStatus(applicationId, status);
-    if (!updatedApp) {
-      throw new NotFoundException(`Application with ID ${applicationId} not found.`);
-    }
-
-    if (status === ApplicationStatus.Approved) {
-      this.usersService.update(updatedApp.userId, { role: 'Mentor' } as any); 
-    }
-
-    this.communicationService.createNotification({
-      userId: updatedApp.userId,
-      title: 'Mentorship Application Update',
-      message: `Your application has been marked as: ${status}.`,
-    });
-
-    return updatedApp;
-  }
-
   issueBadge(mentorId: string, dto: IssueBadgeDto, callerRole?: string): RecommendationBadge {
     if (!mentorId) {
-      throw new UnauthorizedException('x-user-id header is missing.');
+      throw new UnauthorizedException('Authentication required.');
     }
 
     const mentorUser = this.usersService.findUserSafe(mentorId);
@@ -118,9 +78,9 @@ export class MentorshipService {
           (String(s.mentorId) === String(mentorId) ||
            this.mentorMarketplaceService.findProfileById(s.mentorId)?.userId === mentorId)
       );
-    } catch {
-      /* non-critical */
-    }
+    } catch (err: any) {
+        console.warn('[mentorship.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     if (!isProjectMentor && !hasActiveSession && !isAdmin) {
       throw new ForbiddenException('Only the approved mentor of this project can award recommendation badges.');
@@ -190,23 +150,17 @@ export class MentorshipService {
       timestamp: new Date(),
     };
     this.mentorshipRepository.saveBadge(newBadge);
+    this.mentorMarketplaceService?.recordMentorActivity?.(
+      projectId,
+      String(mentorId),
+      'badge_awarded',
+    );
 
-    // 7. Single XP/Reputation award
-    try {
-      this.gamificationService.awardXp(canonicalRecipientId, 250, `Received ${badgeName} Badge`);
-      this.gamificationService.updateReputation(canonicalRecipientId, 8, `Received ${badgeName} Badge from Mentor`);
-    } catch {
-      /* non-critical */
-    }
-
-    // 8. Update recipient profile hasMentorBadge and mentorRecommendations (one source of truth)
+    // 7. Badges are recognition only: do NOT mint new XP or Reputation
+    // 8. Update recipient profile hasMentorBadge and mentorRecommendations
     if (recipientUser) {
       if (!recipientUser.profile) recipientUser.profile = {} as any;
       recipientUser.profile.hasMentorBadge = true;
-      recipientUser.profile.xp = (Number(recipientUser.profile.xp) || 0) + 250;
-      recipientUser.profile.rep = (Number(recipientUser.profile.rep) || 0) + 8;
-      recipientUser.xp = recipientUser.profile.xp;
-      recipientUser.rep = recipientUser.profile.rep;
       if (!recipientUser.data) recipientUser.data = { projects: [], notifications: [], requests: [] };
       if (!Array.isArray(recipientUser.data.mentorRecommendations)) recipientUser.data.mentorRecommendations = [];
       recipientUser.data.mentorRecommendations.unshift({
@@ -221,11 +175,9 @@ export class MentorshipService {
         this.usersService.update(canonicalRecipientId, {
           profile: recipientUser.profile,
           data: recipientUser.data,
-          xp: recipientUser.xp,
-          rep: recipientUser.rep,
         } as any);
-      } catch {
-        /* non-critical */
+      } catch (err: any) {
+        console.warn('[mentorship.service] Suppressed non-critical error:', err?.message || err);
       }
     }
 
@@ -239,9 +191,9 @@ export class MentorshipService {
         readStatus: false,
         referenceId: newBadge.id,
       });
-    } catch {
-      /* non-critical */
-    }
+    } catch (err: any) {
+        console.warn('[mentorship.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     // 10. Audit log
     try {
@@ -254,9 +206,9 @@ export class MentorshipService {
         event: `Mentor ${mentorName} awarded badge "${badgeName}" to ${recipientName} on project "${projectTitle}"`,
         details: { badgeName, projectId, projectTitle, recipientId: canonicalRecipientId, mentorId },
       });
-    } catch {
-      /* non-critical */
-    }
+    } catch (err: any) {
+        console.warn('[mentorship.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     return newBadge;
   }
@@ -278,9 +230,9 @@ export class MentorshipService {
           awardedAt: b.awardedAt,
         }));
       }
-    } catch {
-      /* non-critical */
-    }
+    } catch (err: any) {
+        console.warn('[mentorship.service] Suppressed non-critical error:', err?.message || err);
+      }
     return badges;
   }
 

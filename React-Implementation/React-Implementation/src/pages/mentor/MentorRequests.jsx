@@ -2,7 +2,10 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
 import projectsApi from '../../services/projectsApi';
+import feedbackApi from '../../services/feedbackApi';
 import EmptyState from '../../components/common/EmptyState';
+import Modal from '../../components/common/Modal';
+import { formatDateTime, formatProjectDueDate } from '../../utils/dateFormatter';
 import './mentorRequests.css';
 
 /* ── Extracted SVG Functional Components ── */
@@ -35,10 +38,28 @@ const UserIcon = () => (
 const MentorRequests = () => {
   const navigate = useNavigate();
 
+  const [currentTime] = useState(() => Date.now());
   const [requests, setRequests] = useState([]);
   const [loading, setLoading] = useState(true);
   const [actionInProgress, setActionInProgress] = useState({});
   const [feedback, setFeedback] = useState(null);
+
+  // Decline Modal state
+  const [declineModalOpen, setDeclineModalOpen] = useState(false);
+  const [selectedDeclineReq, setSelectedDeclineReq] = useState(null);
+  const [declineReason, setDeclineReason] = useState('');
+  const [declineReasons, setDeclineReasons] = useState([]);
+  const [declineReasonOptions, setDeclineReasonOptions] = useState([]);
+  const [declineError, setDeclineError] = useState('');
+
+  useEffect(() => {
+    feedbackApi.getFeedbackReasons().then((cfg) => {
+      const list = cfg?.MENTOR_DECLINE_ASSIGNMENT?.reasons || cfg?.actions?.MENTOR_DECLINE_ASSIGNMENT?.reasons || [];
+      if (Array.isArray(list) && list.length > 0) {
+        setDeclineReasonOptions(list);
+      }
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let isMounted = true;
@@ -68,12 +89,16 @@ const MentorRequests = () => {
             projectId: s.projectId,
             projectName: linkedProj.name || linkedProj.title || s.projectName || 'Project Mentorship',
             ownerName: linkedProj.owner || s.ownerName || 'Project Owner',
+            projectDueDate: s.projectDueDate || linkedProj.dueDate || null,
             projectDesc: s.projectDescription || linkedProj.desc || '',
             message: s.projectDescription || s.notes || 'Project owner funded escrow for your mentorship.',
             agreedPrice: s.agreedPrice || 1000,
             skills: linkedProj.skills || [],
             status: 'escrow_funded',
             createdAt: s.createdAt || new Date().toISOString(),
+            respondBy: s.respondBy,
+            declineReason: s.declineReason,
+            declinedBy: s.declinedBy,
           };
         });
 
@@ -120,38 +145,73 @@ const MentorRequests = () => {
       console.error('Failed to accept mentor request:', err);
       setFeedback({
         type: 'error',
-        message: err.message || 'Failed to accept mentorship request.',
+        message: err?.serverMessage || err?.message || 'Failed to accept mentorship request.',
       });
     } finally {
       setActionInProgress((prev) => ({ ...prev, [req.id]: false }));
     }
   };
 
-  const handleDecline = async (req) => {
-    setActionInProgress((prev) => ({ ...prev, [req.id]: true }));
+  const handleOpenDeclineModal = (req) => {
+    setSelectedDeclineReq(req);
+    setDeclineReason('');
+    setDeclineError('');
+    setDeclineModalOpen(true);
+  };
+
+  const handleConfirmDecline = async () => {
+    if (!selectedDeclineReq) return;
+    const trimmed = declineReason.trim();
+    if (!trimmed || trimmed.length < 10) {
+      setDeclineError('A decline reason of at least 10 characters (up to 500) is required.');
+      return;
+    }
+    if (trimmed.length > 500) {
+      setDeclineError('Decline reason cannot exceed 500 characters.');
+      return;
+    }
+
+    const reqId = selectedDeclineReq.id;
+    const reqProjName = selectedDeclineReq.projectName;
+
+    setActionInProgress((prev) => ({ ...prev, [reqId]: true }));
     setFeedback(null);
     try {
-      await mentorMarketplaceApi.declineSession(req.id);
+      const resolvedReasons =
+        declineReasons.length > 0
+          ? declineReasons
+          : (declineReasonOptions[0]?.id ? [declineReasonOptions[0].id] : []);
+      const payload = {
+        feedback: {
+          reasons: resolvedReasons,
+          explanation: trimmed,
+        },
+        reasons: resolvedReasons,
+        explanation: trimmed,
+        reason: trimmed,
+      };
+      await mentorMarketplaceApi.declineSession(reqId, payload);
 
       setFeedback({
         type: 'info',
-        message: `Mentorship for "${req.projectName}" declined. The project owner has been refunded in full from escrow.`,
+        message: `Mentorship for "${reqProjName}" declined. The project owner has been notified with your reason and refunded in full from escrow.`,
       });
 
       // Update local state to reflect declined status
       setRequests((prev) =>
         prev.map((item) =>
-          item.id === req.id ? { ...item, status: 'refunded' } : item
+          item.id === reqId
+            ? { ...item, status: 'refunded', declineReason: trimmed, declinedBy: 'mentor' }
+            : item
         )
       );
+      setDeclineModalOpen(false);
+      setSelectedDeclineReq(null);
     } catch (err) {
       console.error('Failed to decline mentor request:', err);
-      setFeedback({
-        type: 'error',
-        message: err.message || 'Failed to decline mentorship request.',
-      });
+      setDeclineError(err.message || 'Failed to decline mentorship request.');
     } finally {
-      setActionInProgress((prev) => ({ ...prev, [req.id]: false }));
+      setActionInProgress((prev) => ({ ...prev, [reqId]: false }));
     }
   };
 
@@ -221,13 +281,35 @@ const MentorRequests = () => {
                           <span className="tf-mentor-req-escrow">🔒 ₹{r.agreedPrice} in Escrow</span>
                         </>
                       )}
+                      {r.projectDueDate && (
+                        <>
+                          <span className="tf-mentor-req-dot">·</span>
+                          <span className="tf-mentor-req-duedate" data-testid={`project-due-${r.id}`}>
+                            📅 Project due: {formatProjectDueDate(r.projectDueDate).replace(/^Due /, '')}
+                          </span>
+                        </>
+                      )}
                       <span className="tf-mentor-req-dot">·</span>
-                      <span>{new Date(r.createdAt).toLocaleDateString()}</span>
+                      <span>{formatDateTime(r.createdAt)}</span>
+                      {r.respondBy && isPending && (
+                        <>
+                          <span className="tf-mentor-req-dot">·</span>
+                          <span style={{ fontSize: '0.8rem', color: '#b45309', fontWeight: 600 }}>
+                            ⏱️ Respond within {Math.max(1, Math.ceil((new Date(r.respondBy).getTime() - currentTime) / (1000 * 60 * 60 * 24)))}d
+                          </span>
+                        </>
+                      )}
                     </div>
 
                     {r.message && (
                       <div className="tf-mentor-req-notes">
                         &quot;{r.message}&quot;
+                      </div>
+                    )}
+
+                    {r.declineReason && (
+                      <div style={{ marginTop: '8px', fontSize: '0.82rem', color: '#b91c1c', background: '#fef2f2', padding: '6px 10px', borderRadius: '6px', border: '1px solid #fecaca' }}>
+                        <strong>Decline Reason ({r.declinedBy === 'system' ? 'System auto-declined' : 'Mentor'}):</strong> {r.declineReason}
                       </div>
                     )}
 
@@ -258,7 +340,7 @@ const MentorRequests = () => {
                           type="button"
                           className="tf-mentor-req-btn-reject"
                           disabled={isBusy}
-                          onClick={() => handleDecline(r)}
+                          onClick={() => handleOpenDeclineModal(r)}
                         >
                           <XIcon />
                           <span>Decline</span>
@@ -290,6 +372,123 @@ const MentorRequests = () => {
           </div>
         )}
       </div>
+
+      {/* Decline Mentorship Request Modal */}
+      <Modal
+        isOpen={declineModalOpen}
+        title="Decline Mentorship Booking"
+        onClose={() => {
+          if (!actionInProgress[selectedDeclineReq?.id]) {
+            setDeclineModalOpen(false);
+            setSelectedDeclineReq(null);
+          }
+        }}
+        size="md"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', width: '100%' }}>
+            <button
+              type="button"
+              className="tf-mentor-req-btn-outline"
+              disabled={actionInProgress[selectedDeclineReq?.id]}
+              onClick={() => {
+                setDeclineModalOpen(false);
+                setSelectedDeclineReq(null);
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              className="tf-mentor-req-btn-reject"
+              style={{ padding: '8px 16px', background: '#dc2626', color: '#fff', border: 'none', borderRadius: '6px', fontWeight: 600, cursor: 'pointer' }}
+              disabled={actionInProgress[selectedDeclineReq?.id] || declineReason.trim().length < 10 || declineReason.trim().length > 500}
+              onClick={handleConfirmDecline}
+            >
+              {actionInProgress[selectedDeclineReq?.id] ? 'Declining...' : 'Confirm Decline & Refund'}
+            </button>
+          </div>
+        }
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+          <p style={{ margin: 0, fontSize: '0.9rem', color: '#475569' }}>
+            Please provide a written reason for declining the mentorship booking for{' '}
+            <strong>{selectedDeclineReq?.projectName}</strong>. The project owner will be notified with your written explanation, and their escrow payment of <strong>₹{selectedDeclineReq?.agreedPrice}</strong> will be refunded in full.
+          </p>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
+              Decline Reason Tags <span style={{ color: '#dc2626' }}>*</span>
+            </label>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+              {declineReasonOptions.map((r) => {
+                const isSelected = declineReasons.includes(r.id);
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    data-testid={`reason-chip-${r.id}`}
+                    onClick={() => {
+                      setDeclineReasons((prev) =>
+                        prev.includes(r.id) ? prev.filter((id) => id !== r.id) : [...prev, r.id]
+                      );
+                    }}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '9999px',
+                      border: isSelected ? '1px solid #3b82f6' : '1px solid #cbd5e1',
+                      background: isSelected ? '#eff6ff' : '#ffffff',
+                      color: isSelected ? '#1d4ed8' : '#334155',
+                      fontSize: '0.78rem',
+                      fontWeight: isSelected ? 600 : 500,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {isSelected ? '✓ ' : '+ '}
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <label htmlFor="mentor-decline-reason" style={{ fontWeight: 600, fontSize: '0.85rem', color: '#1e293b' }}>
+              Decline Reason <span style={{ color: '#dc2626' }}>*</span> (10 to 500 characters)
+            </label>
+            <textarea
+              id="mentor-decline-reason"
+              rows={4}
+              value={declineReason}
+              onChange={(e) => {
+                setDeclineReason(e.target.value);
+                if (declineError) setDeclineError('');
+              }}
+              placeholder="Explain why you cannot take on this mentorship (e.g. current capacity limits, domain mismatch)..."
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '6px',
+                border: declineError ? '1px solid #dc2626' : '1px solid #cbd5e1',
+                fontSize: '0.875rem',
+                fontFamily: 'inherit',
+                resize: 'vertical',
+                boxSizing: 'border-box',
+              }}
+            />
+            <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.78rem', color: '#64748b' }}>
+              <span>Minimum 10 characters required</span>
+              <span style={{ color: declineReason.trim().length > 500 ? '#dc2626' : '#64748b' }}>
+                {declineReason.trim().length} / 500 characters
+              </span>
+            </div>
+            {declineError && (
+              <div style={{ color: '#dc2626', fontSize: '0.82rem', marginTop: '4px' }}>
+                ⚠️ {declineError}
+              </div>
+            )}
+          </div>
+        </div>
+      </Modal>
     </div>
   );
 };

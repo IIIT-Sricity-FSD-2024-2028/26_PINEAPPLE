@@ -52,4 +52,43 @@ export class Notification {
     required: false,
   })
   referenceId?: string;
+
+  @ApiProperty({
+    description: 'Optional route or URL linking to the relevant resource/project',
+    example: '/collaborator/workspace/proj-1',
+    required: false,
+  })
+  link?: string;
+
+  @ApiProperty({
+    description: 'Optional structured metadata for UI actions or deep links',
+    required: false,
+  })
+  metadata?: Record<string, any>;
+
+  @ApiProperty({
+    description: 'Optional suggested alternative open projects (e.g., on request rejection)',
+    required: false,
+  })
+  suggestedProjects?: any[];
+
+  @ApiProperty({
+    description: 'Optional grouping key for aggregated bulk notifications',
+    required: false,
+  })
+  groupKey?: string;
+
+  @ApiProperty({
+    description: 'Number of items represented by an aggregated notification',
+    required: false,
+  })
+  count?: number;
+
+  @ApiProperty({
+    description: 'List of items (label and optional link) in an aggregated notification',
+    required: false,
+  })
+  items?: Array<{ label: string; link?: string }>;
+
+  priority?: 'immediate' | 'digest';
 }

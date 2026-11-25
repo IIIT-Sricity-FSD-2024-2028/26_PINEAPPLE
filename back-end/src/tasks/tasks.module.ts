@@ -10,6 +10,6 @@ import { UsersModule } from '../users/users.module';
   imports: [GamificationModule, forwardRef(() => ProjectsModule), UsersModule],
   controllers: [TasksController],
   providers: [TasksService, TasksRepository],
-  exports: [TasksService],
+  exports: [TasksService, TasksRepository],
 })
 export class TasksModule {}

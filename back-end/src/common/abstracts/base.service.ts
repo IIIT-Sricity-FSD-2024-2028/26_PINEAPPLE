@@ -1,7 +1,7 @@
 import { NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'crypto';
 
-export abstract class BaseService<T extends { id: string }> {
+export abstract class BaseService<T extends { id: string }, TUpdate = T> {
   protected readonly items: T[] = [];
 
   findAll(): T[] {
@@ -22,7 +22,7 @@ export abstract class BaseService<T extends { id: string }> {
     return created;
   }
 
-  update(id: string, update: Partial<Omit<T, 'id'>>): T {
+  updateSync(id: string, update: Partial<Omit<T, 'id'>>): T {
     const index = this.items.findIndex((entry: T) => entry.id === id);
     if (index === -1) {
       throw new NotFoundException(`Resource with id ${id} not found`);
@@ -30,6 +30,10 @@ export abstract class BaseService<T extends { id: string }> {
 
     this.items[index] = { ...this.items[index], ...update } as T;
     return this.items[index];
+  }
+
+  update(id: string, update: Partial<Omit<T, 'id'>>): TUpdate {
+    return this.updateSync(id, update) as unknown as TUpdate;
   }
 
   remove(id: string): void {

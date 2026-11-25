@@ -24,5 +24,8 @@ export class EscrowAccountEntity {
   @ApiProperty() createdAt!: string;
   @ApiPropertyOptional() fundedAt?: string;
   @ApiPropertyOptional() distributedAt?: string;
+  @ApiPropertyOptional() splitMentorPayout?: number;
+  @ApiPropertyOptional() splitPlatformFee?: number;
+  @ApiPropertyOptional() splitRefundAmount?: number;
 }
 

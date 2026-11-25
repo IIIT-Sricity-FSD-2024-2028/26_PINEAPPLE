@@ -1,9 +1,28 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { AuthContext } from '../../context/AuthContext';
 import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
 import FormInput from '../../components/common/FormInput';
 import MentorCard from '../../components/features/MentorCard';
 import './myMentorProfile.css';
+
+export const PRICE_MIN = 1;
+export const PRICE_MAX = 100000;
+export const INVALID_PRICE_MESSAGE = 'Enter a whole number between 1 and 100,000';
+
+export function validatePriceInput(val) {
+  if (val === '' || val === null || val === undefined) {
+    return INVALID_PRICE_MESSAGE;
+  }
+  const str = String(val).trim();
+  if (!/^\d+$/.test(str)) {
+    return INVALID_PRICE_MESSAGE;
+  }
+  const num = Number(str);
+  if (!Number.isInteger(num) || num < PRICE_MIN || num > PRICE_MAX) {
+    return INVALID_PRICE_MESSAGE;
+  }
+  return '';
+}
 
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -24,7 +43,26 @@ const MyMentorProfile = () => {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [feedback, setFeedback] = useState(null);
+  const [fieldErrors, setFieldErrors] = useState({});
   const [hasExistingProfile, setHasExistingProfile] = useState(false);
+
+  // Toast Notification state
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
+  const toastTimeoutRef = useRef(null);
+
+  const showToast = (message, type = 'success') => {
+    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    setToast({ visible: true, message, type });
+    toastTimeoutRef.current = setTimeout(() => {
+      setToast((prev) => ({ ...prev, visible: false }));
+    }, 4000);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
+    };
+  }, []);
 
   // Form State
   const [name, setName] = useState('');
@@ -33,9 +71,8 @@ const MyMentorProfile = () => {
   const [skillsInput, setSkillsInput] = useState('');
   const [experienceYears, setExperienceYears] = useState(3);
   const [sessionPrice, setSessionPrice] = useState(1000);
-  const [sessionDuration, setSessionDuration] = useState(60);
-  const [availabilityTime, setAvailabilityTime] = useState('Anytime');
   const [isAvailable, setIsAvailable] = useState(true);
+  const [maxActiveMentees, setMaxActiveMentees] = useState(3);
 
   useEffect(() => {
     let isMounted = true;
@@ -62,9 +99,8 @@ const MyMentorProfile = () => {
           setSkillsInput(Array.isArray(data.skills) ? data.skills.join(', ') : '');
           setExperienceYears(data.experienceYears ?? '');
           setSessionPrice(data.sessionPrice ?? '');
-          setSessionDuration(data.sessionDuration ?? 60);
-          setAvailabilityTime(data.availability || 'Anytime');
           setIsAvailable(data.isAvailable !== false);
+          setMaxActiveMentees(data.maxActiveMentees ?? 3);
         } else if (isMounted) {
           // First load with no profile yet: empty form, not an error
           setHasExistingProfile(false);
@@ -74,9 +110,8 @@ const MyMentorProfile = () => {
           setSkillsInput('');
           setExperienceYears('');
           setSessionPrice('');
-          setSessionDuration(60);
-          setAvailabilityTime('Anytime');
           setIsAvailable(true);
+          setMaxActiveMentees(3);
         }
       } catch (err) {
         console.error('Failed to load mentor profile:', err);
@@ -97,17 +132,58 @@ const MyMentorProfile = () => {
     .map((s) => s.trim())
     .filter(Boolean);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    setSaving(true);
-    setFeedback(null);
+  const handleToggleAvailability = async (e) => {
+    const nextVal = e.target.checked;
+    setIsAvailable(nextVal);
+    try {
+      await mentorMarketplaceApi.updateAvailability(nextVal, undefined, user?.id);
+      showToast(nextVal ? 'You are now available for bookings' : 'You are now unavailable for bookings', 'success');
+    } catch (err) {
+      setIsAvailable(!nextVal); // revert on error
+      const msg = err?.serverMessage || err?.message || 'Failed to update availability.';
+      showToast(msg, 'error');
+    }
+  };
 
-    const priceNum = Number(sessionPrice) || 0;
-    if (priceNum <= 0) {
-      setFeedback({ type: 'error', message: 'Session price must be greater than 0 INR.' });
-      setSaving(false);
+  const handleSubmit = async (e) => {
+    if (e && e.preventDefault) e.preventDefault();
+    if (saving) return; // Prevent double submission
+
+    setFieldErrors({});
+    const errors = {};
+
+    if (!name.trim()) {
+      errors.name = 'Display name is required.';
+    }
+    if (!title.trim()) {
+      errors.title = 'Headline / Expertise is required.';
+    }
+    if (!bio.trim()) {
+      errors.bio = 'Bio & Mentoring Focus is required.';
+    }
+    if (!skillsInput.trim() || parsedSkills.length === 0) {
+      errors.skills = 'At least one skill is required.';
+    }
+
+    const priceErr = validatePriceInput(sessionPrice);
+    if (priceErr) {
+      errors.sessionPrice = priceErr;
+    }
+
+    const expNum = Number(experienceYears);
+    if (experienceYears === '' || isNaN(expNum) || expNum < 0) {
+      errors.experienceYears = 'Years of experience is required.';
+    }
+
+    if (Object.keys(errors).length > 0) {
+      setFieldErrors(errors);
+      const firstErrMsg = errors.sessionPrice || errors.name || errors.title || errors.bio || errors.skills || errors.experienceYears;
+      showToast(firstErrMsg, 'error');
       return;
     }
+
+    setSaving(true);
+    setFeedback(null);
 
     const payload = {
       name: name.trim() || user?.name || 'Mentor',
@@ -115,11 +191,10 @@ const MyMentorProfile = () => {
       bio: bio.trim() || 'Experienced mentor ready to guide student projects.',
       skills: parsedSkills.length > 0 ? parsedSkills : ['Mentorship', 'Software Engineering'],
       experienceYears: Number(experienceYears) || 1,
-      sessionPrice: priceNum,
-      sessionDuration: Number(sessionDuration) || 60,
-      availability: availabilityTime,
+      sessionPrice: Number(sessionPrice),
       languages: ['English'],
       isAvailable: Boolean(isAvailable),
+      maxActiveMentees: Math.min(10, Math.max(1, Number(maxActiveMentees) || 3)),
     };
 
     try {
@@ -141,20 +216,31 @@ const MyMentorProfile = () => {
         setSkillsInput(Array.isArray(saved.skills) ? saved.skills.join(', ') : skillsInput);
         setExperienceYears(saved.experienceYears ?? experienceYears);
         setSessionPrice(saved.sessionPrice ?? sessionPrice);
-        setSessionDuration(saved.sessionDuration ?? sessionDuration);
-        setAvailabilityTime(saved.availability || availabilityTime);
         setIsAvailable(saved.isAvailable !== false);
+        setMaxActiveMentees(saved.maxActiveMentees ?? maxActiveMentees);
       }
 
+      showToast('Mentor profile saved', 'success');
       setFeedback({
         type: 'success',
-        message: 'Your mentor profile and session pricing have been saved and published to the marketplace!',
+        message: 'Your mentor profile and pricing have been saved and published to the marketplace!',
       });
     } catch (err) {
       console.error('Failed to save mentor profile:', err);
+      const serverMsg =
+        err?.serverMessage ||
+        err?.data?.message ||
+        err?.response?.data?.message ||
+        err?.message ||
+        'Failed to save mentor profile. Please check all fields.';
+      const errCode = err?.code || err?.data?.code || err?.response?.data?.code;
+      if (errCode === 'INVALID_PRICE' || (serverMsg && serverMsg.includes('between 1 and 100,000'))) {
+        setFieldErrors((prev) => ({ ...prev, sessionPrice: serverMsg }));
+      }
+      showToast(serverMsg, 'error');
       setFeedback({
         type: 'error',
-        message: err.message || 'Failed to save mentor profile. Please check all fields.',
+        message: serverMsg,
       });
     } finally {
       setSaving(false);
@@ -175,7 +261,7 @@ const MyMentorProfile = () => {
         <div>
           <h1 className="tf-mentor-profile-title">My Mentor Profile</h1>
           <p className="tf-mentor-profile-subtitle">
-            Configure your public listing, session pricing, and availability. Project owners see these details when booking mentorship.
+            Configure your public listing, pricing, and availability. Project owners see these details when booking mentorship.
           </p>
         </div>
       </div>
@@ -193,12 +279,16 @@ const MyMentorProfile = () => {
             <UserIcon /> Mentor Details &amp; Pricing
           </h2>
 
-          <form onSubmit={handleSubmit} className="tf-mentor-form">
+          <form onSubmit={handleSubmit} className="tf-mentor-form" noValidate>
             <FormInput
               label="Display Name"
               name="name"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => {
+                setName(e.target.value);
+                if (fieldErrors.name) setFieldErrors((prev) => ({ ...prev, name: '' }));
+              }}
+              error={fieldErrors.name}
               placeholder="e.g. Kiran Bose"
               required
             />
@@ -207,7 +297,11 @@ const MyMentorProfile = () => {
               label="Headline / Expertise"
               name="title"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={(e) => {
+                setTitle(e.target.value);
+                if (fieldErrors.title) setFieldErrors((prev) => ({ ...prev, title: '' }));
+              }}
+              error={fieldErrors.title}
               placeholder="e.g. Full-stack Architect & Cloud Specialist"
               required
             />
@@ -216,7 +310,11 @@ const MyMentorProfile = () => {
               label="Bio & Mentoring Focus"
               name="bio"
               value={bio}
-              onChange={(e) => setBio(e.target.value)}
+              onChange={(e) => {
+                setBio(e.target.value);
+                if (fieldErrors.bio) setFieldErrors((prev) => ({ ...prev, bio: '' }));
+              }}
+              error={fieldErrors.bio}
               placeholder="Describe your background and how you guide teams through their project milestones..."
               multiline
               rows={4}
@@ -227,7 +325,11 @@ const MyMentorProfile = () => {
               label="Skills (comma separated)"
               name="skills"
               value={skillsInput}
-              onChange={(e) => setSkillsInput(e.target.value)}
+              onChange={(e) => {
+                setSkillsInput(e.target.value);
+                if (fieldErrors.skills) setFieldErrors((prev) => ({ ...prev, skills: '' }));
+              }}
+              error={fieldErrors.skills}
               placeholder="e.g. React, Node.js, System Design, DevOps"
               required
             />
@@ -240,43 +342,58 @@ const MyMentorProfile = () => {
                 min="0"
                 max="50"
                 value={experienceYears}
-                onChange={(e) => setExperienceYears(e.target.value)}
+                onChange={(e) => {
+                  setExperienceYears(e.target.value);
+                  if (fieldErrors.experienceYears) setFieldErrors((prev) => ({ ...prev, experienceYears: '' }));
+                }}
+                error={fieldErrors.experienceYears}
                 required
               />
 
               <FormInput
-                label="Session Price (INR ₹)"
+                label="Price (INR)"
                 name="sessionPrice"
+                id="sessionPrice"
                 type="number"
-                min="100"
-                step="50"
+                min="1"
+                max="100000"
+                step="1"
+                inputMode="numeric"
                 value={sessionPrice}
-                onChange={(e) => setSessionPrice(e.target.value)}
+                onKeyDown={(e) => {
+                  if (['e', 'E', '+', '-'].includes(e.key)) {
+                    e.preventDefault();
+                  }
+                }}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setSessionPrice(val);
+                  if (val && /^\d+$/.test(val)) {
+                    const num = Number(val);
+                    if (num >= PRICE_MIN && num <= PRICE_MAX) {
+                      setFieldErrors((prev) => ({ ...prev, sessionPrice: '' }));
+                    }
+                  }
+                }}
+                onBlur={() => {
+                  const err = validatePriceInput(sessionPrice);
+                  setFieldErrors((prev) => ({ ...prev, sessionPrice: err }));
+                }}
+                error={fieldErrors.sessionPrice}
                 required
               />
             </div>
 
-            <div className="tf-mentor-form-row">
-              <FormInput
-                label="Availability Schedule"
-                name="availability"
-                value={availabilityTime}
-                onChange={(e) => setAvailabilityTime(e.target.value)}
-                options={['Anytime', 'Weekdays', 'Weekends']}
-              />
-
-              <FormInput
-                label="Session Duration"
-                name="sessionDuration"
-                value={sessionDuration}
-                onChange={(e) => setSessionDuration(Number(e.target.value))}
-                options={[
-                  { value: 30, label: '30 Minutes' },
-                  { value: 60, label: '60 Minutes' },
-                  { value: 90, label: '90 Minutes' },
-                ]}
-              />
-            </div>
+            <FormInput
+              label="Max Active Mentees (1–10)"
+              name="maxActiveMentees"
+              type="number"
+              min="1"
+              max="10"
+              value={maxActiveMentees}
+              onChange={(e) => setMaxActiveMentees(e.target.value)}
+              helperText="Maximum concurrent active mentored projects or sessions before your profile shows Full."
+            />
 
             {/* Availability Toggle */}
             <div className="tf-mentor-toggle-box">
@@ -284,7 +401,9 @@ const MyMentorProfile = () => {
                 <input
                   type="checkbox"
                   checked={isAvailable}
-                  onChange={(e) => setIsAvailable(e.target.checked)}
+                  onChange={handleToggleAvailability}
+                  disabled={saving}
+                  data-testid="availability-toggle"
                   className="tf-mentor-checkbox"
                 />
                 <span className="tf-mentor-toggle-text">
@@ -298,10 +417,7 @@ const MyMentorProfile = () => {
               type="submit"
               className="tf-mentor-btn-save"
               disabled={saving}
-              onclick={(e) => {
-                e.preventDefault();
-                handleSubmit(e);
-              }}
+              data-testid="save-mentor-profile-btn"
             >
               <CheckIcon />
               <span>{saving ? 'Saving...' : 'Save & Publish Profile'}</span>
@@ -323,9 +439,10 @@ const MyMentorProfile = () => {
               bio={bio || 'Your bio will appear here to prospective project owners looking for mentorship.'}
               skills={parsedSkills.length > 0 ? parsedSkills : ['React', 'System Design']}
               experienceYears={experienceYears}
-              schedule={availabilityTime}
-              sessionPrice={sessionPrice || 0}
+              sessionPrice={/^\d+$/.test(String(sessionPrice).trim()) ? Number(sessionPrice) : 0}
               available={isAvailable}
+              maxActiveMentees={Number(maxActiveMentees) || 3}
+              university={user?.university || user?.profile?.university || ''}
               action={{
                 label: isAvailable ? 'Book with Escrow' : 'Currently Unavailable',
                 disabled: true,
@@ -338,6 +455,34 @@ const MyMentorProfile = () => {
           </div>
         </div>
       </div>
+
+      {/* Toast Notification */}
+      {toast.visible && (
+        <div
+          role="alert"
+          data-testid="toast"
+          className={`tf-mentor-toast ${toast.type}`}
+          style={{
+            position: 'fixed',
+            bottom: '24px',
+            right: '24px',
+            zIndex: 9999,
+            backgroundColor: toast.type === 'error' ? '#ef4444' : '#10b981',
+            color: '#ffffff',
+            padding: '12px 20px',
+            borderRadius: '8px',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.15)',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '10px',
+            fontSize: '0.95rem',
+            fontWeight: 500,
+          }}
+        >
+          <span style={{ fontWeight: 700 }}>{toast.type === 'error' ? '✕' : '✓'}</span>
+          <span>{toast.message}</span>
+        </div>
+      )}
     </div>
   );
 };

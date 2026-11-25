@@ -1,7 +1,6 @@
-import { useContext } from 'react';
 import './sidebar.css';
 import { useNavigate } from "react-router-dom";
-import { RoleContext } from "../context/RoleContext";
+import { useActiveRole } from "../utils/roleStore";
 
 
 const pages = [
@@ -73,10 +72,10 @@ const pages = [
 
 const Sidebar = ({ isOpen }) => {
   const navigate = useNavigate();
-  const { currentRole } = useContext(RoleContext);
+  const { activeRole } = useActiveRole();
 
-  const isOwner = currentRole === 'Project Owner';
-  const isMentor = currentRole === 'Mentor';
+  const isOwner = activeRole === 'Project Owner';
+  const isMentor = activeRole === 'Mentor';
 
   function handleNavigate(link) {
     if (link === '/dashboard') {
@@ -93,7 +92,11 @@ const Sidebar = ({ isOpen }) => {
   }
 
   return (
-    <aside className={`sidebar ${isOpen ? 'open' : 'closed'}`}>
+    <aside
+      className={`sidebar ${isOpen ? 'open' : 'closed'}`}
+      data-testid="sidebar-role"
+      data-active-role={activeRole}
+    >
       <div className="sidebar-section">
         {isOpen && <h3 className="section-title">GLOBAL</h3>}
         

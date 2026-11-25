@@ -1,0 +1,188 @@
+### TeamForge Phase 14 API Tests (REST Client Format)
+### Mentor Lifecycle: Abandonment Review, First-Week Activity, Re-application Cooldown, Mentee Cap, Post-Session Feedback
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@mentorToken = Bearer YOUR_MENTOR_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. MENTOR ABANDONMENT REVIEW & ACTIVITY LIFECYCLE
+### --------------------------------------------------------------------------
+
+### 1a. Owner Checks Mentor Activity & Review Status
+# Expected Status: 200 OK
+GET {{baseUrl}}/projects/PROJECT_ID/mentor/abandonment-review
+Authorization: {{ownerToken}}
+
+###
+
+### 1b. Collaborator Attempts to Check Mentor Abandonment Review
+# Expected Status: 403 Forbidden
+GET {{baseUrl}}/projects/PROJECT_ID/mentor/abandonment-review
+Authorization: {{collabToken}}
+
+###
+
+### 1c. Owner Opens Abandonment Review (Rejected if Mentor Active Within 7 Days)
+# Expected Status: 201 Created (or 409 MENTOR_STILL_ACTIVE / REVIEW_COOLDOWN / REVIEW_ALREADY_OPEN)
+POST {{baseUrl}}/projects/PROJECT_ID/mentor/abandonment-review
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "reason": "Mentor has been unresponsive for over a week."
+}
+
+###
+
+### 1d. Mentor Fetches Open Abandonment Reviews Requiring Confirmation
+# Expected Status: 200 OK
+GET {{baseUrl}}/mentor/abandonment-reviews/mine
+Authorization: {{mentorToken}}
+
+###
+
+### 1e. Assigned Mentor Confirms They Are Still Active (Logs Activity & Restarts 7-Day Clock)
+# Expected Status: 200 OK
+POST {{baseUrl}}/mentor/abandonment-reviews/REVIEW_ID/confirm
+Authorization: {{mentorToken}}
+
+###
+
+### 1f. Admin Cancels an Open Abandonment Review (Requires Written Reason)
+# Expected Status: 200 OK (400 REASON_REQUIRED if reason omitted)
+POST {{baseUrl}}/admin/abandonment-reviews/REVIEW_ID/cancel
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "reason": "Mentor contacted support regarding scheduled medical leave."
+}
+
+###
+
+### 1g. Save Session Note (Records Mentor Project Activity)
+# Expected Status: 200 OK
+POST {{baseUrl}}/mentor-sessions/SESSION_ID/notes
+Authorization: {{mentorToken}}
+Content-Type: application/json
+
+{
+  "note": "Reviewed architecture diagrams and agreed on weekly milestone deliverables."
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 2. MENTEE CAPACITY CAP & BOOKING
+### --------------------------------------------------------------------------
+
+### 2a. Mentor Sets Max Active Mentees (1 to 10, Default 3)
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/mentor-marketplace/mentors/profile
+Authorization: {{mentorToken}}
+x-user-id: 7
+Content-Type: application/json
+
+{
+  "maxActiveMentees": 3
+}
+
+###
+
+### 2b. Book Session Beyond Mentor Active Mentee Cap
+# Expected Status: 409 Conflict (Code: MENTOR_AT_CAPACITY)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "PROJECT_ID",
+  "topic": "Milestone Architecture Review",
+  "scheduledAt": "2026-06-01T10:00:00.000Z"
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 3. RE-APPLICATION COOLDOWN AFTER REJECTION
+### --------------------------------------------------------------------------
+
+### 3a. Re-apply Before Cooldown Expires (Default 14 Days)
+# Expected Status: 409 Conflict (Code: REAPPLY_COOLDOWN with availableAt)
+POST {{baseUrl}}/mentor-applications
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "userId": "2",
+  "email": "arjun.sharma@teamforge.io",
+  "name": "Arjun Sharma",
+  "years": 6,
+  "bio": "Experienced backend and distributed systems engineer mentoring teams.",
+  "skills": ["Node.js", "TypeScript", "NestJS"],
+  "cvFileName": "cv-arjun.pdf",
+  "certificates": [
+    {
+      "title": "AWS Certified Solutions Architect",
+      "issuer": "Amazon Web Services",
+      "holderName": "Arjun Sharma",
+      "documentNumber": "AWS-991"
+    }
+  ]
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 4. POST-SESSION FEEDBACK (PRIVATE TO OWNER -> ADMIN + AGGREGATE STATS)
+### --------------------------------------------------------------------------
+
+### 4a. Owner Submits 1-5 Private Feedback on Completed Session
+# Expected Status: 200 OK (400 INVALID_RATING outside 1..5; 409 ALREADY_RATED on second call)
+POST {{baseUrl}}/mentor-sessions/SESSION_ID/feedback
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "rating": 5,
+  "comment": "Actionable feedback and very structured session notes."
+}
+
+###
+
+### 4b. Mentor Fetches Own Private Aggregate Stats (No Single Comments / Student Names)
+# Expected Status: 200 OK
+GET {{baseUrl}}/mentor-marketplace/mentors/me/stats
+Authorization: {{mentorToken}}
+
+###
+
+### 4c. Admin Inspects Full Mentor Feedback & Abandonment History
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/mentors/7/feedback
+Authorization: {{adminToken}}
+
+###
+
+### --------------------------------------------------------------------------
+### 5. HOURLY SCHEDULER TICK & ESCROW RECONCILIATION
+### --------------------------------------------------------------------------
+
+### 5a. Trigger Hourly Tick (Includes mentorAbandonmentReleaser & mentorActivityNotifier)
+# Expected Status: 202 Accepted
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+
+###
+
+### 5b. Reconcile Escrow Across All Mentor Sessions
+# Expected Status: 200 OK (ok: true, mismatches: [])
+GET {{baseUrl}}/admin/escrow/reconcile
+Authorization: {{adminToken}}

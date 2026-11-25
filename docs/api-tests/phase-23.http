@@ -1,0 +1,42 @@
+### PHASE 23: SNAPSHOT COMPLETENESS, INTEGRITY CHECK & STORAGE HYGIENE
+
+@baseUrl = http://localhost:3000
+@adminToken = Bearer <ADMIN_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Trigger Immediate Snapshot Save (schemaVersion: 2 + All Stateful Stores)
+POST {{baseUrl}}/admin/system/snapshot
+Authorization: {{superUserToken}}
+
+### 2. Inspect Latest Snapshot Integrity Check Report (Super User Only)
+GET {{baseUrl}}/admin/system/integrity
+Authorization: {{superUserToken}}
+
+### 3. Re-run Live Snapshot Integrity Check On Demand (Super User Only)
+GET {{baseUrl}}/admin/system/integrity?refresh=true
+Authorization: {{superUserToken}}
+
+### 4. Integrity Endpoint Forbidden For Regular Admin (403)
+GET {{baseUrl}}/admin/system/integrity
+Authorization: {{adminToken}}
+
+### 5. List Mentor Sessions Flagged needs_review (Admin 'reports' section or Super User)
+GET {{baseUrl}}/admin/mentor-sessions/needs-review
+Authorization: {{adminToken}}
+
+### 6. Clear needs_review Integrity Flag With Mandatory Reason (409 on Replay)
+POST {{baseUrl}}/admin/mentor-sessions/sess-flagged-1/clear-review
+Authorization: {{adminToken}}
+Content-Type: application/json
+
+{
+  "reason": "Verified escrow payment ledger offline and approved settlement."
+}
+
+### 7. Trigger Hourly Jobs Tick (Executes storageHygieneJob & Records Detailed Counts)
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+
+### 8. Inspect Job Run Details Including storageHygiene Counts
+GET {{baseUrl}}/admin/jobs/runs/<RUN_ID>
+Authorization: {{adminToken}}

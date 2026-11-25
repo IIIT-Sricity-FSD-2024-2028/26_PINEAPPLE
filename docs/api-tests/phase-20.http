@@ -1,0 +1,92 @@
+### PHASE 20: RESOURCE AUTHORIZATION & INPUT CHECKS
+
+@baseUrl = http://localhost:3000
+@ownerAToken = Bearer <OWNER_A_JWT>
+@collabAToken = Bearer <COLLAB_A_JWT>
+@userBToken = Bearer <USER_B_JWT>
+@adminMentorToken = Bearer <ADMIN_WITH_MENTOR_APPS_JWT>
+@adminUsersOnlyToken = Bearer <ADMIN_USERS_ONLY_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+@unverifiedToken = Bearer <UNVERIFIED_USER_JWT>
+@projAId = proj-1
+@projBId = <PROJECT_B_ID>
+@taskBId = <TASK_B_ID>
+@notifAId = <NOTIF_A_ID>
+
+### 1. Project A owner blocked from creating task in Project B (403 NOT_A_PROJECT_MEMBER)
+POST {{baseUrl}}/tasks
+Authorization: {{ownerAToken}}
+Content-Type: application/json
+
+{
+  "projectId": "{{projBId}}",
+  "title": "Unauthorized Task",
+  "dueDate": "2028-06-01"
+}
+
+### 2. Project A collaborator blocked from editing/deleting task in Project B (403 NOT_A_PROJECT_MEMBER)
+PATCH {{baseUrl}}/tasks/{{taskBId}}
+Authorization: {{collabAToken}}
+Content-Type: application/json
+
+{
+  "title": "Tampered Task"
+}
+
+### 3. Task ID queried with mismatched projectId returns 404 TASK_NOT_FOUND
+GET {{baseUrl}}/tasks/{{taskBId}}?projectId={{projAId}}
+Authorization: {{userBToken}}
+
+### 4. New task created directly in "In Review" rejected (400 INVALID_INITIAL_STATUS)
+POST {{baseUrl}}/tasks
+Authorization: {{ownerAToken}}
+Content-Type: application/json
+
+{
+  "projectId": "{{projAId}}",
+  "title": "Pre-approved task bypass",
+  "dueDate": "2028-06-01",
+  "status": "In Review"
+}
+
+### 5. Task comment with banned phrase rejected (400 CONTENT_NOT_ALLOWED)
+POST {{baseUrl}}/tasks/task-2/comments
+Authorization: {{collabAToken}}
+Content-Type: application/json
+
+{
+  "text": "Comment containing blocked phrase"
+}
+
+### 6. User B reading/marking/deleting User A's notification returns 404 NOTIFICATION_NOT_FOUND
+GET {{baseUrl}}/notifications/{{notifAId}}
+Authorization: {{userBToken}}
+
+### 7. Non-admin POST /notifications blocked (403 Forbidden)
+POST {{baseUrl}}/notifications
+Authorization: {{collabAToken}}
+Content-Type: application/json
+
+{
+  "userId": "1",
+  "message": "Attempted spoofed notification"
+}
+
+### 8. Admin/Super User POST /notifications with 10-500 char body succeeds (201 Created)
+POST {{baseUrl}}/notifications
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+{
+  "userId": "1",
+  "title": "System Notice",
+  "message": "Scheduled platform maintenance will occur at 11 PM UTC."
+}
+
+### 9. CV download requires applicant, admin with mentor_apps, or Super User (403 for revenue/users-only admin)
+GET {{baseUrl}}/uploads/cv/sample.pdf
+Authorization: {{adminUsersOnlyToken}}
+
+### 10. Unverified user blocked on invite accept, mentor application, report, dispute, and data export (403 EMAIL_NOT_VERIFIED)
+POST {{baseUrl}}/users/me/export
+Authorization: {{unverifiedToken}}

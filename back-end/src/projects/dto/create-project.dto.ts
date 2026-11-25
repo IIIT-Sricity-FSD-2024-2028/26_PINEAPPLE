@@ -1,4 +1,4 @@
-import { IsString, IsArray, IsNotEmpty, IsOptional, IsNumber, IsBoolean } from 'class-validator';
+import { IsString, IsArray, IsNotEmpty, IsOptional, IsNumber, IsBoolean, IsObject, IsIn } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export enum ProjectDifficulty {
@@ -14,6 +14,7 @@ export enum ProjectStatus {
   Open = 'Open',
   InProgress = 'In Progress',
   Completed = 'Completed',
+  Closed = 'Closed',
 }
 
 export class CreateProjectDto {
@@ -49,15 +50,25 @@ export class CreateProjectDto {
   @IsString({ each: true })
   skills?: string[];
 
-  @ApiPropertyOptional({ example: '3 Months' })
-  @IsOptional()
+  @ApiProperty({ example: '2027-01-15T00:00:00.000Z', description: 'Due date for the project' })
+  @IsNotEmpty({ message: 'Project due date is required.' })
   @IsString()
-  duration?: string;
+  dueDate: string;
 
   @ApiPropertyOptional({ example: 5 })
   @IsOptional()
   @IsNumber()
   maxCollaborators?: number;
+
+  @ApiPropertyOptional({ example: 5, description: 'Target team size (cannot be below active member count)' })
+  @IsOptional()
+  @IsNumber()
+  teamSize?: number;
+
+  @ApiPropertyOptional({ example: false, description: 'Whether to shift open task deadlines forward on due date change' })
+  @IsOptional()
+  @IsBoolean()
+  shiftTasks?: boolean;
 
   @ApiPropertyOptional({ example: 'Project Owner' })
   @IsOptional()
@@ -69,9 +80,12 @@ export class CreateProjectDto {
   @IsString()
   ownerId?: string;
 
-  @ApiPropertyOptional({ example: 'Open' })
+  @ApiPropertyOptional({ enum: ProjectStatus, example: ProjectStatus.Open })
   @IsOptional()
   @IsString()
+  @IsIn(Object.values(ProjectStatus), {
+    message: 'Invalid project status. Supported statuses are Open, In Progress, Completed, Closed.',
+  })
   status?: string;
 
   @ApiPropertyOptional({ example: 0 })
@@ -125,4 +139,25 @@ export class CreateProjectDto {
   @ApiPropertyOptional({ example: 'Neha Gupta' })
   @IsOptional()
   mentor?: any;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsArray()
+  removedUsers?: any[];
+
+  @ApiPropertyOptional({ example: 'Web App', description: 'Project category for starter task templates' })
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @ApiPropertyOptional({ type: [String], example: ['web-repo-readme', 'web-main-screens'] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  starterTaskKeys?: string[];
+
+  @ApiPropertyOptional({ description: 'Optional per-template overrides for title and description' })
+  @IsOptional()
+  @IsObject()
+  starterTaskOverrides?: Record<string, { title?: string; description?: string }>;
 }

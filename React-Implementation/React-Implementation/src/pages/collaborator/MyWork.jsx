@@ -17,7 +17,10 @@ const MyWork = () => {
   const navigate = useNavigate();
 
   const [filter, setFilter] = useState('ongoing');
-  const [projects, setProjects] = useState([]);
+  const [ongoingProjects, setOngoingProjects] = useState([]);
+  const [completedProjects, setCompletedProjects] = useState([]);
+  const [ongoingCount, setOngoingCount] = useState(0);
+  const [completedCount, setCompletedCount] = useState(0);
   const [tasksMap, setTasksMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [summaryProject, setSummaryProject] = useState(null);
@@ -29,46 +32,64 @@ const MyWork = () => {
     let isMounted = true;
     const loadMyWork = async () => {
       try {
+        setLoading(true);
 
-        const [allProjects, myRequests] = await Promise.all([
-          projectsApi.list().catch(() => []),
-          joinRequestsApi.list({ userId: currentUserId }).catch(() => []),
-        ]);
-
-        const validRequestProjectIds = new Set(
-          (Array.isArray(myRequests) ? myRequests : [])
-            .filter((r) => {
-              const st = String(r.status || '').toLowerCase();
-              return st === 'approved' || st === 'completed';
-            })
-            .map((r) => r.projectId)
-        );
-
-        const collaborativeProjects = (Array.isArray(allProjects) ? allProjects : []).filter((p) => {
-          const isOwner = p.owner === currentUserName || p.ownerId === currentUserId;
-          if (isOwner) return false;
-
-          const isExplicitMember =
-            Array.isArray(p.collaborators) &&
-            p.collaborators.some(
-              (c) =>
-                c === currentUserId ||
-                c === currentUserName ||
-                (typeof c === 'object' && (c.id === currentUserId || c.name === currentUserName))
+        let res;
+        try {
+          res = await projectsApi.getMyWork(currentUserId);
+        } catch {
+          // Fallback if dedicated endpoint is temporarily unreachable
+          const allProjects = await projectsApi.list({ status: 'all' }).catch(() => []);
+          const collabs = (Array.isArray(allProjects) ? allProjects : []).filter((p) => {
+            const isOwner = p.owner === currentUserName || p.ownerId === currentUserId;
+            if (isOwner) return false;
+            return (
+              Array.isArray(p.collaborators) &&
+              p.collaborators.some(
+                (c) =>
+                  c === currentUserId ||
+                  c === currentUserName ||
+                  (typeof c === 'object' && (c.id === currentUserId || c.name === currentUserName))
+              )
             );
-
-          return isExplicitMember || validRequestProjectIds.has(p.id);
-        });
-
-        if (isMounted) {
-          setProjects(collaborativeProjects);
+          });
+          const ongoing = collabs.filter(
+            (p) =>
+              String(p.status || '').toLowerCase() !== 'completed' &&
+              String(p.status || '').toLowerCase() !== 'closed' &&
+              !p.isCompleted
+          );
+          const completed = collabs.filter(
+            (p) =>
+              String(p.status || '').toLowerCase() === 'completed' ||
+              String(p.status || '').toLowerCase() === 'closed' ||
+              p.isCompleted
+          );
+          res = {
+            ongoing,
+            completed,
+            ongoingCount: ongoing.length,
+            completedCount: completed.length,
+          };
         }
 
-        const projectIds = collaborativeProjects.map((p) => p.id);
-        if (projectIds.length > 0) {
-          const allTasks = await tasksApi.listForProjects(projectIds);
+        const ongoing = Array.isArray(res?.ongoing) ? res.ongoing : [];
+        const completed = Array.isArray(res?.completed) ? res.completed : [];
+        const oCount = typeof res?.ongoingCount === 'number' ? res.ongoingCount : ongoing.length;
+        const cCount = typeof res?.completedCount === 'number' ? res.completedCount : completed.length;
+
+        if (isMounted) {
+          setOngoingProjects(ongoing);
+          setCompletedProjects(completed);
+          setOngoingCount(oCount);
+          setCompletedCount(cCount);
+        }
+
+        const allProjectIds = [...ongoing, ...completed].map((p) => p.id);
+        if (allProjectIds.length > 0) {
+          const allTasks = await tasksApi.listForProjects(allProjectIds);
           const mapped = {};
-          allTasks.forEach((t) => {
+          (allTasks || []).forEach((t) => {
             if (!mapped[t.projectId]) mapped[t.projectId] = [];
             mapped[t.projectId].push(t);
           });
@@ -85,18 +106,17 @@ const MyWork = () => {
       }
     };
 
-    loadMyWork();
+    if (currentUserId) {
+      loadMyWork();
+    } else {
+      setLoading(false);
+    }
 
     return () => {
       isMounted = false;
     };
   }, [currentUserId, currentUserName]);
 
-  const isCompletedProject = (p) => p.isCompleted === true || isProjectLocked(p);
-  const ongoingProjects = projects.filter((p) => !isCompletedProject(p));
-  const completedProjects = projects
-    .filter(isCompletedProject)
-    .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
   const visibleProjects = filter === 'completed' ? completedProjects : ongoingProjects;
 
   return (
@@ -109,8 +129,8 @@ const MyWork = () => {
       <div className="tf-mywork-switch" style={{ width: 'fit-content', marginBottom: '24px' }}>
         <FilterTabs
           tabs={[
-            { id: 'ongoing', label: `Ongoing (${ongoingProjects.length})` },
-            { id: 'completed', label: `Completed (${completedProjects.length})` },
+            { id: 'ongoing', label: `Ongoing (${ongoingCount})` },
+            { id: 'completed', label: `Completed (${completedCount})` },
           ]}
           activeTab={filter}
           onChange={setFilter}

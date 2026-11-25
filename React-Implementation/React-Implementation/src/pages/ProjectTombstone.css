@@ -1,0 +1,140 @@
+.tf-tombstone-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 60vh;
+  padding: 32px 16px;
+}
+
+.tf-tombstone-card {
+  max-width: 560px;
+  width: 100%;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 36px 32px;
+  box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
+  text-align: center;
+}
+
+.tf-tombstone-icon {
+  font-size: 3rem;
+  margin-bottom: 16px;
+}
+
+.tf-tombstone-title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0 0 8px;
+}
+
+.tf-tombstone-subtitle {
+  font-size: 1rem;
+  color: #475569;
+  margin: 0 0 20px;
+}
+
+.tf-tombstone-reasons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.tf-tombstone-label {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: #64748b;
+  letter-spacing: 0.05em;
+}
+
+.tf-tombstone-chips {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+}
+
+.tf-tombstone-chip {
+  background: #f1f5f9;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 0.82rem;
+  font-weight: 500;
+}
+
+.tf-tombstone-explanation {
+  background: #f8fafc;
+  border-left: 3px solid #94a3b8;
+  padding: 12px 16px;
+  margin: 16px 0 20px;
+  text-align: left;
+  border-radius: 0 8px 8px 0;
+}
+
+.tf-tombstone-quote {
+  margin: 4px 0 0;
+  font-size: 0.9rem;
+  font-style: italic;
+  color: #334155;
+}
+
+.tf-tombstone-info {
+  background: #eff6ff;
+  border: 1px solid #dbeafe;
+  border-radius: 8px;
+  padding: 12px 16px;
+  margin-bottom: 24px;
+}
+
+.tf-tombstone-info p {
+  margin: 0;
+  font-size: 0.85rem;
+  color: #1e40af;
+  line-height: 1.45;
+}
+
+.tf-tombstone-actions {
+  display: flex;
+  gap: 12px;
+  justify-content: center;
+}
+
+.tf-tombstone-btn-primary {
+  background: #2563eb;
+  border: 1px solid #2563eb;
+  color: #ffffff;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-tombstone-btn-primary:hover {
+  background: #1d4ed8;
+  border-color: #1d4ed8;
+}
+
+.tf-tombstone-btn-secondary {
+  background: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-tombstone-btn-secondary:hover {
+  background: #f8fafc;
+  border-color: #94a3b8;
+}

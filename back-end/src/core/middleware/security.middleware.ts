@@ -40,9 +40,13 @@ export class SecurityMiddleware implements NestMiddleware {
     // Disable browser DNS prefetching to prevent privacy leaks
     res.setHeader('X-DNS-Prefetch-Control', 'off');
 
-    // Prevent the browser from caching sensitive responses
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
-    res.setHeader('Pragma', 'no-cache');
+    // Set safe caching headers: public static assets and config can cache briefly, sensitive API routes default to no-store
+    if (req.path === '/admin/config/public' || req.path.startsWith('/uploads/')) {
+      res.setHeader('Cache-Control', 'public, max-age=60, stale-while-revalidate=300');
+    } else {
+      res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+      res.setHeader('Pragma', 'no-cache');
+    }
 
     next();
   }

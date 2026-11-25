@@ -5,6 +5,13 @@ yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
 .env
+.env.local
 logs/
 uploads/
 backend-requests.log
+serviceAccountKey.json
+*firebase-adminsdk*.json
+firebase-service-account.json
+.firebase/
+emulator-data/
+firebase-debug.log*

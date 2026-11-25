@@ -1,6 +1,6 @@
-import { Controller, Get, Param } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse } from '@nestjs/swagger';
-import { GamificationService } from './gamification.service';
+import { Controller, Get, Param, Query } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiResponse, ApiQuery } from '@nestjs/swagger';
+import { GamificationService, GamificationPeriod } from './gamification.service';
 import { GamificationRepository } from './gamification.repository';
 
 @ApiTags('Gamification')
@@ -22,6 +22,20 @@ export class GamificationController {
   @ApiOperation({ summary: 'Get the gamification ledger for a specific user' })
   @ApiResponse({ status: 200, description: 'Returns an array of ledger entries.' })
   getLedgerByUserId(@Param('userId') userId: string) {
-    return this.gamificationRepository.getLedgerByUserId(userId);
+    return this.gamificationService.getLedgerByUserId(userId);
+  }
+
+  @Get(':userId/stats')
+  @ApiOperation({ summary: 'Get computed gamification stats for a specific user' })
+  @ApiQuery({ name: 'period', required: false, enum: ['alltime', 'monthly', 'weekly'] })
+  @ApiResponse({ status: 200, description: 'Returns computed total XP, reputation, tasks, and projects.' })
+  getUserStats(
+    @Param('userId') userId: string,
+    @Query('period') period?: GamificationPeriod,
+  ) {
+    if (period) {
+      return this.gamificationService.getUserPeriodStats(userId, period);
+    }
+    return this.gamificationService.getUserStats(userId);
   }
 }

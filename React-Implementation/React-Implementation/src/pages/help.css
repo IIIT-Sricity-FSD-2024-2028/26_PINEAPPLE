@@ -1,6 +1,6 @@
 /* help.css */
 .help-page { padding: 2rem; max-width: 800px; margin: 0 auto; box-sizing: border-box; }
-.help-header { margin-bottom: 2.5rem; }
+.help-header { margin-bottom: 2rem; }
 .help-title-main { font-size: 2.5rem; font-weight: 800; color: var(--fg, #111827); margin: 0 0 0.5rem 0; letter-spacing: -0.02em; }
 .help-subtitle { margin: 0; color: var(--muted-fg, #6b7280); font-size: 1.05rem; }
 
@@ -73,7 +73,8 @@
 .help-textarea { resize: vertical; min-height: 120px; }
 
 .help-btn-primary { padding: 0.75rem 1.5rem; background: var(--primary, #5f513f); color: white; border: none; border-radius: 8px; cursor: pointer; font-size: 0.95rem; font-weight: 600; transition: background 0.2s; }
-.help-btn-primary:hover { background: var(--tf-brand-600, #4a3f31); }
+.help-btn-primary:hover:not(:disabled) { background: var(--tf-brand-600, #4a3f31); }
+.help-btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .help-icon-box {
   width: 32px;
@@ -85,3 +86,123 @@
   background: rgba(95, 81, 63, 0.1);
   color: var(--primary, #5f513f);
 }
+
+/* Tabs */
+.help-tabs-header {
+  display: flex;
+  gap: 0.5rem;
+  border-bottom: 2px solid var(--border, #e5e7eb);
+  margin-bottom: 2rem;
+}
+.help-tab-button {
+  background: none;
+  border: none;
+  padding: 0.75rem 1.25rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--muted-fg, #6b7280);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: all 0.2s ease;
+}
+.help-tab-button:hover {
+  color: var(--fg, #111827);
+}
+.help-tab-button.active {
+  color: var(--primary, #5f513f);
+  border-bottom-color: var(--primary, #5f513f);
+}
+
+/* Combobox & User Search */
+.help-combobox-wrapper {
+  position: relative;
+}
+.help-search-results-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #cbd5e1);
+  border-radius: 8px;
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+  z-index: 50;
+  max-height: 250px;
+  overflow-y: auto;
+}
+.help-search-result-item {
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid var(--border, #f3f4f6);
+  transition: background 0.15s;
+}
+.help-search-result-item:last-child {
+  border-bottom: none;
+}
+.help-search-result-item:hover,
+.help-search-result-item:focus {
+  background: #f1f5f9;
+}
+.help-selected-user-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  background: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 8px;
+}
+
+/* Feedback banners */
+.help-banner-success {
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+.help-banner-error {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+  padding: 0.85rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1.5rem;
+  font-size: 0.95rem;
+}
+
+/* My reports list */
+.help-reports-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+.help-reports-table th {
+  text-align: left;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 2px solid var(--border, #e5e7eb);
+  color: var(--muted-fg, #6b7280);
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+.help-reports-table td {
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid var(--border, #f3f4f6);
+  vertical-align: middle;
+}
+.help-status-badge {
+  display: inline-block;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-transform: capitalize;
+}
+.help-status-open { background: #e0f2fe; color: #0369a1; }
+.help-status-under-review { background: #f3e8ff; color: #7e22ce; }
+.help-status-resolved { background: #dcfce7; color: #15803d; }
+.help-status-dismissed { background: #f1f5f9; color: #475569; }

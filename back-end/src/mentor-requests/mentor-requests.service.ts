@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, Injectable } from '@nestjs/common';
+import { BadRequestException, ForbiddenException, Injectable, Optional, OnModuleInit } from '@nestjs/common';
 import { BaseService } from '../common/abstracts/base.service';
 import { MentorRequestEntity } from './entities/mentor-request.entity';
 import { CreateMentorRequestDto } from './dto/create-mentor-request.dto';
@@ -7,15 +7,40 @@ import { ProjectsService } from '../projects/projects.service';
 import { UsersService } from '../users/users.service';
 import { MentorApplicationsService } from '../mentor-applications/mentor-applications.service';
 import { UserRole } from '../users/dto/create-user.dto';
+import { FeedbackService } from '../feedback/feedback.service';
 
 @Injectable()
-export class MentorRequestsService extends BaseService<MentorRequestEntity> {
+export class MentorRequestsService extends BaseService<MentorRequestEntity> implements OnModuleInit {
   constructor(
     private readonly projectsService: ProjectsService,
     private readonly usersService: UsersService,
     private readonly mentorApplicationsService: MentorApplicationsService,
+    @Optional() private readonly feedbackService?: FeedbackService,
   ) {
     super();
+  }
+
+  onModuleInit(): void {
+    if (this.feedbackService) {
+      this.feedbackService.registerEntityResolver('MENTOR_REQUEST', (requestId: string) => {
+        const req = this.findOne(requestId);
+        if (!req) return { exists: false, parties: [] };
+        let ownerId: string | undefined;
+        try {
+          const p = this.projectsService?.findById?.(req.projectId);
+          if (p?.ownerId) ownerId = String(p.ownerId);
+        } catch {}
+        const parties = [String(req.mentorId)];
+        if (ownerId && !parties.includes(ownerId)) parties.push(ownerId);
+        return {
+          exists: true,
+          projectId: req.projectId,
+          parties,
+          actorId: String(req.mentorId),
+          targetId: ownerId,
+        };
+      });
+    }
   }
 
   isApprovedMentor(userId?: string): boolean {
@@ -29,9 +54,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
           return true;
         }
       }
-    } catch {
-      // User not found in repository
-    }
+    } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     try {
       const apps = this.mentorApplicationsService.findByUser(userId);
@@ -44,9 +69,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
           return true;
         }
       }
-    } catch {
-      // Lookup failure
-    }
+    } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     return false;
   }
@@ -106,7 +131,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       let userEmail: string | undefined;
       try {
         if (userId) userEmail = this.usersService.findById(userId)?.email?.toLowerCase();
-      } catch { /* ignored */ }
+      } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
 
       const reqMentorId = current.mentorId?.trim();
       const reqMentorEmail = current.mentorEmail?.trim().toLowerCase();
@@ -133,9 +160,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
           try {
             const u = this.usersService.findById(assignedMentorId);
             if (u) mentorName = u.name;
-          } catch {
-            /* ignore */
-          }
+          } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
         } else if (current.mentorEmail) {
           try {
             const u = this.usersService.findAll().find(
@@ -145,9 +172,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
               mentorName = u.name;
               assignedMentorId = u.id;
             }
-          } catch {
-            /* ignore */
-          }
+          } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
         }
 
         const project = this.projectsService.findById(current.projectId);
@@ -155,15 +182,15 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
           project.mentorId = assignedMentorId;
           project.mentor = mentorName;
         }
-      } catch {
-        /* non-critical */
+      } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
       }
     }
 
     return updated;
   }
 
-  decline(id: string, userId?: string, role?: string): MentorRequestEntity {
+  decline(id: string, userId?: string, role?: string, feedbackPayload?: any): MentorRequestEntity {
     const current = this.findOne(id);
     if (current?.status === 'accepted') {
       throw new ForbiddenException('A mentor cannot leave or be removed once a project has started.');
@@ -178,7 +205,9 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       let userEmail: string | undefined;
       try {
         if (userId) userEmail = this.usersService.findById(userId)?.email?.toLowerCase();
-      } catch { /* ignored */ }
+      } catch (err: any) {
+        console.warn('[mentor-requests.service] Suppressed non-critical error:', err?.message || err);
+      }
 
       const reqMentorId = current.mentorId?.trim();
       const reqMentorEmail = current.mentorEmail?.trim().toLowerCase();
@@ -188,6 +217,35 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
           throw new ForbiddenException('This mentor request was not assigned to you.');
         }
       }
+    }
+
+    let feedbackRecord: any;
+    if (this.feedbackService) {
+      let fb = feedbackPayload?.reasons !== undefined
+        ? { reasons: feedbackPayload.reasons, explanation: feedbackPayload.explanation }
+        : ((feedbackPayload as any)?.feedback || (feedbackPayload?.reason ? { reasons: ['OTHER'], explanation: feedbackPayload.reason } : undefined));
+      if (!fb && (!feedbackPayload || Object.keys(feedbackPayload).length === 0)) {
+        fb = { reasons: ['OTHER'], explanation: 'Declined by mentor' };
+      }
+      if (!fb) {
+        fb = { reasons: [] };
+      }
+      const validated = this.feedbackService.validate('MENTOR_REJECT_REQUEST', fb, userId, current);
+      let targetOwnerId: string | undefined;
+      try {
+        const p = this.projectsService?.findById?.(current.projectId);
+        if (p?.ownerId) targetOwnerId = String(p.ownerId);
+      } catch {}
+      feedbackRecord = this.feedbackService.record({
+        actionType: 'MENTOR_REJECT_REQUEST',
+        entityType: 'MENTOR_REQUEST',
+        entityId: id,
+        projectId: current.projectId,
+        actorUserId: String(userId || current.mentorId || 'Mentor'),
+        targetUserId: targetOwnerId,
+        reasons: validated.reasons,
+        explanation: validated.explanation,
+      });
     }
 
     return super.update(id, {
@@ -206,5 +264,13 @@ export class MentorRequestsService extends BaseService<MentorRequestEntity> {
       throw new BadRequestException('Project is locked. Mentor requests cannot be removed.');
     }
     super.remove(id);
+  }
+
+  resetToSeed(): void {
+    this.reset();
+  }
+
+  reset(): void {
+    this.items.length = 0;
   }
 }

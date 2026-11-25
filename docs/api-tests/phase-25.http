@@ -1,0 +1,105 @@
+### PHASE 25: MENTOR BOOKING INTEGRITY
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer <PROJECT_OWNER_JWT>
+@mentorToken = Bearer <MENTOR_JWT>
+@owner2Token = Bearer <SECOND_OWNER_JWT>
+
+### 1. Owner Cannot Book Self as Mentor (409 CANNOT_BOOK_SELF)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-owner",
+  "projectId": "proj-owned-by-self",
+  "projectDescription": "Self mentorship attempt",
+  "scheduledAt": "2026-06-12T10:00:00.000Z"
+}
+
+### 2. Owner Cannot Book Project Collaborator as Mentor (409 CANNOT_BOOK_OWN_PROJECT_MENTOR)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-collab",
+  "projectId": "proj-with-collab-as-mentor",
+  "projectDescription": "Collaborator mentor attempt",
+  "scheduledAt": "2026-06-12T10:00:00.000Z"
+}
+
+### 3. Non-Live Project Cannot Be Booked (Draft / Closed / Completed / Deleted -> 409 PROJECT_NOT_BOOKABLE)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-draft-1",
+  "projectDescription": "Booking on draft project",
+  "scheduledAt": "2026-06-12T10:00:00.000Z"
+}
+
+### 4. Book Valid Mentor Session on Live Project (201 Created, ClockService 30m hold)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-live-1",
+  "projectDescription": "Architecture review and milestone sprint mentoring",
+  "scheduledAt": "2026-06-12T10:00:00.000Z"
+}
+
+### 5. Mentor Time Overlap Rejected Without Other Project Name (409 MENTOR_TIME_CONFLICT)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{owner2Token}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-live-2",
+  "projectDescription": "Overlapping 10:30 slot for same mentor",
+  "scheduledAt": "2026-06-12T10:30:00.000Z"
+}
+
+### 6. Owner Time Overlap Rejected Across Mentors (409 OWNER_TIME_CONFLICT)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-4",
+  "projectId": "proj-live-1b",
+  "projectDescription": "Double booking owner schedule with second mentor",
+  "scheduledAt": "2026-06-12T10:30:00.000Z"
+}
+
+### 7. Touching Back-to-Back Slot Allowed (11:00 immediately after 10:00-11:00 -> 201 Created)
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{owner2Token}}
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-live-2",
+  "projectDescription": "Back-to-back touching booking",
+  "scheduledAt": "2026-06-12T11:00:00.000Z"
+}
+
+### 8. Confirm Payment (Re-runs assertBookable under Queue Locks, Idempotency-Key Supported)
+POST {{baseUrl}}/mentor-marketplace/sessions/sess-1/pay
+Authorization: {{ownerToken}}
+Idempotency-Key: pay-key-phase25-1
+Content-Type: application/json
+
+{}
+
+### 9. Mentor Accept (Re-runs assertBookable under Queue Locks Before Assigning Mentor)
+POST {{baseUrl}}/mentor-marketplace/sessions/sess-1/accept
+Authorization: {{mentorToken}}
+Content-Type: application/json
+
+{}

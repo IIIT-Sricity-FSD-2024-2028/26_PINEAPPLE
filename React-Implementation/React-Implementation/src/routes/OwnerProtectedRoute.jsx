@@ -1,14 +1,25 @@
-import { useContext } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
-import { RoleContext } from '../context/RoleContext';
-import { normalizeRole } from '../services/apiClient';
+import { useEffect } from 'react';
+import { useLocation, Navigate, Outlet } from 'react-router-dom';
+import { roleStore, useActiveRole, ROLE_CANONICAL } from '../utils/roleStore';
 
 const OwnerProtectedRoute = () => {
-  const { currentRole } = useContext(RoleContext);
-  const normalized = normalizeRole(currentRole);
+  const location = useLocation();
+  const { allowedRoles, homePath } = useActiveRole();
 
-  if (normalized !== 'project-owner' && normalized !== 'admin' && normalized !== 'superuser') {
-    return <Navigate to="/dashboard" replace />;
+  const isOwnerAllowed =
+    allowedRoles.includes(ROLE_CANONICAL.PROJECT_OWNER) ||
+    allowedRoles.includes('Project Owner') ||
+    allowedRoles.includes('admin') ||
+    allowedRoles.includes('superuser');
+
+  useEffect(() => {
+    if (isOwnerAllowed && location.pathname.startsWith('/owner')) {
+      roleStore.setActiveRole(ROLE_CANONICAL.PROJECT_OWNER);
+    }
+  }, [isOwnerAllowed, location.pathname]);
+
+  if (!isOwnerAllowed) {
+    return <Navigate to={homePath || '/dashboard'} replace />;
   }
 
   return <Outlet />;

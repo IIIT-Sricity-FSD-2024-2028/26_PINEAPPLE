@@ -1,0 +1,113 @@
+### TeamForge Phase 11 API Tests (REST Client Format)
+### Phase 1 Removal: Project Health Telemetry & Impression/Preview Tracking Removed
+### Kept Features: Owner Response Time, Deadline Cascade & Open Task Shifting, Capacity Guard, 3-Day Join Request Reminder
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. REMOVED ROUTES (Return 404 Not Found)
+### --------------------------------------------------------------------------
+
+### 1a. Impression Tracking Removed
+# Expected Status: 404 Not Found
+POST {{baseUrl}}/projects/proj-1/impression
+Authorization: {{collabToken}}
+
+###
+
+### 1b. Preview Tracking Removed
+# Expected Status: 404 Not Found
+POST {{baseUrl}}/projects/proj-1/preview
+Authorization: {{collabToken}}
+
+###
+
+### 1c. Project Health Removed
+# Expected Status: 404 Not Found
+GET {{baseUrl}}/projects/proj-1/health
+Authorization: {{ownerToken}}
+
+###
+
+### --------------------------------------------------------------------------
+### 2. PUBLIC OWNER RESPONSE TIME TELEMETRY (Kept)
+### --------------------------------------------------------------------------
+
+### 2a. Get Owner Response Time (Public Numbers Only)
+# Expected Status: 200 OK
+# Expected Response: { medianHours: N, sample: N }
+GET {{baseUrl}}/users/1/response-time
+
+###
+
+### --------------------------------------------------------------------------
+### 3. DEADLINE CASCADE & OPEN TASK SHIFTING (Kept)
+### --------------------------------------------------------------------------
+
+### 3a. Extend Project Deadline with Task Shifting Enabled
+# Expected Status: 200 OK
+# Shifts open tasks forward by diffDays, leaves Approved tasks untouched
+PATCH {{baseUrl}}/projects/proj-1/deadline
+Authorization: {{ownerToken}}
+Content-Type: application/json
+x-user-id: 1
+x-user-role: project-owner
+
+{
+  "dueDate": "2027-02-15T00:00:00.000Z",
+  "reason": "Scope extension requested by collaborators with owner approval.",
+  "shiftTasks": true
+}
+
+###
+
+### 3b. Extend Project Deadline without Task Shifting
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/projects/proj-1/deadline
+Authorization: {{ownerToken}}
+Content-Type: application/json
+x-user-id: 1
+x-user-role: project-owner
+
+{
+  "dueDate": "2027-03-01T00:00:00.000Z",
+  "reason": "Final wrap-up phase timeline extension.",
+  "shiftTasks": false
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 4. CAPACITY GUARD: TEAM SIZE CANNOT BE BELOW ACTIVE MEMBERS (Kept)
+### --------------------------------------------------------------------------
+
+### 4a. Attempt to Reduce Team Size Below Current Active Members (Rejected)
+# Expected Status: 409 Conflict
+# Expected Error Code: TEAM_SIZE_BELOW_MEMBERS
+PATCH {{baseUrl}}/projects/proj-1
+Authorization: {{ownerToken}}
+Content-Type: application/json
+x-user-id: 1
+x-user-role: project-owner
+
+{
+  "teamSize": 0
+}
+
+###
+
+### 4b. Update Team Size Within Valid Range
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/projects/proj-1
+Authorization: {{ownerToken}}
+Content-Type: application/json
+x-user-id: 1
+x-user-role: project-owner
+
+{
+  "teamSize": 6
+}

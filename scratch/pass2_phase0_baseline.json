@@ -1,0 +1,479 @@
+{
+  "timestamp": "2026-11-06T05:52:53.861Z",
+  "endpoints": [
+    {
+      "name": "POST /auth/login",
+      "method": "POST",
+      "path": "/auth/login",
+      "status": 200,
+      "sizeBytes": 797,
+      "isGzip": true,
+      "cold": "60.39",
+      "median": "60.39",
+      "worst": "65.43",
+      "serverTiming": "total;dur=57.44"
+    },
+    {
+      "name": "POST /auth/refresh",
+      "method": "POST",
+      "path": "/auth/refresh",
+      "status": 200,
+      "sizeBytes": 375,
+      "isGzip": false,
+      "cold": "5.27",
+      "median": "4.18",
+      "worst": "5.27",
+      "serverTiming": "total;dur=1.16"
+    },
+    {
+      "name": "GET /auth/me",
+      "method": "GET",
+      "path": "/auth/me",
+      "status": 200,
+      "sizeBytes": 341,
+      "isGzip": false,
+      "cold": "3.41",
+      "median": "3.41",
+      "worst": "3.52",
+      "serverTiming": "total;dur=0.21"
+    },
+    {
+      "name": "GET /admin/users",
+      "method": "GET",
+      "path": "/admin/users",
+      "status": 200,
+      "sizeBytes": 1784,
+      "isGzip": true,
+      "cold": "3.29",
+      "median": "3.29",
+      "worst": "3.37",
+      "serverTiming": "total;dur=0.40"
+    },
+    {
+      "name": "GET /leaderboard?period=monthly",
+      "method": "GET",
+      "path": "/leaderboard?period=monthly",
+      "status": 200,
+      "sizeBytes": 922,
+      "isGzip": false,
+      "cold": "3.14",
+      "median": "3.14",
+      "worst": "3.20",
+      "serverTiming": "total;dur=0.14"
+    },
+    {
+      "name": "GET /projects",
+      "method": "GET",
+      "path": "/projects",
+      "status": 200,
+      "sizeBytes": 1123,
+      "isGzip": true,
+      "cold": "3.02",
+      "median": "3.02",
+      "worst": "3.03",
+      "serverTiming": "total;dur=0.34"
+    },
+    {
+      "name": "GET /mentor-marketplace/sessions/mentor-view",
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/mentor-view",
+      "status": 200,
+      "sizeBytes": 464,
+      "isGzip": false,
+      "cold": "2.96",
+      "median": "2.77",
+      "worst": "2.96",
+      "serverTiming": "total;dur=0.27"
+    },
+    {
+      "name": "GET /tasks/project/proj-1",
+      "method": "GET",
+      "path": "/tasks/project/proj-1",
+      "status": 200,
+      "sizeBytes": 429,
+      "isGzip": true,
+      "cold": "2.76",
+      "median": "2.73",
+      "worst": "2.76",
+      "serverTiming": "total;dur=0.10"
+    },
+    {
+      "name": "GET /users/1/public-profile",
+      "method": "GET",
+      "path": "/users/1/public-profile",
+      "status": 200,
+      "sizeBytes": 603,
+      "isGzip": false,
+      "cold": "2.71",
+      "median": "2.71",
+      "worst": "3.15",
+      "serverTiming": "total;dur=0.51"
+    },
+    {
+      "name": "GET /leaderboard?period=alltime",
+      "method": "GET",
+      "path": "/leaderboard?period=alltime",
+      "status": 200,
+      "sizeBytes": 922,
+      "isGzip": false,
+      "cold": "2.84",
+      "median": "2.68",
+      "worst": "2.84",
+      "serverTiming": "total;dur=0.13"
+    },
+    {
+      "name": "GET /mentor-marketplace/sessions/admin-stats",
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/admin-stats",
+      "status": 200,
+      "sizeBytes": 202,
+      "isGzip": false,
+      "cold": "3.59",
+      "median": "2.60",
+      "worst": "3.59",
+      "serverTiming": "total;dur=0.08"
+    },
+    {
+      "name": "GET /admin/stats",
+      "method": "GET",
+      "path": "/admin/stats",
+      "status": 200,
+      "sizeBytes": 367,
+      "isGzip": false,
+      "cold": "2.91",
+      "median": "2.54",
+      "worst": "2.91",
+      "serverTiming": "total;dur=0.10"
+    },
+    {
+      "name": "GET /notifications",
+      "method": "GET",
+      "path": "/notifications",
+      "status": 200,
+      "sizeBytes": 2,
+      "isGzip": false,
+      "cold": "2.37",
+      "median": "2.37",
+      "worst": "2.66",
+      "serverTiming": "total;dur=0.25"
+    },
+    {
+      "name": "GET /mentor-marketplace/mentors",
+      "method": "GET",
+      "path": "/mentor-marketplace/mentors",
+      "status": 200,
+      "sizeBytes": 758,
+      "isGzip": true,
+      "cold": "2.37",
+      "median": "2.37",
+      "worst": "2.44",
+      "serverTiming": "total;dur=0.39"
+    },
+    {
+      "name": "GET /communication/notifications",
+      "method": "GET",
+      "path": "/communication/notifications",
+      "status": 200,
+      "sizeBytes": 174,
+      "isGzip": false,
+      "cold": "2.47",
+      "median": "2.28",
+      "worst": "2.47",
+      "serverTiming": "total;dur=0.22"
+    },
+    {
+      "name": "GET /projects/owner/1",
+      "method": "GET",
+      "path": "/projects/owner/1",
+      "status": 200,
+      "sizeBytes": 575,
+      "isGzip": true,
+      "cold": "2.26",
+      "median": "2.26",
+      "worst": "2.77",
+      "serverTiming": "total;dur=0.22"
+    },
+    {
+      "name": "GET /gamification/1/ledger",
+      "method": "GET",
+      "path": "/gamification/1/ledger",
+      "status": 200,
+      "sizeBytes": 177,
+      "isGzip": false,
+      "cold": "1.89",
+      "median": "2.07",
+      "worst": "2.45",
+      "serverTiming": "total;dur=0.08"
+    },
+    {
+      "name": "GET /mentor-marketplace/sessions",
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions",
+      "status": 200,
+      "sizeBytes": 542,
+      "isGzip": true,
+      "cold": "1.84",
+      "median": "1.84",
+      "worst": "2.16",
+      "serverTiming": "total;dur=0.16"
+    },
+    {
+      "name": "GET /admin/audit",
+      "method": "GET",
+      "path": "/admin/audit",
+      "status": 200,
+      "sizeBytes": 1208,
+      "isGzip": true,
+      "cold": "3.30",
+      "median": "1.83",
+      "worst": "3.30",
+      "serverTiming": "total;dur=0.13"
+    },
+    {
+      "name": "GET /communication/messages/project/proj-1",
+      "method": "GET",
+      "path": "/communication/messages/project/proj-1",
+      "status": 200,
+      "sizeBytes": 686,
+      "isGzip": false,
+      "cold": "1.83",
+      "median": "1.72",
+      "worst": "1.83",
+      "serverTiming": "total;dur=0.11"
+    },
+    {
+      "name": "GET /projects/proj-1",
+      "method": "GET",
+      "path": "/projects/proj-1",
+      "status": 200,
+      "sizeBytes": 869,
+      "isGzip": false,
+      "cold": "1.94",
+      "median": "1.69",
+      "worst": "1.94",
+      "serverTiming": "total;dur=0.13"
+    },
+    {
+      "name": "GET /gamification/1/stats",
+      "method": "GET",
+      "path": "/gamification/1/stats",
+      "status": 200,
+      "sizeBytes": 80,
+      "isGzip": false,
+      "cold": "1.69",
+      "median": "1.69",
+      "worst": "1.86",
+      "serverTiming": "total;dur=0.12"
+    },
+    {
+      "name": "GET /escrow",
+      "method": "GET",
+      "path": "/escrow",
+      "status": 200,
+      "sizeBytes": 761,
+      "isGzip": false,
+      "cold": "2.51",
+      "median": "1.66",
+      "worst": "2.51",
+      "serverTiming": "total;dur=0.08"
+    },
+    {
+      "name": "GET /mentor-applications",
+      "method": "GET",
+      "path": "/mentor-applications",
+      "status": 200,
+      "sizeBytes": 2,
+      "isGzip": false,
+      "cold": "1.63",
+      "median": "1.63",
+      "worst": "2.46",
+      "serverTiming": "total;dur=0.19"
+    },
+    {
+      "name": "GET /mentor-marketplace/sessions/mine",
+      "method": "GET",
+      "path": "/mentor-marketplace/sessions/mine",
+      "status": 200,
+      "sizeBytes": 464,
+      "isGzip": false,
+      "cold": "2.05",
+      "median": "1.59",
+      "worst": "2.05",
+      "serverTiming": "total;dur=0.10"
+    },
+    {
+      "name": "GET /join-requests",
+      "method": "GET",
+      "path": "/join-requests",
+      "status": 200,
+      "sizeBytes": 2,
+      "isGzip": false,
+      "cold": "1.72",
+      "median": "1.42",
+      "worst": "1.72",
+      "serverTiming": "total;dur=0.08"
+    },
+    {
+      "name": "GET /users/1",
+      "method": "GET",
+      "path": "/users/1",
+      "status": 200,
+      "sizeBytes": 817,
+      "isGzip": false,
+      "cold": "1.56",
+      "median": "1.37",
+      "worst": "1.56",
+      "serverTiming": "total;dur=0.09"
+    },
+    {
+      "name": "GET /admin/config/public",
+      "method": "GET",
+      "path": "/admin/config/public",
+      "status": 200,
+      "sizeBytes": 161,
+      "isGzip": false,
+      "cold": "1.46",
+      "median": "1.18",
+      "worst": "1.46",
+      "serverTiming": "total;dur=0.06"
+    }
+  ],
+  "pages": [
+    {
+      "name": "Landing Page (/)",
+      "route": "/",
+      "requestCount": 1,
+      "sequentialMs": "1.18",
+      "parallelMaxMs": "1.18",
+      "totalBytes": 161
+    },
+    {
+      "name": "Login (/login)",
+      "route": "/login",
+      "requestCount": 1,
+      "sequentialMs": "1.18",
+      "parallelMaxMs": "1.18",
+      "totalBytes": 161
+    },
+    {
+      "name": "Collaborator Dashboard (/dashboard)",
+      "route": "/dashboard",
+      "requestCount": 6,
+      "sequentialMs": "14.23",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 3121
+    },
+    {
+      "name": "Owner Dashboard (/owner/dashboard)",
+      "route": "/owner/dashboard",
+      "requestCount": 4,
+      "sequentialMs": "9.46",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 920
+    },
+    {
+      "name": "Collaborator Workspace (/workspace/proj-1)",
+      "route": "/workspace/proj-1",
+      "requestCount": 5,
+      "sequentialMs": "11.92",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 2327
+    },
+    {
+      "name": "Owner Workspace (/owner/workspace/proj-1)",
+      "route": "/owner/workspace/proj-1",
+      "requestCount": 6,
+      "sequentialMs": "13.34",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 2329
+    },
+    {
+      "name": "Mentor Workspace (/mentor/workspace/proj-1)",
+      "route": "/mentor/workspace/proj-1",
+      "requestCount": 5,
+      "sequentialMs": "11.92",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 2327
+    },
+    {
+      "name": "Projects Marketplace (/projects)",
+      "route": "/projects",
+      "requestCount": 3,
+      "sequentialMs": "8.80",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 1466
+    },
+    {
+      "name": "Leaderboard (/leaderboard)",
+      "route": "/leaderboard",
+      "requestCount": 4,
+      "sequentialMs": "10.15",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 1345
+    },
+    {
+      "name": "Notifications (/notifications)",
+      "route": "/notifications",
+      "requestCount": 3,
+      "sequentialMs": "8.06",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 517
+    },
+    {
+      "name": "Profile (/profile)",
+      "route": "/profile",
+      "requestCount": 5,
+      "sequentialMs": "10.91",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 1417
+    },
+    {
+      "name": "Settings (/settings)",
+      "route": "/settings",
+      "requestCount": 3,
+      "sequentialMs": "7.15",
+      "parallelMaxMs": "3.41",
+      "totalBytes": 1160
+    },
+    {
+      "name": "Admin Dashboard (/admin)",
+      "route": "/admin",
+      "requestCount": 5,
+      "sequentialMs": "9.12",
+      "parallelMaxMs": "3.29",
+      "totalBytes": 2914
+    },
+    {
+      "name": "Admin Users (/admin/users)",
+      "route": "/admin/users",
+      "requestCount": 1,
+      "sequentialMs": "3.29",
+      "parallelMaxMs": "3.29",
+      "totalBytes": 1784
+    },
+    {
+      "name": "Admin Projects (/admin/projects)",
+      "route": "/admin/projects",
+      "requestCount": 1,
+      "sequentialMs": "0.00",
+      "parallelMaxMs": "0.00",
+      "totalBytes": 0
+    },
+    {
+      "name": "Admin Audit Log (/admin/audit)",
+      "route": "/admin/audit",
+      "requestCount": 1,
+      "sequentialMs": "1.83",
+      "parallelMaxMs": "1.83",
+      "totalBytes": 1208
+    },
+    {
+      "name": "Admin Escrow / Revenue (/admin/mentor-revenue)",
+      "route": "/admin/mentor-revenue",
+      "requestCount": 2,
+      "sequentialMs": "2.60",
+      "parallelMaxMs": "2.60",
+      "totalBytes": 202
+    }
+  ]
+}

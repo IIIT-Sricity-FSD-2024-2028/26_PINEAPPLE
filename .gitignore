@@ -1,0 +1,33 @@
+# Dependencies
+node_modules/
+dist/
+
+# Environment and secrets (NEVER COMMIT SECRETS)
+.env
+.env.local
+.env.*.local
+*.env
+serviceAccountKey.json
+*firebase-adminsdk*.json
+firebase-service-account.json
+
+# Firebase Emulator
+.firebase/
+emulator-data/
+firebase-debug.log*
+firestore-debug.log*
+ui-debug.log*
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+# Persistence snapshots
+data/
+back-end/data/
+*.corrupt-*
+*.tmp
+

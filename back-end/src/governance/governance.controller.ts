@@ -1,51 +1,52 @@
-import { Controller, Get, Post, Body, Patch, Param, Headers, UnauthorizedException } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiResponse, ApiHeader } from '@nestjs/swagger';
-import { GovernanceService } from './governance.service';
-import { CreateReportDto } from './dto/create-report.dto';
-import { ResolveReportDto } from './dto/resolve-report.dto';
-import { Roles } from '../core/decorators/roles.decorator';
+import { Controller, Get, Post, Patch } from '@nestjs/common';
+import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { throwLegacyEndpointRemoved } from '../common/utils/legacy-route.util';
 
-@ApiTags('Governance')
+@ApiTags('Governance (Retired)')
+@ApiBearerAuth()
 @Controller('governance')
 export class GovernanceController {
-  constructor(private readonly governanceService: GovernanceService) {}
-
   @Post('reports')
-  @ApiOperation({ summary: 'File a moderation report' })
-  @ApiHeader({ name: 'x-user-id', required: true })
-  @ApiResponse({ status: 201, description: 'Report filed successfully.' })
-  createReport(
-    @Headers('x-user-id') reporterId: string,
-    @Body() dto: CreateReportDto,
-  ) {
-    if (!reporterId) throw new UnauthorizedException('x-user-id header is missing.');
-    return this.governanceService.createReport(reporterId, dto);
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use POST /reports)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  createReport(): never {
+    return throwLegacyEndpointRemoved('POST /governance/reports', 'POST /reports');
   }
 
   @Get('reports')
-  @Roles('Administrator')
-  @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Get all reports (Admin only)' })
-  getAllReports() {
-    return this.governanceService.getAllReports();
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use GET /admin/reports)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  getAllReports(): never {
+    return throwLegacyEndpointRemoved('GET /governance/reports', 'GET /admin/reports');
   }
 
   @Get('reports/:id')
-  @Roles('Administrator')
-  @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Get a specific report by ID (Admin only)' })
-  getReportById(@Param('id') id: string) {
-    return this.governanceService.getReportById(id);
+  @ApiOperation({
+    deprecated: true,
+    summary: 'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use GET /admin/reports/:id)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  getReportById(): never {
+    return throwLegacyEndpointRemoved('GET /governance/reports/:id', 'GET /admin/reports/:id');
   }
 
   @Patch('reports/:id/resolve')
-  @Roles('Administrator')
-  @ApiHeader({ name: 'x-user-role', description: 'User role for authorization', required: true })
-  @ApiOperation({ summary: 'Resolve a report (Admin only)' })
-  resolveReport(
-    @Param('id') id: string,
-    @Body() dto: ResolveReportDto,
-  ) {
-    return this.governanceService.resolveReport(id, dto);
+  @ApiOperation({
+    deprecated: true,
+    summary:
+      'Retired legacy endpoint (returns 410 LEGACY_ENDPOINT_REMOVED; use PATCH /admin/reports/:id/status or POST /admin/reports/:id/action)',
+  })
+  @ApiResponse({ status: 410, description: 'Legacy endpoint retired.' })
+  resolveReport(): never {
+    return throwLegacyEndpointRemoved(
+      'PATCH /governance/reports/:id/resolve',
+      'PATCH /admin/reports/:id/status and POST /admin/reports/:id/action',
+    );
   }
 }

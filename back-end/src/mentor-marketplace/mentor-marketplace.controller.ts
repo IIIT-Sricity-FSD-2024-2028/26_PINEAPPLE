@@ -1,5 +1,6 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
-  Body, Controller, Get, Headers, Param, Post, Patch, Query, UseGuards,
+  BadRequestException, Body, Controller, Get, Headers, HttpCode, HttpStatus, Param, Post, Patch, Put, Query, Req, UseGuards,
 } from '@nestjs/common';
 import {
   ApiBody, ApiCreatedResponse, ApiHeader, ApiOkResponse,
@@ -7,7 +8,9 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
 import { RolesGuard, normalizeRole } from '../common/guards/roles.guard';
+import { EmailVerifiedGuard } from '../auth/guards/email-verified.guard';
 import { MentorMarketplaceService } from './mentor-marketplace.service';
+import { validateMentorPrice } from './mentor-marketplace.config';
 import {
   BookSessionDto,
   CreateMentorProfileDto,
@@ -20,7 +23,7 @@ import {
 @ApiTags('Mentor Marketplace')
 @ApiHeader({ name: 'x-user-role', required: true, schema: { type: 'string' } })
 @ApiHeader({ name: 'x-user-id', required: false, schema: { type: 'string' } })
-@Controller('mentor-marketplace')
+@Controller(['mentor-marketplace', ''])
 @UseGuards(RolesGuard)
 export class MentorMarketplaceController {
   constructor(private readonly svc: MentorMarketplaceService) {}
@@ -44,8 +47,25 @@ export class MentorMarketplaceController {
   @Get('mentors/me')
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor: get my own listing (null if not created yet)' })
-  getMyProfile(@Headers('x-user-id') userId: string) {
-    return this.svc.getMyProfile(userId);
+  getMyProfile(
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') userId: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.getMyProfile(effectiveUserId);
+  }
+
+  @Get('mentors/me/stats')
+  @Roles('mentor', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Mentor: private aggregate stats, feedback average, and open abandonment reviews' })
+  getMyStats(
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') userId: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.getMentorPrivateStats(effectiveUserId);
   }
 
   @Get('mentors/:id')
@@ -62,10 +82,28 @@ export class MentorMarketplaceController {
   @ApiBody({ type: CreateMentorProfileDto })
   @ApiCreatedResponse({ description: 'Mentor profile created' })
   createProfile(
+    @CurrentUser('uid') authUid: string,
     @Headers('x-user-id') userId: string,
     @Body() dto: CreateMentorProfileDto,
+    @Req() req: any,
   ) {
-    return this.svc.createProfile(userId, dto);
+    if (
+      req?.body &&
+      ((Object.prototype.hasOwnProperty.call(req.body, 'username') && req.body.username !== undefined) ||
+        (req.body.profile && Object.prototype.hasOwnProperty.call(req.body.profile, 'username') && req.body.profile.username !== undefined))
+    ) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'USERNAME_IMMUTABLE',
+        message: "Your username can't be changed.",
+      });
+    }
+    const rawPrice = req?.body?.sessionPrice !== undefined ? req.body.sessionPrice : dto?.sessionPrice;
+    dto.sessionPrice = validateMentorPrice(rawPrice);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.createProfile(effectiveUserId, dto);
   }
 
   @Patch('mentors/availability')
@@ -73,17 +111,25 @@ export class MentorMarketplaceController {
   @ApiOperation({ summary: 'Mentor toggles their availability on/off' })
   @ApiBody({ type: UpdateAvailabilityDto })
   updateAvailability(
+    @CurrentUser('uid') authUid: string,
     @Headers('x-user-id') userId: string,
     @Body() dto: UpdateAvailabilityDto,
   ) {
-    return this.svc.updateAvailability(userId, dto.isAvailable);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.updateAvailability(effectiveUserId, dto.isAvailable);
   }
 
   @Patch('mentors/confirm-role')
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Self-service: sync the caller\'s backend user record to role=Mentor' })
-  confirmMentorRole(@Headers('x-user-id') userId: string) {
-    return this.svc.confirmMentorRole(userId);
+  confirmMentorRole(
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') userId: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.confirmMentorRole(effectiveUserId);
   }
 
   @Patch('mentors/profile')
@@ -91,23 +137,122 @@ export class MentorMarketplaceController {
   @ApiOperation({ summary: 'Mentor edits their own listing (e.g. change price)' })
   @ApiBody({ type: UpdateMentorProfileDto })
   updateProfile(
+    @CurrentUser('uid') authUid: string,
     @Headers('x-user-id') userId: string,
     @Body() dto: UpdateMentorProfileDto,
+    @Req() req: any,
   ) {
-    return this.svc.updateProfile(userId, dto);
+    if (
+      req?.body &&
+      ((Object.prototype.hasOwnProperty.call(req.body, 'username') && req.body.username !== undefined) ||
+        (req.body.profile && Object.prototype.hasOwnProperty.call(req.body.profile, 'username') && req.body.profile.username !== undefined))
+    ) {
+      throw new BadRequestException({
+        statusCode: 400,
+        error: 'Bad Request',
+        code: 'USERNAME_IMMUTABLE',
+        message: "Your username can't be changed.",
+      });
+    }
+    if (req?.body && Object.prototype.hasOwnProperty.call(req.body, 'sessionPrice')) {
+      dto.sessionPrice = validateMentorPrice(req.body.sessionPrice);
+    } else if (dto?.sessionPrice !== undefined) {
+      dto.sessionPrice = validateMentorPrice(dto.sessionPrice);
+    }
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : authUid;
+    return this.svc.updateProfile(effectiveUserId, dto);
+  }
+
+  @Put('mentors/profile')
+  @Roles('mentor', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Mentor edits their own listing (PUT alias)' })
+  @ApiBody({ type: UpdateMentorProfileDto })
+  updateProfilePut(
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') userId: string,
+    @Body() dto: UpdateMentorProfileDto,
+    @Req() req: any,
+  ) {
+    return this.updateProfile(authUid, userId, dto, req);
   }
 
   // ── Sessions ───────────────────────────────────────────────────────────
+  @Post('sessions/:id/confirm-payment')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(EmailVerifiedGuard)
+  @Roles('project-owner', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Owner confirms demo UPI payment -> escrow funded' })
+  @ApiParam({ name: 'id' })
+  confirmPayment(
+    @Param('id') id: string,
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') studentId: string,
+    @CurrentUser('role') authRole: string,
+    @Headers('x-user-role') role: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    const effectiveRole = isLegacy ? role : authRole;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.confirmPayment(id, effectiveStudentId, isPrivileged, idempotencyKey);
+  }
+
+  @Post('sessions/:id/pay')
+  @HttpCode(HttpStatus.OK)
+  @UseGuards(EmailVerifiedGuard)
+  @Roles('project-owner', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Owner pays for session with Idempotency-Key -> escrow funded' })
+  @ApiParam({ name: 'id' })
+  paySession(
+    @Param('id') id: string,
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') studentId: string,
+    @CurrentUser('role') authRole: string,
+    @Headers('x-user-role') role: string,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    const effectiveRole = isLegacy ? role : authRole;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.confirmPayment(id, effectiveStudentId, isPrivileged, idempotencyKey);
+  }
+
+  @Post('sessions/:id/cancel-payment')
+  @HttpCode(HttpStatus.OK)
+  @Roles('project-owner', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Owner cancels demo UPI payment -> releases project hold' })
+  @ApiParam({ name: 'id' })
+  cancelPayment(
+    @Param('id') id: string,
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') studentId: string,
+    @CurrentUser('role') authRole: string,
+    @Headers('x-user-role') role: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    const effectiveRole = isLegacy ? role : authRole;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.cancelPayment(id, effectiveStudentId, isPrivileged);
+  }
+
   @Post('sessions/book')
+  @UseGuards(EmailVerifiedGuard)
   @Roles('project-owner', 'admin', 'superuser')
   @ApiOperation({ summary: 'Project owner books a mentor for their project — money goes to escrow' })
   @ApiBody({ type: BookSessionDto })
   @ApiCreatedResponse({ description: 'Session created, escrow funded' })
   bookSession(
+    @CurrentUser('uid') authUid: string,
     @Headers('x-user-id') studentId: string,
     @Body() dto: BookSessionDto,
   ) {
-    return this.svc.bookSession(studentId, dto);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    return this.svc.bookSession(effectiveStudentId, dto);
   }
 
   @Get('sessions')
@@ -127,19 +272,47 @@ export class MentorMarketplaceController {
   @Get('sessions/mine')
   @Roles('user', 'project-owner', 'collaborator', 'admin', 'superuser')
   @ApiOperation({ summary: 'Student: my booked sessions' })
-  mySessionsStudent(@Headers('x-user-id') studentId: string) {
-    return this.svc.getSessionsByStudent(studentId);
+  mySessionsStudent(
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') studentId: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    return this.svc.getSessionsByStudent(effectiveStudentId);
   }
 
   @Get('sessions/mentor-view')
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor: sessions assigned to me' })
   mySessionsMentor(
+    @CurrentUser() authUser: any,
     @Headers('x-user-id') mentorUserId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
-    return this.svc.getSessionsByMentor(mentorUserId, isPrivileged);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveMentorId = isLegacy ? mentorUserId : authUser?.uid;
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.getSessionsByMentor(effectiveMentorId, isPrivileged);
+  }
+
+  @Get('mentored-projects')
+  @Roles('mentor', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Mentor: get my mentored projects (active and completed)' })
+  getMentoredProjects(
+    @CurrentUser() authUser: any,
+    @Headers('x-user-id') mentorUserId: string,
+    @Headers('x-user-role') role: string,
+    @Query('mentorUserId') mentorUserIdParam?: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRole = isLegacy ? role : (authUser?.role || role);
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    let effectiveMentorId = isLegacy ? mentorUserId : (authUser?.uid || mentorUserId);
+    if (isPrivileged && mentorUserIdParam) {
+      effectiveMentorId = mentorUserIdParam;
+    }
+    return this.svc.getMentoredProjects(effectiveMentorId);
   }
 
   @Post('sessions/:id/start')
@@ -151,29 +324,42 @@ export class MentorMarketplaceController {
   }
 
   @Post('sessions/:id/accept')
+  @HttpCode(HttpStatus.OK)
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor accepts a booking request — grants project workspace access' })
   @ApiParam({ name: 'id' })
   acceptSession(
     @Param('id') id: string,
+    @CurrentUser() authUser: any,
     @Headers('x-user-id') mentorUserId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
-    return this.svc.acceptSession(id, mentorUserId, isPrivileged);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveMentorId = isLegacy ? mentorUserId : authUser?.uid;
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.acceptSession(id, effectiveMentorId, isPrivileged);
   }
 
   @Post('sessions/:id/decline')
+  @Patch('sessions/:id/decline')
+  @HttpCode(HttpStatus.OK)
   @Roles('mentor', 'admin', 'superuser')
   @ApiOperation({ summary: 'Mentor declines a booking request — escrow is refunded' })
   @ApiParam({ name: 'id' })
   declineSession(
     @Param('id') id: string,
+    @Body() body: any,
+    @CurrentUser() authUser: any,
     @Headers('x-user-id') mentorUserId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
-    return this.svc.declineSession(id, mentorUserId, isPrivileged);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveMentorId = isLegacy ? mentorUserId : (authUser?.uid || authUser?.id);
+    const effectiveRole = isLegacy ? role : authUser?.role;
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    const reason = body?.reason || body?.declineReason;
+    return this.svc.declineSession(id, effectiveMentorId, isPrivileged, reason, body);
   }
 
   @Post('sessions/:id/complete')
@@ -182,11 +368,15 @@ export class MentorMarketplaceController {
   @ApiParam({ name: 'id' })
   completeSession(
     @Param('id') id: string,
+    @CurrentUser() authUser: any,
     @Headers('x-user-id') requesterId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
-    return this.svc.completeSession(id, requesterId, isPrivileged);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveRequesterId = isLegacy ? requesterId : (authUser?.uid || authUser?.id);
+    const effectiveRole = isLegacy ? role : (authUser?.role || authUser?.roleName);
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.completeSession(id, effectiveRequesterId, isPrivileged);
   }
 
   @Post('sessions/:id/cancel')
@@ -195,11 +385,16 @@ export class MentorMarketplaceController {
   @ApiParam({ name: 'id' })
   cancelSession(
     @Param('id') id: string,
+    @Body() body: any,
+    @CurrentUser() authUser: any,
     @Headers('x-user-id') userId: string,
     @Headers('x-user-role') role: string,
   ) {
-    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(role));
-    return this.svc.cancelSession(id, userId, isPrivileged);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? userId : (authUser?.uid || authUser?.id);
+    const effectiveRole = isLegacy ? role : (authUser?.role || authUser?.roleName);
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.cancelSession(id, effectiveUserId, isPrivileged, body);
   }
 
   @Post('sessions/:id/review')
@@ -209,10 +404,48 @@ export class MentorMarketplaceController {
   @ApiBody({ type: SubmitReviewDto })
   submitReview(
     @Param('id') sessionId: string,
+    @CurrentUser('uid') authUid: string,
     @Headers('x-user-id') studentId: string,
     @Body() dto: SubmitReviewDto,
   ) {
-    return this.svc.submitReview(sessionId, studentId, dto);
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveStudentId = isLegacy ? studentId : authUid;
+    return this.svc.submitReview(sessionId, effectiveStudentId, dto);
+  }
+
+  @Post('sessions/:id/notes')
+  @HttpCode(HttpStatus.OK)
+  @Roles('mentor', 'project-owner', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Save session note and record mentor project activity' })
+  @ApiParam({ name: 'id' })
+  addSessionNote(
+    @Param('id') id: string,
+    @CurrentUser() authUser: any,
+    @Headers('x-user-id') headerUserId: string,
+    @Headers('x-user-role') headerRole: string,
+    @Body() body: { note?: string },
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? headerUserId : (authUser?.uid || authUser?.id);
+    const effectiveRole = isLegacy ? headerRole : (authUser?.role || authUser?.roleName);
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.addSessionNote(id, effectiveUserId, body?.note || '', isPrivileged);
+  }
+
+  @Post('sessions/:id/feedback')
+  @HttpCode(HttpStatus.OK)
+  @Roles('user', 'project-owner', 'collaborator', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Project owner submits private 1-5 post-session feedback once' })
+  @ApiParam({ name: 'id' })
+  submitFeedback(
+    @Param('id') id: string,
+    @CurrentUser('uid') authUid: string,
+    @Headers('x-user-id') studentId: string,
+    @Body() body: { rating?: any; comment?: string },
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? studentId : authUid;
+    return this.svc.submitSessionFeedback(id, effectiveUserId, body || {});
   }
 
   @Post('sessions/:id/retry-payout')
@@ -221,5 +454,25 @@ export class MentorMarketplaceController {
   @ApiParam({ name: 'id' })
   retryPayout(@Param('id') id: string) {
     return this.svc.retryPayout(id);
+  }
+
+  @Post('sessions/:id/dispute')
+  @UseGuards(EmailVerifiedGuard)
+  @HttpCode(HttpStatus.CREATED)
+  @Roles('user', 'project-owner', 'collaborator', 'mentor', 'admin', 'superuser')
+  @ApiOperation({ summary: 'Open an escrow dispute on an accepted, active, or awaiting-release session' })
+  @ApiParam({ name: 'id' })
+  openDispute(
+    @Param('id') id: string,
+    @CurrentUser() authUser: any,
+    @Headers('x-user-id') headerUserId: string,
+    @Headers('x-user-role') headerRole: string,
+    @Body() body: { reason?: string },
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const effectiveUserId = isLegacy ? headerUserId : (authUser?.uid || authUser?.id);
+    const effectiveRole = isLegacy ? headerRole : (authUser?.role || authUser?.roleName);
+    const isPrivileged = ['admin', 'superuser'].includes(normalizeRole(effectiveRole));
+    return this.svc.openSessionDispute(id, effectiveUserId, body?.reason || '', isPrivileged);
   }
 }

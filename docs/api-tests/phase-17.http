@@ -1,0 +1,82 @@
+### Phase 17: Disputes and Admin Accountability
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer <owner_jwt>
+@mentorToken = Bearer <mentor_jwt>
+@adminAToken = Bearer <admin_a_jwt>
+@adminBToken = Bearer <admin_b_jwt>
+@superUserToken = Bearer <superuser_jwt>
+
+### 1. Owner opens an escrow dispute on an active/accepted/payout_pending session
+POST {{baseUrl}}/mentor-sessions/SESSION_ID/dispute
+Authorization: {{ownerToken}}
+Content-Type: application/json
+
+{
+  "reason": "The mentorship session ended early without covering the deliverables."
+}
+
+### 2. Attempting payout release while disputed -> 409 SESSION_DISPUTED
+POST {{baseUrl}}/mentor-marketplace/sessions/SESSION_ID/complete
+Authorization: {{ownerToken}}
+
+### 3. Admin lists open escrow disputes
+GET {{baseUrl}}/admin/disputes?status=open
+Authorization: {{adminAToken}}
+
+### 4. Admin decides dispute with 70/30 split (fee only on 70% mentor part)
+POST {{baseUrl}}/admin/disputes/DISPUTE_ID/decide
+Authorization: {{adminAToken}}
+Content-Type: application/json
+
+{
+  "decision": "split",
+  "mentorPercent": 70,
+  "reason": "Session delivered partial architecture guidance before ending early."
+}
+
+### 5. Admin inspects project escrow breakdown & reconciled totals
+GET {{baseUrl}}/admin/projects/proj-1/escrow
+Authorization: {{adminAToken}}
+
+### 6. Admin exports audit log in CSV or JSON with filters (max 10,000 rows)
+GET {{baseUrl}}/admin/audit/export?format=csv&from=2026-01-01&to=2026-12-31&actor=admin&action=escrow
+Authorization: {{adminAToken}}
+
+### 7. Admin checks 30-day owner rejection patterns & Review Pattern flags
+GET {{baseUrl}}/admin/reports/owner-patterns
+Authorization: {{adminAToken}}
+
+### 8. Admin A attempts manual suspension of >90-day or >=150-rep user -> 202 pending_second_approval
+POST {{baseUrl}}/admin/users/2/suspend
+Authorization: {{adminAToken}}
+Content-Type: application/json
+
+{
+  "reason": "Repeated harassment reported across multiple project workspaces."
+}
+
+### 9. List pending second-approval moderation actions
+GET {{baseUrl}}/admin/moderation-actions?status=pending
+Authorization: {{adminBToken}}
+
+### 10. Different admin approves pending suspension -> 200 suspended
+POST {{baseUrl}}/admin/moderation-actions/ACTION_ID/approve
+Authorization: {{adminBToken}}
+Content-Type: application/json
+
+{
+  "reason": "Verified chat evidence and duplicate complaint corroboration."
+}
+
+### 11. Different admin rejects pending suspension -> 200 rejected (user remains active)
+POST {{baseUrl}}/admin/moderation-actions/ACTION_ID/reject
+Authorization: {{adminBToken}}
+Content-Type: application/json
+
+{
+  "reason": "Insufficient corroborating evidence after reviewing project logs."
+}
+
+### 12. Super User triggers hourly tick (runs warningDecay, disputeSuperUserReminder, pendingModerationExpiry)
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}

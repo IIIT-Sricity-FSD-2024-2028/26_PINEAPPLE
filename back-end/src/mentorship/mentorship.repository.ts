@@ -1,6 +1,10 @@
 import { Injectable } from '@nestjs/common';
-import { CreateApplicationDto, ApplicationStatus } from './dto/create-application.dto';
-import { IssueBadgeDto, BadgeType } from './dto/issue-badge.dto';
+
+export enum ApplicationStatus {
+  Pending = 'Pending',
+  Approved = 'Approved',
+  Rejected = 'Rejected',
+}
 
 export interface MentorApplication {
   id: string;
@@ -34,6 +38,10 @@ export class MentorshipRepository {
   private badges: RecommendationBadge[] = [];
 
   constructor() {
+    this.initSeeds();
+  }
+
+  private initSeeds(): void {
     const now = new Date();
 
     // Seed test application for User '3' (Kiran Bose)
@@ -92,29 +100,10 @@ export class MentorshipRepository {
     });
   }
 
-  createApplication(userId: string, dto: CreateApplicationDto, initialStatus: ApplicationStatus): MentorApplication {
-    const newApp: MentorApplication = {
-      id: `app-${Date.now()}`,
-      userId,
-      ...dto,
-      status: initialStatus,
-      timestamp: new Date(),
-    };
-    this.applications.push(newApp);
-    return newApp;
-  }
-
-  getApplicationByUserId(userId: string): MentorApplication | undefined {
-    return this.applications.find((app) => app.userId === userId);
-  }
-
-  updateApplicationStatus(applicationId: string, status: ApplicationStatus): MentorApplication | undefined {
-    const index = this.applications.findIndex((app) => app.id === applicationId);
-    if (index === -1) {
-      return undefined;
-    }
-    this.applications[index].status = status;
-    return this.applications[index];
+  resetToSeed(): void {
+    this.applications = [];
+    this.badges = [];
+    this.initSeeds();
   }
 
   saveBadge(badge: RecommendationBadge): RecommendationBadge {

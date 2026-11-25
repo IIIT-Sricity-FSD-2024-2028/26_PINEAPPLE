@@ -1,0 +1,185 @@
+### TeamForge Phase 9 API Tests (REST Client Format)
+### Escrow and Payment Safety (Booking Window, Idempotency, 30-min Auto-Expiry, Closure Refund, Reconciliation)
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. BOOKING WINDOW VALIDATION
+### --------------------------------------------------------------------------
+
+### 1a. Booking Without Scheduled Date
+# Expected Status: 400 Bad Request
+# Expected Code: BOOKING_OUTSIDE_WINDOW
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-5",
+  "projectDescription": "Architecture review without date"
+}
+
+###
+
+### 1b. Booking In The Past
+# Expected Status: 400 Bad Request
+# Expected Code: BOOKING_OUTSIDE_WINDOW
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-5",
+  "projectDescription": "Past date booking attempt",
+  "scheduledAt": "2020-01-01T10:00:00.000Z"
+}
+
+###
+
+### 1c. Booking After Project Due Date
+# Expected Status: 400 Bad Request
+# Expected Code: BOOKING_OUTSIDE_WINDOW
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-1",
+  "projectDescription": "Booking after project due date",
+  "scheduledAt": "2028-05-01T12:00:00.000Z"
+}
+
+###
+
+### 1d. Valid Booking Inside Window
+# Expected Status: 201 Created
+# Returns: { session: { id, status: "payment_pending", scheduledAt, ... }, paymentIntent: { id, upiUri, ... } }
+POST {{baseUrl}}/mentor-marketplace/sessions/book
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "mentorId": "mentor-profile-1",
+  "projectId": "proj-5",
+  "projectDescription": "Deliverables review within window",
+  "scheduledAt": "2026-03-15T14:00:00.000Z"
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 2. PAYMENT CONFIRMATION & IDEMPOTENCY
+### --------------------------------------------------------------------------
+
+### 2a. First Payment Confirmation with Idempotency-Key
+# Replace SESSION_ID with the session id returned in step 1d
+# Expected Status: 200 OK
+# Returns: { success: true, session: { status: "escrow_funded" }, escrow: { ... } }
+POST {{baseUrl}}/mentor-marketplace/sessions/SESSION_ID/confirm-payment
+Authorization: {{ownerToken}}
+x-user-id: 1
+Idempotency-Key: e9a2c314-5b6d-4e8f-9a1c-7d3e5f2b8a01
+Content-Type: application/json
+
+{}
+
+###
+
+### 2b. Repeat Payment with SAME Idempotency-Key (Idempotency Safe)
+# Expected Status: 200 OK
+# Invariant: Never charges twice, returns original cached payment result
+POST {{baseUrl}}/mentor-marketplace/sessions/SESSION_ID/confirm-payment
+Authorization: {{ownerToken}}
+x-user-id: 1
+Idempotency-Key: e9a2c314-5b6d-4e8f-9a1c-7d3e5f2b8a01
+Content-Type: application/json
+
+{}
+
+###
+
+### 2c. Pay on Alias Route with SAME Idempotency-Key
+# Expected Status: 200 OK
+POST {{baseUrl}}/mentor-marketplace/sessions/SESSION_ID/pay
+Authorization: {{ownerToken}}
+x-user-id: 1
+Idempotency-Key: e9a2c314-5b6d-4e8f-9a1c-7d3e5f2b8a01
+Content-Type: application/json
+
+{}
+
+###
+
+### 2d. Payment with DIFFERENT Idempotency-Key on Already Paid Session
+# Expected Status: 409 Conflict
+# Expected Code: ALREADY_PAID
+POST {{baseUrl}}/mentor-marketplace/sessions/SESSION_ID/confirm-payment
+Authorization: {{ownerToken}}
+x-user-id: 1
+Idempotency-Key: b7c8d9e0-1f2a-3b4c-5d6e-7f8a9b0c1d2e
+Content-Type: application/json
+
+{}
+
+###
+
+### --------------------------------------------------------------------------
+### 3. PAYMENT EXPIRY JOB (30-MIN WINDOW) IN HOURLY TICK
+### --------------------------------------------------------------------------
+
+### 3a. Super User Manually Triggers Hourly Tick
+# Expected Status: 202 Accepted
+# Returns: { runId: "..." }
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+x-user-id: u-superuser
+
+###
+
+### 3b. Verify expirePendingPayments Job in Run Log
+# Replace RUN_ID with runId returned from tick
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/jobs/runs/RUN_ID
+Authorization: {{adminToken}}
+x-user-id: u-admin
+
+###
+
+### --------------------------------------------------------------------------
+### 4. ESCROW RECONCILIATION
+### --------------------------------------------------------------------------
+
+### 4a. Collaborator Access to Escrow Reconciliation (Forbidden)
+# Expected Status: 403 Forbidden
+GET {{baseUrl}}/admin/escrow/reconcile
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 4b. Admin Escrow Reconciliation
+# Expected Status: 200 OK
+# Verifies Invariant: totalOwnerPaid === totalMentorPayout + totalPlatformFee + totalRefunds + totalInEscrow
+# Returns: { ok: true, totalSessions, reconciledCount, totals: { ... }, mismatches: [] }
+GET {{baseUrl}}/admin/escrow/reconcile
+Authorization: {{adminToken}}
+x-user-id: u-admin
+
+###
+
+### 4c. Super User Escrow Reconciliation
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/escrow/reconcile
+Authorization: {{superUserToken}}
+x-user-id: u-superuser

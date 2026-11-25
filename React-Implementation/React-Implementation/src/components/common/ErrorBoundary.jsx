@@ -54,10 +54,10 @@ class ErrorBoundary extends React.Component {
           >
             <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }}>⚠️</div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 600, margin: '0 0 0.5rem 0', color: '#0f172a' }}>
-              Something went wrong
+              Something went wrong. Reload the page
             </h2>
             <p style={{ fontSize: '0.925rem', color: '#64748b', margin: '0 0 1.5rem 0', lineHeight: 1.5 }}>
-              An unexpected error occurred while rendering this page. You can try refreshing or going back.
+              An unexpected error occurred while rendering this page. You can reload the page or go back.
             </p>
             {this.state.error?.message && (
               <pre
@@ -107,7 +107,7 @@ class ErrorBoundary extends React.Component {
                   cursor: 'pointer',
                 }}
               >
-                Refresh Page
+                Reload
               </button>
             </div>
           </div>

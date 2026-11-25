@@ -23,15 +23,34 @@ export const joinRequestsApi = {
       role: role || getCurrentUserRole(),
     }),
   update: (id, payload, role) =>
-    apiRequest(`/join-requests/${id}`, "PUT", payload, {
+    apiRequest(`/join-requests/${id}`, "PATCH", payload, {
       role: role || getCurrentUserRole(),
     }),
-  remove: (id, role) =>
-    apiRequest(`/join-requests/${id}`, "DELETE", null, {
-      role: role || getCurrentUserRole(),
-    }),
-  respond: (id, status, role) =>
-    apiRequest(`/join-requests/${id}`, "PUT", { status }, {
+  remove: (id, payloadOrRole, role) => {
+    const payload = typeof payloadOrRole === 'object' && payloadOrRole !== null ? payloadOrRole : null;
+    const effectiveRole = typeof payloadOrRole === 'string' ? payloadOrRole : role;
+    return apiRequest(`/join-requests/${id}`, "DELETE", payload, {
+      role: effectiveRole || getCurrentUserRole(),
+    });
+  },
+  respond: (id, status, reasonOrRole, maybeRole) => {
+    let payload = { status };
+    let actualRole = maybeRole;
+    if (typeof reasonOrRole === 'object' && reasonOrRole !== null) {
+      payload = { status, ...reasonOrRole };
+    } else if (typeof reasonOrRole === 'string') {
+      if (status === 'rejected') {
+        payload.reason = reasonOrRole;
+      } else {
+        actualRole = reasonOrRole;
+      }
+    }
+    return apiRequest(`/join-requests/${id}`, "PATCH", payload, {
+      role: actualRole || getCurrentUserRole(),
+    });
+  },
+  getMyRequests: (role) =>
+    apiRequest("/join-requests/mine", "GET", null, {
       role: role || getCurrentUserRole(),
     }),
 };

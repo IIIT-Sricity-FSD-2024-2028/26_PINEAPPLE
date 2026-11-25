@@ -15,19 +15,79 @@ export interface Task {
   assignedTo?: string;
   difficulty?: string;
   priority?: string;
+  effort?: string;
+  starterTemplateKey?: string;
   proofLink?: string;
   proofUrl?: string;
   notes?: string;
   xpAwarded?: boolean;
   awardedXp?: number;
   awardedRep?: number;
+  dueDate?: string;
+  isOverdue?: boolean;
+  assigneeRole?: string;
+  penaltyAppliedAt?: string;
+  rejectionReason?: string;
+  rejectedAt?: string;
+  rejectedBy?: string;
+  rejectionHistory?: Array<{ reason: string; at: string; by: string }>;
+  autoApproved?: boolean;
+  reviewReminderSentAt?: string;
+  inReviewSince?: string;
+  assignedAt?: string;
+  approvedAt?: string;
+  submittedAt?: string;
+  dueDateHistory?: Array<{
+    previousDueDate: string;
+    newDueDate: string;
+    creditMs?: number;
+    reason: string;
+    at: string;
+    extendedProject?: boolean;
+  }>;
+  lastCreditedSubmissionAt?: string;
+  cumulativeReviewCreditMs?: number;
+  dueSoonNotifiedAt?: string;
+  overdueNotifiedAt?: string;
+  createdAt?: string | Date;
+  updatedAt?: string | Date;
 }
 
 @Injectable()
 export class TasksRepository {
   private tasks: Task[] = [];
+  private tasksById = new Map<string, Task>();
+  private tasksByProjectId = new Map<string, Task[]>();
+
+  private indexTask(t: Task): void {
+    if (!t) return;
+    this.tasksById.set(String(t.id), t);
+    const pid = String(t.projectId);
+    if (!this.tasksByProjectId.has(pid)) {
+      this.tasksByProjectId.set(pid, []);
+    }
+    const list = this.tasksByProjectId.get(pid)!;
+    const existingIdx = list.findIndex((item) => String(item.id) === String(t.id));
+    if (existingIdx !== -1) {
+      list[existingIdx] = t;
+    } else {
+      list.push(t);
+    }
+  }
+
+  private rebuildIndexes(): void {
+    this.tasksById.clear();
+    this.tasksByProjectId.clear();
+    for (const t of this.tasks) {
+      this.indexTask(t);
+    }
+  }
 
   constructor() {
+    this.initSeeds();
+  }
+
+  private initSeeds(): void {
     // Seed test data explicitly linked to 'proj-1' from Phase 4
     this.tasks.push({
       id: 'task-1',
@@ -40,6 +100,12 @@ export class TasksRepository {
       assigneeName: 'Arjun Sharma',
       assignee: 'Arjun Sharma',
       assignedTo: 'Arjun Sharma',
+      dueDate: '2026-03-01T00:00:00.000Z',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      approvedAt: '2025-01-03T00:00:00.000Z',
+      xpAwarded: true,
+      awardedXp: 50,
+      awardedRep: 8,
     });
 
     this.tasks.push({
@@ -53,6 +119,8 @@ export class TasksRepository {
       assigneeName: 'Arjun Sharma',
       assignee: 'Arjun Sharma',
       assignedTo: 'Arjun Sharma',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      dueDate: '2027-01-20T00:00:00.000Z',
     });
 
     this.tasks.push({
@@ -62,6 +130,7 @@ export class TasksRepository {
       description: 'Build the React components for the user dashboard.',
       xpReward: 75,
       status: TaskStatus.ToDo,
+      dueDate: '2026-10-01T00:00:00.000Z',
       assigneeName: 'Unassigned',
       assignee: 'Unassigned',
     });
@@ -77,6 +146,8 @@ export class TasksRepository {
       assigneeName: 'Vikram Nair',
       assignee: 'Vikram Nair',
       assignedTo: 'Vikram Nair',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      dueDate: '2027-02-15T00:00:00.000Z',
     });
 
     this.tasks.push({
@@ -90,6 +161,11 @@ export class TasksRepository {
       assigneeName: 'Aditya Sai',
       assignee: 'Aditya Sai',
       assignedTo: 'Aditya Sai',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      dueDate: '2026-03-01T00:00:00.000Z',
+      xpAwarded: true,
+      awardedXp: 100,
+      awardedRep: 8,
     });
 
     this.tasks.push({
@@ -103,6 +179,8 @@ export class TasksRepository {
       assigneeName: 'Aditya Sai',
       assignee: 'Aditya Sai',
       assignedTo: 'Aditya Sai',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      approvedAt: '2025-01-03T00:00:00.000Z',
     });
 
     this.tasks.push({
@@ -116,23 +194,15 @@ export class TasksRepository {
       assigneeName: 'Neha Gupta',
       assignee: 'Neha Gupta',
       assignedTo: 'Neha Gupta',
+      assignedAt: '2025-01-02T00:00:00.000Z',
+      dueDate: '2027-03-01T00:00:00.000Z',
     });
-
-    this.tasks.push({
-      id: 'task-8',
-      projectId: 'proj-8',
-      title: 'Database Normalization',
-      description: 'Optimize PostgreSQL schema for product catalog.',
-      xpReward: 80,
-      status: TaskStatus.Completed,
-      assigneeId: '1', // Priya Patel
-      assigneeName: 'Priya Patel',
-      assignee: 'Priya Patel',
-      assignedTo: 'Priya Patel',
-    });
+    this.rebuildIndexes();
   }
 
   findAllByProjectId(projectId: string): Task[] {
+    const list = this.tasksByProjectId.get(String(projectId));
+    if (list) return list;
     return this.tasks.filter((task) => task.projectId === projectId);
   }
 
@@ -141,7 +211,7 @@ export class TasksRepository {
   }
 
   findById(id: string): Task | undefined {
-    return this.tasks.find((task) => task.id === id);
+    return this.tasksById.get(String(id)) || this.tasks.find((task) => task.id === id);
   }
 
   create(createTaskDto: CreateTaskDto): Task {
@@ -162,7 +232,11 @@ export class TasksRepository {
     if (newTask.assignee && !newTask.assignedTo) {
       newTask.assignedTo = newTask.assignee;
     }
+    if (newTask.assigneeId && newTask.assigneeId.toLowerCase() !== 'unassigned' && !newTask.assignedAt) {
+      newTask.assignedAt = new Date().toISOString();
+    }
     this.tasks.push(newTask);
+    this.indexTask(newTask);
     return newTask;
   }
 
@@ -180,6 +254,9 @@ export class TasksRepository {
     if (updateTaskDto.assigneeId === undefined && 'assigneeId' in updateTaskDto) {
       delete updated.assigneeId;
     }
+    if ((updateTaskDto as any).assignedAt === undefined && 'assignedAt' in updateTaskDto) {
+      delete updated.assignedAt;
+    }
 
     if (updated.assigneeName && !updated.assignee) {
       updated.assignee = updated.assigneeName;
@@ -192,6 +269,7 @@ export class TasksRepository {
     }
 
     this.tasks[index] = updated;
+    this.indexTask(updated);
 
     return this.tasks[index];
   }
@@ -199,6 +277,47 @@ export class TasksRepository {
   delete(id: string): boolean {
     const initialLength = this.tasks.length;
     this.tasks = this.tasks.filter((task) => task.id !== id);
-    return this.tasks.length < initialLength;
+    const deleted = this.tasks.length < initialLength;
+    if (deleted) {
+      this.rebuildIndexes();
+    }
+    return deleted;
+  }
+
+  resetToSeed(): void {
+    this.tasks = [];
+    this.tasksById.clear();
+    this.tasksByProjectId.clear();
+    this.initSeeds();
+  }
+
+  reset(): void {
+    if (process.env.NODE_ENV !== 'test' && !process.env.ALLOW_STORE_RESET) return;
+    this.resetToSeed();
+  }
+
+  anonymizeUser(userId: string, originalName?: string): number {
+    const uid = String(userId || '');
+    const origLower = originalName ? originalName.trim().toLowerCase() : '';
+    let count = 0;
+    for (const task of this.tasks) {
+      const matchesId = String(task.assigneeId || '') === uid;
+      const matchesName =
+        Boolean(origLower) &&
+        ((task.assigneeName || '').trim().toLowerCase() === origLower ||
+          (task.assignedTo || '').trim().toLowerCase() === origLower ||
+          (task.assignee || '').trim().toLowerCase() === origLower);
+      if (matchesId || matchesName) {
+        task.assigneeName = 'Deleted user';
+        task.assignedTo = 'Deleted user';
+        task.assignee = 'Deleted user';
+        (task as any).assigneeIsDeleted = true;
+        count += 1;
+      }
+      if (task.rejectedBy && (String(task.rejectedBy) === uid || (origLower && task.rejectedBy.trim().toLowerCase() === origLower))) {
+        task.rejectedBy = 'Deleted user';
+      }
+    }
+    return count;
   }
 }

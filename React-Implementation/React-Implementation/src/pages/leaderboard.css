@@ -133,7 +133,23 @@
 }
 
 .leaderboard-table tbody tr.is-current-user {
-  background: color-mix(in srgb, var(--accent) 10%, transparent);
+  background: color-mix(in srgb, var(--accent, #2563eb) 14%, transparent) !important;
+}
+
+.tf-datatable-row.is-current-user {
+  background: color-mix(in srgb, var(--accent, #2563eb) 14%, transparent) !important;
+}
+
+.leaderboard-table tbody tr.is-current-user td:first-child,
+.tf-datatable-row.is-current-user td:first-child {
+  border-left: 3px solid var(--primary, #2563eb);
+}
+
+.leaderboard-role-badge {
+  margin-left: 8px;
+  font-size: 0.72rem;
+  padding: 1px 7px;
+  vertical-align: middle;
 }
 
 .leaderboard-table tbody td {

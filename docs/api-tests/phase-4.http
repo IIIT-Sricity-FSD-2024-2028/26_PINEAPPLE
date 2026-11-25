@@ -1,0 +1,347 @@
+### TeamForge Phase 4 API Tests (REST Client Format)
+### Mentors and Deadlines: Mentor Application Experience & Minimum Tenure, Mentor Booking Decline with Reason, Task Due Dates & Missed Deadline Penalties, Project Deadline Changes
+
+@baseUrl = http://localhost:3000
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@superuserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@ownerToken = Bearer YOUR_PROJECT_OWNER_TOKEN_HERE
+@mentorToken = Bearer YOUR_MENTOR_TOKEN_HERE
+@collaboratorToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+@projectId = proj-1
+@sessionId = YOUR_SESSION_ID_HERE
+@taskId = YOUR_TASK_ID_HERE
+
+### ============================================================================
+### 1. MENTOR APPLICATION YEARS OF EXPERIENCE VALIDATION (5 to 40 years)
+### ============================================================================
+
+### 1.1 Submit Mentor Application with Invalid Experience (< 5 years)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "message": ["Years of experience must be an integer between 5 and 40."] }
+POST {{baseUrl}}/mentor-applications
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "name": "Aarav Sharma",
+  "email": "aarav.sharma@example.com",
+  "bio": "Experienced frontend and full stack mentor.",
+  "motivation": "Eager to guide junior developers through real-world projects.",
+  "years": 3,
+  "skills": ["React", "TypeScript", "Node.js"],
+  "cvFileName": "aarav-resume.pdf",
+  "certificates": [
+    {
+      "documentType": "Degree Certificate",
+      "issuer": "Indian Institute of Technology",
+      "holderName": "Aarav Sharma",
+      "documentNumber": "IIT-2018-0912",
+      "status": "verified"
+    }
+  ]
+}
+
+###
+
+### 1.2 Submit Mentor Application with Invalid Experience (> 40 years)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "message": ["Years of experience must be an integer between 5 and 40."] }
+POST {{baseUrl}}/mentor-applications
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "name": "Aarav Sharma",
+  "email": "aarav.sharma@example.com",
+  "bio": "Experienced frontend and full stack mentor.",
+  "motivation": "Eager to guide junior developers through real-world projects.",
+  "years": 45,
+  "skills": ["React", "TypeScript", "Node.js"],
+  "cvFileName": "aarav-resume.pdf",
+  "certificates": [
+    {
+      "documentType": "Degree Certificate",
+      "issuer": "Indian Institute of Technology",
+      "holderName": "Aarav Sharma",
+      "documentNumber": "IIT-2018-0912",
+      "status": "verified"
+    }
+  ]
+}
+
+###
+
+### 1.3 Submit Mentor Application with Valid Experience (5 to 40 years)
+# Expected Status: 201 Created
+# Expected Response: { "id": "...", "name": "Aarav Sharma", "years": 8, "status": "pending", ... }
+POST {{baseUrl}}/mentor-applications
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "name": "Aarav Sharma",
+  "email": "aarav.sharma@example.com",
+  "bio": "Experienced frontend and full stack mentor.",
+  "motivation": "Eager to guide junior developers through real-world projects.",
+  "years": 8,
+  "skills": ["React", "TypeScript", "Node.js"],
+  "cvFileName": "aarav-resume.pdf",
+  "certificates": [
+    {
+      "documentType": "Degree Certificate",
+      "issuer": "Indian Institute of Technology",
+      "holderName": "Aarav Sharma",
+      "documentNumber": "IIT-2018-0912",
+      "status": "verified"
+    }
+  ]
+}
+
+###
+
+### ============================================================================
+### 2. PLATFORM CONFIG MINIMUM TENURE (Defaults to 5, can only be raised 5 to 40)
+### ============================================================================
+
+### 2.1 Retrieve Platform Configuration
+# Expected Status: 200 OK
+# Expected Response includes: { "minimumTenure": 5, "mentorMinYearsExperience": 5, ... }
+GET {{baseUrl}}/admin/config
+Authorization: {{superuserToken}}
+
+###
+
+### 2.2 Attempt to Lower Minimum Tenure (Refused)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "message": "Minimum tenure can only be raised (between 5 and 40)." }
+PATCH {{baseUrl}}/admin/config
+Content-Type: application/json
+Authorization: {{superuserToken}}
+
+{
+  "minimumTenure": 4
+}
+
+###
+
+### 2.3 Raise Minimum Tenure to 6 Years (Success)
+# Expected Status: 200 OK
+# Expected Response: { "minimumTenure": 6, "mentorMinYearsExperience": 6, ... }
+PATCH {{baseUrl}}/admin/config
+Content-Type: application/json
+Authorization: {{superuserToken}}
+
+{
+  "minimumTenure": 6
+}
+
+###
+
+### ============================================================================
+### 3. MENTOR BOOKING DECLINE WITH REASON & AUTO-DECLINE
+### ============================================================================
+
+### 3.1 Mentor Attempts to Decline Booking Without Reason (400 REASON_REQUIRED)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "REASON_REQUIRED", "message": "A decline reason between 10 and 500 characters is required." }
+POST {{baseUrl}}/mentor-marketplace/sessions/{{sessionId}}/decline
+Content-Type: application/json
+Authorization: {{mentorToken}}
+
+{}
+
+###
+
+### 3.2 Mentor Attempts to Decline with Short Reason < 10 chars (400 REASON_REQUIRED)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "REASON_REQUIRED", "message": "A decline reason between 10 and 500 characters is required." }
+POST {{baseUrl}}/mentor-marketplace/sessions/{{sessionId}}/decline
+Content-Type: application/json
+Authorization: {{mentorToken}}
+
+{
+  "reason": "Too busy"
+}
+
+###
+
+### 3.3 Mentor Declines Booking with Valid Reason (200 OK, full refund to owner)
+# Expected Status: 200 OK
+# Expected Response: { "id": "...", "status": "refunded", "declineReason": "...", "declinedBy": "mentor" }
+POST {{baseUrl}}/mentor-marketplace/sessions/{{sessionId}}/decline
+Content-Type: application/json
+Authorization: {{mentorToken}}
+
+{
+  "reason": "Unfortunately I have reached my mentee capacity for this month and cannot take on new projects."
+}
+
+###
+
+### ============================================================================
+### 4. TASK DUE DATES: CREATION VALIDATIONS, LOCKING, & MOVING
+### ============================================================================
+
+### 4.1 Create Task Without Due Date (400 DUE_DATE_REQUIRED)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "DUE_DATE_REQUIRED", "message": "Task due date is required." }
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "title": "Design Database Schema",
+  "priority": "High"
+}
+
+###
+
+### 4.2 Create Task With Past Due Date (400 DUE_DATE_PAST)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "DUE_DATE_PAST", "message": "Task due date cannot be in the past." }
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "title": "Design Database Schema",
+  "priority": "High",
+  "dueDate": "2020-01-01T00:00:00.000Z"
+}
+
+###
+
+### 4.3 Create Task Exceeding Project Due Date (400 DUE_DATE_AFTER_PROJECT)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "DUE_DATE_AFTER_PROJECT", "message": "Task due date cannot be after the project's due date." }
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "title": "Setup Deployment Pipeline",
+  "priority": "Medium",
+  "dueDate": "2029-12-31T00:00:00.000Z"
+}
+
+###
+
+### 4.4 Create Task with Valid Future Due Date Within Project Bounds
+# Expected Status: 201 Created
+# Expected Response: { "id": "...", "title": "Design Database Schema", "dueDate": "2027-01-20T00:00:00.000Z", "status": "To Do" }
+POST {{baseUrl}}/tasks
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "projectId": "{{projectId}}",
+  "title": "Design Database Schema",
+  "priority": "High",
+  "dueDate": "2027-01-20T00:00:00.000Z"
+}
+
+###
+
+### 4.5 Owner Moves Task Due Date Before Passed/Approved (Success)
+# Expected Status: 200 OK
+# Expected Response: { "id": "...", "dueDate": "2027-01-25T00:00:00.000Z" }
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2027-01-25T00:00:00.000Z"
+}
+
+###
+
+### 4.6 Attempt to Move Due Date of an Overdue/Passed Task (409 DUE_DATE_LOCKED)
+# Expected Status: 409 Conflict
+# Expected Response: { "statusCode": 409, "error": "Conflict", "code": "DUE_DATE_LOCKED", "message": "Task due date is locked because the due date has already passed." }
+PATCH {{baseUrl}}/tasks/{{taskId}}
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2027-02-10T00:00:00.000Z"
+}
+
+###
+
+### ============================================================================
+### 5. OWNER CHANGES PROJECT DEADLINE (PATCH /projects/:id/deadline)
+### ============================================================================
+
+### 5.1 Non-Owner Attempts to Change Project Deadline (403 FORBIDDEN)
+# Expected Status: 403 Forbidden
+# Expected Response: { "statusCode": 403, "error": "Forbidden", "code": "FORBIDDEN", "message": "Only the project owner can change the project deadline." }
+PATCH {{baseUrl}}/projects/{{projectId}}/deadline
+Content-Type: application/json
+Authorization: {{collaboratorToken}}
+
+{
+  "dueDate": "2027-08-31T00:00:00.000Z",
+  "reason": "Collaborator attempting to change deadline."
+}
+
+###
+
+### 5.2 Change Project Deadline Without Valid Reason (< 10 chars: 400 REASON_REQUIRED)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "REASON_REQUIRED", "message": "A reason of at least 10 characters is required to change the project deadline." }
+PATCH {{baseUrl}}/projects/{{projectId}}/deadline
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2027-08-31T00:00:00.000Z",
+  "reason": "Delay"
+}
+
+###
+
+### 5.3 Change Project Deadline to Past Date (400 DEADLINE_NOT_FUTURE)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "DEADLINE_NOT_FUTURE", "message": "New project deadline must be in the future." }
+PATCH {{baseUrl}}/projects/{{projectId}}/deadline
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2020-01-01T00:00:00.000Z",
+  "reason": "Attempting to change to past date."
+}
+
+###
+
+### 5.4 Change Project Deadline Earlier than Active Task Due Date (400 DEADLINE_BEFORE_TASKS)
+# Expected Status: 400 Bad Request
+# Expected Response: { "statusCode": 400, "error": "Bad Request", "code": "DEADLINE_BEFORE_TASKS", "message": "New project deadline cannot be earlier than task due date..." }
+PATCH {{baseUrl}}/projects/{{projectId}}/deadline
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2027-01-10T00:00:00.000Z",
+  "reason": "Attempting deadline earlier than task due date."
+}
+
+###
+
+### 5.5 Owner Successfully Updates Project Deadline (200 OK)
+# Expected Status: 200 OK
+# Expected Response: { "id": "proj-1", "dueDate": "2027-08-31T00:00:00.000Z", ... }
+# Notifies all collaborators and mentor; logs audit entry.
+PATCH {{baseUrl}}/projects/{{projectId}}/deadline
+Content-Type: application/json
+Authorization: {{ownerToken}}
+
+{
+  "dueDate": "2027-08-31T00:00:00.000Z",
+  "reason": "Extending project timeline to accommodate comprehensive security audits and load testing."
+}
+
+###

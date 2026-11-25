@@ -15,6 +15,7 @@ import {
 } from '@nestjs/swagger';
 import { RolesGuard } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { LeaderboardService, LeaderboardPeriod } from './leaderboard.service';
 import { LeaderboardEntryDto } from './leaderboard-entry.dto';
 
@@ -45,6 +46,12 @@ export class LeaderboardController {
     type: Number,
     description: 'Maximum number of entries to return',
   })
+  @ApiQuery({
+    name: 'tab',
+    required: false,
+    enum: ['xp', 'reliable', 'standing'],
+    description: 'Leaderboard tab/view',
+  })
   @ApiResponse({
     status: 200,
     description: 'Leaderboard rankings',
@@ -53,8 +60,10 @@ export class LeaderboardController {
   getLeaderboard(
     @Query('period') period: LeaderboardPeriod = 'alltime',
     @Query('limit') limit?: number,
+    @Query('tab') tab: 'xp' | 'reliable' | 'standing' = 'xp',
+    @CurrentUser() caller?: any,
   ): LeaderboardEntryDto[] {
-    return this.leaderboardService.getLeaderboard(period, limit);
+    return this.leaderboardService.getLeaderboard(period, limit, tab, caller);
   }
 
   @Get(':userId')

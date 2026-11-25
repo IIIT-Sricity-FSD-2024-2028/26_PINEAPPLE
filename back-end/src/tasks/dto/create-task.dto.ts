@@ -24,6 +24,11 @@ export class CreateTaskDto {
   @IsOptional()
   description?: string;
 
+  @ApiPropertyOptional({ example: '2027-01-10T00:00:00.000Z', description: 'Due date for the task' })
+  @IsOptional()
+  @IsString()
+  dueDate?: string;
+
   @ApiProperty({ example: 50, description: 'XP awarded upon completion' })
   @IsNumber()
   @IsOptional()
@@ -63,6 +68,16 @@ export class CreateTaskDto {
   @IsString()
   @IsOptional()
   priority?: string;
+
+  @ApiPropertyOptional({ example: 'medium', enum: ['small', 'medium', 'large'] })
+  @IsString()
+  @IsOptional()
+  effort?: string;
+
+  @ApiPropertyOptional({ example: 'web-repo-readme' })
+  @IsString()
+  @IsOptional()
+  starterTemplateKey?: string;
 
   @ApiPropertyOptional({ example: 'https://github.com/pr/1' })
   @IsString()

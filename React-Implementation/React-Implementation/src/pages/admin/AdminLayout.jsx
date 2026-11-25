@@ -1,47 +1,63 @@
+import { useState, useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { signOut as fbSignOut } from 'firebase/auth';
+import { auth } from '../../services/firebase.js';
+import { getAuthMode, setAccessToken } from '../../services/apiClient.js';
+import reportsApi from '../../services/reportsApi';
+import storage from '../../utils/storage';
 import './AdminLayout.css';
 
 const AdminLayout = () => {
   const navigate = useNavigate();
+  const [openReportsCount, setOpenReportsCount] = useState(0);
 
-  const handleExit = () => {
-    sessionStorage.removeItem('teamforge.portalRole');
-    sessionStorage.removeItem('teamforge.adminToken');
-    sessionStorage.removeItem('teamforge.isSuperUser');
-    sessionStorage.removeItem('teamforge.adminPermissions');
-    sessionStorage.removeItem('teamforge.adminEmail');
-    sessionStorage.removeItem('teamforge.adminName');
-    sessionStorage.removeItem('portalRole');
-    sessionStorage.removeItem('adminToken');
-    sessionStorage.removeItem('isSuperUser');
+  const handleExit = async () => {
+    storage.clearAdminSession();
+    setAccessToken(null);
+    if (getAuthMode() === 'firebase') {
+      try {
+        await fbSignOut(auth);
+      } catch (err) {
+        console.warn("[AdminLayout] Firebase sign-out failed:", err);
+      }
+    }
     navigate('/', { replace: true });
   };
 
-  const portalRole = sessionStorage.getItem('teamforge.portalRole');
-  const isSuperUserFlag = sessionStorage.getItem('teamforge.isSuperUser') === 'true';
-  const role = sessionStorage.getItem('teamforge.role');
-  const isSuperUser = 
-    isSuperUserFlag || 
-    portalRole?.toLowerCase() === 'superuser' || 
-    portalRole?.toLowerCase() === 'super user' ||
-    role?.toLowerCase() === 'superuser' ||
-    role?.toLowerCase() === 'super user';
-
-  const permissionsRaw = sessionStorage.getItem('teamforge.adminPermissions');
-  let permissions = null;
-  if (permissionsRaw) {
-    try {
-      permissions = JSON.parse(permissionsRaw);
-    } catch {
-      permissions = null;
-    }
-  }
+  const { isSuperUser, permissions } = storage.getAdminSession();
 
   const hasPermission = (key) => {
     if (isSuperUser) return true;
     if (!permissions || !Array.isArray(permissions)) return true;
     return permissions.includes(key);
   };
+
+  useEffect(() => {
+    let isMounted = true;
+    const fetchOpenReports = async () => {
+      if (!hasPermission('reports')) return;
+      try {
+        const res = await reportsApi.getOpenCount();
+        if (isMounted) {
+          const count = typeof res?.count === 'number' ? res.count : typeof res?.openCount === 'number' ? res.openCount : 0;
+          setOpenReportsCount(count);
+        }
+      } catch {
+        // Non-critical fallback
+      }
+    };
+
+    fetchOpenReports();
+
+    const handleUpdate = () => {
+      fetchOpenReports();
+    };
+    window.addEventListener('teamforge:report_updated', handleUpdate);
+    return () => {
+      isMounted = false;
+      window.removeEventListener('teamforge:report_updated', handleUpdate);
+    };
+  }, [hasPermission('reports')]);
 
   return (
     <div id="admin-dashboard-screen" className="admin-layout">
@@ -79,9 +95,42 @@ const AdminLayout = () => {
             💰 Revenue &amp; Escrow
           </NavLink>
         )}
+        {hasPermission('reports') && (
+          <NavLink to="/admin/reports" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            <span>🚩 Reports &amp; Appeals</span>
+            {openReportsCount > 0 && (
+              <span
+                data-testid="admin-reports-count-badge"
+                className="admin-badge-count"
+                style={{
+                  marginLeft: 'auto',
+                  backgroundColor: '#ef4444',
+                  color: '#ffffff',
+                  borderRadius: '999px',
+                  fontSize: '0.72rem',
+                  fontWeight: 700,
+                  padding: '1px 7px',
+                }}
+              >
+                {openReportsCount}
+              </span>
+            )}
+          </NavLink>
+        )}
+        {hasPermission('support') && (
+          <NavLink to="/admin/support" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            🛟 Support Inbox
+          </NavLink>
+        )}
         {hasPermission('audit') && (
           <NavLink to="/admin/audit" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
             📜 Audit Log
+          </NavLink>
+        )}
+
+        {!isSuperUser && (
+          <NavLink to="/admin/su-config" className={({ isActive }) => `admin-nav-item ${isActive ? 'active' : ''}`}>
+            ⏱️ Scheduled Jobs
           </NavLink>
         )}
 
@@ -92,7 +141,7 @@ const AdminLayout = () => {
               🔐 Manage Admins
             </NavLink>
             <NavLink to="/admin/su-config" className={({ isActive }) => `admin-nav-item su-nav-item ${isActive ? 'active' : ''}`}>
-              ⚙️ Platform Config
+              ⚙️ Platform Config &amp; Jobs
             </NavLink>
           </div>
         )}

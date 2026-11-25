@@ -1,0 +1,478 @@
+[
+  {
+    "name": "auth: login",
+    "method": "POST",
+    "path": "/auth/login",
+    "status": 200,
+    "sizeBytes": 799,
+    "isGzip": true,
+    "runs": [
+      "171.48",
+      "163.07",
+      "152.06"
+    ],
+    "cold": "171.48",
+    "median": "163.07",
+    "worst": "171.48",
+    "serverTiming": "total;dur=145.86"
+  },
+  {
+    "name": "admin: users list",
+    "method": "GET",
+    "path": "/admin/users",
+    "status": 200,
+    "sizeBytes": 1784,
+    "isGzip": true,
+    "runs": [
+      "8.79",
+      "7.90",
+      "7.93"
+    ],
+    "cold": "8.79",
+    "median": "7.93",
+    "worst": "8.79",
+    "serverTiming": "total;dur=1.15"
+  },
+  {
+    "name": "projects: list",
+    "method": "GET",
+    "path": "/projects",
+    "status": 200,
+    "sizeBytes": 1123,
+    "isGzip": true,
+    "runs": [
+      "7.75",
+      "6.99",
+      "5.67"
+    ],
+    "cold": "7.75",
+    "median": "6.99",
+    "worst": "7.75",
+    "serverTiming": "total;dur=0.75"
+  },
+  {
+    "name": "gamification: leaderboard alltime",
+    "method": "GET",
+    "path": "/leaderboard?period=alltime",
+    "status": 200,
+    "sizeBytes": 922,
+    "isGzip": false,
+    "runs": [
+      "7.81",
+      "5.18",
+      "6.48"
+    ],
+    "cold": "7.81",
+    "median": "6.48",
+    "worst": "7.81",
+    "serverTiming": "total;dur=0.36"
+  },
+  {
+    "name": "auth: refresh",
+    "method": "POST",
+    "path": "/auth/refresh",
+    "status": 200,
+    "sizeBytes": 375,
+    "isGzip": false,
+    "runs": [
+      "9.68",
+      "4.62",
+      "6.13"
+    ],
+    "cold": "9.68",
+    "median": "6.13",
+    "worst": "9.68",
+    "serverTiming": "total;dur=2.16"
+  },
+  {
+    "name": "mentor applications: list",
+    "method": "GET",
+    "path": "/mentor-applications",
+    "status": 200,
+    "sizeBytes": 2,
+    "isGzip": false,
+    "runs": [
+      "6.60",
+      "6.00",
+      "5.67"
+    ],
+    "cold": "6.60",
+    "median": "6.00",
+    "worst": "6.60",
+    "serverTiming": "total;dur=0.42"
+  },
+  {
+    "name": "escrow: list all",
+    "method": "GET",
+    "path": "/escrow",
+    "status": 200,
+    "sizeBytes": 761,
+    "isGzip": false,
+    "runs": [
+      "6.00",
+      "7.94",
+      "5.88"
+    ],
+    "cold": "6.00",
+    "median": "6.00",
+    "worst": "7.94",
+    "serverTiming": "total;dur=0.34"
+  },
+  {
+    "name": "users: public profile",
+    "method": "GET",
+    "path": "/users/1/public-profile",
+    "status": 200,
+    "sizeBytes": 603,
+    "isGzip": false,
+    "runs": [
+      "12.19",
+      "5.89",
+      "5.86"
+    ],
+    "cold": "12.19",
+    "median": "5.89",
+    "worst": "12.19",
+    "serverTiming": "total;dur=1.81"
+  },
+  {
+    "name": "notifications: list",
+    "method": "GET",
+    "path": "/notifications",
+    "status": 200,
+    "sizeBytes": 2,
+    "isGzip": false,
+    "runs": [
+      "5.55",
+      "5.26",
+      "5.97"
+    ],
+    "cold": "5.55",
+    "median": "5.55",
+    "worst": "5.97",
+    "serverTiming": "total;dur=0.51"
+  },
+  {
+    "name": "chat: project messages",
+    "method": "GET",
+    "path": "/communication/messages/project/proj-1",
+    "status": 200,
+    "sizeBytes": 686,
+    "isGzip": false,
+    "runs": [
+      "7.13",
+      "4.83",
+      "5.43"
+    ],
+    "cold": "7.13",
+    "median": "5.43",
+    "worst": "7.13",
+    "serverTiming": "total;dur=0.38"
+  },
+  {
+    "name": "admin: audit log",
+    "method": "GET",
+    "path": "/admin/audit",
+    "status": 200,
+    "sizeBytes": 1208,
+    "isGzip": true,
+    "runs": [
+      "6.18",
+      "5.42",
+      "5.37"
+    ],
+    "cold": "6.18",
+    "median": "5.42",
+    "worst": "6.18",
+    "serverTiming": "total;dur=0.47"
+  },
+  {
+    "name": "projects: my projects (owner)",
+    "method": "GET",
+    "path": "/projects/owner/1",
+    "status": 200,
+    "sizeBytes": 575,
+    "isGzip": true,
+    "runs": [
+      "5.64",
+      "5.33",
+      "5.04"
+    ],
+    "cold": "5.64",
+    "median": "5.33",
+    "worst": "5.64",
+    "serverTiming": "total;dur=0.44"
+  },
+  {
+    "name": "admin: dashboard stats",
+    "method": "GET",
+    "path": "/admin/stats",
+    "status": 200,
+    "sizeBytes": 367,
+    "isGzip": false,
+    "runs": [
+      "7.56",
+      "5.33",
+      "4.91"
+    ],
+    "cold": "7.56",
+    "median": "5.33",
+    "worst": "7.56",
+    "serverTiming": "total;dur=0.27"
+  },
+  {
+    "name": "gamification: leaderboard monthly",
+    "method": "GET",
+    "path": "/leaderboard?period=monthly",
+    "status": 200,
+    "sizeBytes": 922,
+    "isGzip": false,
+    "runs": [
+      "5.64",
+      "5.18",
+      "4.73"
+    ],
+    "cold": "5.64",
+    "median": "5.18",
+    "worst": "5.64",
+    "serverTiming": "total;dur=0.33"
+  },
+  {
+    "name": "mentor marketplace: sessions",
+    "method": "GET",
+    "path": "/mentor-marketplace/sessions",
+    "status": 200,
+    "sizeBytes": 542,
+    "isGzip": true,
+    "runs": [
+      "5.44",
+      "5.13",
+      "4.87"
+    ],
+    "cold": "5.44",
+    "median": "5.13",
+    "worst": "5.44",
+    "serverTiming": "total;dur=0.42"
+  },
+  {
+    "name": "mentor marketplace: admin stats (revenue/escrow)",
+    "method": "GET",
+    "path": "/mentor-marketplace/sessions/admin-stats",
+    "status": 200,
+    "sizeBytes": 202,
+    "isGzip": false,
+    "runs": [
+      "5.57",
+      "4.45",
+      "5.09"
+    ],
+    "cold": "5.57",
+    "median": "5.09",
+    "worst": "5.57",
+    "serverTiming": "total;dur=0.36"
+  },
+  {
+    "name": "projects: get by id",
+    "method": "GET",
+    "path": "/projects/proj-1",
+    "status": 200,
+    "sizeBytes": 869,
+    "isGzip": false,
+    "runs": [
+      "8.05",
+      "4.73",
+      "5.08"
+    ],
+    "cold": "8.05",
+    "median": "5.08",
+    "worst": "8.05",
+    "serverTiming": "total;dur=0.40"
+  },
+  {
+    "name": "notifications: communication unread",
+    "method": "GET",
+    "path": "/communication/notifications",
+    "status": 200,
+    "sizeBytes": 174,
+    "isGzip": false,
+    "runs": [
+      "5.22",
+      "4.83",
+      "5.00"
+    ],
+    "cold": "5.22",
+    "median": "5.00",
+    "worst": "5.22",
+    "serverTiming": "total;dur=0.37"
+  },
+  {
+    "name": "gamification: user ledger",
+    "method": "GET",
+    "path": "/gamification/1/ledger",
+    "status": 200,
+    "sizeBytes": 177,
+    "isGzip": false,
+    "runs": [
+      "5.22",
+      "4.97",
+      "4.27"
+    ],
+    "cold": "5.22",
+    "median": "4.97",
+    "worst": "5.22",
+    "serverTiming": "total;dur=0.27"
+  },
+  {
+    "name": "tasks: by project",
+    "method": "GET",
+    "path": "/tasks/project/proj-1",
+    "status": 200,
+    "sizeBytes": 429,
+    "isGzip": true,
+    "runs": [
+      "4.99",
+      "4.93",
+      "4.96"
+    ],
+    "cold": "4.99",
+    "median": "4.96",
+    "worst": "4.99",
+    "serverTiming": "total;dur=0.38"
+  },
+  {
+    "name": "auth: me",
+    "method": "GET",
+    "path": "/auth/me",
+    "status": 200,
+    "sizeBytes": 341,
+    "isGzip": false,
+    "runs": [
+      "8.75",
+      "4.64",
+      "3.30"
+    ],
+    "cold": "8.75",
+    "median": "4.64",
+    "worst": "8.75",
+    "serverTiming": "total;dur=0.21"
+  },
+  {
+    "name": "gamification: user stats",
+    "method": "GET",
+    "path": "/gamification/1/stats",
+    "status": 200,
+    "sizeBytes": 80,
+    "isGzip": false,
+    "runs": [
+      "4.82",
+      "4.64",
+      "4.46"
+    ],
+    "cold": "4.82",
+    "median": "4.64",
+    "worst": "4.82",
+    "serverTiming": "total;dur=0.30"
+  },
+  {
+    "name": "mentor marketplace: sessions mine",
+    "method": "GET",
+    "path": "/mentor-marketplace/sessions/mine",
+    "status": 200,
+    "sizeBytes": 464,
+    "isGzip": false,
+    "runs": [
+      "4.56",
+      "6.83",
+      "4.09"
+    ],
+    "cold": "4.56",
+    "median": "4.56",
+    "worst": "6.83",
+    "serverTiming": "total;dur=0.33"
+  },
+  {
+    "name": "mentor marketplace: list mentors",
+    "method": "GET",
+    "path": "/mentor-marketplace/mentors",
+    "status": 200,
+    "sizeBytes": 758,
+    "isGzip": true,
+    "runs": [
+      "6.86",
+      "4.54",
+      "4.09"
+    ],
+    "cold": "6.86",
+    "median": "4.54",
+    "worst": "6.86",
+    "serverTiming": "total;dur=0.58"
+  },
+  {
+    "name": "mentor marketplace: mentor view (earnings)",
+    "method": "GET",
+    "path": "/mentor-marketplace/sessions/mentor-view",
+    "status": 200,
+    "sizeBytes": 464,
+    "isGzip": false,
+    "runs": [
+      "4.53",
+      "4.23",
+      "5.25"
+    ],
+    "cold": "4.53",
+    "median": "4.53",
+    "worst": "5.25",
+    "serverTiming": "total;dur=0.40"
+  },
+  {
+    "name": "join requests: list",
+    "method": "GET",
+    "path": "/join-requests",
+    "status": 200,
+    "sizeBytes": 2,
+    "isGzip": false,
+    "runs": [
+      "4.86",
+      "4.31",
+      "4.19"
+    ],
+    "cold": "4.86",
+    "median": "4.31",
+    "worst": "4.86",
+    "serverTiming": "total;dur=0.30"
+  },
+  {
+    "name": "users: user profile (id)",
+    "method": "GET",
+    "path": "/users/1",
+    "status": 200,
+    "sizeBytes": 817,
+    "isGzip": false,
+    "runs": [
+      "4.28",
+      "4.33",
+      "4.29"
+    ],
+    "cold": "4.28",
+    "median": "4.29",
+    "worst": "4.33",
+    "serverTiming": "total;dur=0.39"
+  },
+  {
+    "name": "platform: config",
+    "method": "GET",
+    "path": "/admin/config/public",
+    "status": 200,
+    "sizeBytes": 161,
+    "isGzip": false,
+    "runs": [
+      "5.00",
+      "2.71",
+      "2.85"
+    ],
+    "cold": "5.00",
+    "median": "2.85",
+    "worst": "5.00",
+    "serverTiming": "total;dur=0.28"
+  }
+]

@@ -1,0 +1,302 @@
+.tf-delete-dialog-content {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  color: #334155;
+  font-size: 0.92rem;
+}
+
+.tf-del-loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+  gap: 12px;
+  color: #64748b;
+}
+
+.tf-del-spinner {
+  width: 32px;
+  height: 32px;
+  border: 3px solid #e2e8f0;
+  border-top-color: #ef4444;
+  border-radius: 50%;
+  animation: tf-spin 0.8s linear infinite;
+}
+
+@keyframes tf-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.tf-del-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.tf-del-alert-danger {
+  background-color: #fef2f2;
+  border: 1px solid #fecaca;
+  color: #991b1b;
+}
+
+.tf-del-alert-error {
+  background-color: #fff1f2;
+  border: 1px solid #fda4af;
+  color: #be123c;
+}
+
+.tf-del-alert-info {
+  background-color: #eff6ff;
+  border: 1px solid #bfdbfe;
+  color: #1e40af;
+}
+
+.tf-del-alert-icon {
+  font-size: 1.2rem;
+  line-height: 1;
+}
+
+.tf-del-blockers-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.tf-del-blocker-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px 14px;
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-left: 4px solid #ef4444;
+  border-radius: 6px;
+}
+
+.tf-del-blocker-info {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.tf-del-blocker-badge {
+  background-color: #fee2e2;
+  color: #b91c1c;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  padding: 2px 6px;
+  border-radius: 4px;
+  white-space: nowrap;
+}
+
+.tf-del-blocker-msg {
+  margin: 0;
+  color: #1e293b;
+  font-size: 0.88rem;
+}
+
+.tf-del-blocker-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 4px;
+}
+
+.tf-del-action-btn {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #0f172a;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-del-action-btn:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.tf-del-impact-card {
+  background-color: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  padding: 12px 14px;
+}
+
+.tf-del-impact-list {
+  margin: 0;
+  padding-left: 20px;
+  font-size: 0.88rem;
+  color: #334155;
+  line-height: 1.5;
+}
+
+.tf-del-section-label {
+  display: block;
+  font-size: 0.86rem;
+  font-weight: 600;
+  color: #1e293b;
+  margin-bottom: 6px;
+}
+
+.tf-del-chips-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.tf-del-reason-chip {
+  display: inline-flex;
+  align-items: center;
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #334155;
+  padding: 6px 10px;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-del-reason-chip:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.tf-del-reason-chip.selected {
+  background-color: #fee2e2;
+  border-color: #f87171;
+  color: #991b1b;
+  font-weight: 600;
+}
+
+.tf-del-textarea {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  color: #0f172a;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.tf-del-textarea:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+}
+
+.tf-del-char-count {
+  font-size: 0.78rem;
+  color: #64748b;
+  margin-top: 4px;
+  text-align: right;
+}
+
+.tf-del-input {
+  width: 100%;
+  box-sizing: border-box;
+  border: 1px solid #cbd5e1;
+  border-radius: 6px;
+  padding: 8px 10px;
+  font-size: 0.88rem;
+  color: #0f172a;
+}
+
+.tf-del-input:focus {
+  outline: none;
+  border-color: #ef4444;
+  box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+}
+
+.tf-del-input-hint {
+  display: block;
+  font-size: 0.8rem;
+  margin-top: 4px;
+}
+
+.tf-del-input-error {
+  color: #dc2626;
+}
+
+.tf-del-input-success {
+  color: #16a34a;
+}
+
+.tf-del-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  width: 100%;
+}
+
+.tf-del-btn-secondary {
+  background-color: #ffffff;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-del-btn-secondary:hover:not(:disabled) {
+  background-color: #f8fafc;
+  border-color: #94a3b8;
+}
+
+.tf-del-btn-danger {
+  background-color: #dc2626;
+  border: 1px solid #dc2626;
+  color: #ffffff;
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.tf-del-btn-danger:hover:not(:disabled) {
+  background-color: #b91c1c;
+  border-color: #b91c1c;
+}
+
+.tf-del-btn-danger:disabled,
+.tf-del-btn-secondary:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.tf-del-radio-group {
+  display: flex;
+  gap: 16px;
+  margin-top: 4px;
+}
+
+.tf-del-radio-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.88rem;
+  color: #334155;
+  cursor: pointer;
+}

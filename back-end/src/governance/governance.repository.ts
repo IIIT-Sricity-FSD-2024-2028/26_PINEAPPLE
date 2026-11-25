@@ -1,6 +1,15 @@
 import { Injectable } from '@nestjs/common';
-import { CreateReportDto, ReportStatus } from './dto/create-report.dto';
-import { ResolveReportDto, ResolutionAction } from './dto/resolve-report.dto';
+
+export enum ReportStatus {
+  Open = 'Open',
+  Resolved = 'Resolved',
+}
+
+export enum ResolutionAction {
+  Warn = 'Warn',
+  Suspend = 'Suspend',
+  Dismiss = 'Dismiss',
+}
 
 export interface Report {
   id: string;
@@ -18,6 +27,10 @@ export class GovernanceRepository {
   private reports: Report[] = [];
 
   constructor() {
+    this.initSeeds();
+  }
+
+  private initSeeds(): void {
     const now = new Date();
 
     // Seed test report filed by User '2' (Arjun) against User '3' (Kiran)
@@ -42,41 +55,26 @@ export class GovernanceRepository {
     });
   }
 
-  createReport(reporterId: string, dto: CreateReportDto): Report {
-    const newReport: Report = {
-      id: `report-${Date.now()}`,
-      reporterId,
-      targetUserId: dto.targetUserId,
-      reason: dto.reason,
-      status: ReportStatus.Open,
-      timestamp: new Date(),
-    };
-    this.reports.push(newReport);
-    return newReport;
+  resetToSeed(): void {
+    this.reports = [];
+    this.initSeeds();
   }
 
-  getAllReports(): Report[] {
-    // Reverse Chronological (Newest first)
-    return this.reports.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }
-
-  getReportById(reportId: string): Report | undefined {
-    return this.reports.find((r) => r.id === reportId);
-  }
-
-  updateReportStatus(reportId: string, status: ReportStatus, resolution: string, action: ResolutionAction): Report | undefined {
-    const index = this.reports.findIndex((r) => r.id === reportId);
-    if (index === -1) {
-      return undefined;
+  anonymizeUser(userId: string, anonymizedId: string): number {
+    const uid = String(userId || '');
+    let count = 0;
+    for (const r of this.reports) {
+      let touched = false;
+      if (String(r.reporterId) === uid) {
+        r.reporterId = anonymizedId;
+        touched = true;
+      }
+      if (String(r.targetUserId) === uid) {
+        r.targetUserId = anonymizedId;
+        touched = true;
+      }
+      if (touched) count += 1;
     }
-
-    this.reports[index] = {
-      ...this.reports[index],
-      status,
-      resolution,
-      action,
-    };
-
-    return this.reports[index];
+    return count;
   }
 }

@@ -22,11 +22,7 @@ export const communicationApi = {
   },
 
   getNotifications: (role, userId) => {
-    const activeUserId =
-      userId ||
-      (typeof localStorage !== "undefined"
-        ? localStorage.getItem("teamforge.backendUserId") || ""
-        : "");
+    const activeUserId = userId || getCurrentUserId() || "";
     return apiRequest("/communication/notifications", "GET", null, {
       role: role || getCurrentUserRole(),
       userId: activeUserId,
@@ -36,6 +32,25 @@ export const communicationApi = {
   markNotificationRead: (id, role) =>
     apiRequest(`/communication/notifications/${id}/read`, "PATCH", null, {
       role: role || getCurrentUserRole(),
+    }),
+
+  getUnread: (role, userId) =>
+    apiRequest("/communication/unread", "GET", null, {
+      role: role || getCurrentUserRole(),
+      userId: userId || getCurrentUserId(),
+      skipCache: true,
+    }),
+
+  markProjectRead: (projectId, role, userId) =>
+    apiRequest(`/communication/projects/${projectId}/read`, "POST", {}, {
+      role: role || getCurrentUserRole(),
+      userId: userId || getCurrentUserId(),
+    }),
+
+  reportMessage: (messageId, reason, role, userId) =>
+    apiRequest(`/communication/messages/${messageId}/report`, "POST", { reason }, {
+      role: role || getCurrentUserRole(),
+      userId: userId || getCurrentUserId(),
     }),
 };
 

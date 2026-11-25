@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TeamForge Architectural &amp; Policy Audit (Post-Phase 18 Update)</title>
+<style>
+  :root {
+    --primary: #0284c7;
+    --primary-dark: #0369a1;
+    --primary-light: #e0f2fe;
+    --text-main: #0f172a;
+    --text-muted: #475569;
+    --bg-main: #ffffff;
+    --bg-subtle: #f8fafc;
+    --border-color: #e2e8f0;
+    --code-bg: #f1f5f9;
+    --table-header: #f1f5f9;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    padding: 0;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    color: var(--text-main);
+    background-color: var(--bg-main);
+    line-height: 1.5;
+    font-size: 12.5px;
+  }
+
+  .container {
+    max-width: 1040px;
+    margin: 0 auto;
+    padding: 28px 22px;
+  }
+
+  .header-cover {
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 58%, #0369a1 100%);
+    color: #ffffff;
+    padding: 34px 30px;
+    border-radius: 12px;
+    margin-bottom: 24px;
+    box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.2);
+  }
+  .header-cover h1 {
+    margin: 0 0 8px 0;
+    font-size: 24px;
+    font-weight: 800;
+    letter-spacing: -0.4px;
+  }
+  .header-cover p {
+    margin: 4px 0;
+    color: #cbd5e1;
+    font-size: 12.5px;
+  }
+  .header-cover code {
+    background: rgba(255, 255, 255, 0.16);
+    color: #ffffff;
+    padding: 1px 5px;
+    border-radius: 4px;
+  }
+  .header-tags {
+    margin-top: 14px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .header-tag {
+    background: rgba(255, 255, 255, 0.16);
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+
+  .scorecard-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 12px;
+    margin-bottom: 24px;
+  }
+  .score-card {
+    background: var(--bg-subtle);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 14px 12px;
+    text-align: center;
+  }
+  .score-number {
+    font-size: 26px;
+    font-weight: 800;
+    color: var(--primary);
+    line-height: 1.1;
+  }
+  .score-number--green { color: #15803d; }
+  .score-number--amber { color: #b45309; }
+  .score-number--red { color: #b91c1c; }
+  .score-label {
+    font-size: 10.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    margin-top: 5px;
+  }
+
+  h2 {
+    font-size: 17px;
+    font-weight: 700;
+    color: #0f172a;
+    border-bottom: 2px solid var(--primary-light);
+    padding-bottom: 6px;
+    margin-top: 30px;
+    margin-bottom: 14px;
+  }
+  h3 {
+    font-size: 14px;
+    font-weight: 700;
+    color: #1e293b;
+    margin-top: 18px;
+    margin-bottom: 8px;
+  }
+
+  code {
+    background-color: var(--code-bg);
+    padding: 1px 4px;
+    border-radius: 3px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 10.5px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 12px 0 22px 0;
+    font-size: 11px;
+  }
+  th, td {
+    padding: 7px 8px;
+    border: 1px solid var(--border-color);
+    text-align: left;
+    vertical-align: top;
+  }
+  th {
+    background-color: var(--table-header);
+    font-weight: 700;
+    color: #1e293b;
+  }
+  tr:nth-child(even) td {
+    background-color: #fafafa;
+  }
+
+  .badge {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 9.5px;
+    font-weight: 700;
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+  .badge-done { background-color: #dcfce7; color: #166534; }
+  .badge-partial { background-color: #fef3c7; color: #92400e; }
+  .badge-bug { background-color: #fee2e2; color: #991b1b; }
+  .badge-gap { background-color: #fef3c7; color: #92400e; }
+  .badge-idea { background-color: #e0f2fe; color: #075985; }
+  .badge-crit { background-color: #991b1b; color: #ffffff; }
+  .badge-high { background-color: #fee2e2; color: #b91c1c; }
+  .badge-med { background-color: #ffedd5; color: #c2410c; }
+  .badge-low { background-color: #f1f5f9; color: #475569; }
+
+  .callout {
+    padding: 12px 15px;
+    border-left: 4px solid var(--primary);
+    background-color: var(--primary-light);
+    border-radius: 0 6px 6px 0;
+    margin: 12px 0;
+    font-size: 12px;
+  }
+  .callout-warning {
+    border-left-color: #d97706;
+    background-color: #fef3c7;
+    color: #78350f;
+  }
+  .callout-danger {
+    border-left-color: #dc2626;
+    background-color: #fee2e2;
+    color: #7f1d1d;
+  }
+
+  .deep-dive-card {
+    background: #ffffff;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 15px 18px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    page-break-inside: avoid;
+  }
+  .deep-dive-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 8px;
+    margin-bottom: 10px;
+    gap: 8px;
+  }
+  .deep-dive-title {
+    font-size: 14px;
+    font-weight: 700;
+    color: #0f172a;
+  }
+
+  @page {
+    size: A4 portrait;
+    margin: 12mm 10mm 12mm 10mm;
+  }
+  @media print {
+    body { font-size: 11px; }
+    .container { width: 100%; max-width: none; padding: 0; }
+    .header-cover { padding: 22px 20px; margin-bottom: 14px; border-radius: 6px; }
+    .deep-dive-card { page-break-inside: avoid; margin-bottom: 12px; padding: 11px 13px; }
+    table { font-size: 8.8px; }
+    th, td { padding: 3px 5px; }
+    tr { break-inside: avoid; page-break-inside: avoid; }
+    thead { display: table-header-group; }
+    h2 { margin-top: 20px; font-size: 15px; page-break-after: avoid; }
+    h3 { font-size: 12.5px; page-break-after: avoid; }
+    .page-break { page-break-before: always; }
+  }
+</style>
+</head>
+<body>
+
+<div class="container">
+
+  <div class="header-cover">
+    <h1>TeamForge Architectural &amp; Policy Audit (Updated)</h1>
+    <p>What's Done vs What's Left from the Original 42 Items + 18 New Post-Phase 18 Findings &amp; Ideas</p>
+    <p>Scope: React + Vite Frontend (<code>React-Implementation/</code>) &bull; NestJS In-Memory Backend (<code>back-end/</code>) &bull; Phases 1–18 Implemented</p>
+    <div class="header-tags">
+      <span class="header-tag">November 11, 2026</span>
+      <span class="header-tag">60 Total Audited Items</span>
+      <span class="header-tag">38 / 42 Original Done</span>
+      <span class="header-tag">4 Partial Remaining</span>
+      <span class="header-tag">+18 New Findings Verified</span>
+    </div>
+  </div>
+
+  <div class="scorecard-grid">
+    <div class="score-card">
+      <div class="score-number score-number--green">38 / 42</div>
+      <div class="score-label">Original Items Done</div>
+    </div>
+    <div class="score-card">
+      <div class="score-number score-number--amber">4 / 42</div>
+      <div class="score-label">Original Partial / Left</div>
+    </div>
+    <div class="score-card">
+      <div class="score-number score-number--red">+14</div>
+      <div class="score-label">New Bugs &amp; Gaps</div>
+    </div>
+    <div class="score-card">
+      <div class="score-number">+4</div>
+      <div class="score-label">New Product Ideas</div>
+    </div>
+  </div>
+
+  <div class="callout">
+    <strong>Executive Summary:</strong> Across <strong>Phases 6–18</strong>, <strong>38 of the original 42 audit findings</strong> are fully implemented (chat membership guard, hourly <code>@Cron</code> scheduler, escrow closure refunds, report/appeal finality, Project Health telemetry, Zombie breaker, Ghost mentor abandonment, task feedback, snapshots, disputes, &amp; GDPR deletion). Only <strong>4 original items remain PARTIAL</strong> (incomplete <code>&lt;SafeLink&gt;</code> UI rollout on 6 raw <code>&lt;a&gt;</code> links, instant completion badge farming without min project age, and non-digest batch notification floods). Auditing the live post-Phase-18 tree uncovered <strong>18 new concrete items</strong>—including <strong>4 Critical bugs</strong> in legacy <code>UsersController</code> auth bypasses, dual reputation ledger double-counting, and snapshot omissions for <code>EscrowService</code> &amp; <code>PlatformConfig</code>.
+  </div>
+
+  <h2>1. Status of Original 42 Findings (What's Done vs What's Left)</h2>
+  <p>Every baseline finding from Phase 5 was checked directly against current source files in <code>back-end/src/</code> and <code>React-Implementation/React-Implementation/src/</code>.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:7%;">ID</th>
+        <th style="width:24%;">Original Finding</th>
+        <th style="width:8%;">Orig Type</th>
+        <th style="width:11%;">Status</th>
+        <th style="width:50%;">Verified Implementation (Done) / Remaining Gap (What's Left)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr><td><strong>SEC-01</strong></td><td>Private chat history exfiltration</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 6)</td><td><code>CHAT_MEMBERSHIP_REQUIRED</code> (403) + <code>CHAT_ACCESS_DENIED</code> audit in <code>communication.service.ts</code>; locked UI in <code>ChatBox.jsx</code>.</td></tr>
+      <tr><td><strong>JOB-01</strong></td><td>Hourly background jobs never trigger</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 7)</td><td><code>@Cron(CronExpression.EVERY_HOUR)</code> in <code>jobs.service.ts</code>, <code>JobRunsService</code>, &amp; <code>POST /admin/jobs/tick</code>.</td></tr>
+      <tr><td><strong>FIN-01</strong></td><td>Escrow refund ignores pending states</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 9)</td><td><code>handleProjectClosed</code> settles <code>payment_pending</code>, <code>escrow_funded</code>, <code>active</code>, &amp; <code>payout_pending</code> idempotently.</td></tr>
+      <tr><td><strong>MOD-01</strong></td><td>Duplicate moderation report actioning</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 8)</td><td><code>reports.service.ts</code> throws <code>409 REPORT_ALREADY_ACTIONED</code> on terminal reports; actions disabled in <code>AdminReports.jsx</code>.</td></tr>
+      <tr><td><strong>MOD-02</strong></td><td>Appeal decision reversal</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 8)</td><td><code>appeals.service.ts</code> throws <code>409 APPEAL_ALREADY_DECIDED</code> once settled.</td></tr>
+      <tr><td><strong>PRJ-01</strong></td><td>Zero-task instant project completion</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 8)</td><td><code>projects.service.ts</code> rejects empty task completion with <code>400 PROJECT_NO_TASKS</code>.</td></tr>
+      <tr><td><strong>SEC-02</strong></td><td>Proof &amp; profile link XSS (<code>javascript:</code>)</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-partial">PARTIAL</span></td><td><strong>Done (Ph 6):</strong> Server <code>assertSafeHttpUrl</code> + <code>&lt;SafeLink&gt;</code> on <code>TaskCard</code> &amp; <code>profile.jsx</code>. <strong>Left:</strong> 6 raw <code>&lt;a href&gt;</code> links remain in <code>ProjectCard:250</code>, <code>AdminMentorApps:534</code>, <code>CollaboratorWorkspace:587</code>, <code>OwnedWorkspace:1377,2116,2214</code>; SVG XSS in uploads.</td></tr>
+      <tr><td><strong>COM-01</strong></td><td>Orphaned seed notifications store</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 8)</td><td>Consolidated into <code>NotificationsService</code>; duplicate store removed from <code>CommunicationRepository</code>.</td></tr>
+      <tr><td><strong>SEC-03</strong></td><td>DigiLocker substring matching</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 6)</td><td><code>isDigiLockerNameMatch</code> enforces token-set equality + honorific stripping in <code>digilocker-sandbox.provider.ts</code>.</td></tr>
+      <tr><td><strong>COL-01</strong></td><td>Join approval concurrency race</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 8)</td><td>Per-project queue (<code>runInProjectQueue</code>) in <code>join-requests.service.ts</code> serializes capacity checks.</td></tr>
+      <tr><td><strong>PRJ-02</strong></td><td>"Why Nobody Applies" Health Panel</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 11)</td><td><code>ProjectViewsService</code>, <code>HealthService</code> (0–100 score, A–F grades, funnel), &amp; <code>ProjectHealthPanel.jsx</code>.</td></tr>
+      <tr><td><strong>JOB-02</strong></td><td>Zombie project infinite Day-5 pause</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 12)</td><td><code>zombieProjectBreaker</code> closes paused projects after 48h grace window &amp; marks pending requests <code>system_closed</code>.</td></tr>
+      <tr><td><strong>MEN-01</strong></td><td>Ghost mentor workspace lock</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 14)</td><td>7-day idle check + <code>POST /projects/:id/mentor/abandonment-review</code> + 48h auto-release &amp; escrow refund.</td></tr>
+      <tr><td><strong>TSK-01</strong></td><td>Silent task rejection feedback</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 13)</td><td>Mandatory 10–500 char reason in <code>POST /tasks/:id/review</code>, stored <code>rejectionHistory[]</code>, displayed in <code>TaskCard.jsx</code>.</td></tr>
+      <tr><td><strong>TSK-02</strong></td><td>In-Review tasks lost on departure</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 13)</td><td>Shared <code>releaseMemberTasksOnDeparture</code> keeps <code>In Review</code> tasks &amp; proofs intact on leave/removal/suspension.</td></tr>
+      <tr><td><strong>MEN-02</strong></td><td>Unlimited mentor re-applications</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 14)</td><td>14-day cooldown (<code>409 REAPPLY_COOLDOWN</code>) via <code>rejectedAt</code> &amp; configurable <code>mentorReapplyCooldownDays</code>.</td></tr>
+      <tr><td><strong>TSK-03</strong></td><td>Abandoned In-Review task limbo</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 13)</td><td><code>reviewDeadlineJob</code> sends Day-3 owner reminder &amp; auto-approves at Day 7 (skipping unsafe proof URLs).</td></tr>
+      <tr><td><strong>PRJ-03</strong></td><td>Project extend without task shift</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 11)</td><td><code>PATCH /projects/:id/deadline</code> accepts <code>shiftTasks: true</code> + UI checkbox in <code>OwnedWorkspace.jsx</code>.</td></tr>
+      <tr><td><strong>COL-02</strong></td><td>Early withdraw burns quota slot</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 12)</td><td>Withdrawing <code>&lt; 2h</code> before owner <code>viewedAt</code> sets <code>countedTowardLimit = false</code>.</td></tr>
+      <tr><td><strong>AUT-01</strong></td><td>Incomplete profile URL bypass</td><td><span class="badge badge-bug">BUG</span></td><td><span class="badge badge-done">DONE</span> (Ph 5/6)</td><td><code>AuthGuard</code> returns <code>403 PROFILE_INCOMPLETE</code>; <code>ProtectedRoute</code> forces <code>/complete-profile</code>.</td></tr>
+      <tr><td><strong>AUT-02</strong></td><td>Phone OTP brute-force vulnerability</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 16)</td><td>5 wrong attempts trigger 15-minute <code>429 OTP_LOCKED</code> lockout + Settings timer.</td></tr>
+      <tr><td><strong>MOD-03</strong></td><td>Self-report bypass via direct API</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 6)</td><td><code>reports.service.ts</code> returns <code>400 CANNOT_REPORT_SELF</code>; <code>help.jsx</code> filters self.</td></tr>
+      <tr><td><strong>GAM-01</strong></td><td>Dummy project completion badge farm</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-partial">PARTIAL</span></td><td><strong>Done (Ph 8):</strong> Requires <code>&ge; 3</code> approved tasks. <strong>Left:</strong> Still no minimum project age (5d); owner can approve 3 dummy tasks in 60s for <code>+250 XP/+15 Rep</code>.</td></tr>
+      <tr><td><strong>REP-01</strong></td><td>Ranked user search &amp; highlights</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 15)</td><td><code>UsersService.searchUsers</code> ranks exact -&gt; prefix -&gt; substring; <code>HighlightMatch</code> highlights UI.</td></tr>
+      <tr><td><strong>MEN-03</strong></td><td>Booking date outside project window</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 9)</td><td>Validates future booking date <code>&le; project.dueDate</code> (<code>400 BOOKING_OUTSIDE_WINDOW</code>).</td></tr>
+      <tr><td><strong>PRJ-04</strong></td><td>Export / clone finished projects</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 15)</td><td><code>GET /projects/:id/export.md</code> &amp; <code>POST /projects/:id/clone</code> creating isolated <code>Draft</code>.</td></tr>
+      <tr><td><strong>COM-02</strong></td><td>Global navbar unread chat badge</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 15)</td><td><code>GET /communication/unread</code> + navbar quick-jump badge capped at <code>99+</code>.</td></tr>
+      <tr><td><strong>TSK-04</strong></td><td>Last-minute task drop without reason</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 13)</td><td><code>POST /tasks/:id/unassign</code> mandates 10–300 char reason within <code>&lt; 24h</code> of deadline.</td></tr>
+      <tr><td><strong>COL-03</strong></td><td>Suggested projects in rejection notice</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 15)</td><td>Attaches up to 3 skill-matched open projects to rejection notifications &amp; <code>AppliedProjects.jsx</code>.</td></tr>
+      <tr><td><strong>ADM-01</strong></td><td>Admin project details escrow view</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 17)</td><td><code>GET /admin/projects/:id/escrow</code> &amp; "Escrow &amp; Financials" tab in <code>AdminProjectDetails.jsx</code>.</td></tr>
+      <tr><td><strong>MOD-04</strong></td><td>90-day good standing warning decay</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 17)</td><td><code>warningDecay</code> (Job 14) expires clean warnings &gt; 90 days into <code>expired</code> history.</td></tr>
+      <tr><td><strong>MEN-04</strong></td><td>Mentor max concurrent mentees</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 14)</td><td><code>maxActiveMentees</code> (1–10, default 3) enforced via <code>409 MENTOR_AT_CAPACITY</code>.</td></tr>
+      <tr><td><strong>PRJ-05</strong></td><td>Capacity reduction orphan guard</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 11)</td><td>Throws <code>409 TEAM_SIZE_BELOW_MEMBERS</code> when lowering below active collaborators.</td></tr>
+      <tr><td><strong>JOB-03</strong></td><td>Admin Scheduled Jobs Monitor UI</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 7)</td><td><code>GET /admin/jobs/runs</code> + <code>ScheduledJobsPanel.jsx</code> &amp; detail drawer.</td></tr>
+      <tr><td><strong>TSK-05</strong></td><td>Due date editable by collaborators</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 13)</td><td>Role whitelist throws <code>403 FORBIDDEN_FIELD</code> on non-owner <code>dueDate</code> changes.</td></tr>
+      <tr><td><strong>COL-04</strong></td><td>Direct collaborator username invite</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 15)</td><td><code>ProjectInvitesService</code> + 7-day expiry job + Workspace modal.</td></tr>
+      <tr><td><strong>MEN-05</strong></td><td>Payment timeout &amp; retry recovery</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 9)</td><td>30-min expiry job, <code>Idempotency-Key</code> payment cache, &amp; "Book again" flow.</td></tr>
+      <tr><td><strong>GAM-02</strong></td><td>Reputation ledger pagination &amp; filter</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 10)</td><td><code>GET /users/me/reputation</code> &amp; <code>GET /admin/users/:id/reputation</code> with paging UI.</td></tr>
+      <tr><td><strong>ADM-02</strong></td><td>Audit log CSV/JSON export</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-done">DONE</span> (Ph 17)</td><td><code>GET /admin/audit/export</code> with formula-prefix neutralization &amp; modal.</td></tr>
+      <tr><td><strong>SEC-04</strong></td><td>Outbound external link warning modal</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-partial">PARTIAL</span></td><td><strong>Done (Ph 6):</strong> <code>SafeLink.jsx</code> works on <code>TaskCard</code> &amp; <code>profile.jsx</code>. <strong>Left:</strong> 6 external links in <code>ProjectCard</code>, <code>AdminMentorApps</code>, &amp; Workspaces bypass modal.</td></tr>
+      <tr><td><strong>NOT-01</strong></td><td>Batch notification flooding control</td><td><span class="badge badge-idea">IDEA</span></td><td><span class="badge badge-partial">PARTIAL</span></td><td><strong>Done (Ph 18):</strong> <code>DigestService</code> merges duplicate events when <code>digestEnabled: true</code>. <strong>Left:</strong> Immediate mode (<code>digestEnabled: false</code>) still emits N individual notifications.</td></tr>
+      <tr><td><strong>PRJ-06</strong></td><td>Soft-delete projects &amp; 30d restore</td><td><span class="badge badge-gap">GAP</span></td><td><span class="badge badge-done">DONE</span> (Ph 18)</td><td><code>DELETE /projects/:id</code> sets <code>deletedAt</code>; <code>POST /admin/projects/:id/restore</code> inside 30 days.</td></tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2>2. +18 New Audit Findings &amp; Ideas (Verified in Post-Phase 18 Code)</h2>
+  <p>Inspected across controllers, services, guards, DTOs, cron runners, persistence layers, and React components.</p>
+
+  <table>
+    <thead>
+      <tr>
+        <th style="width:7%;">ID</th>
+        <th style="width:9%;">Type</th>
+        <th style="width:8%;">Severity</th>
+        <th style="width:20%;">Scenario</th>
+        <th style="width:24%;">Exact Code Evidence</th>
+        <th style="width:32%;">Exploit / Impact &amp; Required Fix</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>SEC-05</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-crit">CRITICAL</span></td>
+        <td>Unauthenticated Super User Creation &amp; Passwordless Login</td>
+        <td><code>users.controller.ts:48-62</code><br><code>create-user.dto.ts:30-32,80-83</code><br><code>users.service.ts:150-192</code></td>
+        <td><code>@Public() POST /users</code> lets unauthenticated requests create <code>role: "Super User"</code> with <code>emailVerified: true</code>. <code>POST /users/login</code> skips password checks entirely if <code>password</code> is omitted! <strong>Fix:</strong> Restrict <code>POST /users</code> to <code>@Roles('superuser')</code>; require password + rate limit on <code>/users/login</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-06</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-crit">CRITICAL</span></td>
+        <td>Mass Assignment on <code>PATCH /users/:id</code> &amp; Unscoped <code>DELETE /users/:id</code></td>
+        <td><code>update-user.dto.ts:4-7</code><br><code>users.controller.ts:508-542</code><br><code>users.service.ts:585-695</code></td>
+        <td><code>UpdateUserDto</code> inherits <code>role</code>, <code>status</code>, <code>emailVerified</code>, <code>profile.xp</code> (users can self-promote or change email without resetting verification). <code>DELETE /users/:id</code> lets Collaborators delete Admins with 0 checks! <strong>Fix:</strong> Allow-list safe profile DTO fields; restrict <code>DELETE /users/:id</code> to <code>superuser</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>DAT-01</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-crit">CRITICAL</span></td>
+        <td>Dual Reputation Ledger Split-Brain &amp; Seed Double-Count</td>
+        <td><code>reputation.service.ts:20-50,158-174</code><br><code>gamification.service.ts:237-262</code><br><code>tasks.service.ts:692</code><br><code>users.service.ts:322,567</code></td>
+        <td>Startup <code>backfillStartupSeedUsers()</code> pushes seed rep into <code>GamificationRepository</code> again (doubling Arjun <code>87 &rarr; 174</code> on Leaderboard!). New signups (<code>+100</code>), approved tasks (<code>+8</code>), &amp; completion badges (<code>+15</code>) skip <code>ReputationService</code>, leaving <code>/users/me/reputation</code> stale. <strong>Fix:</strong> Unify into one canonical ledger store.</td>
+      </tr>
+      <tr>
+        <td><strong>DUR-01</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-crit">CRITICAL</span></td>
+        <td>Snapshot Persistence Omits <code>EscrowService</code>, <code>PlatformConfig</code> &amp; Admins</td>
+        <td><code>persistence.service.ts:73-94,179-207</code><br><code>escrow.service.ts:6</code><br><code>mentor-applications.service.ts:26</code><br><code>demo-upi.provider.ts:9-10</code></td>
+        <td>On snapshot reload, <code>sessions</code> restore <code>escrowId</code>, while <code>EscrowService</code> restarts empty—crashing <code>release()</code>/<code>refund()</code>/<code>dispute()</code> with <code>Escrow not found</code>! Raised minimum tenure, portal admins, mentor apps, payment idempotency keys, &amp; job logs vanish. <strong>Fix:</strong> Persist all 6 missing stores.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-07</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Cross-User PII Leak via <code>GET /users</code> &amp; <code>GET /users/:id</code></td>
+        <td><code>users.controller.ts:427-432, 500-506</code></td>
+        <td>Any authenticated user can enumerate <code>GET /users</code> or fetch <code>GET /users/:id</code> to read private <code>email</code>, <code>phone</code>, and warnings, bypassing <code>/public-profile</code> redaction. <strong>Fix:</strong> Admin/Superuser-only on <code>GET /users</code>; self-or-admin on <code>GET /users/:id</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-08</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Cross-Project Task Injection, Deletion &amp; Commenting</td>
+        <td><code>tasks.controller.ts:30-44, 150-180</code><br><code>tasks.service.ts:456-535, 1489-1526</code></td>
+        <td><code>POST /tasks</code>, <code>DELETE /tasks/:id</code>, and <code>POST /tasks/:id/comments</code> lack project ownership/membership validation! Any collaborator can inject/delete tasks or post unmoderated comments on unrelated projects. <strong>Fix:</strong> Enforce <code>isProjectOwner</code> / <code>isProjectMember</code> &amp; <code>ContentFilter</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-09</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Notification IDOR Read/Delete &amp; Alert Forgery</td>
+        <td><code>notifications.controller.ts:74-197</code></td>
+        <td><code>GET/PATCH/PUT/DELETE /notifications/:id</code> miss caller ownership checks, and <code>POST /notifications</code> lets role <code>user</code> forge fake alerts into any victim's inbox. <strong>Fix:</strong> Enforce <code>notification.userId === callerId</code> and lock <code>POST /notifications</code> to admins.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-10</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>SVG Upload Stored XSS &amp; Unscoped Admin CV Access</td>
+        <td><code>file-upload.middleware.ts:62-68</code><br><code>uploads.controller.ts:102, 165-280</code></td>
+        <td><code>IMAGE_MIMES</code> allows <code>image/svg+xml</code> without sanitization or magic bytes; <code>GET/DELETE /uploads/cv/:filename</code> permits any admin lacking <code>'mentor_apps'</code> permission. <strong>Fix:</strong> Drop SVG MIME, verify image magic bytes, check <code>'mentor_apps'</code> permission.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-11</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Legacy Parallel Routes Bypass Policies (<code>/governance</code>, <code>/mentorship</code>)</td>
+        <td><code>governance.controller.ts:14-54</code><br><code>governance.service.ts:57</code><br><code>mentorship.controller.ts:14-47</code></td>
+        <td><code>POST /governance/reports</code> &amp; <code>resolveReport</code> bypass daily/self limits &amp; mutate rep directly; <code>POST /mentorship/apply</code> skips 5–40 tenure, CV &amp; DigiLocker checks; <code>GET /mentorship/application</code> has <code>x-user-id</code> IDOR. <strong>Fix:</strong> Retire or route through canonical services.</td>
+      </tr>
+      <tr>
+        <td><strong>PRJ-07</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Cron Jobs Close Drafts &amp; Penalize Deleted Projects + Spam Bypass</td>
+        <td><code>jobs.service.ts:91-95,274-311,1384-1414</code><br><code>projects.service.ts:652, 2369-2395</code></td>
+        <td><code>closeEmptyProjects</code> closes 5-day Drafts; <code>applyDeadlinePenalties</code> deducts <code>-5</code> rep on soft-deleted/closed projects; create-and-delete resets 24h project daily limit; soft-delete leaves pending requests open. <strong>Fix:</strong> Filter Drafts &amp; <code>deletedAt</code>; include deleted in 24h cap; close pending requests on delete.</td>
+      </tr>
+      <tr>
+        <td><strong>PRJ-08</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Account Deletion Retains Seats, Open Tasks &amp; CVs on Disk</td>
+        <td><code>account-deletion.service.ts:92-98,293-305</code><br><code>tasks.repository.ts:272-295</code><br><code>data-export.service.ts:230-250</code></td>
+        <td>Deleting a collaborator leaves them in <code>collaborators[]</code> blocking team seats, assigns open tasks to <code>"Deleted user"</code> instead of releasing them, keeps CV PDFs in <code>secure-cvs/</code>, trusts client <code>socialConfirmed: true</code>, &amp; leaks pre-restart export files. <strong>Fix:</strong> Call departure release, vacate slot, unlink CVs, &amp; scan disk exports.</td>
+      </tr>
+      <tr>
+        <td><strong>MEN-06</strong></td>
+        <td><span class="badge badge-bug">BUG</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Mentor Self-Booking, Dead Project Booking &amp; Time Collisions</td>
+        <td><code>mentor-marketplace.service.ts:631-730</code><br><code>demo-upi.provider.ts:21, 64-69</code></td>
+        <td>Owners can book themselves as mentor, book sessions on <code>Closed</code>/<code>Draft</code>/<code>deletedAt</code> projects, or double-book a mentor at overlapping hours; <code>DemoUpiProvider</code> uses <code>Date.now()</code> instead of <code>ClockService</code>. <strong>Fix:</strong> Reject self-booking, non-active projects &amp; time overlaps; inject <code>ClockService</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>SEC-12</strong></td>
+        <td><span class="badge badge-gap">GAP</span></td>
+        <td><span class="badge badge-med">MEDIUM</span></td>
+        <td>Unthrottled Admin Login &amp; Missing <code>EmailVerifiedGuard</code> Routes</td>
+        <td><code>admin.service.ts:325-340</code><br><code>invites.controller.ts</code>; <code>reports.controller.ts</code></td>
+        <td><code>POST /admin/login</code> lacks brute-force throttling; unverified users can still accept project invites, apply as mentor, or file reports. <strong>Fix:</strong> Apply 10-attempt lockout to admin login &amp; attach <code>EmailVerifiedGuard</code>.</td>
+      </tr>
+      <tr>
+        <td><strong>TSK-06</strong></td>
+        <td><span class="badge badge-gap">GAP</span></td>
+        <td><span class="badge badge-med">MEDIUM</span></td>
+        <td><code>ContentFilter</code> Gaps on Tasks/Comments/MentorApps</td>
+        <td><code>tasks.service.ts:456-535,1506</code><br><code>mentor-applications.service.ts</code></td>
+        <td>Profanity/spam filter is bypassed when creating tasks, posting comments, or applying as mentor; <code>POST /tasks</code> allows initial <code>status: 'In Review'</code>. <strong>Fix:</strong> Run <code>ContentFilterService</code> on tasks/comments/apps &amp; enforce initial status.</td>
+      </tr>
+      <tr>
+        <td><strong>ADM-03</strong></td>
+        <td><span class="badge badge-idea">IDEA</span></td>
+        <td><span class="badge badge-high">HIGH</span></td>
+        <td>Admin Support &amp; Closure Ticket Inbox UI</td>
+        <td><code>support.controller.ts</code>; <code>supportApi.js</code> (no Admin page)</td>
+        <td>Phase 12 <code>Project Closure Request</code> tickets &amp; Help inquiries have zero Admin UI screen! <strong>Proposal:</strong> Build <code>AdminSupport.jsx</code> (<code>/admin/support</code>) with ticket status updates &amp; 1-click abandoned project closure.</td>
+      </tr>
+      <tr>
+        <td><strong>PRJ-09</strong></td>
+        <td><span class="badge badge-idea">IDEA</span></td>
+        <td><span class="badge badge-med">MEDIUM</span></td>
+        <td>Category Starter-Task Templates &amp; Task Dependencies</td>
+        <td><code>CreateProject.jsx</code>; <code>OwnedWorkspace.jsx</code>; <code>TaskCard.jsx</code></td>
+        <td>New owners struggle to write 2+ starter tasks (hurting Phase 11 Health Score) or coordinate sequential work. <strong>Proposal:</strong> Add 1-click starter templates on creation &amp; optional <code>blockedByTaskId</code> dependencies.</td>
+      </tr>
+      <tr>
+        <td><strong>MEN-07</strong></td>
+        <td><span class="badge badge-idea">IDEA</span></td>
+        <td><span class="badge badge-med">MEDIUM</span></td>
+        <td>Mentor Availability Calendar &amp; Session Agenda</td>
+        <td><code>MyMentorProfile.jsx</code>; <code>MentorsDirectory.jsx</code></td>
+        <td>Mentors only have a binary available toggle. <strong>Proposal:</strong> Add weekly recurring UTC availability windows, conflict-free slot selection in directory, &amp; default session agenda notes.</td>
+      </tr>
+      <tr>
+        <td><strong>MOD-05</strong></td>
+        <td><span class="badge badge-idea">IDEA</span></td>
+        <td><span class="badge badge-med">MEDIUM</span></td>
+        <td>Disk Storage Hygiene Job &amp; Accessible Modals (<code>UX-01</code>)</td>
+        <td><code>JobsService.cleanExpiredExports</code>; <code>secure-cvs/</code>; custom modals</td>
+        <td>Orphan uploads, pre-restart export JSONs, &amp; &gt;30d deleted tombstones persist forever; custom dialogs lack <code>Escape</code>/focus traps. <strong>Proposal:</strong> Job 19 <code>storageHygieneJob</code> + unify accessible <code>&lt;Modal&gt;</code>.</td>
+      </tr>
+    </tbody>
+  </table>
+
+  <div class="page-break"></div>
+
+  <h2>3. Critical Deep Dives &amp; Remediation Blueprint</h2>
+
+  <div class="deep-dive-card">
+    <div class="deep-dive-header">
+      <div class="deep-dive-title">#1. Lock Down Public &amp; Unscoped User Endpoints (<code>SEC-05</code>, <code>SEC-06</code>, <code>SEC-07</code>)</div>
+      <span class="badge badge-crit">CRITICAL SECURITY</span>
+    </div>
+    <p><strong>Vulnerability:</strong> While <code>/auth/signup</code> &amp; <code>/auth/login</code> enforce security controls, legacy endpoints on <code>UsersController</code> (<code>@Public() POST /users</code>, <code>@Public() POST /users/login</code>, <code>GET /users</code>, <code>PATCH /users/:id</code>, <code>DELETE /users/:id</code>) permit anonymous Super User creation, passwordless email logins, mass-assignment role/XP elevation, cross-user PII harvesting, and cross-account deletions.</p>
+    <p><strong>Solution:</strong> Require <code>@Roles('superuser')</code> on <code>POST /users</code> and <code>DELETE /users/:id</code>; lock <code>GET /users</code> to Admin/SuperUser and <code>GET /users/:id</code> to self/admin; enforce allow-listed <code>SelfUpdateUserDto</code> (resetting <code>emailVerified = false</code> upon email modification); enforce non-empty password checks and lockouts on every login path.</p>
+  </div>
+
+  <div class="deep-dive-card">
+    <div class="deep-dive-header">
+      <div class="deep-dive-title">#2. Resolve Dual Reputation Ledger Split-Brain (<code>DAT-01</code>, <code>GAM-01</code>)</div>
+      <span class="badge badge-crit">CRITICAL INTEGRITY</span>
+    </div>
+    <p><strong>Root Cause:</strong> <code>GamificationRepository</code> serves Leaderboard/Profile stats, while <code>ReputationService</code> maintains a separate <code>entries[]</code> array for Moderation &amp; <code>/users/me/reputation</code>. On boot, <code>ReputationService.backfillStartupSeedUsers()</code> pushes seed values into <code>GamificationRepository</code> a second time, inflating Arjun Sharma from <strong>87</strong> to <strong>174</strong> Rep. Meanwhile, signups (<code>+100</code>), approved tasks (<code>+8</code>), and completion badges (<code>+15</code>) skip <code>ReputationService</code>.</p>
+    <p><strong>Solution:</strong> Consolidate into a single unified ledger repository with idempotent startup seeding, bidirectional synchronization, and a 5-day minimum project age on completion badges.</p>
+  </div>
+
+  <div class="deep-dive-card">
+    <div class="deep-dive-header">
+      <div class="deep-dive-title">#3. Complete Snapshot Durability for Financial &amp; Config Stores (<code>DUR-01</code>)</div>
+      <span class="badge badge-crit">CRITICAL DURABILITY</span>
+    </div>
+    <p><strong>Root Cause:</strong> <code>PersistenceService</code> saves sessions (including <code>escrowId</code>) in <code>mentorMarketplace</code>, but omits <code>EscrowService</code>, <code>PlatformConfigService</code>, <code>PortalAdminsService</code>, <code>MentorApplicationsService</code>, <code>DemoUpiProvider</code>, and <code>JobRunsService</code>. Reloading a snapshot leaves funded sessions orphaned from escrow records, crashing releases and refunds.</p>
+    <p><strong>Solution:</strong> Add <code>exportState()</code>/<code>importState()</code> across all 6 services and persist them atomically in <code>PersistenceService</code>.</p>
+  </div>
+
+  <div class="deep-dive-card">
+    <div class="deep-dive-header">
+      <div class="deep-dive-title">#4. Cron Draft/Deleted Filtering, Account Deletion Cleanup &amp; 100% <code>&lt;SafeLink&gt;</code> Parity (<code>PRJ-07</code>, <code>PRJ-08</code>, <code>SEC-02</code>, <code>SEC-04</code>)</div>
+      <span class="badge badge-high">HIGH PRIORITY</span>
+    </div>
+    <p><strong>Problem:</strong> Cron runners close <code>Draft</code> projects and deduct missed-deadline penalties on <code>deletedAt</code> projects; collaborator account deletion keeps seats occupied in <code>collaborators[]</code>, leaves open tasks assigned to <code>"Deleted user"</code>, and fails to delete <code>secure-cvs/</code> files; 6 frontend links (<code>ProjectCard</code>, <code>AdminMentorApps</code>, Workspaces) still bypass <code>&lt;SafeLink&gt;</code>.</p>
+    <p><strong>Solution:</strong> Exclude <code>Draft</code> and <code>deletedAt</code> projects from cron penalties/closures, release member tasks &amp; unlink CVs on account deletion, count deleted projects in 24h spam windows, and migrate the final 6 raw links to <code>&lt;SafeLink&gt;</code>.</p>
+  </div>
+
+  <div class="deep-dive-card">
+    <div class="deep-dive-header">
+      <div class="deep-dive-title">#5. High-Value New Features: Admin Support Inbox, Templates &amp; Mentor Calendar (<code>ADM-03</code>, <code>PRJ-09</code>, <code>MEN-07</code>)</div>
+      <span class="badge badge-idea">NEW INNOVATIONS</span>
+    </div>
+    <p><strong>Roadmap Upgrades:</strong> Build <code>AdminSupport.jsx</code> so admins can manage Phase 12 <code>Project Closure Request</code> cases and Help inquiries; offer category starter-task templates on <code>CreateProject</code> + dependency blockers; provide weekly UTC mentor availability slots with automated overlap prevention (<code>MEN-06</code>/<code>MEN-07</code>); and deploy Job 19 <code>storageHygieneJob</code>.</p>
+  </div>
+
+  <h2>4. Updated Phased Delivery Roadmap (Phases 19–22)</h2>
+  <table>
+    <thead>
+      <tr>
+        <th style="width:12%;">Phase</th>
+        <th style="width:26%;">Focus Areas</th>
+        <th style="width:44%;">Key Deliverables</th>
+        <th style="width:9%;">Effort</th>
+        <th style="width:9%;">Priority</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><strong>Phase 19</strong></td>
+        <td>Critical Security &amp; RBAC Lockdown</td>
+        <td>Lock down <code>/users</code> endpoints (<code>SEC-05/06/07</code>), rate-limit <code>POST /admin/login</code>, guard tasks &amp; notifications (<code>SEC-08/09</code>), ban SVG uploads &amp; check magic bytes (<code>SEC-10</code>), retire legacy bypasses (<code>SEC-11</code>), extend <code>EmailVerifiedGuard</code> (<code>SEC-12</code>).</td>
+        <td>2 Days</td>
+        <td><span class="badge badge-crit">P0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Phase 20</strong></td>
+        <td>Canonical Ledger, Snapshots &amp; Cron Fixes</td>
+        <td>Unify Reputation &amp; Gamification into 1 canonical ledger (<code>DAT-01</code>), enforce 5-day badge min duration (<code>GAM-01</code>), persist all 6 missing stores in <code>PersistenceService</code> (<code>DUR-01</code>), fix Draft/deletedAt cron filters &amp; daily cap bypass (<code>PRJ-07</code>).</td>
+        <td>3 Days</td>
+        <td><span class="badge badge-crit">P0</span></td>
+      </tr>
+      <tr>
+        <td><strong>Phase 21</strong></td>
+        <td>Lifecycle Cleanup, Mentorship Slots &amp; SafeLink</td>
+        <td>Release tasks/seats &amp; delete CVs on account deletion (<code>PRJ-08</code>), reject mentor self-booking &amp; time overlaps + inject <code>ClockService</code> in UPI provider (<code>MEN-06</code>), migrate remaining 6 raw anchors to <code>&lt;SafeLink&gt;</code> (<code>SEC-02/04</code>), add task ContentFilter (<code>TSK-06</code>).</td>
+        <td>2 Days</td>
+        <td><span class="badge badge-high">P1</span></td>
+      </tr>
+      <tr>
+        <td><strong>Phase 22</strong></td>
+        <td>Admin Support UI, Templates &amp; UX Polish</td>
+        <td>Build <code>AdminSupport.jsx</code> ticket/closure inbox (<code>ADM-03</code>), starter-task templates &amp; task dependencies (<code>PRJ-09</code>), mentor weekly calendar slots (<code>MEN-07</code>), Job 19 <code>storageHygieneJob</code> &amp; batch immediate alerts (<code>MOD-05</code>, <code>NOT-01</code>).</td>
+        <td>3 Days</td>
+        <td><span class="badge badge-idea">P2</span></td>
+      </tr>
+    </tbody>
+  </table>
+
+</div>
+
+</body>
+</html>

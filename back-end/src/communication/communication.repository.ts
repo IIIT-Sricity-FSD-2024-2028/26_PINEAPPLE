@@ -1,7 +1,8 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Inject, forwardRef } from '@nestjs/common';
 import { SendMessageDto } from './dto/send-message.dto';
-import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UsersRepository } from '../users/users.repository';
+import { ProjectsRepository } from '../projects/projects.repository';
+import { getProjectRole } from '../common/utils/role.util';
 
 export interface Message {
   id: string;
@@ -9,28 +10,56 @@ export interface Message {
   senderId: string;
   senderName: string;
   sender?: string;
-  role: string;
+  role?: string;
   senderRole?: string;
+  projectRole?: string | null;
   content: string;
   text?: string;
-  timestamp: Date;
-}
-
-export interface Notification {
-  id: string;
-  userId: string;
-  title: string;
-  message: string;
-  isRead: boolean;
+  flaggedForAdmin?: boolean;
+  flagReason?: string;
+  flaggedAt?: string;
   timestamp: Date;
 }
 
 @Injectable()
 export class CommunicationRepository {
+  private static readonly MAX_MESSAGES = 5000;
   private messages: Message[] = [];
-  private notifications: Notification[] = [];
+  private messagesByProjectId = new Map<string, Message[]>();
+  private lastReadByUserProject = new Map<string, string>();
 
-  constructor(private readonly usersRepository: UsersRepository) {
+  private indexMessage(m: Message): void {
+    if (!m) return;
+    const pid = String(m.projectId);
+    if (!this.messagesByProjectId.has(pid)) {
+      this.messagesByProjectId.set(pid, []);
+    }
+    const list = this.messagesByProjectId.get(pid)!;
+    const existingIdx = list.findIndex((item) => item.id === m.id);
+    if (existingIdx !== -1) {
+      list[existingIdx] = m;
+    } else {
+      list.push(m);
+    }
+  }
+
+  private rebuildIndexes(): void {
+    this.messagesByProjectId.clear();
+    for (const m of this.messages) {
+      this.indexMessage(m);
+    }
+  }
+
+  constructor(
+    private readonly usersRepository: UsersRepository,
+    @Inject(forwardRef(() => ProjectsRepository))
+    private readonly projectsRepository: any,
+  ) {
+    this.seedMessages();
+  }
+
+  private seedMessages(): void {
+    this.messages = [];
     const now = new Date();
     
     // Seed test messages linked to proj-1
@@ -53,24 +82,6 @@ export class CommunicationRepository {
       content: 'I will start looking at the database schema today.',
       text: 'I will start looking at the database schema today.',
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 2), // 2 hours ago
-    });
-
-    // Seed test notifications
-    this.notifications.push({
-      id: 'notif-1',
-      userId: '2', // Arjun
-      title: 'Task Assigned',
-      message: 'You have been assigned to "Implement Authentication".',
-      isRead: false,
-      timestamp: new Date(now.getTime() - 1000 * 60 * 60), // 1 hour ago
-    });
-    this.notifications.push({
-      id: 'notif-2',
-      userId: '1', // Priya
-      title: 'Project Update',
-      message: 'Arjun completed the "Design Database Schema" task.',
-      isRead: true,
-      timestamp: new Date(now.getTime() - 1000 * 60 * 30), // 30 mins ago
     });
 
     this.messages.push({
@@ -105,81 +116,173 @@ export class CommunicationRepository {
       timestamp: new Date(now.getTime() - 1000 * 60 * 60 * 24 * 2),
     });
 
-
-    this.notifications.push({
-      id: 'notif-4',
-      userId: '7', // Neha Gupta
-      title: 'Task In Progress',
-      message: 'You started working on "Train ML Model".',
-      isRead: true,
-      timestamp: new Date(now.getTime() - 1000 * 60 * 15),
-    });
+    // Delete stored role fields from message records on start-up
+    this.cleanStoredRoles();
+    this.rebuildIndexes();
   }
 
-  private resolveDisplayRole(role?: string): string {
-    const r = String(role || '').trim().toLowerCase().replace(/[_\s]+/g, '-');
-    if (r === 'project-owner' || r === 'owner') return 'Owner';
-    if (r === 'mentor') return 'Mentor';
-    if (r === 'collaborator' || r === 'collab') return 'Collaborator';
-    if (r === 'admin' || r === 'administrator') return 'Admin';
-    if (r === 'superuser' || r === 'super-user') return 'Super User';
-    return 'Collaborator';
+  resetToSeed(): void {
+    this.seedMessages();
+    this.resetReadState();
   }
 
-  sendMessage(senderId: string, roleHeader: string | undefined, dto: SendMessageDto): Message {
-    const user = this.usersRepository.findById(senderId);
+  reset(): void {
+    this.resetToSeed();
+  }
+
+  cleanStoredRoles(): void {
+    for (const msg of this.messages) {
+      delete (msg as any).role;
+      delete (msg as any).senderRole;
+    }
+  }
+
+  sendMessage(
+    senderId: string,
+    dto: SendMessageDto,
+    projectRole: string,
+    customTimestamp?: Date,
+    meta?: { flaggedForAdmin?: boolean; flagReason?: string },
+  ): Message {
+    const user = this.usersRepository.findById(senderId) || this.usersRepository.findAll().find(u => String(u.id) === String(senderId) || String((u as any).uid || '') === String(senderId));
     const senderName = (user ? (user.name || user.profile?.fullName) : undefined) || dto.senderName || 'Unknown user';
-
-    // Role priority: roleHeader (from active context) or user's base role
-    const resolvedRole = this.resolveDisplayRole(roleHeader || user?.role);
     const content = (dto.content || dto.text || '').trim();
+    const msgDate = customTimestamp || new Date();
 
     const newMessage: Message = {
-      id: `msg-${Date.now()}`,
+      id: `msg-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
       projectId: dto.projectId,
       senderId,
       senderName,
       sender: senderName,
-      role: resolvedRole,
-      senderRole: resolvedRole,
       content,
       text: content,
-      timestamp: new Date(),
+      ...(meta?.flaggedForAdmin
+        ? {
+            flaggedForAdmin: true,
+            flagReason: meta.flagReason || 'Content filter match',
+            flaggedAt: msgDate.toISOString(),
+          }
+        : {}),
+      timestamp: msgDate,
     };
     this.messages.push(newMessage);
-    return newMessage;
+    if (this.messages.length > CommunicationRepository.MAX_MESSAGES) {
+      this.messages.shift();
+    }
+    this.indexMessage(newMessage);
+    this.setLastReadAt(String(senderId), String(dto.projectId), msgDate.toISOString());
+
+    return {
+      ...newMessage,
+      role: projectRole,
+      senderRole: projectRole,
+      projectRole,
+    };
+  }
+
+  private readKey(userId: string, projectId: string): string {
+    return `${String(userId).trim()}:${String(projectId).trim()}`;
+  }
+
+  getLastReadAt(userId: string, projectId: string): string | undefined {
+    return this.lastReadByUserProject.get(this.readKey(userId, projectId));
+  }
+
+  setLastReadAt(userId: string, projectId: string, iso: string): void {
+    this.lastReadByUserProject.set(this.readKey(userId, projectId), iso);
+  }
+
+  resetReadState(): void {
+    this.lastReadByUserProject.clear();
+  }
+
+  findMessageById(messageId: string): Message | undefined {
+    return this.messages.find((m) => String(m.id) === String(messageId));
+  }
+
+  deleteMessage(messageId: string): boolean {
+    const initialLen = this.messages.length;
+    this.messages = this.messages.filter((m) => String(m.id) !== String(messageId));
+    if (this.messages.length < initialLen) {
+      this.rebuildIndexes();
+      return true;
+    }
+    return false;
+  }
+
+  getMessageContextSnapshot(projectId: string, messageId: string, maxCount = 20): Array<{
+    id: string;
+    projectId: string;
+    senderId: string;
+    senderName: string;
+    role?: string;
+    content: string;
+    timestamp: string;
+  }> {
+    const all = this.getMessagesByProjectId(projectId);
+    if (all.length === 0) return [];
+    const targetIdx = all.findIndex((m) => String(m.id) === String(messageId));
+    let slice: Message[];
+    if (all.length <= maxCount || targetIdx === -1) {
+      slice = all.slice(0, maxCount);
+    } else {
+      const half = Math.floor(maxCount / 2);
+      const start = Math.max(0, Math.min(targetIdx - half, all.length - maxCount));
+      slice = all.slice(start, start + maxCount);
+    }
+    return slice.map((m) => ({
+      id: String(m.id),
+      projectId: String(m.projectId),
+      senderId: String(m.senderId),
+      senderName: String(m.senderName || 'Unknown user'),
+      role: m.projectRole || m.role || undefined,
+      content: String(m.content || m.text || ''),
+      timestamp: m.timestamp instanceof Date ? m.timestamp.toISOString() : new Date(m.timestamp).toISOString(),
+    }));
+  }
+
+  exportChatReadState(): Record<string, string> {
+    const out: Record<string, string> = {};
+    this.lastReadByUserProject.forEach((v, k) => {
+      out[k] = v;
+    });
+    return out;
+  }
+
+  importChatReadState(state: Record<string, string>): void {
+    if (!state || typeof state !== 'object') return;
+    this.lastReadByUserProject.clear();
+    for (const [k, v] of Object.entries(state)) {
+      if (typeof v === 'string') {
+        this.lastReadByUserProject.set(k, v);
+      }
+    }
   }
 
   getMessagesByProjectId(projectId: string): Message[] {
-    return this.messages
-      .filter((msg) => msg.projectId === projectId)
+    const project = this.projectsRepository ? this.projectsRepository.findById(projectId) : null;
+    const baseList = this.messagesByProjectId.get(String(projectId)) || this.messages.filter((msg) => msg.projectId === projectId);
+    return baseList
       .map((msg) => {
-        let senderName = msg.senderName;
-        let role = msg.role;
+        const user = this.usersRepository.findById(msg.senderId) || this.usersRepository.findAll(true).find(u => String(u.id) === String(msg.senderId) || String((u as any).uid || '') === String(msg.senderId));
+        const isDeletedUser = Boolean((user as any)?.isDeleted || (user as any)?.deletedAt || msg.senderName === 'Deleted user');
+        const senderName = isDeletedUser
+          ? 'Deleted user'
+          : (user ? (user.name || user.profile?.fullName || 'Unknown user') : (msg.senderName || 'Unknown user'));
 
-        const isRoleString = ['collaborator', 'project owner', 'owner', 'project-owner', 'mentor', 'admin', 'administrator', 'superuser', 'super user'].includes(
-          String(senderName || '').trim().toLowerCase(),
-        );
-
-        if (!senderName || isRoleString) {
-          const user = this.usersRepository.findById(msg.senderId);
-          senderName = user ? (user.name || user.profile?.fullName || 'Unknown user') : 'Unknown user';
-          if (!role && user) {
-            role = this.resolveDisplayRole(user.role);
-          }
-        }
-
-        if (!role) {
-          const user = this.usersRepository.findById(msg.senderId);
-          role = user ? this.resolveDisplayRole(user.role) : 'Collaborator';
-        }
+        // Dynamically compute role from project membership
+        const projectRole = project ? getProjectRole(project, msg.senderId) : null;
+        const roleLabel = projectRole || (project && Array.isArray(project.removedUsers) && project.removedUsers.some((r: any) => String(r.userId || r.id) === String(msg.senderId)) ? 'Former member' : null);
 
         return {
           ...msg,
           senderName,
           sender: senderName,
-          role,
-          senderRole: role,
+          ...(isDeletedUser ? { senderIsDeleted: true } : {}),
+          role: roleLabel || undefined,
+          senderRole: roleLabel || undefined,
+          projectRole: roleLabel,
           content: msg.content,
           text: msg.text || msg.content,
           timestamp: msg.timestamp,
@@ -188,31 +291,25 @@ export class CommunicationRepository {
       .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
   }
 
-  createNotification(dto: CreateNotificationDto): Notification {
-    const newNotification: Notification = {
-      id: `notif-${Date.now()}`,
-      userId: dto.userId,
-      title: dto.title,
-      message: dto.message,
-      isRead: false,
-      timestamp: new Date(),
-    };
-    this.notifications.push(newNotification);
-    return newNotification;
+  getMessagesBySender(senderId: string): Message[] {
+    const uid = String(senderId || '');
+    return this.messages.filter((m) => String(m.senderId) === uid);
   }
 
-  getNotificationsByUserId(userId: string): Notification[] {
-    return this.notifications
-      .filter((notif) => notif.userId === userId)
-      .sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime()); // Reverse chronological order
-  }
-
-  markNotificationAsRead(notificationId: string): Notification | undefined {
-    const notif = this.notifications.find((n) => n.id === notificationId);
-    if (notif) {
-      notif.isRead = true;
-      return notif;
+  anonymizeSender(senderId: string): number {
+    const uid = String(senderId || '');
+    let updated = 0;
+    for (const msg of this.messages) {
+      if (String(msg.senderId) === uid) {
+        msg.senderName = 'Deleted user';
+        msg.sender = 'Deleted user';
+        updated += 1;
+      }
     }
-    return undefined;
+    return updated;
+  }
+
+  getAllMessages(): Message[] {
+    return this.messages;
   }
 }

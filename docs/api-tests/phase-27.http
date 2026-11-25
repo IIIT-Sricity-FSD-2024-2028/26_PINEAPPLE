@@ -1,0 +1,100 @@
+### PHASE 27: ADMIN SUPPORT INBOX & PROJECT CLOSURE REQUESTS
+
+@baseUrl = http://localhost:3000
+@userToken = Bearer <USER_JWT>
+@adminSupportToken = Bearer <ADMIN_WITH_SUPPORT_PERMISSION_JWT>
+@superuserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Visitor Help Ticket Submission (email required when unauthenticated)
+POST {{baseUrl}}/support/tickets
+Content-Type: application/json
+
+{
+  "type": "help",
+  "email": "visitor@example.com",
+  "subject": "Trouble verifying email link",
+  "message": "The verification link says expired even though I requested it a minute ago."
+}
+
+### 2. Authenticated User Creates Help Ticket (5/day cap, ContentFilter enforced)
+POST {{baseUrl}}/support/tickets
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "type": "help",
+  "priority": "normal",
+  "subject": "Cannot export finished project markdown",
+  "message": "Clicked the Export Markdown button twice in Closed project workspace with no download."
+}
+
+### 3. User Lists Own Tickets & Views Single Ticket (internal notes stripped)
+GET {{baseUrl}}/support/tickets
+Authorization: {{userToken}}
+
+###
+GET {{baseUrl}}/support/tickets/<TICKET_ID>
+Authorization: {{userToken}}
+
+### 4. User Replies While Ticket Open / In Progress / Waiting User
+POST {{baseUrl}}/support/tickets/<TICKET_ID>/replies
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "body": "Attached project ID #proj-1; issue still persists on Chrome."
+}
+
+### 5. Admin Support Inbox List (Paged, Filtered, Newest First - requires "support" permission)
+GET {{baseUrl}}/admin/support/tickets?status=open&type=all&page=1&limit=20
+Authorization: {{adminSupportToken}}
+
+### 6. Admin Assigns, Changes Priority, & Transitions Status
+PATCH {{baseUrl}}/admin/support/tickets/<TICKET_ID>
+Authorization: {{adminSupportToken}}
+Content-Type: application/json
+
+{
+  "assigneeId": "u-superuser",
+  "priority": "high",
+  "status": "in_progress"
+}
+
+### 7. Admin Posts Internal Note vs Public Reply
+POST {{baseUrl}}/admin/support/tickets/<TICKET_ID>/replies
+Authorization: {{adminSupportToken}}
+Content-Type: application/json
+
+{
+  "body": "Internal investigation: verified user project status is still Active.",
+  "internal": true
+}
+
+###
+POST {{baseUrl}}/admin/support/tickets/<TICKET_ID>/replies
+Authorization: {{adminSupportToken}}
+Content-Type: application/json
+
+{
+  "body": "Hi! Markdown export requires the project to be Closed or Completed first.",
+  "internal": false
+}
+
+### 8. Admin Resolves Ticket With Mandatory Visible Note (10-500 chars)
+PATCH {{baseUrl}}/admin/support/tickets/<TICKET_ID>
+Authorization: {{adminSupportToken}}
+Content-Type: application/json
+
+{
+  "status": "resolved",
+  "note": "Explained export lifecycle prerequisites and verified user resolved issue."
+}
+
+### 9. Admin Closes Abandoned Project From Project Closure Ticket (Owner inactive + Phase 9 Escrow Refund)
+POST {{baseUrl}}/admin/support/tickets/<CLOSURE_TICKET_ID>/close-project
+Authorization: {{superuserToken}}
+Content-Type: application/json
+
+{
+  "reason": "Confirmed project owner has been inactive for 35 days; closing project and refunding held escrow."
+}

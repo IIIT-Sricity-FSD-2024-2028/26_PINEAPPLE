@@ -1,0 +1,42 @@
+### PHASE 26: FRONT-END PARITY & NOTIFICATION AGGREGATION
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer <PROJECT_OWNER_JWT>
+@collabToken = Bearer <COLLABORATOR_JWT>
+@superuserToken = Bearer <SUPERUSER_JWT>
+
+### 1. Suspend Collaborator with 8 Open Tasks -> 1 Grouped Owner Notification
+POST {{baseUrl}}/admin/users/2/suspend
+Authorization: {{superuserToken}}
+Content-Type: application/json
+
+{
+  "reason": "Policy violation suspension to verify single grouped TASK_RELEASED notice."
+}
+
+### 2. Inspect Owner Grouped Notification (count, groupKey, items[])
+GET {{baseUrl}}/notifications
+Authorization: {{ownerToken}}
+
+### 3. Close Project with 5 Pending Requests -> 1 Applicant Notice Each + 1 Owner Summary
+POST {{baseUrl}}/projects/proj-1/close
+Authorization: {{superuserToken}}
+Content-Type: application/json
+
+{
+  "reason": "Administrative closure with multiple pending requests"
+}
+
+### 4. Delete Collaborator Account Participating in Multiple Projects of Same Owner
+POST {{baseUrl}}/users/me/delete
+Authorization: {{collabToken}}
+Content-Type: application/json
+
+{
+  "username": "arjun_sharma",
+  "password": "Password@123"
+}
+
+### 5. Trigger Hourly Scheduled Jobs -> Grouped Per-Owner / Per-Recipient Reminders
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superuserToken}}

@@ -34,7 +34,9 @@ export class PortalAdminsService extends BaseService<PortalAdminEntity> {
         event: `Super User provisioned new admin account: "${created.name}" (${created.email})`,
         details: { permissions: created.permissions },
       });
-    } catch { /* non-critical */ }
+    } catch (err: any) {
+        console.warn('[portal-admins.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     return created;
   }
@@ -70,7 +72,9 @@ export class PortalAdminsService extends BaseService<PortalAdminEntity> {
           : `Super User updated permissions for admin "${admin.name}"`,
         details: updatePortalAdminDto,
       });
-    } catch { /* non-critical */ }
+    } catch (err: any) {
+        console.warn('[portal-admins.service] Suppressed non-critical error:', err?.message || err);
+      }
 
     return updated;
   }
@@ -96,6 +100,16 @@ export class PortalAdminsService extends BaseService<PortalAdminEntity> {
         entityId: id,
         event: `Super User erased admin account: "${targetAdmin ? targetAdmin.name : id}"`,
       });
-    } catch { /* non-critical */ }
+    } catch (err: any) {
+        console.warn('[portal-admins.service] Suppressed non-critical error:', err?.message || err);
+      }
+  }
+
+  resetToSeed(): void {
+    this.reset();
+  }
+
+  reset(): void {
+    this.items.length = 0;
   }
 }

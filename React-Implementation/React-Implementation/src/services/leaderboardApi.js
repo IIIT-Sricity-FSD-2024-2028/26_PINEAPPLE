@@ -5,6 +5,7 @@ export const leaderboardApi = {
     const queryParams = new URLSearchParams();
     if (params?.period) queryParams.append("period", params.period);
     if (params?.limit) queryParams.append("limit", params.limit);
+    if (params?.tab) queryParams.append("tab", params.tab);
     const query = queryParams.toString();
     return apiRequest(`/leaderboard${query ? `?${query}` : ""}`, "GET", null, {
       role: role || getCurrentUserRole(),

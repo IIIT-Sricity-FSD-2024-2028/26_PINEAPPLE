@@ -35,7 +35,7 @@ const MyProjects = () => {
         const currentUserId = user?.id;
         const currentUserName = user?.name || '';
 
-        const allProjects = await projectsApi.list().catch(() => []);
+        const allProjects = await projectsApi.list({ status: 'all' }).catch(() => []);
         const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
           (p) => p.ownerId === currentUserId || p.owner === currentUserName
         );
@@ -59,11 +59,29 @@ const MyProjects = () => {
     };
   }, [user?.id, user?.name]);
 
-  const isCompletedProject = (p) => p.isCompleted === true || isProjectLocked(p);
-  const activeProjects = projects.filter((p) => !isCompletedProject(p));
+  const isClosedProject = (p) => String(p.status || '').toLowerCase() === 'closed';
+  const isCompletedProject = (p) => !isClosedProject(p) && (p.isCompleted === true || isProjectLocked(p));
+  const activeProjects = projects.filter((p) => !isClosedProject(p) && !isCompletedProject(p));
   const completedProjects = projects
     .filter(isCompletedProject)
     .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
+  const closedProjects = projects.filter(isClosedProject);
+
+  const [nowTs] = useState(() => Date.now());
+  const formatPauseCountdown = (proj) => {
+    const expiresMs = proj.pendingReviewGraceExpiresAt
+      ? new Date(proj.pendingReviewGraceExpiresAt).getTime()
+      : new Date(proj.pausedAt).getTime() + 48 * 60 * 60 * 1000;
+    const diffMs = Math.max(0, expiresMs - nowTs);
+    if (diffMs === 0) return '0h remaining (closing soon)';
+    const totalHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${totalHours}h ${mins}m remaining`;
+  };
+
+  const pausedPendingProjects = activeProjects.filter(
+    (p) => Boolean(p.pausedAt) && (p.pendingRequestsCount === undefined || p.pendingRequestsCount > 0),
+  );
 
   return (
     <div id="page-my-projects" className="tf-myproj-container">
@@ -81,13 +99,52 @@ const MyProjects = () => {
         </button>
       </div>
 
+      {pausedPendingProjects.length > 0 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginBottom: '20px' }}>
+          {pausedPendingProjects.map((p) => (
+            <div
+              key={`pause-banner-${p.id}`}
+              data-testid={`myprojects-zombie-banner-${p.id}`}
+              role="alert"
+              style={{
+                padding: '12px 18px',
+                borderRadius: '8px',
+                background: '#fffbeb',
+                border: '1px solid #f59e0b',
+                color: '#92400e',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center',
+                gap: '12px',
+                flexWrap: 'wrap',
+              }}
+            >
+              <div>
+                <strong>⏳ 48-Hour Countdown Running:</strong> Project{' '}
+                <strong>{p.title || p.name}</strong> has pending join requests at Day 5. Decide within{' '}
+                <strong>{formatPauseCountdown(p)}</strong> or the project closes automatically.
+              </div>
+              <button
+                type="button"
+                className="tf-myproj-btn-primary"
+                style={{ padding: '6px 14px', fontSize: '0.85rem', backgroundColor: '#d97706' }}
+                onClick={() => navigate(`/owner/workspace/${p.id}`)}
+              >
+                Decide Pending Requests →
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
       {!loading && projects.length > 0 && (
         <div style={{ marginBottom: '24px' }}>
           <FilterTabs
             tabs={[
               { id: 'all', label: 'All', count: projects.length },
               { id: 'active', label: 'Active', count: activeProjects.length },
-              { id: 'completed', label: 'Completed', count: completedProjects.length }
+              { id: 'completed', label: 'Completed', count: completedProjects.length },
+              { id: 'closed', label: 'Closed', count: closedProjects.length }
             ]}
             activeTab={filter}
             onChange={setFilter}
@@ -137,6 +194,24 @@ const MyProjects = () => {
               </div>
               <div className="tf-myproj-grid">
                 {completedProjects.map((p) => (
+                  <ProjectCard
+                    key={p.id}
+                    project={p}
+                    variant="owner"
+                    onSelect={(proj) => navigate(`/owner/workspace/${proj.id}`)}
+                  />
+                ))}
+              </div>
+            </div>
+          )}
+
+          {(filter === 'all' || filter === 'closed') && closedProjects.length > 0 && (
+            <div className="tf-myproj-section">
+              <div className="tf-myproj-section-title" style={{ color: '#b91c1c' }}>
+                🛑 Closed Projects ({closedProjects.length})
+              </div>
+              <div className="tf-myproj-grid">
+                {closedProjects.map((p) => (
                   <ProjectCard
                     key={p.id}
                     project={p}

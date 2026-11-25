@@ -1,0 +1,138 @@
+### TeamForge Phase 13 API Tests (REST Client Format)
+### Task Review & Feedback (Mandatory Rejection Reason, In Review Retention on Leave/Suspend, 3d Reminder & 7d Auto-Approve, Late Unassign Reason, Due Date Role Whitelist)
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. TASK REVIEW: REJECTION REASON VALIDATION & APPROVAL
+### --------------------------------------------------------------------------
+
+### 1a. Reject Submitted Task Without Reason
+# Expected Status: 400 Bad Request
+# Expected Code: REASON_REQUIRED
+POST {{baseUrl}}/tasks/TASK_ID/review
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "decision": "reject"
+}
+
+###
+
+### 1b. Reject Submitted Task With Valid Reason (10 to 500 characters)
+# Expected Status: 200 OK
+# Stores rejectionReason, rejectedAt, rejectedBy, rejectionHistory[] and notifies collaborator
+POST {{baseUrl}}/tasks/TASK_ID/review
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "decision": "reject",
+  "reason": "Please add unit tests for the new validation path and update error handling."
+}
+
+###
+
+### 1c. Resubmit Proof (Clears Visible Rejection Reason While Preserving History)
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/tasks/TASK_ID/status
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "status": "In Review",
+  "proofLink": "https://github.com/org/repo/pull/22"
+}
+
+###
+
+### 1d. Owner Approves Task
+# Expected Status: 200 OK
+POST {{baseUrl}}/tasks/TASK_ID/review
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "decision": "approve"
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 2. ROLE WHITELIST ON TASK UPDATE (DUE DATE LOCK)
+### --------------------------------------------------------------------------
+
+### 2a. Collaborator Attempts to Change Due Date
+# Expected Status: 403 Forbidden
+# Expected Code: FORBIDDEN_FIELD
+PATCH {{baseUrl}}/tasks/TASK_ID
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "dueDate": "2027-06-01T00:00:00.000Z"
+}
+
+###
+
+### 2b. Owner Changes Due Date
+# Expected Status: 200 OK
+PATCH {{baseUrl}}/tasks/TASK_ID
+Authorization: {{ownerToken}}
+x-user-id: 1
+Content-Type: application/json
+
+{
+  "dueDate": "2027-05-15T00:00:00.000Z"
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 3. UNASSIGN / DROP TASK (24-HOUR LATE-DROP RULE)
+### --------------------------------------------------------------------------
+
+### 3a. Collaborator Unassigns Within 24h Without Reason
+# Expected Status: 400 Bad Request
+# Expected Code: REASON_REQUIRED
+POST {{baseUrl}}/tasks/TASK_ID/unassign
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{}
+
+###
+
+### 3b. Collaborator Unassigns Within 24h With Reason (10 to 300 chars)
+# Expected Status: 200 OK
+# Returns task to Unassigned / To Do and notifies owner with reason
+POST {{baseUrl}}/tasks/TASK_ID/unassign
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "reason": "Blocked by an unforeseen urgent commitment and need to hand off."
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 4. HOURLY SCHEDULER TICK (reviewDeadlineJob)
+### --------------------------------------------------------------------------
+
+### 4a. Trigger Hourly Tick (Runs 3d Review Reminder & 7d Auto-Approve Job)
+# Expected Status: 202 Accepted
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+x-user-id: u-superuser

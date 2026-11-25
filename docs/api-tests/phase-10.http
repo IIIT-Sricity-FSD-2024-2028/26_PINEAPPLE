@@ -1,0 +1,127 @@
+### TeamForge Phase 10 API Tests (REST Client Format)
+### Platform Durability (Snapshot to File and Restore, UTC Time Handling, Reputation Ledger Pagination)
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. REPUTATION LEDGER PAGINATION & FILTERING
+### --------------------------------------------------------------------------
+
+### 1a. User Reputation Ledger (Default Page 1, Limit 20)
+# Expected Status: 200 OK
+# Expected Response: { items: [...], page: 1, limit: 20, total: N }
+GET {{baseUrl}}/users/me/reputation
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 1b. User Reputation Ledger (Custom Page and Limit)
+# Expected Status: 200 OK
+# Expected Response: { items: [...], page: 2, limit: 5, total: N }
+GET {{baseUrl}}/users/me/reputation?page=2&limit=5
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 1c. User Reputation Ledger (Filter by Type: task_approved)
+# Expected Status: 200 OK
+# Expected Response: items containing only type === 'task_approved'
+GET {{baseUrl}}/users/me/reputation?type=task_approved
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 1d. Invalid Pagination Limit > 100
+# Expected Status: 400 Bad Request
+# Expected Code: INVALID_PAGINATION
+GET {{baseUrl}}/users/me/reputation?limit=101
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 1e. Invalid Pagination Limit <= 0
+# Expected Status: 400 Bad Request
+# Expected Code: INVALID_PAGINATION
+GET {{baseUrl}}/users/me/reputation?limit=0
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 1f. Invalid Pagination Page <= 0
+# Expected Status: 400 Bad Request
+# Expected Code: INVALID_PAGINATION
+GET {{baseUrl}}/users/me/reputation?page=-1
+Authorization: {{collabToken}}
+x-user-id: 2
+
+### --------------------------------------------------------------------------
+### 2. ADMIN REPUTATION LEDGER
+### --------------------------------------------------------------------------
+
+### 2a. Admin View User Reputation
+# Expected Status: 200 OK
+# Expected Response: { items: [...], page: 1, limit: 10, total: N }
+GET {{baseUrl}}/admin/users/2/reputation?page=1&limit=10
+Authorization: {{adminToken}}
+x-user-role: admin
+
+###
+
+### 2b. Admin View Platform Reputation Ledger
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/reputation?page=1&limit=20
+Authorization: {{adminToken}}
+x-user-role: admin
+
+###
+
+### 2c. Collaborator Forbidden from Admin Reputation
+# Expected Status: 403 Forbidden
+GET {{baseUrl}}/admin/users/2/reputation
+Authorization: {{collabToken}}
+x-user-role: collaborator
+
+### --------------------------------------------------------------------------
+### 3. SUPER USER SNAPSHOT MANAGEMENT
+### --------------------------------------------------------------------------
+
+### 3a. Super User Triggers Manual Snapshot Save
+# Expected Status: 200 OK
+# Expected Response: { savedAt: "ISO_UTC", sizeBytes: 12345 }
+POST {{baseUrl}}/admin/system/snapshot
+Authorization: {{superUserToken}}
+x-user-role: superuser
+
+###
+
+### 3b. Super User Checks Snapshot Telemetry
+# Expected Status: 200 OK
+# Expected Response: { savedAt: "...", sizeBytes: ... }
+GET {{baseUrl}}/admin/system/snapshot
+Authorization: {{superUserToken}}
+x-user-role: superuser
+
+###
+
+### 3c. Regular Admin Forbidden from Saving Snapshot
+# Expected Status: 403 Forbidden
+POST {{baseUrl}}/admin/system/snapshot
+Authorization: {{adminToken}}
+x-user-role: admin
+
+###
+
+### 3d. Collaborator Forbidden from Saving Snapshot
+# Expected Status: 403 Forbidden
+POST {{baseUrl}}/admin/system/snapshot
+Authorization: {{collabToken}}
+x-user-role: collaborator

@@ -1,7 +1,7 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useContext, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AuthContext } from '../../context/AuthContext';
-import { RoleContext } from '../../context/RoleContext';
+import { useActiveRole } from '../../utils/roleStore';
 import mentorMarketplaceApi, { calculateEscrowBreakdown } from '../../services/mentorMarketplaceApi';
 import projectsApi from '../../services/projectsApi';
 import { normalizeRole } from '../../services/apiClient';
@@ -13,14 +13,116 @@ import FilterTabs from '../../components/common/FilterTabs';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import MentorCard from '../../components/features/MentorCard';
+import trustApi from '../../services/trustApi';
+import { formatDateTime } from '../../utils/dateFormatter';
+import QRCodeSvg from '../../components/common/QRCodeSvg';
 import './mentorsDirectory.css';
+
+const BLOCKING_BOOKING_STATUSES = new Set([
+  'pending',
+  'payment_pending',
+  'escrow_funded',
+  'accepted',
+  'active',
+]);
+
+const isMentorCollaboratorOnProject = (project, mentorUserId) => {
+  if (!project || !mentorUserId) return false;
+  const uid = String(mentorUserId);
+  const matchesEntry = (entry) => {
+    if (!entry) return false;
+    if (typeof entry === 'string') return entry === uid;
+    if (String(entry.status || '').toLowerCase() === 'removed') return false;
+    return String(entry.userId || entry.id || entry.uid || '') === uid;
+  };
+  const collabs = Array.isArray(project.collaborators) ? project.collaborators : [];
+  if (collabs.some(matchesEntry)) return true;
+  const members = Array.isArray(project.members) ? project.members : [];
+  return members.some((m) => matchesEntry(m) && String(m?.role || '').toLowerCase() !== 'owner');
+};
+
+const getProjectBookingStatus = (project, sessions) => {
+  if (!project) return { disabled: true, reason: 'Project not found' };
+  if (project.deletedAt) {
+    return { disabled: true, reason: 'Project deleted' };
+  }
+  const statusLower = String(project.status || '').toLowerCase().trim();
+  const isCompleted = project.isCompleted || statusLower === 'completed';
+  if (isCompleted) {
+    return { disabled: true, reason: 'Completed' };
+  }
+  if (statusLower === 'closed') {
+    return { disabled: true, reason: 'Closed' };
+  }
+  if (statusLower === 'cancelled') {
+    return { disabled: true, reason: 'Cancelled' };
+  }
+  if (project.mentorId || project.mentor) {
+    return { disabled: true, reason: `Mentor already assigned (${project.mentor || 'Active'})` };
+  }
+  const liveSession = (sessions || []).find(
+    (s) =>
+      String(s.projectId) === String(project.id) &&
+      BLOCKING_BOOKING_STATUSES.has(String(s.status || '').toLowerCase()),
+  );
+  if (liveSession) {
+    if (liveSession.status === 'active') return { disabled: true, reason: 'Active mentor session' };
+    if (liveSession.status === 'payment_pending') return { disabled: true, reason: 'Payment pending' };
+    return { disabled: true, reason: 'Mentorship booking pending' };
+  }
+  return { disabled: false, reason: null };
+};
+
+export const formatBookingError = (err) => {
+  if (!err) return 'An unexpected error occurred. Please try again.';
+
+  if (err.isNetworkError || (err instanceof TypeError && !err.statusCode && !err.serverMessage)) {
+    return 'Network error. Please check your connection and try again.';
+  }
+
+  const code = err?.code || err?.data?.code;
+
+  switch (code) {
+    case 'EMAIL_NOT_VERIFIED':
+      return 'Verify your email to book a mentor';
+    case 'SESSION_INVALID':
+      return 'Your session expired. Please sign in again';
+    case 'ALREADY_PAID':
+      if (err?.serverMessage && err.serverMessage.toLowerCase().includes('already paid for')) {
+        return err.serverMessage;
+      }
+      if (err?.message && err.message.toLowerCase().includes('already paid for')) {
+        return err.message;
+      }
+      return 'This booking has already been paid';
+    case 'PAYMENT_EXPIRED':
+    case 'HOLD_EXPIRED':
+      return 'This payment hold has expired. Please book again.';
+    case 'CANNOT_BOOK_SELF':
+      return err?.serverMessage || err?.message || 'You cannot book yourself as a mentor for your own project.';
+    case 'CANNOT_BOOK_OWN_PROJECT_MENTOR':
+    case 'MENTOR_IS_PROJECT_MEMBER':
+      return err?.serverMessage || err?.message || 'A project owner or active collaborator cannot be booked as mentor on the same project.';
+    case 'PROJECT_NOT_BOOKABLE':
+      return err?.serverMessage || err?.message || 'This project is not in a live, bookable state.';
+    case 'MENTOR_SUSPENDED':
+      return err?.serverMessage || err?.message || 'This mentor account is suspended and cannot be booked.';
+    case 'MENTOR_UNAVAILABLE':
+      return err?.serverMessage || err?.message || 'This mentor is currently unavailable.';
+    case 'MENTOR_AT_CAPACITY':
+      return err?.serverMessage || err?.message || 'This mentor is currently at full active mentee capacity.';
+    default:
+      return err?.serverMessage || err?.message || 'Failed to complete payment. Please try again.';
+  }
+};
 
 const MentorsDirectory = () => {
   const { user } = useContext(AuthContext);
-  const { currentRole } = useContext(RoleContext);
+  const { activeRole, allowedRoles } = useActiveRole();
   const navigate = useNavigate();
 
   const [mentors, setMentors] = useState([]);
+  const [trustSummaries, setTrustSummaries] = useState({});
   const [searchQuery, setSearchQuery] = useState('');
   const [ownedProjects, setOwnedProjects] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -34,13 +136,45 @@ const MentorsDirectory = () => {
   const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
 
+  // Phase 9: Demo Payment Flow state (30-min window & idempotency key)
+  const [bookingStep, setBookingStep] = useState('details'); // 'details' | 'payment'
+  const [activePaymentSession, setActivePaymentSession] = useState(null);
+  const [activePaymentIntent, setActivePaymentIntent] = useState(null);
+  const [paymentTimeLeft, setPaymentTimeLeft] = useState(1800);
+  const [confirmingPayment, setConfirmingPayment] = useState(false);
+  const [copiedUpi, setCopiedUpi] = useState(false);
+  const [idempotencyKey, setIdempotencyKey] = useState('');
+  const successTimerRef = useRef(null);
+
+  // Phase 14: Post-session feedback modal state (1-5 stars + optional 500-char comment)
+  const [feedbackTargetSession, setFeedbackTargetSession] = useState(null);
+  const [feedbackRating, setFeedbackRating] = useState(5);
+  const [feedbackComment, setFeedbackComment] = useState('');
+  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
+  const [feedbackModalError, setFeedbackModalError] = useState('');
+
+  // Phase 17: Escrow dispute modal state
+  const [disputeTargetSession, setDisputeTargetSession] = useState(null);
+  const [disputeReason, setDisputeReason] = useState('');
+  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const [disputeModalError, setDisputeModalError] = useState('');
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
+
   // Non-owners opening Mentors directory must be redirected
   useEffect(() => {
-    const role = normalizeRole(currentRole);
-    if (role !== 'project-owner' && role !== 'admin' && role !== 'superuser') {
+    const isOwnerAllowed =
+      allowedRoles.includes('Project Owner') ||
+      allowedRoles.includes('admin') ||
+      allowedRoles.includes('superuser');
+    if (!isOwnerAllowed) {
       navigate('/dashboard', { replace: true });
     }
-  }, [currentRole, navigate]);
+  }, [allowedRoles, navigate]);
 
   useEffect(() => {
     let isMounted = true;
@@ -58,16 +192,27 @@ const MentorsDirectory = () => {
           setMentors(validMentors);
           setMySessions(Array.isArray(bookedSessions) ? bookedSessions : []);
 
-          // Only list uncompleted projects owned by caller
           const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
-            (p) => {
-              const isOwner = p.ownerId === user?.id || p.owner === user?.name;
-              const isCompleted = p.isCompleted || String(p.status || '').toLowerCase() === 'completed';
-              return isOwner && !isCompleted;
-            }
+            (p) => p && (p.ownerId === user?.id || p.owner === user?.name)
           );
           setOwnedProjects(owned);
-          if (owned.length > 0) setSelectedProjectId(owned[0].id);
+          const firstEligible = owned.find((p) => !getProjectBookingStatus(p, bookedSessions).disabled);
+          if (firstEligible) setSelectedProjectId(firstEligible.id);
+          else if (owned.length > 0) setSelectedProjectId(owned[0].id);
+          if (validMentors.length > 0) {
+            const mentorIds = validMentors.map((m) => String(m.userId || m.id || '')).filter(Boolean);
+            if (mentorIds.length > 0) {
+              trustApi.getTrustSummaries(mentorIds.slice(0, 50)).then((summaries) => {
+                if (isMounted && Array.isArray(summaries)) {
+                  const map = {};
+                  summaries.forEach((s) => {
+                    if (s?.userId) map[s.userId] = s;
+                  });
+                  setTrustSummaries(map);
+                }
+              }).catch(() => {});
+            }
+          }
         }
       } catch (err) {
         console.error('Failed to load mentors directory:', err);
@@ -82,13 +227,62 @@ const MentorsDirectory = () => {
 
     return () => {
       isMounted = false;
+      if (successTimerRef.current) {
+        clearTimeout(successTimerRef.current);
+      }
     };
   }, [user?.id, user?.name]);
 
+  // Phase 7: 10-minute countdown timer for Demo Payment
+  useEffect(() => {
+    let timer = null;
+    if (bookingStep === 'payment' && paymentTimeLeft > 0) {
+      timer = setInterval(() => {
+        setPaymentTimeLeft((prev) => Math.max(0, prev - 1));
+      }, 1000);
+    }
+    return () => {
+      if (timer) clearInterval(timer);
+    };
+  }, [bookingStep, paymentTimeLeft]);
+
+  const formatTimer = (seconds) => {
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+    return `${m}:${s < 10 ? '0' : ''}${s}`;
+  };
+
   const handleOpenBooking = (mentor) => {
+    const viewerId = user?.id || user?.uid;
+    if (viewerId && mentor?.userId && String(mentor.userId) === String(viewerId)) {
+      return;
+    }
     setSelectedMentor(mentor);
     setFeedback(null);
     setRequestMsg('');
+    setIdempotencyKey('');
+    setBookingStep('details');
+    setActivePaymentSession(null);
+    setActivePaymentIntent(null);
+    setPaymentTimeLeft(1800);
+    setConfirmingPayment(false);
+    setCopiedUpi(false);
+    const hasCurrentSelected = selectedProjectId && ownedProjects.some((p) => String(p.id) === String(selectedProjectId));
+    if (!hasCurrentSelected) {
+      const firstEligible = ownedProjects.find((p) => !getProjectBookingStatus(p, mySessions).disabled);
+      if (firstEligible) setSelectedProjectId(firstEligible.id);
+      else setSelectedProjectId(ownedProjects[0]?.id || '');
+    }
+  };
+
+  const handleBookAgain = () => {
+    setBookingStep('details');
+    setActivePaymentSession(null);
+    setActivePaymentIntent(null);
+    setFeedback(null);
+    setPaymentTimeLeft(1800);
+    setConfirmingPayment(false);
+    setIdempotencyKey('');
   };
 
   // Canonical fee calculation for modal
@@ -99,7 +293,7 @@ const MentorsDirectory = () => {
   const totalAmount = breakdown.totalAmount;
   const mentorPayout = breakdown.mentorPayout;
 
-  const handleBookSession = async (e) => {
+  const handleProceedToPayment = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) {
       setFeedback({ type: 'error', message: 'Please select one of your projects to book mentorship for.' });
@@ -112,8 +306,20 @@ const MentorsDirectory = () => {
       return;
     }
 
-    if (targetProj.isCompleted || String(targetProj.status || '').toLowerCase() === 'completed') {
-      setFeedback({ type: 'error', message: 'Cannot book mentorship for a completed project.' });
+    const viewerId = user?.id || user?.uid;
+    if (viewerId && selectedMentor?.userId && String(selectedMentor.userId) === String(viewerId)) {
+      setFeedback({ type: 'error', message: 'You cannot book yourself as a mentor for your own project.' });
+      return;
+    }
+
+    if (isMentorCollaboratorOnProject(targetProj, selectedMentor?.userId)) {
+      setFeedback({ type: 'error', message: 'Cannot book a collaborator or member of this project as its mentor.' });
+      return;
+    }
+
+    const bookingStatus = getProjectBookingStatus(targetProj, mySessions);
+    if (bookingStatus.disabled) {
+      setFeedback({ type: 'error', message: `Cannot book mentorship: ${bookingStatus.reason}` });
       return;
     }
 
@@ -121,7 +327,7 @@ const MentorsDirectory = () => {
     setFeedback(null);
 
     try {
-      await mentorMarketplaceApi.bookSession({
+      const res = await mentorMarketplaceApi.bookSession({
         mentorId: selectedMentor.id,
         projectId: selectedProjectId,
         projectDescription: requestMsg.trim() || 'Mentorship booking for project deliverables and architecture review.',
@@ -130,26 +336,104 @@ const MentorsDirectory = () => {
       const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
       setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
 
-      setFeedback({
-        type: 'success',
-        message: `Mentorship booked! ₹${totalAmount} is secured in escrow. The mentor has been notified.`,
-      });
+      // Phase 9: Generate UUID idempotency key once per pay screen open
+      const key = typeof crypto !== 'undefined' && crypto.randomUUID
+        ? crypto.randomUUID()
+        : 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
+      setIdempotencyKey(key);
 
-      setTimeout(() => {
-        setSelectedMentor(null);
-        setFeedback(null);
-      }, 1600);
+      setActivePaymentSession(res.session);
+      setActivePaymentIntent(res.paymentIntent);
+      setBookingStep('payment');
+      setPaymentTimeLeft(1800);
     } catch (err) {
       setFeedback({
         type: 'error',
-        message: err.message || 'Failed to complete escrow booking. Please check your project selection.',
+        message: formatBookingError(err),
       });
     } finally {
       setSubmitting(false);
     }
   };
 
+  const handleCloseModal = () => {
+    setSelectedMentor(null);
+    setBookingStep('details');
+    setActivePaymentSession(null);
+    setActivePaymentIntent(null);
+    setFeedback(null);
+    setIdempotencyKey('');
+    setConfirmingPayment(false);
+  };
+
+  const handleConfirmPayment = async () => {
+    if (!activePaymentSession || confirmingPayment || paymentTimeLeft <= 0) return;
+
+    setConfirmingPayment(true);
+    setFeedback(null);
+
+    try {
+      await mentorMarketplaceApi.confirmPayment(activePaymentSession.id, null, {
+        'Idempotency-Key': idempotencyKey,
+      });
+
+      const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
+      setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
+
+      setFeedback({
+        type: 'success',
+        message: `Demo payment confirmed! ₹${totalAmount} is secured in escrow. The mentor has been notified.`,
+      });
+
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+      successTimerRef.current = setTimeout(() => {
+        handleCloseModal();
+      }, 1600);
+    } catch (err) {
+      if (err.code === 'ALREADY_PAID' || err.status === 409 || (err.message && err.message.toLowerCase().includes('already paid'))) {
+        setFeedback({
+          type: 'error',
+          message: err.serverMessage || err.message || 'This session has already been paid for.',
+        });
+      } else {
+        setFeedback({
+          type: 'error',
+          message: formatBookingError(err) || 'Payment confirmation failed. Please try again.',
+        });
+      }
+    } finally {
+      setConfirmingPayment(false);
+    }
+  };
+
+  const handleCancelPayment = async () => {
+    if (activePaymentSession && bookingStep === 'payment') {
+      try {
+        await mentorMarketplaceApi.cancelPayment(activePaymentSession.id).catch(() => {});
+        const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
+        setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
+      } catch (err) {
+        console.warn('[MentorsDirectory] Error cancelling payment session:', err);
+      }
+    }
+    handleCloseModal();
+  };
+
+  const handleCopyUpi = () => {
+    const vpa = activePaymentIntent?.payeeVpa || 'teamforge@demo';
+    navigator.clipboard.writeText(vpa);
+    setCopiedUpi(true);
+    if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    successTimerRef.current = setTimeout(() => setCopiedUpi(false), 2000);
+  };
+
+  const viewerId = user?.id || user?.uid;
+
   const displayedMentors = mentors.filter((m) => {
+    // Hide owner's own mentor profile so they cannot try to book themselves
+    if (viewerId && m.userId && String(m.userId) === String(viewerId)) return false;
+    // Hide suspended mentors
+    if (m.isSuspended || String(m.status || '').toLowerCase() === 'suspended') return false;
     // Hide mentors with availability off
     if (m.isAvailable === false) return false;
     // Do not list demo mentors without a price
@@ -162,6 +446,11 @@ const MentorsDirectory = () => {
     const skills = Array.isArray(m.skills) ? m.skills.join(' ').toLowerCase() : '';
     return name.includes(q) || title.includes(q) || skills.includes(q);
   });
+
+  const selectedProject = ownedProjects.find((p) => String(p.id) === String(selectedProjectId)) || null;
+  const selectedProjectStatus = selectedProject
+    ? getProjectBookingStatus(selectedProject, mySessions)
+    : null;
 
   const mentorMap = {};
   mentors.forEach((m) => {
@@ -212,21 +501,116 @@ const MentorsDirectory = () => {
       header: 'Status',
       render: (s) => {
         const map = {
+          payment_pending: ['Payment Pending', 'warning'],
           escrow_funded: ['Escrow Funded', 'warning'],
           active: ['Active', 'success'],
           completed: ['Completed', 'completed'],
           refunded: ['Refunded', 'danger'],
           cancelled: ['Cancelled', 'danger'],
           payout_pending: ['Payout Pending', 'warning'],
+          disputed: ['Disputed (Frozen)', 'danger'],
+          split: ['Split Settled', 'info'],
         };
         const [label, variant] = map[s.status] || [s.status, 'info'];
-        return <Badge variant={variant}>{label}</Badge>;
+        return (
+          <div>
+            <Badge variant={variant}>{label}</Badge>
+            {(s.status === 'disputed' || s.disputed) && (
+              <div
+                data-testid={`session-frozen-badge-${s.id}`}
+                style={{ marginTop: '4px', fontSize: '0.78rem', color: '#b91c1c', fontWeight: 600 }}
+              >
+                Payout Frozen — Admin Dispute Review
+              </div>
+            )}
+            {s.dispute?.status === 'decided' && (
+              <div style={{ marginTop: '4px', fontSize: '0.76rem', color: '#334155' }}>
+                Decision: <strong>{s.dispute.decision}</strong>
+                {s.dispute.decisionReason ? ` — ${s.dispute.decisionReason}` : ''}
+              </div>
+            )}
+            {s.status === 'refunded' && (
+              <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#b91c1c', maxWidth: '240px', wordBreak: 'break-word' }}>
+                <strong>Refunded:</strong> ₹{(s.totalAmount || 0).toLocaleString()}
+                {s.declineReason && <div>&ldquo;{s.declineReason}&rdquo;</div>}
+              </div>
+            )}
+            {s.status === 'cancelled' && (
+              <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#b91c1c', maxWidth: '240px', wordBreak: 'break-word' }}>
+                {s.declineReason || 'Payment not completed'}
+              </div>
+            )}
+            {s.status !== 'refunded' && s.status !== 'cancelled' && s.declineReason && (
+              <div style={{ marginTop: '4px', fontSize: '0.78rem', color: '#b91c1c', maxWidth: '240px', wordBreak: 'break-word' }}>
+                <strong>{s.declinedBy === 'system' ? 'Auto-declined' : 'Declined'}:</strong> &ldquo;{s.declineReason}&rdquo;
+              </div>
+            )}
+            {s.status === 'escrow_funded' && s.respondBy && (
+              <div style={{ marginTop: '4px', fontSize: '0.75rem', color: '#64748b' }}>
+                Respond by: {formatDateTime(s.respondBy)}
+              </div>
+            )}
+          </div>
+        );
       },
     },
     {
       key: 'date',
       header: 'Booked',
-      render: (s) => (s.createdAt ? new Date(s.createdAt).toLocaleDateString() : '—'),
+      render: (s) => (s.createdAt ? formatDateTime(s.createdAt) : '—'),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (s) => {
+        const canDispute =
+          !s.disputed &&
+          s.status !== 'disputed' &&
+          s.dispute?.status !== 'decided' &&
+          (['escrow_funded', 'active', 'payout_pending'].includes(s.status) ||
+            (['completed', 'refunded'].includes(s.status) &&
+              Date.now() - new Date(s.completedAt || s.endedAt || s.refundedAt || s.createdAt).getTime() <= 7 * 24 * 60 * 60 * 1000));
+        return (
+          <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', alignItems: 'center' }}>
+            {s.status === 'completed' && (
+              s.hasFeedback ? (
+                <Badge variant="success">Rated</Badge>
+              ) : (
+                <button
+                  type="button"
+                  data-testid={`rate-session-btn-${s.id}`}
+                  className="tf-mentors-btn-secondary"
+                  style={{ padding: '4px 10px', fontSize: '0.78rem' }}
+                  onClick={() => {
+                    setFeedbackTargetSession(s);
+                    setFeedbackRating(5);
+                    setFeedbackComment('');
+                    setFeedbackModalError('');
+                  }}
+                >
+                  Rate Session
+                </button>
+              )
+            )}
+            {canDispute && (
+              <button
+                type="button"
+                data-testid={`open-dispute-btn-${s.id}`}
+                className="tf-mentors-btn-secondary"
+                style={{ padding: '4px 10px', fontSize: '0.78rem', color: '#b91c1c', borderColor: '#fecaca' }}
+                onClick={() => {
+                  setDisputeTargetSession(s);
+                  setDisputeReason('');
+                  setDisputeModalError('');
+                }}
+              >
+                Dispute
+              </button>
+            )}
+            {s.status !== 'completed' && !canDispute && '—'}
+          </div>
+        );
+      },
     },
   ];
 
@@ -268,14 +652,61 @@ const MentorsDirectory = () => {
         </div>
       ) : (
         <>
-          <div style={{ marginBottom: '24px', maxWidth: '480px' }}>
-            <SearchBar
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onClear={() => setSearchQuery('')}
-              placeholder="Search mentors by name or skill..."
-            />
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '16px', alignItems: 'flex-end', marginBottom: '20px' }}>
+            <div style={{ flex: '1 1 280px', maxWidth: '480px' }}>
+              <SearchBar
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onClear={() => setSearchQuery('')}
+                placeholder="Search mentors by name or skill..."
+              />
+            </div>
+
+            {ownedProjects.length > 0 && (
+              <div style={{ flex: '1 1 280px', maxWidth: '420px' }}>
+                <label
+                  htmlFor="directory-project-select"
+                  className="tf-mentors-form-label"
+                  style={{ display: 'block', marginBottom: '4px' }}
+                >
+                  Booking for Project
+                </label>
+                <select
+                  id="directory-project-select"
+                  className="tf-mentors-input"
+                  value={selectedProjectId}
+                  onChange={(e) => setSelectedProjectId(e.target.value)}
+                >
+                  {ownedProjects.map((p) => {
+                    const st = getProjectBookingStatus(p, mySessions);
+                    return (
+                      <option key={p.id} value={p.id}>
+                        {p.title || p.name} {st.reason ? `(${st.reason})` : ''}
+                      </option>
+                    );
+                  })}
+                </select>
+              </div>
+            )}
           </div>
+
+          {selectedProject && selectedProjectStatus?.disabled && (
+            <div
+              data-testid="project-not-bookable-banner"
+              style={{
+                marginBottom: '18px',
+                padding: '10px 14px',
+                background: '#fef2f2',
+                border: '1px solid #fecaca',
+                borderRadius: '8px',
+                color: '#b91c1c',
+                fontSize: '0.88rem',
+                fontWeight: 600,
+              }}
+            >
+              Booking unavailable for &ldquo;{selectedProject.title || selectedProject.name}&rdquo;: {selectedProjectStatus.reason}
+            </div>
+          )}
 
           {loading ? (
             <p>Loading mentors directory...</p>
@@ -288,25 +719,51 @@ const MentorsDirectory = () => {
             />
           ) : (
             <div id="mentors-grid" className="tf-mentors-grid">
-              {displayedMentors.map((m) => (
-                <MentorCard
-                  key={m.id}
-                  name={m.name}
-                  avatar={m.avatar}
-                  headline={m.title || m.bio || 'Verified Mentor'}
-                  bio={m.bio}
-                  skills={m.skills}
-                  experienceYears={m.experienceYears}
-                  schedule={m.availability}
-                  sessionPrice={m.sessionPrice}
-                  available={m.isAvailable !== false}
-                  action={{
-                    label: m.isAvailable !== false ? 'Book with Escrow' : 'Currently Unavailable',
-                    onClick: () => handleOpenBooking(m),
-                    disabled: m.isAvailable === false,
-                  }}
-                />
-              ))}
+              {displayedMentors.map((m) => {
+                const isCollabMentor =
+                  selectedProject && isMentorCollaboratorOnProject(selectedProject, m.userId);
+                const projectBlockedReason = isCollabMentor
+                  ? 'Already a collaborator on selected project'
+                  : selectedProjectStatus?.disabled
+                  ? `Project not bookable: ${selectedProjectStatus.reason}`
+                  : null;
+                const actionDisabled =
+                  m.isAvailable === false ||
+                  Boolean(m.isFull) ||
+                  Boolean(projectBlockedReason);
+                const actionLabel = m.isFull
+                  ? 'Full'
+                  : isCollabMentor
+                  ? 'Project Collaborator'
+                  : m.isAvailable !== false
+                  ? 'Book with Escrow'
+                  : 'Currently Unavailable';
+
+                return (
+                  <MentorCard
+                    key={m.id}
+                    name={m.name}
+                    avatar={m.avatar}
+                    headline={m.title || m.bio || 'Verified Mentor'}
+                    bio={m.bio}
+                    skills={m.skills}
+                    experienceYears={m.experienceYears}
+                    sessionPrice={m.sessionPrice}
+                    available={m.isAvailable !== false}
+                    isFull={Boolean(m.isFull)}
+                    activeMenteesCount={m.activeMenteesCount ?? 0}
+                    maxActiveMentees={m.maxActiveMentees ?? 3}
+                    university={m.university || m.institution || ''}
+                    trustSummary={trustSummaries[m.userId || m.id]}
+                    action={{
+                      label: actionLabel,
+                      onClick: () => handleOpenBooking(m),
+                      disabled: actionDisabled,
+                      disabledReason: projectBlockedReason,
+                    }}
+                  />
+                );
+              })}
             </div>
           )}
         </>
@@ -315,105 +772,491 @@ const MentorsDirectory = () => {
       {/* Escrow Booking Modal via Reusable Modal */}
       <Modal
         isOpen={Boolean(selectedMentor)}
-        title={`Book Mentorship Session: ${selectedMentor?.name || ''}`}
-        onClose={() => setSelectedMentor(null)}
+        title={
+          bookingStep === 'payment'
+            ? `Demo Payment — ₹${totalAmount}`
+            : `Book Mentorship Session: ${selectedMentor?.name || ''}`
+        }
+        onClose={handleCancelPayment}
+        closeDisabled={bookingStep === 'payment' ? confirmingPayment : submitting}
+        footer={
+          bookingStep === 'payment' ? (
+            <>
+              <button
+                type="button"
+                className="tf-myproj-btn-primary"
+                style={{ background: '#9ca3af' }}
+                disabled={confirmingPayment}
+                onClick={handleCancelPayment}
+              >
+                Cancel
+              </button>
+              {paymentTimeLeft <= 0 ? (
+                <button
+                  type="button"
+                  className="tf-mentors-btn-primary"
+                  style={{ width: 'auto' }}
+                  onClick={handleBookAgain}
+                >
+                  Book again
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="tf-mentors-btn-primary"
+                  style={{ width: 'auto' }}
+                  disabled={confirmingPayment || paymentTimeLeft <= 0}
+                  onClick={handleConfirmPayment}
+                >
+                  {confirmingPayment
+                    ? 'Securing Escrow...'
+                    : 'I have paid'}
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <button
+                type="button"
+                className="tf-myproj-btn-primary"
+                style={{ background: '#9ca3af' }}
+                onClick={handleCloseModal}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                className="tf-mentors-btn-primary"
+                style={{ width: 'auto' }}
+                disabled={submitting || ownedProjects.length === 0 || ownedProjects.every((p) => getProjectBookingStatus(p, mySessions).disabled) || !selectedProjectId}
+                onClick={handleProceedToPayment}
+              >
+                {submitting ? 'Creating Payment Hold...' : `Proceed to Payment (₹${totalAmount})`}
+              </button>
+            </>
+          )
+        }
+      >
+        {selectedMentor && (
+          bookingStep === 'payment' ? (
+            <div style={{ textAlign: 'center', padding: '8px 0' }}>
+              {/* Prominent Demo Payment Banner */}
+              <div
+                style={{
+                  background: '#fef3c7',
+                  border: '1px solid #f59e0b',
+                  borderRadius: '8px',
+                  padding: '10px 14px',
+                  marginBottom: '16px',
+                  color: '#92400e',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                }}
+              >
+                ⚠️ Demo payment: no real money is charged.
+              </div>
+
+              {/* Amount & Timer */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px', padding: '0 8px' }}>
+                <span style={{ fontSize: '1.25rem', fontWeight: 700, color: '#111827' }}>
+                  Total: ₹{totalAmount}
+                </span>
+                <span
+                  style={{
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                    color: paymentTimeLeft < 60 ? '#dc2626' : '#4b5563',
+                    background: '#f3f4f6',
+                    padding: '4px 10px',
+                    borderRadius: '20px',
+                  }}
+                >
+                  ⏱️ Hold expires in: {formatTimer(paymentTimeLeft)}
+                </span>
+              </div>
+
+              {/* QR Code */}
+              <div style={{ margin: '14px 0' }}>
+                <QRCodeSvg
+                  value={activePaymentIntent?.upiUri || `upi://pay?pa=teamforge@demo&pn=TeamForge&am=${totalAmount}`}
+                  size={180}
+                />
+              </div>
+
+              {/* UPI ID and Copy */}
+              <div
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  background: '#f9fafb',
+                  border: '1px solid #e5e7eb',
+                  padding: '6px 12px',
+                  borderRadius: '8px',
+                  margin: '8px 0 14px 0',
+                }}
+              >
+                <span style={{ fontSize: '0.825rem', color: '#6b7280' }}>UPI ID:</span>
+                <code style={{ fontSize: '0.9rem', fontWeight: 600, color: '#111827' }}>
+                  {activePaymentIntent?.payeeVpa || 'teamforge@demo'}
+                </code>
+                <button
+                  type="button"
+                  onClick={handleCopyUpi}
+                  style={{
+                    background: '#e5e7eb',
+                    border: 'none',
+                    borderRadius: '4px',
+                    padding: '2px 8px',
+                    fontSize: '0.75rem',
+                    cursor: 'pointer',
+                    fontWeight: 500,
+                  }}
+                >
+                  {copiedUpi ? '✓ Copied' : 'Copy'}
+                </button>
+              </div>
+
+              {/* Pay using UPI app link */}
+              <div>
+                <a
+                  href={activePaymentIntent?.upiUri || '#'}
+                  className="tf-mentors-btn-secondary"
+                  style={{
+                    display: 'inline-block',
+                    padding: '8px 16px',
+                    fontSize: '0.875rem',
+                    borderRadius: '6px',
+                    textDecoration: 'none',
+                    marginBottom: '10px',
+                  }}
+                >
+                  📱 Pay using UPI app
+                </a>
+              </div>
+
+              {paymentTimeLeft <= 0 && (
+                <div style={{ marginTop: '14px', padding: '12px', background: '#fee2e2', borderRadius: '8px', color: '#b91c1c' }}>
+                  <p style={{ margin: '0 0 10px 0', fontWeight: 600 }}>Payment window expired (Payment not completed). Hold released.</p>
+                  <button
+                    type="button"
+                    className="tf-mentors-btn-primary"
+                    style={{ width: 'auto', padding: '6px 16px' }}
+                    onClick={handleBookAgain}
+                  >
+                    Book again
+                  </button>
+                </div>
+              )}
+
+              {feedback && (
+                <p
+                  className="tf-myproj-card-meta"
+                  style={{
+                    color: feedback.type === 'success' ? '#16a34a' : '#ef4444',
+                    marginTop: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {feedback.message}
+                </p>
+              )}
+            </div>
+          ) : (
+            <form onSubmit={handleProceedToPayment}>
+              <div className="tf-mentors-form-group">
+                <label className="tf-mentors-form-label">Select Your Project</label>
+                {ownedProjects.length === 0 ? (
+                  <p className="tf-myproj-card-meta" style={{ color: '#dc2626' }}>
+                    You have no active projects eligible for mentorship. Please create an active project first.
+                  </p>
+                ) : (
+                  <>
+                    <select
+                      className="tf-mentors-input"
+                      value={selectedProjectId}
+                      onChange={(e) => setSelectedProjectId(e.target.value)}
+                      required
+                    >
+                      <option value="" disabled>-- Select an eligible project --</option>
+                      {ownedProjects.map((p) => {
+                        const status = getProjectBookingStatus(p, mySessions);
+                        return (
+                          <option key={p.id} value={p.id} disabled={status.disabled}>
+                            {p.title || p.name} {status.reason ? `(${status.reason})` : ''}
+                          </option>
+                        );
+                      })}
+                    </select>
+                    {selectedProject && selectedProjectStatus?.disabled && (
+                      <p className="tf-myproj-card-meta" style={{ color: '#dc2626', marginTop: '6px' }}>
+                        Cannot book mentorship for this project: {selectedProjectStatus.reason}
+                      </p>
+                    )}
+                  </>
+                )}
+              </div>
+
+              <FormInput
+                label="Mentorship Needs & Project Goals"
+                name="requestMsg"
+                value={requestMsg}
+                onChange={(e) => setRequestMsg(e.target.value)}
+                placeholder="Describe current architecture challenges, code reviews, or guidance needed..."
+                multiline
+                rows={3}
+                helperText="The mentor will review this description before accepting the session."
+              />
+
+              {/* Escrow Price Breakdown */}
+              <div className="tf-mentors-escrow-breakdown">
+                <div className="tf-escrow-breakdown-row">
+                  <span>Mentor Price</span>
+                  <span>₹{basePrice}</span>
+                </div>
+                <div className="tf-escrow-breakdown-row">
+                  <span>Platform Fee (15%)</span>
+                  <span>₹{platformFee}</span>
+                </div>
+                <div className="tf-escrow-breakdown-row">
+                  <span>Payment Gateway Fee (2%)</span>
+                  <span>₹{gatewayFee}</span>
+                </div>
+                <div className="tf-escrow-breakdown-row" style={{ color: '#16a34a', fontWeight: 500 }}>
+                  <span>Mentor Payout (on completion)</span>
+                  <span>₹{mentorPayout}</span>
+                </div>
+                <div className="tf-escrow-breakdown-total">
+                  <span>Total Amount</span>
+                  <span>₹{totalAmount}</span>
+                </div>
+                <span className="tf-escrow-badge">
+                  🔒 Escrow Protection: Funds will be held securely in escrow upon payment confirmation. Payout is released to the mentor only after you complete and publish the project.
+                </span>
+              </div>
+
+              {feedback && (
+                <p
+                  className="tf-myproj-card-meta"
+                  style={{
+                    color: feedback.type === 'success' ? '#16a34a' : '#ef4444',
+                    marginTop: '0.75rem',
+                    fontWeight: 600,
+                  }}
+                >
+                  {feedback.message}
+                </p>
+              )}
+            </form>
+          )
+        )}
+      </Modal>
+
+      {/* Phase 14: Private Post-Session Feedback Modal (1–5 stars, one-time) */}
+      <Modal
+        isOpen={Boolean(feedbackTargetSession)}
+        title="Rate Completed Mentor Session"
+        onClose={() => !feedbackSubmitting && setFeedbackTargetSession(null)}
         footer={
           <>
             <button
               type="button"
               className="tf-myproj-btn-primary"
               style={{ background: '#9ca3af' }}
-              onClick={() => setSelectedMentor(null)}
+              disabled={feedbackSubmitting}
+              onClick={() => setFeedbackTargetSession(null)}
             >
               Cancel
             </button>
             <button
               type="button"
+              data-testid="submit-session-feedback-btn"
               className="tf-mentors-btn-primary"
               style={{ width: 'auto' }}
-              disabled={submitting || ownedProjects.length === 0}
-              onClick={handleBookSession}
+              disabled={feedbackSubmitting}
+              onClick={async () => {
+                if (!feedbackTargetSession || feedbackSubmitting) return;
+                setFeedbackSubmitting(true);
+                setFeedbackModalError('');
+                try {
+                  await mentorMarketplaceApi.submitSessionFeedback(
+                    feedbackTargetSession.id,
+                    {
+                      rating: feedbackRating,
+                      comment: feedbackComment.trim() || undefined,
+                    },
+                  );
+                  setMySessions((prev) =>
+                    prev.map((sess) =>
+                      sess.id === feedbackTargetSession.id ? { ...sess, hasFeedback: true } : sess
+                    )
+                  );
+                  setFeedbackTargetSession(null);
+                } catch (err) {
+                  setFeedbackModalError(err.serverMessage || err.message || 'Failed to submit session feedback.');
+                } finally {
+                  setFeedbackSubmitting(false);
+                }
+              }}
             >
-              {submitting ? 'Funding Escrow...' : `Confirm & Pay ₹${totalAmount}`}
+              {feedbackSubmitting ? 'Submitting...' : 'Submit Feedback'}
             </button>
           </>
         }
       >
-        {selectedMentor && (
-          <form onSubmit={handleBookSession}>
-            <div className="tf-mentors-form-group">
-              <label className="tf-mentors-form-label">Select Your Project</label>
-              {ownedProjects.length > 0 ? (
-                <select
-                  className="tf-mentors-input"
-                  value={selectedProjectId}
-                  onChange={(e) => setSelectedProjectId(e.target.value)}
-                  required
-                >
-                  {ownedProjects.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.title || p.name}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <p className="tf-myproj-card-meta" style={{ color: '#dc2626' }}>
-                  You have no active projects eligible for mentorship. Please create an active project first.
-                </p>
-              )}
+        {feedbackTargetSession && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569' }}>
+              Your feedback is confidential: single ratings and comments are visible only to administrators and never alter mentor payouts.
+            </p>
+            <div>
+              <div style={{ fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px' }}>
+                Session Rating (1 to 5 stars)
+              </div>
+              <div style={{ display: 'flex', gap: '8px' }} data-testid="feedback-star-selector">
+                {[1, 2, 3, 4, 5].map((star) => (
+                  <button
+                    key={star}
+                    type="button"
+                    data-testid={`feedback-star-${star}`}
+                    onClick={() => setFeedbackRating(star)}
+                    style={{
+                      padding: '6px 12px',
+                      borderRadius: '8px',
+                      border: feedbackRating >= star ? '1px solid #d97706' : '1px solid #cbd5e1',
+                      background: feedbackRating >= star ? '#fef3c7' : '#ffffff',
+                      color: feedbackRating >= star ? '#b45309' : '#64748b',
+                      fontWeight: 600,
+                      cursor: 'pointer',
+                    }}
+                  >
+                    ★ {star}
+                  </button>
+                ))}
+              </div>
             </div>
-
-            <FormInput
-              label="Mentorship Needs & Project Goals"
-              name="requestMsg"
-              value={requestMsg}
-              onChange={(e) => setRequestMsg(e.target.value)}
-              placeholder="Describe current architecture challenges, code reviews, or guidance needed..."
-              multiline
-              rows={3}
-              helperText="The mentor will review this description before accepting the session."
-            />
-
-            {/* Escrow Price Breakdown */}
-            <div className="tf-mentors-escrow-breakdown">
-              <div className="tf-escrow-breakdown-row">
-                <span>Mentor Session Fee</span>
-                <span>₹{basePrice}</span>
-              </div>
-              <div className="tf-escrow-breakdown-row">
-                <span>Platform Fee (15%)</span>
-                <span>₹{platformFee}</span>
-              </div>
-              <div className="tf-escrow-breakdown-row">
-                <span>Payment Gateway Fee (2%)</span>
-                <span>₹{gatewayFee}</span>
-              </div>
-              <div className="tf-escrow-breakdown-row" style={{ color: '#16a34a', fontWeight: 500 }}>
-                <span>Mentor Payout (on completion)</span>
-                <span>₹{mentorPayout}</span>
-              </div>
-              <div className="tf-escrow-breakdown-total">
-                <span>Total Escrow Amount</span>
-                <span>₹{totalAmount}</span>
-              </div>
-              <span className="tf-escrow-badge">
-                🔒 Escrow Protection: Funds will be held securely. If the mentor declines, you receive a 100% full refund. Payout is released to the mentor only after you complete and publish the project.
-              </span>
-            </div>
-
-            {feedback && (
-              <p
-                className="tf-myproj-card-meta"
+            <div>
+              <label htmlFor="session-feedback-comment" style={{ display: 'block', fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px' }}>
+                Private Comment (optional, max 500 chars)
+              </label>
+              <textarea
+                id="session-feedback-comment"
+                data-testid="feedback-comment-input"
+                rows={3}
+                maxLength={500}
+                value={feedbackComment}
+                onChange={(e) => setFeedbackComment(e.target.value)}
+                placeholder="Share helpful details about mentoring quality and responsiveness..."
                 style={{
-                  color: feedback.type === 'success' ? '#16a34a' : '#ef4444',
-                  marginTop: '0.75rem',
-                  fontWeight: 600,
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontFamily: 'inherit',
+                  fontSize: '0.9rem',
+                  boxSizing: 'border-box',
                 }}
-              >
-                {feedback.message}
-              </p>
+              />
+              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px' }}>
+                {feedbackComment.trim().length} / 500 characters
+              </div>
+            </div>
+            {feedbackModalError && (
+              <div style={{ color: '#dc2626', fontSize: '0.85rem', background: '#fef2f2', padding: '8px 10px', borderRadius: '6px' }}>
+                ⚠️ {feedbackModalError}
+              </div>
             )}
-          </form>
+          </div>
+        )}
+      </Modal>
+
+      {/* Phase 17: Open Escrow Dispute Modal */}
+      <Modal
+        isOpen={Boolean(disputeTargetSession)}
+        title="Open Escrow Dispute"
+        onClose={() => !disputeSubmitting && setDisputeTargetSession(null)}
+        footer={
+          <>
+            <button
+              type="button"
+              className="tf-mentors-btn-secondary"
+              disabled={disputeSubmitting}
+              onClick={() => setDisputeTargetSession(null)}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-testid="submit-dispute-btn"
+              className="tf-mentors-btn-primary"
+              style={{ background: '#dc2626' }}
+              disabled={disputeSubmitting || disputeReason.trim().length < 10}
+              onClick={async () => {
+                if (!disputeTargetSession) return;
+                setDisputeSubmitting(true);
+                setDisputeModalError('');
+                try {
+                  const dispute = await mentorMarketplaceApi.openDispute(
+                    disputeTargetSession.id,
+                    disputeReason.trim(),
+                  );
+                  setMySessions((prev) =>
+                    prev.map((sess) =>
+                      sess.id === disputeTargetSession.id
+                        ? { ...sess, status: 'disputed', disputed: true, dispute }
+                        : sess
+                    )
+                  );
+                  setDisputeTargetSession(null);
+                } catch (err) {
+                  setDisputeModalError(err.serverMessage || err.message || 'Failed to open dispute.');
+                } finally {
+                  setDisputeSubmitting(false);
+                }
+              }}
+            >
+              {disputeSubmitting ? 'Submitting...' : 'Freeze Payout & Open Dispute'}
+            </button>
+          </>
+        }
+      >
+        {disputeTargetSession && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+            <p style={{ margin: 0, fontSize: '0.88rem', color: '#475569' }}>
+              Opening a dispute immediately freezes escrow payout or refund until an administrator reviews evidence from both parties and makes a binding ruling.
+            </p>
+            <div>
+              <label htmlFor="session-dispute-reason" style={{ display: 'block', fontWeight: 600, fontSize: '0.88rem', marginBottom: '6px' }}>
+                Dispute Reason (10 to 1000 characters) *
+              </label>
+              <textarea
+                id="session-dispute-reason"
+                data-testid="dispute-reason-input"
+                rows={4}
+                maxLength={1000}
+                value={disputeReason}
+                onChange={(e) => setDisputeReason(e.target.value)}
+                placeholder="Explain the issue with this mentorship session..."
+                style={{
+                  width: '100%',
+                  padding: '8px 12px',
+                  borderRadius: '8px',
+                  border: '1px solid #cbd5e1',
+                  fontFamily: 'inherit',
+                  fontSize: '0.9rem',
+                  boxSizing: 'border-box',
+                }}
+              />
+              <div style={{ fontSize: '0.76rem', color: '#64748b', marginTop: '4px' }}>
+                {disputeReason.trim().length} / 1000 characters
+              </div>
+            </div>
+            {disputeModalError && (
+              <div style={{ color: '#dc2626', fontSize: '0.85rem', background: '#fef2f2', padding: '8px 10px', borderRadius: '6px' }}>
+                ⚠️ {disputeModalError}
+              </div>
+            )}
+          </div>
         )}
       </Modal>
     </div>

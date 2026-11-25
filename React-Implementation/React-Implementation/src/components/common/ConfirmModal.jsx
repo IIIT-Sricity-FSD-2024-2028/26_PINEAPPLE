@@ -40,6 +40,7 @@ const ConfirmModal = ({
       isOpen={isOpen}
       title={title}
       onClose={handleClose}
+      closeDisabled={loading}
       size="sm"
       footer={
         <div className="tf-confirm-modal-actions">

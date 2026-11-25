@@ -1,0 +1,65 @@
+### PHASE 18: PRIVACY, DELETION AND NOTIFICATIONS
+
+@baseUrl = http://localhost:3000
+@ownerToken = Bearer <OWNER_JWT>
+@userToken = Bearer <USER_JWT>
+@adminToken = Bearer <ADMIN_JWT>
+@projectId = proj-1
+@exportId = exp_123456
+
+### 1. Soft-delete a project (owner)
+DELETE {{baseUrl}}/projects/{{projectId}}
+Authorization: {{ownerToken}}
+
+### 2. List deleted projects (admin only)
+GET {{baseUrl}}/projects?status=deleted
+Authorization: {{adminToken}}
+
+### 3. Restore a soft-deleted project within 30 days (admin only)
+POST {{baseUrl}}/admin/projects/{{projectId}}/restore
+Authorization: {{adminToken}}
+
+### 4. Request personal account data JSON export (max 1/hour, 24h expiry)
+POST {{baseUrl}}/users/me/export
+Authorization: {{userToken}}
+
+### 5. List own data export requests
+GET {{baseUrl}}/users/me/export
+Authorization: {{userToken}}
+
+### 6. Check export request status
+GET {{baseUrl}}/users/me/export/{{exportId}}
+Authorization: {{userToken}}
+
+### 7. Download export JSON file
+GET {{baseUrl}}/users/me/export/{{exportId}}/download
+Authorization: {{userToken}}
+
+### 8. Delete own account (requires username + current password or fresh social confirmation)
+POST {{baseUrl}}/users/me/delete
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "username": "arjunsharma",
+  "password": "password123"
+}
+
+### 9. Get notification digest settings
+GET {{baseUrl}}/users/me/settings
+Authorization: {{userToken}}
+
+### 10. Update notification digest settings
+PATCH {{baseUrl}}/users/me/settings
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "digestEnabled": true,
+  "digestHour": 9,
+  "utcOffsetMinutes": 330
+}
+
+### 11. Trigger hourly background jobs (cleans expired exports & flushes due digests)
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{adminToken}}

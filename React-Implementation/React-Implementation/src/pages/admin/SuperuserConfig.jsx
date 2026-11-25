@@ -1,13 +1,22 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { signOut as fbSignOut } from 'firebase/auth';
+import { auth } from '../../services/firebase.js';
+import { getAuthMode, setAccessToken } from '../../services/apiClient.js';
 import portalAdminsApi from '../../services/portalAdminsApi';
 import adminApi, { recordPortalAuditEntry } from '../../services/adminApi';
 import FormInput from '../../components/common/FormInput';
+import Modal from '../../components/common/Modal';
+import ScheduledJobsPanel from './ScheduledJobsPanel';
+import { formatDateTime } from '../../utils/dateFormatter';
+import storage from '../../utils/storage';
 import './SuperuserConfig.css';
 
 const DEFAULT_CONFIG = {
   maxProjectsPerUser: 10,
   maxCollaboratorsPerProject: 20,
-  mentorMinYearsExperience: 4,
+  mentorMinYearsExperience: 5,
+  minimumTenure: 5,
   xpPerTaskCompletion: 100,
   maintenanceMode: false,
   platformVersion: "1.4.2",
@@ -16,17 +25,26 @@ const DEFAULT_CONFIG = {
 const SuperuserConfig = () => {
   const [config, setConfig] = useState(() => {
     try {
-      const stored = localStorage.getItem("teamforge.platformConfig");
-      return stored ? { ...DEFAULT_CONFIG, ...JSON.parse(stored) } : DEFAULT_CONFIG;
+      const stored = storage.getPlatformConfig();
+      return stored ? { ...DEFAULT_CONFIG, ...stored } : DEFAULT_CONFIG;
     } catch {
       return DEFAULT_CONFIG;
     }
   });
 
+  const [initialTenure, setInitialTenure] = useState(5);
   const [adminsCount, setAdminsCount] = useState(0);
   const [activeUsersCount, setActiveUsersCount] = useState(0);
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
+  const navigate = useNavigate();
+  const [demoResetStatus, setDemoResetStatus] = useState({ enabled: false, lastResetAt: null });
+  const [isDemoResetModalOpen, setIsDemoResetModalOpen] = useState(false);
+  const [demoResetConfirmText, setDemoResetConfirmText] = useState('');
+  const [isResettingDemo, setIsResettingDemo] = useState(false);
+  const [demoResetError, setDemoResetError] = useState('');
+
+  const { isSuperUser } = storage.getAdminSession();
 
   useEffect(() => {
     const fetchTelemetry = async () => {
@@ -39,7 +57,11 @@ const SuperuserConfig = () => {
 
         if (backendConfig) {
           setConfig((prev) => ({ ...prev, ...backendConfig }));
-          localStorage.setItem("teamforge.platformConfig", JSON.stringify(backendConfig));
+          const backendTenure = Number(backendConfig.minimumTenure ?? backendConfig.mentorMinYearsExperience ?? 5);
+          if (!isNaN(backendTenure)) {
+            setInitialTenure(backendTenure);
+          }
+          storage.setPlatformConfig(backendConfig);
         }
 
         if (statsData?.activeAdmins !== undefined) {
@@ -53,13 +75,24 @@ const SuperuserConfig = () => {
         } else if (statsData?.totalUsers !== undefined) {
           setActiveUsersCount(statsData.totalUsers);
         }
+
+        if (isSuperUser && typeof adminApi.getDemoResetStatus === 'function') {
+          adminApi.getDemoResetStatus().then((status) => {
+            if (status && typeof status.enabled === 'boolean') {
+              setDemoResetStatus({
+                enabled: status.enabled,
+                lastResetAt: status.lastResetAt || null,
+              });
+            }
+          }).catch(() => {});
+        }
       } catch (err) {
         console.warn("Telemetry fetch error:", err);
       }
     };
 
     fetchTelemetry();
-  }, []);
+  }, [isSuperUser]);
 
   const handleChange = (field, value) => {
     setConfig((prev) => ({
@@ -74,7 +107,7 @@ const SuperuserConfig = () => {
 
     const maxProjects = Number(config.maxProjectsPerUser);
     const maxCollabs = Number(config.maxCollaboratorsPerProject);
-    const mentorYears = Number(config.mentorMinYearsExperience);
+    const mentorYears = Number(config.minimumTenure ?? config.mentorMinYearsExperience);
     const xpPerTask = Number(config.xpPerTaskCompletion);
 
     if (!Number.isFinite(maxProjects) || maxProjects < 1 || maxProjects > 100) {
@@ -85,8 +118,12 @@ const SuperuserConfig = () => {
       setError("Max Collaborators must be between 1 and 200.");
       return;
     }
-    if (!Number.isFinite(mentorYears) || mentorYears < 0 || mentorYears > 50) {
-      setError("Mentor min years must be between 0 and 50.");
+    if (!Number.isInteger(mentorYears) || mentorYears < 5 || mentorYears > 40) {
+      setError("Minimum tenure must be a whole number between 5 and 40.");
+      return;
+    }
+    if (mentorYears < initialTenure) {
+      setError(`Minimum tenure can only be raised (current: ${initialTenure}, attempted: ${mentorYears}).`);
       return;
     }
     if (!Number.isFinite(xpPerTask) || xpPerTask < 0 || xpPerTask > 10000) {
@@ -98,6 +135,7 @@ const SuperuserConfig = () => {
       maxProjectsPerUser: maxProjects,
       maxCollaboratorsPerProject: maxCollabs,
       mentorMinYearsExperience: mentorYears,
+      minimumTenure: mentorYears,
       xpPerTaskCompletion: xpPerTask,
       maintenanceMode: Boolean(config.maintenanceMode),
       platformVersion: config.platformVersion || "1.4.2",
@@ -105,7 +143,7 @@ const SuperuserConfig = () => {
 
     try {
       await adminApi.updateConfig(updatedConfig);
-      localStorage.setItem("teamforge.platformConfig", JSON.stringify(updatedConfig));
+      storage.setPlatformConfig(updatedConfig);
       setConfig(updatedConfig);
       setSuccessMsg("Platform configuration committed successfully.");
 
@@ -127,9 +165,70 @@ const SuperuserConfig = () => {
     }
   };
 
+  const handleConfirmDemoReset = async () => {
+    if (isResettingDemo || demoResetConfirmText !== 'RESET') return;
+    if (typeof adminApi.resetDemoData !== 'function') return;
+
+    setIsResettingDemo(true);
+    setDemoResetError('');
+    try {
+      await adminApi.resetDemoData('RESET');
+      setIsDemoResetModalOpen(false);
+      setDemoResetConfirmText('');
+
+      try {
+        storage.clearAll();
+        storage.setDemoResetNotice('Demo data restored. Please log in again.');
+      } catch (storageErr) {
+        console.warn('[SuperuserConfig] Error clearing session keys after demo reset:', storageErr);
+      }
+      setAccessToken(null);
+
+      if (getAuthMode() === 'firebase') {
+        try {
+          await fbSignOut(auth);
+        } catch (fbErr) {
+          console.warn('[SuperuserConfig] Firebase signout after demo reset failed:', fbErr);
+        }
+      }
+
+      navigate('/admin/login', {
+        replace: true,
+        state: { demoResetMessage: 'Demo data restored. Please log in again.' },
+      });
+    } catch (err) {
+      const code = err?.code || err?.data?.code || '';
+      if (code === 'MAINTENANCE' || err?.statusCode === 503) {
+        setDemoResetError('The system is being reset, retrying...');
+      } else if (code === 'RESET_IN_PROGRESS' || err?.statusCode === 409) {
+        setDemoResetError(err?.serverMessage || 'A demo reset is already in progress. Please wait.');
+      } else {
+        setDemoResetError(err?.serverMessage || err?.message || 'Failed to reset demo data.');
+      }
+    } finally {
+      setIsResettingDemo(false);
+    }
+  };
+
   return (
     <div id="su-config" className="admin-page su-config-page">
-      <h1>Platform Configuration <span className="su-page-badge" style={{ fontSize: '0.75rem', padding: '2px 8px', borderRadius: '999px', background: '#fef3c7', color: '#92400e', border: '1px solid #fde68a', marginLeft: '8px' }}>Super User Only</span></h1>
+      <h1>
+        Platform Configuration &amp; Scheduler{' '}
+        <span
+          className="su-page-badge"
+          style={{
+            fontSize: '0.75rem',
+            padding: '2px 8px',
+            borderRadius: '999px',
+            background: isSuperUser ? '#fef3c7' : '#e0e7ff',
+            color: isSuperUser ? '#92400e' : '#3730a3',
+            border: isSuperUser ? '1px solid #fde68a' : '1px solid #c7d2fe',
+            marginLeft: '8px',
+          }}
+        >
+          {isSuperUser ? 'Super User Only' : 'Admin Read-Only'}
+        </span>
+      </h1>
       <p className="page-subtitle mt-1">System-level settings that control platform behaviour for all users.</p>
 
       {error && <div className="su-form-error mt-4" style={{ color: 'var(--destructive, #ef4444)', padding: '12px', background: 'rgba(239, 68, 68, 0.1)', borderRadius: '8px' }}>{error}</div>}
@@ -173,10 +272,15 @@ const SuperuserConfig = () => {
             label="Minimum Career Tenure (Years)"
             name="mentorMinYearsExperience"
             type="number"
-            min="0"
-            max="50"
-            value={config.mentorMinYearsExperience}
-            onChange={(e) => handleChange("mentorMinYearsExperience", e.target.value)}
+            min={Math.max(5, initialTenure)}
+            max="40"
+            step="1"
+            value={config.minimumTenure ?? config.mentorMinYearsExperience ?? 5}
+            onChange={(e) => {
+              handleChange("mentorMinYearsExperience", e.target.value);
+              handleChange("minimumTenure", e.target.value);
+            }}
+            helperText="Platform minimum tenure defaults to 5 and can only be raised (up to 40)."
           />
           <FormInput
             label="Standard XP Yield / Task"
@@ -237,17 +341,168 @@ const SuperuserConfig = () => {
             <span className="su-info-value">{activeUsersCount} authenticated</span>
           </div>
         </div>
+
+        {/* Demo data reset card (shown only for Super User when ALLOW_DEMO_RESET enabled) */}
+        {isSuperUser && demoResetStatus.enabled && (
+          <div
+            className="su-config-section"
+            data-testid="demo-reset-card"
+            style={{ borderColor: '#fecaca' }}
+          >
+            <h3 className="su-config-section-title" style={{ color: '#b91c1c' }}>
+              <span>🧹</span> Demo data
+            </h3>
+            <p style={{ fontSize: '0.86rem', color: 'var(--text-muted, #64748b)', lineHeight: 1.5, marginBottom: '12px' }}>
+              Restore all in-memory stores, seed credentials, uploaded files, CVs, and exports back to the clean initial mock seed state. Everyone including you will be logged out.
+            </p>
+            <div className="su-info-row">
+              <span className="su-info-label">Last reset</span>
+              <span className="su-info-value" data-testid="demo-reset-last-at">
+                {demoResetStatus.lastResetAt ? formatDateTime(demoResetStatus.lastResetAt) : 'Never'}
+              </span>
+            </div>
+            <div className="mt-3">
+              <button
+                type="button"
+                data-testid="demo-reset-open-btn"
+                onClick={() => {
+                  setDemoResetConfirmText('');
+                  setDemoResetError('');
+                  setIsDemoResetModalOpen(true);
+                }}
+                style={{
+                  padding: '9px 16px',
+                  borderRadius: '8px',
+                  border: 'none',
+                  background: '#dc2626',
+                  color: '#fff',
+                  fontWeight: 600,
+                  cursor: 'pointer',
+                }}
+              >
+                Reset to mock data
+              </button>
+            </div>
+          </div>
+        )}
       </div>
 
-      <div className="su-config-actions mt-4">
-        <button
-          className="btn btn-primary"
-          style={{ height: '48px', padding: '0 28px', borderRadius: '12px', fontWeight: 700, fontSize: '0.95rem' }}
-          onClick={handleSave}
-        >
-          Commit Changes
-        </button>
-      </div>
+      {/* Confirmation dialog for Reset to mock data */}
+      <Modal
+        isOpen={isDemoResetModalOpen}
+        title="Reset to mock data?"
+        onClose={() => {
+          if (!isResettingDemo) setIsDemoResetModalOpen(false);
+        }}
+        closeDisabled={isResettingDemo}
+        size="sm"
+        testId="demo-reset-modal"
+        footer={
+          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', width: '100%' }}>
+            <button
+              type="button"
+              data-testid="demo-reset-cancel-btn"
+              disabled={isResettingDemo}
+              onClick={() => setIsDemoResetModalOpen(false)}
+              style={{
+                padding: '8px 14px',
+                borderRadius: '8px',
+                border: '1px solid #cbd5e1',
+                background: '#fff',
+                color: '#334155',
+                fontWeight: 600,
+                cursor: isResettingDemo ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              data-testid="demo-reset-submit-btn"
+              disabled={isResettingDemo || demoResetConfirmText !== 'RESET'}
+              onClick={handleConfirmDemoReset}
+              style={{
+                padding: '8px 16px',
+                borderRadius: '8px',
+                border: 'none',
+                background: isResettingDemo || demoResetConfirmText !== 'RESET' ? '#fca5a5' : '#dc2626',
+                color: '#fff',
+                fontWeight: 600,
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '8px',
+                cursor: isResettingDemo || demoResetConfirmText !== 'RESET' ? 'not-allowed' : 'pointer',
+              }}
+            >
+              {isResettingDemo && (
+                <span
+                  data-testid="demo-reset-spinner"
+                  role="status"
+                  aria-hidden="true"
+                  style={{
+                    width: '14px',
+                    height: '14px',
+                    border: '2px solid currentColor',
+                    borderRightColor: 'transparent',
+                    borderRadius: '50%',
+                    display: 'inline-block',
+                    animation: 'spin 0.75s linear infinite',
+                  }}
+                />
+              )}
+              <span>{isResettingDemo ? 'Resetting...' : 'Reset demo data'}</span>
+            </button>
+          </div>
+        }
+      >
+        <p style={{ color: '#475569', fontSize: '0.9rem', marginTop: 0, lineHeight: 1.5 }}>
+          The following changes will take effect immediately:
+        </p>
+        <ul style={{ color: '#334155', fontSize: '0.88rem', paddingLeft: '20px', lineHeight: 1.6, margin: '8px 0 14px' }}>
+          <li>All created users, projects, tasks, requests, invites, chat messages, notifications, reports, appeals, support tickets, sessions, escrow, and payments will be erased back to initial mock seed data.</li>
+          <li>Post-seed uploaded files, CVs, and exports will be permanently deleted.</li>
+          <li><strong>Everyone — including you — will be logged out. This cannot be undone.</strong></li>
+        </ul>
+        <FormInput
+          label="Type RESET to confirm"
+          name="demoResetConfirm"
+          data-testid="demo-reset-confirm-input"
+          placeholder="RESET"
+          value={demoResetConfirmText}
+          onChange={(e) => setDemoResetConfirmText(e.target.value)}
+        />
+        {demoResetError && (
+          <div
+            role="alert"
+            data-testid="demo-reset-error"
+            style={{
+              marginTop: '10px',
+              padding: '10px 12px',
+              borderRadius: '6px',
+              background: '#fef2f2',
+              color: '#b91c1c',
+              fontSize: '0.86rem',
+            }}
+          >
+            ⚠️ {demoResetError}
+          </div>
+        )}
+      </Modal>
+
+      {isSuperUser && (
+        <div className="su-config-actions mt-4">
+          <button
+            className="btn btn-primary"
+            style={{ height: '48px', padding: '0 28px', borderRadius: '12px', fontWeight: 700, fontSize: '0.95rem' }}
+            onClick={handleSave}
+          >
+            Commit Changes
+          </button>
+        </div>
+      )}
+
+      {/* Phase 7: Scheduled Jobs Panel */}
+      <ScheduledJobsPanel isSuperUser={isSuperUser} />
     </div>
   );
 };

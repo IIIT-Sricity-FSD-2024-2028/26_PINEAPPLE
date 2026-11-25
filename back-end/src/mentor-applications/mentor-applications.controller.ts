@@ -1,3 +1,4 @@
+import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import {
   Body,
   Controller,
@@ -25,7 +26,8 @@ import {
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles } from '../common/decorators/roles.decorator';
-import { RolesGuard } from '../common/guards/roles.guard';
+import { RolesGuard, normalizeRole } from '../common/guards/roles.guard';
+import { EmailVerifiedGuard } from '../auth/guards/email-verified.guard';
 import { CreateMentorApplicationDto } from './dto/create-mentor-application.dto';
 import { UpdateMentorApplicationDto } from './dto/update-mentor-application.dto';
 import { MentorApplicationEntity } from './entities/mentor-application.entity';
@@ -44,7 +46,7 @@ import { MentorApplicationsService } from './mentor-applications.service';
   required: false,
   schema: { type: 'string' },
 })
-@Controller('mentor-applications')
+@Controller(['mentor-applications', 'admin/mentor-applications'])
 @UseGuards(RolesGuard)
 export class MentorApplicationsController {
   constructor(private readonly mentorApplicationsService: MentorApplicationsService) {}
@@ -70,6 +72,20 @@ export class MentorApplicationsController {
     return effectiveUserId;
   }
 
+  @Get('digilocker/status')
+  @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser', 'user')
+  @ApiOperation({ summary: 'Check DigiLocker provider mode and availability' })
+  getDigiLockerStatus() {
+    return this.mentorApplicationsService.getDigiLockerStatus();
+  }
+
+  @Post('digilocker/pull-documents')
+  @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser', 'user')
+  @ApiOperation({ summary: 'Pull and verify issued documents from DigiLocker' })
+  pullDigiLockerDocuments(@Body() body: { applicantName: string }) {
+    return this.mentorApplicationsService.pullDigiLockerDocuments(body.applicantName);
+  }
+
   @Get()
   @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser')
   @ApiOperation({ summary: 'List mentor applications' })
@@ -78,23 +94,49 @@ export class MentorApplicationsController {
   @ApiOkResponse({ description: 'List of mentor applications returned successfully.', type: [MentorApplicationEntity] })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions or missing applicant identification' })
   getAll(
+    @CurrentUser() authUser: any,
     @Headers('x-user-role') xUserRole: string,
     @Headers('x-user-id') xUserId?: string,
     @Query('status') status?: string,
     @Query('userId') userId?: string,
   ): MentorApplicationEntity[] {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const role = isLegacy ? xUserRole : authUser?.role;
+    const uid = isLegacy ? xUserId : authUser?.uid;
+
     let applications = this.mentorApplicationsService.findAll();
 
     if (status) {
       applications = applications.filter((application: MentorApplicationEntity) => application.status === status);
     }
 
-    const applicantId = this.resolveApplicantId(xUserRole, userId, xUserId);
+    const applicantId = this.resolveApplicantId(role, userId, uid);
     if (applicantId) {
       applications = applications.filter((application: MentorApplicationEntity) => application.userId === applicantId);
     }
 
-    return applications;
+    return applications.sort((a, b) => {
+      const timeA = new Date(a.createdAt || a.applicationDate || 0).getTime();
+      const timeB = new Date(b.createdAt || b.applicationDate || 0).getTime();
+      return timeB - timeA;
+    });
+  }
+
+  @Get('me')
+  @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser', 'user')
+  @ApiOperation({ summary: 'Get current user mentor application status and latest application' })
+  getMyStatus(
+    @CurrentUser() authUser: any,
+    @Headers('x-user-role') xUserRole: string,
+    @Headers('x-user-id') xUserId?: string,
+    @Query('userId') queryUserId?: string,
+  ) {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const uid = isLegacy ? (xUserId || queryUserId) : (authUser?.uid || authUser?.id);
+    if (!uid) {
+      throw new ForbiddenException('User ID required');
+    }
+    return this.mentorApplicationsService.getMyMentorStatus(uid);
   }
 
   @Get(':id')
@@ -105,13 +147,17 @@ export class MentorApplicationsController {
   @ApiNotFoundResponse({ description: 'Mentor application not found' })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions or missing applicant identification' })
   getOne(
+    @CurrentUser() authUser: any,
     @Headers('x-user-role') xUserRole: string,
     @Headers('x-user-id') xUserId: string,
     @Param('id') id: string,
   ): MentorApplicationEntity {
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const role = isLegacy ? xUserRole : authUser?.role;
+    const uid = isLegacy ? xUserId : authUser?.uid;
     const application = this.mentorApplicationsService.findOne(id);
 
-    if (!this.isAdminRole(xUserRole) && application.userId !== xUserId) {
+    if (!this.isAdminRole(role) && application.userId !== uid) {
       throw new ForbiddenException('You can only access your own mentor application.');
     }
 
@@ -119,12 +165,19 @@ export class MentorApplicationsController {
   }
 
   @Post()
-  @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser')
+  @UseGuards(EmailVerifiedGuard)
+  @Roles('admin', 'project-owner', 'collaborator', 'mentor', 'superuser', 'user')
   @ApiOperation({ summary: 'Submit a new mentor application' })
   @ApiBody({ type: CreateMentorApplicationDto })
   @ApiCreatedResponse({ description: 'Mentor application submitted successfully.', type: MentorApplicationEntity })
   @ApiForbiddenResponse({ description: 'Forbidden - insufficient permissions' })
-  create(@Body() createMentorApplicationDto: CreateMentorApplicationDto): MentorApplicationEntity {
+  create(
+    @Body() createMentorApplicationDto: CreateMentorApplicationDto,
+    @CurrentUser() authUser?: any,
+  ): MentorApplicationEntity {
+    if (!createMentorApplicationDto.userId && (authUser?.uid || authUser?.id)) {
+      createMentorApplicationDto.userId = String(authUser.uid || authUser.id);
+    }
     return this.mentorApplicationsService.create(createMentorApplicationDto);
   }
 
@@ -157,19 +210,26 @@ export class MentorApplicationsController {
   @ApiOkResponse({ description: 'Mentor application approved successfully.', type: MentorApplicationEntity })
   @ApiNotFoundResponse({ description: 'Mentor application not found' })
   @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
-  approve(@Param('id') id: string): MentorApplicationEntity {
-    return this.mentorApplicationsService.approve(id);
+  approve(
+    @Param('id') id: string,
+    @Body() body: { overrideVerification?: boolean; overrideNote?: string },
+    @CurrentUser() adminUser: any,
+  ): MentorApplicationEntity {
+    const adminName = adminUser?.name || adminUser?.email || 'Admin';
+    return this.mentorApplicationsService.approve(id, adminName, body);
   }
 
   @Put(':id/reject')
+  @Post(':id/reject')
   @Roles('admin', 'superuser')
   @ApiOperation({ summary: 'Reject a mentor application' })
   @ApiParam({ name: 'id', description: 'Mentor application ID' })
   @ApiOkResponse({ description: 'Mentor application rejected successfully.', type: MentorApplicationEntity })
   @ApiNotFoundResponse({ description: 'Mentor application not found' })
   @ApiForbiddenResponse({ description: 'Forbidden - admin role required' })
-  reject(@Param('id') id: string): MentorApplicationEntity {
-    return this.mentorApplicationsService.reject(id);
+  reject(@Param('id') id: string, @Body() body: any, @CurrentUser() adminUser: any): MentorApplicationEntity {
+    const adminName = adminUser?.name || adminUser?.email || 'Admin';
+    return this.mentorApplicationsService.reject(id, body?.reason, adminName, body);
   }
 
   @Delete(':id')

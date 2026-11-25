@@ -6,23 +6,45 @@
   "scripts": {
     "start": "ts-node src/main.ts",
     "dev": "ts-node src/main.ts",
-    "generate:swagger": "ts-node src/swagger.ts"
+    "start:dev:stable": "ts-node src/main.ts",
+    "test": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --runInBand",
+    "test:watch": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --watch",
+    "test:cov": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --coverage --runInBand",
+    "test:e2e": "node --experimental-vm-modules ./node_modules/jest/bin/jest.js --config test/jest-e2e.json --runInBand",
+    "test:routes": "ts-node scripts/generate-route-matrix.ts",
+    "generate:swagger": "ts-node src/swagger.ts",
+    "emulators": "npx firebase emulators:start --only auth",
+    "emulators:persist": "npx firebase emulators:start --only auth --import=../emulator-data --export-on-exit=../emulator-data"
   },
   "dependencies": {
     "@nestjs/common": "^12.0.0",
     "@nestjs/core": "^12.0.1",
+    "@nestjs/jwt": "^12.0.3",
     "@nestjs/platform-express": "^12.0.1",
     "@nestjs/schedule": "^12.0.1",
     "@nestjs/swagger": "^12.0.1",
+    "bcryptjs": "^3.0.3",
     "class-transformer": "^0.5.1",
     "class-validator": "^0.14.0",
+    "cookie-parser": "^1.4.7",
+    "firebase-admin": "^14.5.0",
     "multer": "^2.3.0",
+    "nodemailer": "^10.2.1",
     "reflect-metadata": "^0.1.13",
     "rxjs": "^7.8.1",
     "swagger-ui-express": "^5.0.0"
   },
   "devDependencies": {
+    "@nestjs/testing": "^12.4.2",
+    "@types/bcryptjs": "^2.4.6",
+    "@types/cookie-parser": "^1.4.10",
+    "@types/jest": "^30.0.0",
     "@types/multer": "^1.4.12",
+    "@types/nodemailer": "^8.0.2",
+    "@types/supertest": "^7.2.1",
+    "jest": "^30.5.2",
+    "supertest": "^7.3.2",
+    "ts-jest": "^29.4.15",
     "ts-node": "^10.9.1",
     "typescript": "^5.1.3"
   }

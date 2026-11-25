@@ -10,6 +10,20 @@ const MentorRevenue = () => {
   const [mentorMap, setMentorMap] = useState({});
   const [isLoading, setIsLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
+  const [reconciliation, setReconciliation] = useState(null);
+  const [reconciling, setReconciling] = useState(false);
+
+  const handleReconcile = async () => {
+    setReconciling(true);
+    try {
+      const res = await mentorMarketApi.reconcileEscrow();
+      setReconciliation(res);
+    } catch (err) {
+      console.warn("Reconcile error:", err);
+    } finally {
+      setReconciling(false);
+    }
+  };
 
   useEffect(() => {
     let isMounted = true;
@@ -84,7 +98,7 @@ const MentorRevenue = () => {
     }
   };
 
-  const renderStatusBadge = (status, sessionId) => {
+  const renderStatusBadge = (status, sessionId, sess = {}) => {
     const map = {
       escrow_funded: ["🟡 Escrow Funded", "warning"],
       active: ["🟢 Active", "success"],
@@ -95,19 +109,32 @@ const MentorRevenue = () => {
     };
     const [label, cls] = map[status] || [status, "warning"];
     return (
-      <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
-        <span className={`admin-audit-type ${cls}`}>{label}</span>
-        {status === "payout_pending" && (
-          <button
-            className="btn btn-xs btn-outline"
-            style={{ padding: "2px 6px", fontSize: "11px" }}
-            onClick={(e) => {
-              e.stopPropagation();
-              handleRetryPayout(sessionId);
-            }}
-          >
-            Retry
-          </button>
+      <div style={{ display: "inline-flex", flexDirection: "column", gap: "2px" }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: "6px" }}>
+          <span className={`admin-audit-type ${cls}`}>{label}</span>
+          {status === "payout_pending" && (
+            <button
+              className="btn btn-xs btn-outline"
+              style={{ padding: "2px 6px", fontSize: "11px" }}
+              onClick={(e) => {
+                e.stopPropagation();
+                handleRetryPayout(sessionId);
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
+        {status === "refunded" && (
+          <div style={{ fontSize: "11px", color: "#b91c1c", marginTop: "2px" }}>
+            <span>₹{(sess.totalAmount || 0).toLocaleString()} refunded</span>
+            {sess.declineReason && <div style={{ fontSize: "10px", color: "#6b7280" }}>&ldquo;{sess.declineReason}&rdquo;</div>}
+          </div>
+        )}
+        {status === "cancelled" && sess.declineReason && (
+          <div style={{ fontSize: "10px", color: "#6b7280", marginTop: "2px" }}>
+            {sess.declineReason}
+          </div>
         )}
       </div>
     );
@@ -186,7 +213,7 @@ const MentorRevenue = () => {
       header: 'Status',
       accessor: 'status',
       sortable: true,
-      render: (sess) => renderStatusBadge(sess.status, sess.id),
+      render: (sess) => renderStatusBadge(sess.status, sess.id, sess),
     },
     {
       header: 'Booked',
@@ -209,9 +236,26 @@ const MentorRevenue = () => {
             Funded on booking, held while pending or active, released to the mentor on completion, refunded to the owner on decline.
           </p>
         </div>
-        <button className="btn btn-outline btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>
-          🔄 Refresh
-        </button>
+        <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
+          {reconciliation && (
+            <span
+              className={`admin-audit-type ${reconciliation.ok ? 'success' : 'error'}`}
+              style={{ fontSize: "12px", padding: "4px 8px" }}
+            >
+              {reconciliation.ok ? '✓ Escrow Reconciled' : '⚠️ Escrow Mismatch'}
+            </span>
+          )}
+          <button
+            className="btn btn-outline btn-sm"
+            onClick={handleReconcile}
+            disabled={reconciling}
+          >
+            {reconciling ? 'Checking...' : '⚖️ Reconcile Escrow'}
+          </button>
+          <button className="btn btn-outline btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>
+            🔄 Refresh
+          </button>
+        </div>
       </div>
 
       <div className="admin-dash-grid-top mt-4">

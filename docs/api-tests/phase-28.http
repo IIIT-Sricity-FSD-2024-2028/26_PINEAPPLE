@@ -1,0 +1,54 @@
+### Phase 28: Starter Task Templates API Requests
+
+@baseUrl = http://localhost:3000
+@ownerToken = YOUR_OWNER_JWT
+@userToken = YOUR_AUTHENTICATED_USER_JWT
+
+### 1. Preview starter task templates by category during project creation (any logged-in user)
+GET {{baseUrl}}/task-templates?category=Web%20App
+Authorization: Bearer {{userToken}}
+
+### 2. Unknown category falls back gracefully to General
+GET {{baseUrl}}/task-templates?category=UnknownCategory
+Authorization: Bearer {{userToken}}
+
+### 3. Create project WITH optional starterTaskKeys (and optional overrides)
+POST {{baseUrl}}/projects
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "title": "TeamForge Campus Portal",
+  "description": "A collaborative student campus portal connecting project owners, contributors, and verified mentors.",
+  "requiredSkills": ["React", "Node.js", "TypeScript"],
+  "dueDate": "2027-06-01T00:00:00.000Z",
+  "maxCollaborators": 5,
+  "category": "Web App",
+  "starterTaskKeys": ["web-repo-readme", "web-main-screens", "web-first-tests"],
+  "starterTaskOverrides": {
+    "web-repo-readme": {
+      "title": "Set up monorepo and onboarding README"
+    }
+  }
+}
+
+### 4. Fetch starter task templates for an existing project (Owner or Admin)
+GET {{baseUrl}}/projects/{{projectId}}/task-templates
+Authorization: Bearer {{ownerToken}}
+
+### 5. Apply starter task templates to an existing project (Owner only)
+POST {{baseUrl}}/projects/{{projectId}}/task-templates/apply
+Authorization: Bearer {{ownerToken}}
+Content-Type: application/json
+
+{
+  "keys": ["web-auth-flow", "web-deploy-demo"],
+  "overrides": {
+    "web-deploy-demo": {
+      "title": "Deploy staging preview environment",
+      "description": "Publish working staging preview link and verify environment health check endpoint."
+    }
+  }
+}
+
+

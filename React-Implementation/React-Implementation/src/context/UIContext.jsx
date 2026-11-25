@@ -1,4 +1,5 @@
 import { createContext, useState, useEffect } from 'react';
+import storage from '../utils/storage';
 
 export const UIContext = createContext();
 
@@ -78,8 +79,9 @@ export const UIProvider = ({ children }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [theme, setThemeState] = useState(() => {
     try {
-      return localStorage.getItem("teamforge.theme") || "light";
-    } catch {
+      return storage.getTheme() || "light";
+    } catch (err) {
+      console.warn('[UIContext] Error reading theme from storage:', err);
       return "light";
     }
   });
@@ -88,9 +90,9 @@ export const UIProvider = ({ children }) => {
     const selectedMode = mode === "dark" ? "dark" : "light";
     setThemeState(selectedMode);
     try {
-      localStorage.setItem("teamforge.theme", selectedMode);
-    } catch {
-      // ignore local storage errors
+      storage.setTheme(selectedMode);
+    } catch (err) {
+      console.warn('[UIContext] Error saving theme to storage:', err);
     }
     applyThemeTokens(selectedMode);
   };

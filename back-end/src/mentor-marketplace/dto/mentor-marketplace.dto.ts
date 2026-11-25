@@ -1,6 +1,6 @@
 import { ApiProperty, ApiPropertyOptional, PartialType } from '@nestjs/swagger';
 import {
-  IsArray, IsBoolean, IsEnum, IsInt, IsNumber, IsOptional,
+  IsArray, IsBoolean, IsInt, IsNumber, IsOptional,
   IsPositive, IsString, Max, Min,
 } from 'class-validator';
 
@@ -12,12 +12,15 @@ export class CreateMentorProfileDto {
   @ApiProperty() @IsString() bio!: string;
   @ApiProperty({ type: [String] }) @IsArray() @IsString({ each: true }) skills!: string[];
   @ApiProperty({ description: 'Years of experience' }) @IsInt() @Min(0) experienceYears!: number;
-  @ApiProperty({ description: 'Session price in INR' }) @IsNumber() @IsPositive() sessionPrice!: number;
-  @ApiProperty({ enum: [30, 60, 90], description: 'Session duration in minutes' }) @IsInt() sessionDuration!: number;
+  @ApiProperty({ description: 'Session price in INR (whole number 1 to 100,000)' }) @IsOptional() sessionPrice!: any;
   @ApiPropertyOptional({ type: [String] }) @IsOptional() @IsArray() languages?: string[];
-  @ApiProperty({ enum: ['Weekdays', 'Weekends', 'Anytime'] })
-  @IsEnum(['Weekdays', 'Weekends', 'Anytime']) availability!: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isAvailable?: boolean;
+  @ApiPropertyOptional({ minimum: 1, maximum: 10, default: 3, description: 'Maximum active mentees' })
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(10)
+  maxActiveMentees?: number;
 }
 
 // ── Book a session (student) ─────────────────────────────────────────────────
@@ -48,7 +51,6 @@ export class FilterMentorsDto {
   @ApiPropertyOptional() @IsOptional() minPrice?: number;
   @ApiPropertyOptional() @IsOptional() maxPrice?: number;
   @ApiPropertyOptional() @IsOptional() minExp?: number;
-  @ApiPropertyOptional({ enum: ['Weekdays', 'Weekends', 'Anytime'] }) @IsOptional() availability?: string;
   @ApiPropertyOptional({
     enum: ['price_asc', 'price_desc'],
     description: 'Sort order',

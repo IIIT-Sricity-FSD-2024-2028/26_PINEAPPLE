@@ -1,0 +1,118 @@
+### PHASE 19: USERS CONTROLLER LOCKDOWN
+
+@baseUrl = http://localhost:3000
+@userToken = Bearer <USER_JWT>
+@adminUsersToken = Bearer <ADMIN_WITH_USERS_PERM_JWT>
+@adminReportsToken = Bearer <ADMIN_WITH_REPORTS_ONLY_JWT>
+@superUserToken = Bearer <SUPERUSER_JWT>
+@userId = 2
+@targetDeleteId = 6
+
+### 1. Anonymous POST /users blocked (401 Unauthorized)
+POST {{baseUrl}}/users
+Content-Type: application/json
+
+{
+  "name": "Unauthorized Super User",
+  "email": "anon.su@teamforge.io",
+  "role": "Super User"
+}
+
+### 2. Super User POST /users creates admin with password setup reset email (201 Created, no password in response)
+POST {{baseUrl}}/users
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+{
+  "name": "Operations Admin",
+  "email": "ops.admin@teamforge.io",
+  "role": "Administrator",
+  "university": "IIT Bombay"
+}
+
+### 3. Login without password returns 400 PASSWORD_REQUIRED
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "identifier": "arjun.sharma@teamforge.io",
+  "password": ""
+}
+
+### 4. Admin login without password returns 400 PASSWORD_REQUIRED
+POST {{baseUrl}}/admin/login
+Content-Type: application/json
+
+{
+  "email": "admin@teamforge.io"
+}
+
+### 5. Removed passwordless legacy login endpoint (404 Not Found)
+POST {{baseUrl}}/users/login
+Content-Type: application/json
+
+{
+  "email": "arjun.sharma@teamforge.io"
+}
+
+### 6. Self profile update with allow-listed fields only (200 OK)
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "name": "Arjun Sharma",
+  "bio": "Full-stack engineer focused on distributed team systems.",
+  "skills": ["TypeScript", "NestJS", "React"],
+  "links": {
+    "github": "https://github.com/arjunsharma"
+  },
+  "settings": {
+    "compactMode": false
+  }
+}
+
+### 7. Self profile update attempting role/xp mass-assignment (400 FIELD_NOT_ALLOWED + audit USER_UPDATE_REJECTED_FIELD)
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "role": "Super User",
+  "xp": 99999
+}
+
+### 8. Cross-user profile update blocked (403 NOT_YOUR_ACCOUNT)
+PATCH {{baseUrl}}/users/3
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "bio": "Unauthorized cross-user edit attempt."
+}
+
+### 9. Email change resets emailVerified, sends verification link, and revokes other sessions (200 OK)
+PATCH {{baseUrl}}/users/{{userId}}
+Authorization: {{userToken}}
+Content-Type: application/json
+
+{
+  "email": "arjun.updated@teamforge.io"
+}
+
+### 10. List all users restricted to Admin with 'users' permission or Super User (403 without 'users')
+GET {{baseUrl}}/users
+Authorization: {{adminUsersToken}}
+
+### 11. Inspect single user account restricted to owner or Admin with 'users' permission (403 for others)
+GET {{baseUrl}}/users/{{userId}}
+Authorization: {{userToken}}
+
+### 12. Super User deletes account with written reason (403 for non-Super User / Super User target, 409 on open obligations)
+DELETE {{baseUrl}}/users/{{targetDeleteId}}
+Authorization: {{superUserToken}}
+Content-Type: application/json
+
+{
+  "reason": "Confirmed policy violation after final review."
+}

@@ -167,6 +167,8 @@
   padding: 4px 8px;
   border-radius: 20px;
   transition: background-color 0.15s ease;
+  max-width: 190px;
+  min-width: 0;
 }
 
 .user-profile:hover {
@@ -201,6 +203,10 @@
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--fg, #111827);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
 /* Dropdown Container */
@@ -221,6 +227,8 @@
   z-index: 1000;
   display: none;
   animation: dropdownIn 0.18s ease-out;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 @keyframes dropdownIn {
@@ -244,7 +252,11 @@
 
 .profile-menu {
   right: 0;
-  width: 210px;
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 16px));
+  width: auto;
+  box-sizing: border-box;
+  overflow-x: hidden;
 }
 
 .dropdown-header {
@@ -260,6 +272,8 @@
 .dropdown-item {
   display: flex;
   align-items: center;
+  box-sizing: border-box;
+  width: 100%;
   padding: 0.5rem 0.75rem;
   border-radius: 8px;
   font-size: 0.92rem;
@@ -319,20 +333,43 @@
 }
 
 /* Profile Menu Specifics */
+.profile-header,
 .profile-info {
   padding: 0.5rem 0.75rem;
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
 }
 
 .profile-name {
   font-weight: 700;
   color: var(--fg, #1a1a1a);
   font-size: 0.96rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-email {
+  font-size: 0.8rem;
+  color: var(--muted-fg, #8c8b88);
+  margin-top: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .profile-role {
   font-size: 0.8rem;
   color: var(--muted-fg, #8c8b88);
   margin-top: 0.1rem;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .dropdown-divider {

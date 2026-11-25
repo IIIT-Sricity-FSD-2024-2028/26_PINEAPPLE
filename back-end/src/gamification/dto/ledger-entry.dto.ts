@@ -1,4 +1,4 @@
-import { IsString, IsEnum, IsNumber, IsDate } from 'class-validator';
+import { IsString, IsNumber, IsOptional } from 'class-validator';
 import { ApiProperty } from '@nestjs/swagger';
 
 export enum LedgerType {
@@ -7,27 +7,43 @@ export enum LedgerType {
 }
 
 export class LedgerEntryDto {
-  @ApiProperty({ example: 'entry-123' })
+  @ApiProperty({ example: 'ledg-1' })
   @IsString()
   id: string;
 
-  @ApiProperty({ example: 'user-1' })
+  @ApiProperty({ example: '2' })
   @IsString()
   userId: string;
 
-  @ApiProperty({ enum: LedgerType, example: LedgerType.XP })
-  @IsEnum(LedgerType)
-  type: LedgerType;
+  @ApiProperty({ example: 'task-1', required: false })
+  @IsString()
+  @IsOptional()
+  taskId?: string | null;
 
-  @ApiProperty({ example: 50 })
+  @ApiProperty({ example: 'proj-1', required: false })
+  @IsString()
+  @IsOptional()
+  projectId?: string | null;
+
+  @ApiProperty({ example: 40 })
   @IsNumber()
-  amount: number;
+  xp: number;
 
-  @ApiProperty({ example: 'Task Approved' })
+  @ApiProperty({ example: 'Task Approved: Design Database Schema' })
   @IsString()
   reason: string;
 
-  @ApiProperty({ example: '2026-05-03T12:00:00Z' })
-  @IsDate()
-  timestamp: Date;
+  @ApiProperty({ example: '2026-10-24T12:00:00.000Z' })
+  @IsString()
+  date: string;
+
+  // Backward compatibility helpers
+  @IsOptional()
+  type?: LedgerType;
+
+  @IsOptional()
+  amount?: number;
+
+  @IsOptional()
+  timestamp?: Date;
 }

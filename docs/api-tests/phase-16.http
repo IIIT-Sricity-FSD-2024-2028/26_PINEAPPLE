@@ -1,0 +1,76 @@
+### Phase 16: Trust & Safety HTTP Test Pack
+### Base URL
+@baseUrl = http://localhost:3000
+
+### 1. Signup (creates unverified account + dispatches 24h verification email)
+POST {{baseUrl}}/auth/signup
+Content-Type: application/json
+
+{
+  "name": "Ravi Kumar",
+  "username": "ravikumar_ts16",
+  "email": "ravi.kumar+teamforge@gmail.com",
+  "password": "Password123!",
+  "role": "Project Owner"
+}
+
+### 2. Verify Email (24h single-use token)
+POST {{baseUrl}}/auth/verify-email
+Content-Type: application/json
+
+{
+  "token": "REPLACE_WITH_TOKEN_FROM_EMAIL"
+}
+
+### 3. Resend Verification Email (2-minute cooldown -> 429 RESEND_COOLDOWN)
+POST {{baseUrl}}/auth/resend-verification
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+
+### 4. Create Project (5+ char title, 100+ char description, content filter, 3/day & 10 open caps)
+POST {{baseUrl}}/projects
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "title": "Class Assistant Analytics",
+  "description": "An open-source academic project workspace built with React, Python, and NestJS for collaborating on assignments.",
+  "requiredSkills": ["React", "Python"],
+  "dueDate": "2027-06-01T00:00:00.000Z",
+  "maxCollaborators": 4
+}
+
+### 5. Report a Chat Message (saves 20-message snapshot; 10/day -> 429 TOO_MANY_REPORTS)
+POST {{baseUrl}}/communication/messages/msg-1/report
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "reason": "This chat message contains abusive harassment toward collaborators."
+}
+
+### 6. Admin: List Possible Duplicate Accounts (requires admin 'users' permission or superuser)
+GET {{baseUrl}}/admin/users/duplicates
+Authorization: Bearer REPLACE_WITH_ADMIN_TOKEN
+
+### 7. Phone OTP Challenge Status / Request / Verify (5 wrong attempts -> 15m OTP_LOCKED)
+GET {{baseUrl}}/users/me/phone/otp-status
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+
+###
+POST {{baseUrl}}/users/me/phone/request-otp
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "phone": "+919876543210"
+}
+
+###
+POST {{baseUrl}}/users/me/phone/verify-otp
+Authorization: Bearer REPLACE_WITH_ACCESS_TOKEN
+Content-Type: application/json
+
+{
+  "phone": "+919876543210",
+  "code": "123456"
+}

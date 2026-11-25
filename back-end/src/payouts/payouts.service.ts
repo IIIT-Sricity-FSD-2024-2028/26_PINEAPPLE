@@ -27,4 +27,12 @@ export class PayoutsService {
   findAll(payeeId?: string): TransactionEntity[] {
     return payeeId ? this.transactions.filter((t) => t.payeeId === payeeId) : [...this.transactions];
   }
+
+  resetToSeed(): void {
+    this.reset();
+  }
+
+  reset(): void {
+    this.transactions = [];
+  }
 }

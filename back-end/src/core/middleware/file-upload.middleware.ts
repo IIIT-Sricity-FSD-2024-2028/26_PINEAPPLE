@@ -1,8 +1,16 @@
-import multer = require('multer');
+import * as multerNs from 'multer';
+import type multerType from 'multer';
+const multerRuntime: any =
+  typeof (multerNs as any) === 'function'
+    ? multerNs
+    : typeof (multerNs as any)?.default === 'function'
+      ? (multerNs as any).default
+      : multerNs;
 import * as path from 'path';
 import * as fs from 'fs';
 import { Request } from 'express';
 import { BadRequestException } from '@nestjs/common';
+import { randomUUID } from 'crypto';
 
 /**
  * FileUploadMiddleware — Multer-based File Upload Configuration
@@ -23,7 +31,7 @@ import { BadRequestException } from '@nestjs/common';
 // Storage Configuration
 // ──────────────────────────────────────────────────────────────
 
-const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
+export const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
 
 // Ensure uploads directory exists
 if (!fs.existsSync(UPLOADS_DIR)) {
@@ -45,7 +53,7 @@ function sanitizeFilename(originalName: string): string {
 /**
  * Multer disk storage with sanitized filenames.
  */
-const storage = multer.diskStorage({
+const storage = multerRuntime.diskStorage({
   destination: (_req: Request, _file: Express.Multer.File, cb: Function) => {
     cb(null, UPLOADS_DIR);
   },
@@ -60,40 +68,37 @@ const storage = multer.diskStorage({
 
 const IMAGE_MIMES = [
   'image/jpeg',
+  'image/jpg',
   'image/png',
-  'image/gif',
   'image/webp',
-  'image/svg+xml',
 ];
 
-const DOCUMENT_MIMES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'text/plain',
-  'text/markdown',
-];
+const IMAGE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
 
-const ARCHIVE_MIMES = [
-  'application/zip',
-  'application/x-zip-compressed',
-  'application/gzip',
-  'application/x-tar',
-  'application/x-7z-compressed',
-];
+const GENERAL_MIMES = [...IMAGE_MIMES, 'application/pdf'];
+const GENERAL_EXTS = [...IMAGE_EXTS, '.pdf'];
 
 // ──────────────────────────────────────────────────────────────
 // File Filter Factories
 // ──────────────────────────────────────────────────────────────
 
-function createFileFilter(allowedMimes: string[]) {
-  return (_req: Request, file: Express.Multer.File, cb: multer.FileFilterCallback) => {
-    if (allowedMimes.includes(file.mimetype)) {
+function createFileFilter(allowedMimes: string[], allowedExts: string[]) {
+  return (_req: Request, file: Express.Multer.File, cb: multerType.FileFilterCallback) => {
+    const ext = path.extname(String(file.originalname || '')).toLowerCase();
+    const mime = String(file.mimetype || '').trim().toLowerCase();
+    const isSvg = ext === '.svg' || ext === '.svgz' || mime === 'image/svg+xml';
+
+    if (!isSvg && allowedMimes.includes(mime) && allowedExts.includes(ext)) {
       cb(null, true);
     } else {
-      cb(new BadRequestException(
-        `Invalid file type: ${file.mimetype}. Allowed types: ${allowedMimes.join(', ')}`,
-      ) as any);
+      cb(
+        new BadRequestException({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'UNSUPPORTED_FILE_TYPE',
+          message: `Unsupported file type (${file.mimetype || ext}). Allowed types: png, jpg, jpeg, webp, pdf.`,
+        }) as any,
+      );
     }
   };
 }
@@ -103,31 +108,79 @@ function createFileFilter(allowedMimes: string[]) {
 // ──────────────────────────────────────────────────────────────
 
 /**
- * Avatar upload — images only, max 2 MB.
+ * Avatar upload — PNG, JPG, JPEG, WEBP only, max 2 MB.
  */
 export const avatarUploadOptions = {
   storage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
-  fileFilter: createFileFilter(IMAGE_MIMES),
+  fileFilter: createFileFilter(IMAGE_MIMES, IMAGE_EXTS),
 };
-export const avatarUpload = multer(avatarUploadOptions);
+export const avatarUpload = multerRuntime(avatarUploadOptions);
 
 /**
- * Task proof upload — images, PDFs, ZIPs — max 5 MB.
+ * Task proof upload — PNG, JPG, JPEG, WEBP, PDF — max 5 MB.
  */
 export const taskProofUploadOptions = {
   storage,
   limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
-  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
+  fileFilter: createFileFilter(GENERAL_MIMES, GENERAL_EXTS),
 };
-export const taskProofUpload = multer(taskProofUploadOptions);
+export const taskProofUpload = multerRuntime(taskProofUploadOptions);
 
 /**
- * Resource upload — documents, images, archives — max 10 MB.
+ * Resource upload — PNG, JPG, JPEG, WEBP, PDF — max 10 MB.
  */
 export const resourceUploadOptions = {
   storage,
   limits: { fileSize: 10 * 1024 * 1024 }, // 10 MB
-  fileFilter: createFileFilter([...IMAGE_MIMES, ...DOCUMENT_MIMES, ...ARCHIVE_MIMES]),
+  fileFilter: createFileFilter(GENERAL_MIMES, GENERAL_EXTS),
 };
-export const resourceUpload = multer(resourceUploadOptions);
+export const resourceUpload = multerRuntime(resourceUploadOptions);
+
+// ──────────────────────────────────────────────────────────────
+// Secure CV Upload Configuration (Stored outside public web root)
+// ──────────────────────────────────────────────────────────────
+
+export const SECURE_CVS_DIR = path.join(process.cwd(), 'secure-cvs');
+if (!fs.existsSync(SECURE_CVS_DIR)) {
+  fs.mkdirSync(SECURE_CVS_DIR, { recursive: true });
+}
+
+const cvStorage = multerRuntime.diskStorage({
+  destination: (_req: Request, _file: Express.Multer.File, cb: Function) => {
+    cb(null, SECURE_CVS_DIR);
+  },
+  filename: (_req: Request, file: Express.Multer.File, cb: Function) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const cleanId = randomUUID();
+    cb(null, `cv-${cleanId}${ext}`);
+  },
+});
+
+function createPdfFilter() {
+  return (_req: Request, file: Express.Multer.File, cb: multerType.FileFilterCallback) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    if (file.mimetype === 'application/pdf' && ext === '.pdf') {
+      cb(null, true);
+    } else {
+      cb(
+        new BadRequestException({
+          statusCode: 400,
+          error: 'Bad Request',
+          code: 'UNSUPPORTED_FILE_TYPE',
+          message: 'Invalid file type: Only PDF documents (.pdf) are allowed for CV upload.',
+        }) as any,
+      );
+    }
+  };
+}
+
+/**
+ * CV upload — strictly PDF only, max 5 MB, stored securely outside web root
+ */
+export const cvUploadOptions = {
+  storage: cvStorage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: createPdfFilter(),
+};
+export const cvUpload = multerRuntime(cvUploadOptions);

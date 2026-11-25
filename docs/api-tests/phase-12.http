@@ -1,0 +1,136 @@
+### TeamForge Phase 12 API Tests (REST Client Format)
+### Stuck Projects, Requests and Inactivity (Zombie Project Breaker, Request Timeout, Early-Withdraw Refund, Abandoned Owner, Inactive Collaborator)
+
+@baseUrl = http://localhost:3000
+@superUserToken = Bearer YOUR_SUPERUSER_TOKEN_HERE
+@adminToken = Bearer YOUR_ADMIN_TOKEN_HERE
+@ownerToken = Bearer YOUR_OWNER_TOKEN_HERE
+@collabToken = Bearer YOUR_COLLABORATOR_TOKEN_HERE
+
+### --------------------------------------------------------------------------
+### 1. OWNER VIEW TRACKING & EARLY-WITHDRAW REFUND (< 2h & Unviewed)
+### --------------------------------------------------------------------------
+
+### 1a. Applicant Submits Join Request
+# Expected Status: 201 Created
+POST {{baseUrl}}/join-requests
+Authorization: {{collabToken}}
+x-user-id: 7
+Content-Type: application/json
+
+{
+  "projectId": "proj-1",
+  "message": "Applying to contribute to the frontend."
+}
+
+###
+
+### 1b. Early Withdraw Within 2 Hours (Before Owner Views -> Slot Restored)
+# Expected Status: 200 OK
+# Requests used remains 0 (slot refunded)
+DELETE {{baseUrl}}/join-requests/REQ_ID
+Authorization: {{collabToken}}
+x-user-id: 7
+
+###
+
+### 1c. Owner Views Project Join Requests (Sets viewedAt on Pending Requests)
+# Expected Status: 200 OK
+GET {{baseUrl}}/join-requests?projectId=proj-1
+Authorization: {{ownerToken}}
+x-user-id: 1
+
+###
+
+### --------------------------------------------------------------------------
+### 2. INACTIVE COLLABORATOR: RELEASE TASKS (KEEP MEMBERSHIP & IN-REVIEW TASKS)
+### --------------------------------------------------------------------------
+
+### 2a. Owner Releases Inactive Member's Open & In Progress Tasks
+# Expected Status: 200 OK
+# Returns: { released: N, taskIds: [...], tasks: [...] }
+POST {{baseUrl}}/projects/proj-1/members/2/release-tasks
+Authorization: {{ownerToken}}
+x-user-id: 1
+
+###
+
+### 2b. Collaborator Attempt to Release Tasks (Forbidden)
+# Expected Status: 403 Forbidden
+POST {{baseUrl}}/projects/proj-1/members/2/release-tasks
+Authorization: {{collabToken}}
+x-user-id: 2
+
+###
+
+### 2c. Repeat Release When No Open/In-Progress Tasks Remain
+# Expected Status: 409 Conflict
+# Expected Code: NOTHING_TO_RELEASE
+POST {{baseUrl}}/projects/proj-1/members/2/release-tasks
+Authorization: {{ownerToken}}
+x-user-id: 1
+
+###
+
+### --------------------------------------------------------------------------
+### 3. ABANDONED OWNER (30-DAY ELIGIBILITY) & ADMIN MANUAL CLOSE
+### --------------------------------------------------------------------------
+
+### 3a. Collaborator Requests Close (Before 30d Inactive)
+# Expected Status: 409 Conflict
+# Expected Code: NOT_ELIGIBLE
+POST {{baseUrl}}/projects/proj-1/request-close
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "reason": "Owner has been inactive for over 30 days."
+}
+
+###
+
+### 3b. Collaborator Requests Close (After 30d Owner Inactivity Flag)
+# Expected Status: 200 OK
+# Creates a 'Project Closure Request' ticket in SupportService
+POST {{baseUrl}}/projects/proj-1/request-close
+Authorization: {{collabToken}}
+x-user-id: 2
+Content-Type: application/json
+
+{
+  "reason": "Owner inactive for 30+ days."
+}
+
+###
+
+### 3c. Admin Closes Project with Reason 'Owner inactive' (Settles Escrow via Phase 9)
+# Expected Status: 200 OK
+POST {{baseUrl}}/admin/projects/proj-1/close
+Authorization: {{adminToken}}
+x-user-id: 3
+Content-Type: application/json
+
+{
+  "reason": "Owner inactive"
+}
+
+###
+
+### --------------------------------------------------------------------------
+### 4. HOURLY SCHEDULER TICK & JOB RUN LOG
+### --------------------------------------------------------------------------
+
+### 4a. Super User Manually Runs Hourly Tick (Runs All 9 Jobs Including Zombie Breaker, Stale Request Closer, Inactivity Notifiers)
+# Expected Status: 202 Accepted
+POST {{baseUrl}}/admin/jobs/tick
+Authorization: {{superUserToken}}
+x-user-id: u-superuser
+
+###
+
+### 4b. View Job Run History (Admin or Super User)
+# Expected Status: 200 OK
+GET {{baseUrl}}/admin/jobs/runs
+Authorization: {{adminToken}}
+x-user-id: 3

@@ -14,6 +14,8 @@ const permOptions = [
   { key: "projects", label: "Projects" },
   { key: "mentor_apps", label: "Mentors" },
   { key: "revenue", label: "Revenue & Escrow" },
+  { key: "reports", label: "Reports" },
+  { key: "support", label: "Support Inbox" },
   { key: "audit", label: "Audit" },
 ];
 
