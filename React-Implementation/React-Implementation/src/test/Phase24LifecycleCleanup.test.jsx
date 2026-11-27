@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import Settings from '../pages/settings';
+import { renderWithStore } from './test-utils';
 import AppliedProjects from '../pages/collaborator/AppliedProjects';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import usersApi from '../services/usersApi';
@@ -34,8 +31,6 @@ vi.mock('../services/apiClient.js', async () => {
 vi.mock('../services/usersApi', () => ({
   default: {
     getMe: vi.fn(),
-    getSettings: vi.fn().mockResolvedValue({ digestEnabled: true, digestHour: 9 }),
-    updateSettings: vi.fn(),
     requestExport: vi.fn(),
     listExports: vi.fn().mockResolvedValue([]),
     downloadExport: vi.fn(),
@@ -96,21 +91,19 @@ vi.mock('../services/appealsApi', () => ({
 describe('Phase 24 Frontend Tests: Deletion Re-Auth Code Flow & Lifecycle Cleanup', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem('teamforge.backendUserId', 'u-social-24');
   });
 
-  const renderWithContext = (ui, user, extraAuth = {}) =>
-    render(
-      <MemoryRouter>
-        <UIProvider>
-          <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, ...extraAuth }}>
-            <NotificationContext.Provider value={{ notifications: [], unreadCount: 0, markAsRead: vi.fn() }}>
-              {ui}
-            </NotificationContext.Provider>
-          </AuthContext.Provider>
-        </UIProvider>
-      </MemoryRouter>,
-    );
+  const renderWithContext = (ui, user) =>
+    renderWithStore(ui, {
+      preloadedState: {
+        session: {
+          user,
+          loading: false,
+          isAuthenticated: true,
+          status: 'authenticated',
+        },
+      },
+    });
 
   it('1. Passwordless deletion: Delete disabled until username matches, dialog Cancel aborts, server mismatch/obligations render, confirm deletes & redirects', async () => {
     const socialUser = {
@@ -121,7 +114,6 @@ describe('Phase 24 Frontend Tests: Deletion Re-Auth Code Flow & Lifecycle Cleanu
       role: 'Collaborator',
       hasPassword: false,
     };
-    const mockLogout = vi.fn();
 
     usersApi.getMe.mockResolvedValue({ ...socialUser, hasPassword: false });
     usersApi.deleteMyAccount
@@ -132,7 +124,7 @@ describe('Phase 24 Frontend Tests: Deletion Re-Auth Code Flow & Lifecycle Cleanu
       })
       .mockResolvedValueOnce({ success: true });
 
-    renderWithContext(<Settings />, socialUser, { logout: mockLogout });
+    const { store } = renderWithContext(<Settings />, socialUser);
 
     const usernameInput = await screen.findByTestId('delete-account-username');
     // Never renders password input, code box, or socialConfirmed checkbox
@@ -177,7 +169,7 @@ describe('Phase 24 Frontend Tests: Deletion Re-Auth Code Flow & Lifecycle Cleanu
       expect(usersApi.deleteMyAccount).toHaveBeenLastCalledWith({
         username: 'SOCIAL24',
       });
-      expect(mockLogout).toHaveBeenCalled();
+      expect(store.getState().session.user).toBeNull();
       expect(mockNavigate).toHaveBeenCalledWith(
         '/',
         expect.objectContaining({

@@ -1,4 +1,5 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test-utils';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import fs from 'fs';
 import path from 'path';
@@ -72,7 +73,7 @@ describe('Admin Mentor Applications Rejection & Guard Tests', () => {
       };
     });
 
-    render(<AdminMentorApps />);
+    renderWithStore(<AdminMentorApps />);
 
     // 1. Initial pending application card renders
     expect(await screen.findByText('Ananya Roy')).toBeDefined();

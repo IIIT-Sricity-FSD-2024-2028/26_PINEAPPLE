@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
+import { screen, waitFor, fireEvent, render } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import Profile, { MentoredProjectsCard } from '../pages/profile';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 import usersApi from '../services/usersApi';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
@@ -54,13 +54,17 @@ describe('Profile: Mentored Projects Card', () => {
     vi.spyOn(gamificationApi, 'getUserLedger').mockResolvedValue([]);
     vi.spyOn(trustApi, 'getMyTrust').mockResolvedValue(null);
 
-    render(
-      <AuthContext.Provider value={{ user: mockMentor, isAuthenticated: true }}>
-        <MemoryRouter initialEntries={['/profile']}>
-          <Profile />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Profile />, {
+      route: '/profile',
+      preloadedState: {
+        session: {
+          user: mockMentor,
+          isAuthenticated: true,
+          status: 'authenticated',
+          initialized: true,
+        },
+      },
+    });
 
     const card = await screen.findByTestId('profile-mentored-projects-card');
     expect(card.textContent).toContain('Active Mentored SaaS');

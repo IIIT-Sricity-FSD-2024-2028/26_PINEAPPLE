@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 
@@ -8,10 +7,7 @@ import MentorCard from '../components/features/MentorCard';
 import MyMentorProfile from '../pages/mentor/MyMentorProfile';
 import MentorsDirectory from '../pages/owner/MentorsDirectory';
 import AdminReports from '../pages/admin/AdminReports';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationProvider } from '../context/NotificationContext';
+import { renderWithStore } from './test-utils';
 
 const { mockMentorMarketplaceApi, mockProjectsApi, mockReportsApi, mockAdminApi } = vi.hoisted(() => ({
   mockMentorMarketplaceApi: {
@@ -130,19 +126,18 @@ describe('Phase 4: Remove Mentor Session Duration, Availability Schedule, Bookin
         maxActiveMentees: 3,
       });
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: mentorUser }}>
-            <RoleContext.Provider value={{ currentRole: 'Mentor' }}>
-              <UIProvider>
-                <NotificationProvider>
-                  <MyMentorProfile />
-                </NotificationProvider>
-              </UIProvider>
-            </RoleContext.Provider>
-          </AuthContext.Provider>
-        </MemoryRouter>
-      );
+      renderWithStore(<MyMentorProfile />, {
+        preloadedState: {
+          session: {
+            user: mentorUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Mentor',
+            allowedRoles: ['Mentor'],
+            mentorApproved: true,
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(screen.getByDisplayValue('Neha Gupta')).toBeDefined();
@@ -170,7 +165,7 @@ describe('Phase 4: Remove Mentor Session Duration, Availability Schedule, Bookin
     });
 
     it('renders shared MentorCard with Price (INR) label and without Schedule badge', () => {
-      const { container } = render(
+      const { container } = renderWithStore(
         <MentorCard
           name="Kiran Bose"
           headline="Full-Stack Architect"
@@ -221,19 +216,17 @@ describe('Phase 4: Remove Mentor Session Duration, Availability Schedule, Bookin
       ]);
       mockMentorMarketplaceApi.mySessions.mockResolvedValue([]);
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: ownerUser }}>
-            <RoleContext.Provider value={{ currentRole: 'Project Owner' }}>
-              <UIProvider>
-                <NotificationProvider>
-                  <MentorsDirectory />
-                </NotificationProvider>
-              </UIProvider>
-            </RoleContext.Provider>
-          </AuthContext.Provider>
-        </MemoryRouter>
-      );
+      renderWithStore(<MentorsDirectory />, {
+        preloadedState: {
+          session: {
+            user: ownerUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Project Owner',
+            allowedRoles: ['Project Owner'],
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(screen.getByText('Kiran Bose')).toBeDefined();
@@ -282,19 +275,17 @@ describe('Phase 4: Remove Mentor Session Duration, Availability Schedule, Bookin
       mockAdminApi.getDisputes.mockResolvedValue(mockDisputes);
       mockAdminApi.getNeedsReviewSessions.mockResolvedValue([]);
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: adminUser }}>
-            <RoleContext.Provider value={{ currentRole: 'Admin' }}>
-              <UIProvider>
-                <NotificationProvider>
-                  <AdminReports />
-                </NotificationProvider>
-              </UIProvider>
-            </RoleContext.Provider>
-          </AuthContext.Provider>
-        </MemoryRouter>
-      );
+      renderWithStore(<AdminReports />, {
+        preloadedState: {
+          session: {
+            user: adminUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            portalRole: 'admin',
+            permissions: ['*'],
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('tab-disputes')).toBeDefined();

@@ -1,4 +1,5 @@
 import React from 'react';
+import { navigateWithAppRouter } from '../../routes/navigationRef';
 
 class ErrorBoundary extends React.Component {
   constructor(props) {
@@ -22,7 +23,9 @@ class ErrorBoundary extends React.Component {
     if (window.history.length > 1) {
       window.history.back();
     } else {
-      window.location.href = '/dashboard';
+      this.setState({ hasError: false, error: null }, () => {
+        navigateWithAppRouter('/dashboard', { replace: true });
+      });
     }
   };
 

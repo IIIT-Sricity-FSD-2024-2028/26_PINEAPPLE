@@ -15,6 +15,7 @@ import { UserStatus } from './dto/create-user.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
 import { normalizeRole } from '../common/utils/role.util';
 import { ClockService } from '../common/services/clock.service';
+import { ADMIN_REFRESH_SERVICE } from '../common/utils/refresh-cookie.util';
 import { FileCleanupService } from '../common/services/file-cleanup.service';
 import { ProjectsRepository } from '../projects/projects.repository';
 import { ProjectInvitesService } from '../projects/invites.service';
@@ -461,11 +462,13 @@ export class AccountDeletionService {
 
     const userPersonalSnapshot = {
       avatar: (user as any).avatar,
+      avatarUrl: (user as any).avatarUrl,
       cvFileName: (user as any).cvFileName,
       cvUrl: (user as any).cvUrl,
       profile: user.profile
         ? {
             avatar: (user.profile as any).avatar,
+            avatarUrl: (user.profile as any).avatarUrl,
             photoUrl: (user.profile as any).photoUrl,
             cvFileName: (user.profile as any).cvFileName,
             cvUrl: (user.profile as any).cvUrl,
@@ -482,6 +485,7 @@ export class AccountDeletionService {
     user.phoneVerifiedAt = undefined;
     user.linkedIn = undefined;
     (user as any).avatar = undefined;
+    (user as any).avatarUrl = undefined;
     (user as any).cvFileName = undefined;
     (user as any).cvUrl = undefined;
     user.password = undefined;
@@ -490,6 +494,12 @@ export class AccountDeletionService {
     user.refreshTokens = [];
     user.allowedLegacyJti = undefined;
     user.tokenVersion = (user.tokenVersion || 1) + 1;
+    try {
+      const adminRefresh = this.moduleRef.get<any>(ADMIN_REFRESH_SERVICE, { strict: false });
+      adminRefresh?.bumpTokenVersion?.(String(user.id));
+    } catch {
+      // Optional service in isolated unit tests
+    }
     user.isDeleted = true;
     user.isHidden = true;
     user.deletedAt = nowIso;
@@ -500,6 +510,7 @@ export class AccountDeletionService {
       user.profile.bio = '';
       user.profile.linkedin = undefined;
       (user.profile as any).avatar = undefined;
+      (user.profile as any).avatarUrl = undefined;
       (user.profile as any).photoUrl = undefined;
       (user.profile as any).cvFileName = undefined;
       (user.profile as any).cvUrl = undefined;

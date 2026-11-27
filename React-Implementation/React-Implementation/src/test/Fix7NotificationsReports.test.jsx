@@ -1,17 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import Notifications from '../pages/notifications';
 import ChatBox from '../components/features/ChatBox';
 import Help from '../pages/help';
 import AdminLayout from '../pages/admin/AdminLayout';
 import AdminReports from '../pages/admin/AdminReports';
 import Navbar from '../components/navbar';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext, NotificationProvider } from '../context/NotificationContext';
-import storage from '../utils/storage';
+import { fetchNotifications } from '../store/thunks/notificationsThunks';
+import { renderWithStore } from './test-utils';
 
 const { mockNotificationsApi, mockCommunicationApi, mockReportsApi } = vi.hoisted(() => ({
   mockNotificationsApi: {
@@ -69,47 +65,37 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
 
   describe('ITEM 10: Notifications Mark All Read & Badge Sync', () => {
     it('button is always rendered, disabled at 0 unread, enabled with unread count', () => {
-      const { rerender } = render(
-        <MemoryRouter>
-          <NotificationContext.Provider
-            value={{
-              notifications: [{ id: 'n1', title: 'Task Done', message: 'Read item', isRead: true }],
-              unreadCount: 0,
-              markAllAsRead: vi.fn(),
-              markAsRead: vi.fn(),
-            }}
-          >
-            <Notifications />
-          </NotificationContext.Provider>
-        </MemoryRouter>,
-      );
+      renderWithStore(<Notifications />, {
+        preloadedState: {
+          notifications: {
+            ids: ['n1'],
+            entities: { n1: { id: 'n1', title: 'Task Done', message: 'Read item', isRead: true } },
+            unreadCount: 0,
+            status: 'succeeded',
+          },
+        },
+      });
 
       const btn = screen.getByTestId('mark-all-read-btn');
       expect(btn).toBeDefined();
       expect(btn.disabled).toBe(true);
       expect(btn.textContent).toContain('Mark all as read');
 
-      // When unread > 0, button is enabled
-      rerender(
-        <MemoryRouter>
-          <NotificationContext.Provider
-            value={{
-              notifications: [
-                { id: 'n1', title: 'Task Done', message: 'Unread item', isRead: false },
-              ],
-              unreadCount: 1,
-              markAllAsRead: vi.fn(),
-              markAsRead: vi.fn(),
-            }}
-          >
-            <Notifications />
-          </NotificationContext.Provider>
-        </MemoryRouter>,
-      );
-      expect(screen.getByTestId('mark-all-read-btn').disabled).toBe(false);
+      renderWithStore(<Notifications />, {
+        preloadedState: {
+          notifications: {
+            ids: ['n2'],
+            entities: { n2: { id: 'n2', title: 'Task Done', message: 'Unread item', isRead: false } },
+            unreadCount: 1,
+            status: 'succeeded',
+          },
+        },
+      });
+      const btns = screen.getAllByTestId('mark-all-read-btn');
+      expect(btns[1].disabled).toBe(false);
     });
 
-    it('clicking Mark All Read updates notifications list and unread badge via provider and shows loading state', async () => {
+    it('clicking Mark All Read updates notifications list and unread badge via store and shows loading state', async () => {
       let notifsState = [
         { id: 'n-1', title: 'Invite Received', message: 'Project A', isRead: false, readStatus: false },
         { id: 'n-2', title: 'Task Assigned', message: 'Project B', isRead: false, readStatus: false },
@@ -129,18 +115,24 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
           ),
       );
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: mockUser }}>
-            <RoleContext.Provider value={{ currentRole: 'Collaborator', switchRole: vi.fn(), isMentorApproved: false }}>
-              <NotificationProvider>
-                <Navbar />
-                <Notifications />
-              </NotificationProvider>
-            </RoleContext.Provider>
-          </AuthContext.Provider>
-        </MemoryRouter>,
+      const { store } = renderWithStore(
+        <>
+          <Navbar />
+          <Notifications />
+        </>,
+        {
+          preloadedState: {
+            session: {
+              user: mockUser,
+              isAuthenticated: true,
+              status: 'authenticated',
+              activeRole: 'Collaborator',
+              allowedRoles: ['Collaborator'],
+            },
+          },
+        },
       );
+      await store.dispatch(fetchNotifications({ userId: mockUser.id, force: true }));
 
       // Wait for notifications to load
       await waitFor(() => {
@@ -174,15 +166,16 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
       ]);
       mockNotificationsApi.markAllAsRead.mockRejectedValue(new Error('Database lock error. Please try again.'));
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: mockUser }}>
-            <NotificationProvider>
-              <Notifications />
-            </NotificationProvider>
-          </AuthContext.Provider>
-        </MemoryRouter>,
-      );
+      const { store } = renderWithStore(<Notifications />, {
+        preloadedState: {
+          session: {
+            user: mockUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      });
+      await store.dispatch(fetchNotifications({ userId: mockUser.id, force: true }));
 
       await waitFor(() => {
         expect(screen.getByText('Update')).toBeDefined();
@@ -207,7 +200,7 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
         { id: 'msg-1', senderId: 'other-user', senderName: 'Other Person', content: 'Inappropriate chat content', timestamp: new Date().toISOString() },
       ];
 
-      render(
+      renderWithStore(
         <ChatBox
           messages={messages}
           currentUserId="user-1"
@@ -256,13 +249,16 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
         },
       ]);
 
-      render(
-        <MemoryRouter initialEntries={['/help?tab=my-reports']}>
-          <AuthContext.Provider value={{ user: mockUser }}>
-            <Help />
-          </AuthContext.Provider>
-        </MemoryRouter>,
-      );
+      renderWithStore(<Help />, {
+        route: '/help?tab=my-reports',
+        preloadedState: {
+          session: {
+            user: mockUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      });
 
       // Verify My reports tab is active and rendered
       await waitFor(() => {
@@ -325,17 +321,15 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
         reportedUser: { id: 'u-bad', name: 'Bad Actor', username: 'badactor' },
       });
 
-      vi.spyOn(storage, 'getAdminSession').mockReturnValue({
-        isSuperUser: true,
-        portalRole: 'superuser',
-        permissions: ['*'],
+      renderWithStore(<AdminReports />, {
+        preloadedState: {
+          session: {
+            isSuperUser: true,
+            portalRole: 'superuser',
+            permissions: ['*'],
+          },
+        },
       });
-
-      render(
-        <MemoryRouter>
-          <AdminReports />
-        </MemoryRouter>,
-      );
 
       // Verify chat message badge in reports table
       await waitFor(() => {
@@ -360,17 +354,15 @@ describe('Fix 7 Frontend Tests: Notifications Read-All & Chat Reports Visibility
     it('Admin menu displays open reports count badge when reports are open', async () => {
       mockReportsApi.getOpenCount.mockResolvedValue({ count: 4, openCount: 4 });
 
-      vi.spyOn(storage, 'getAdminSession').mockReturnValue({
-        isSuperUser: false,
-        portalRole: 'admin',
-        permissions: ['reports'],
+      renderWithStore(<AdminLayout />, {
+        preloadedState: {
+          session: {
+            isSuperUser: false,
+            portalRole: 'admin',
+            permissions: ['reports'],
+          },
+        },
       });
-
-      render(
-        <MemoryRouter>
-          <AdminLayout />
-        </MemoryRouter>,
-      );
 
       await waitFor(() => {
         const badge = screen.getByTestId('admin-reports-count-badge');

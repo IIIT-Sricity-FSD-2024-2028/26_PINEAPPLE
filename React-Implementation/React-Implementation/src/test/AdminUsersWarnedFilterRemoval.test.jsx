@@ -1,14 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import AdminUsers from '../pages/admin/AdminUsers';
 import adminApi from '../services/adminApi';
-import trustApi from '../services/trustApi';
-import storage from '../utils/storage';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/adminApi', () => ({
   default: {
     listUsers: vi.fn(),
+    getUserCounts: vi.fn(),
     getDuplicateUsers: vi.fn(),
     getModerationActions: vi.fn(),
     warnUser: vi.fn(),
@@ -26,14 +25,6 @@ vi.mock('../services/trustApi', () => ({
   },
 }));
 
-vi.mock('../utils/storage', () => ({
-  default: {
-    getAdminSession: vi.fn(() => ({ uid: 'admin-super', role: 'admin', isSuperUser: true })),
-    getRole: vi.fn(() => 'admin'),
-    getPortalRole: vi.fn(() => 'admin'),
-  },
-}));
-
 const mockUsers = [
   { id: '1', name: 'Alice Active', role: 'Collaborator', status: 'Active', warnings: 0, flags: false, xp: 100, rep: 50 },
   { id: '2', name: 'Bob Warned', role: 'Collaborator', status: 'Warned', warnings: 2, flags: false, xp: 200, rep: 40 },
@@ -45,6 +36,15 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     adminApi.listUsers.mockResolvedValue([...mockUsers]);
+    adminApi.getUserCounts.mockResolvedValue({
+      total: 4,
+      active: 1,
+      suspended: 1,
+      flagged: 1,
+      warned: 1,
+      possibleDuplicates: 1,
+      pendingApprovals: 1,
+    });
     adminApi.getDuplicateUsers.mockResolvedValue({ groups: [{ id: 'dup-1', users: ['1', '2'] }] });
     adminApi.getModerationActions.mockResolvedValue([
       { id: 'act-1', targetUserId: '3', actionType: 'suspend', status: 'pending', requestedBy: 'other-admin' },
@@ -52,11 +52,17 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
   });
 
   it('renders exactly the 6 filter tabs: All, Active, Suspended, Flagged, Possible duplicates, Approvals (no Warned chip)', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users']}>
-        <AdminUsers />
-      </MemoryRouter>
-    );
+    renderWithStore(<AdminUsers />, {
+      route: '/admin/users',
+      preloadedState: {
+        session: {
+          adminUid: 'admin-super',
+          portalRole: 'admin',
+          isSuperUser: true,
+          permissions: ['*'],
+        },
+      },
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Alice Active')).toBeTruthy();
@@ -81,11 +87,17 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
   });
 
   it('filters correctly using remaining chips and counts remain unchanged', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users']}>
-        <AdminUsers />
-      </MemoryRouter>
-    );
+    renderWithStore(<AdminUsers />, {
+      route: '/admin/users',
+      preloadedState: {
+        session: {
+          adminUid: 'admin-super',
+          portalRole: 'admin',
+          isSuperUser: true,
+          permissions: ['*'],
+        },
+      },
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Alice Active')).toBeTruthy();
@@ -119,11 +131,7 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
   });
 
   it('opening the page with ?filter=warned falls back to All without showing empty list', async () => {
-    render(
-      <MemoryRouter initialEntries={['/admin/users?filter=warned']}>
-        <AdminUsers />
-      </MemoryRouter>
-    );
+    renderWithStore(<AdminUsers />, { route: '/admin/users?filter=warned' });
 
     await waitFor(() => {
       expect(screen.getByText('Alice Active')).toBeTruthy();
@@ -148,11 +156,12 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
       return null;
     };
 
-    render(
-      <MemoryRouter initialEntries={['/admin/users?filter=warned']}>
+    renderWithStore(
+      <>
         <AdminUsers />
         <LocationWatcher />
-      </MemoryRouter>
+      </>,
+      { route: '/admin/users?filter=warned' },
     );
 
     await waitFor(() => {
@@ -175,11 +184,17 @@ describe('AdminUsers: Warned Filter Chip Removal', () => {
   it('row displays Warned badge and Warn user action continues to work', async () => {
     adminApi.warnUser.mockResolvedValueOnce({ id: 'w-1', status: 'Warned' });
 
-    render(
-      <MemoryRouter initialEntries={['/admin/users']}>
-        <AdminUsers />
-      </MemoryRouter>
-    );
+    renderWithStore(<AdminUsers />, {
+      route: '/admin/users',
+      preloadedState: {
+        session: {
+          adminUid: 'admin-super',
+          portalRole: 'admin',
+          isSuperUser: true,
+          permissions: ['*'],
+        },
+      },
+    });
 
     await waitFor(() => {
       expect(screen.getByText('Bob Warned')).toBeTruthy();

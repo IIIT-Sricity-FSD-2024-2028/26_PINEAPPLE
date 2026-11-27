@@ -1,17 +1,16 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import React, { useContext } from 'react';
-import { MemoryRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { Routes, Route, Outlet } from 'react-router-dom';
+import { useSelector } from 'react-redux';
 import Navbar from '../components/navbar.jsx';
 import Sidebar from '../components/sidebar.jsx';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { RoleProvider, useActiveRole } from '../context/RoleContext.jsx';
 import OwnerProtectedRoute from '../routes/OwnerProtectedRoute.jsx';
-import storage from '../utils/storage.js';
-import { setAuthMode } from '../services/apiClient.js';
+import { selectActiveRole } from '../store/selectors/sessionSelectors.js';
+import { setActiveRole } from '../store/slices/sessionSlice.js';
+import { renderWithStore } from './test-utils.jsx';
 
 function MockLayout() {
-  const { currentRole } = useActiveRole();
+  const currentRole = useSelector(selectActiveRole);
   return (
     <div>
       <Navbar onMenuClick={() => {}} />
@@ -27,8 +26,6 @@ describe('Fix 2: Navbar and Sidebar Role Sync on a Single Click', () => {
     vi.clearAllMocks();
     localStorage.clear();
     sessionStorage.clear();
-    setAuthMode('legacy');
-    storage.setRole('Collaborator');
   });
 
   afterEach(() => {
@@ -46,31 +43,28 @@ describe('Fix 2: Navbar and Sidebar Role Sync on a Single Click', () => {
       emailVerified: true,
     };
 
-    const mockAuthContext = {
-      user: mockUser,
-      isAuthenticated: true,
-      status: 'authenticated',
-      loading: false,
-      login: vi.fn(),
-      logout: vi.fn(),
-      refreshUser: vi.fn(),
-    };
-
-    render(
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <AuthContext.Provider value={mockAuthContext}>
-          <RoleProvider>
-            <Routes>
-              <Route element={<MockLayout />}>
-                <Route path="/dashboard" element={<div data-testid="collaborator-dashboard">Collaborator Dashboard</div>} />
-                <Route element={<OwnerProtectedRoute />}>
-                  <Route path="/owner/dashboard" element={<div data-testid="owner-dashboard">Project Owner Dashboard</div>} />
-                </Route>
-              </Route>
-            </Routes>
-          </RoleProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>
+    const { store } = renderWithStore(
+      <Routes>
+        <Route element={<MockLayout />}>
+          <Route path="/dashboard" element={<div data-testid="collaborator-dashboard">Collaborator Dashboard</div>} />
+          <Route element={<OwnerProtectedRoute />}>
+            <Route path="/owner/dashboard" element={<div data-testid="owner-dashboard">Project Owner Dashboard</div>} />
+          </Route>
+        </Route>
+      </Routes>,
+      {
+        route: '/dashboard',
+        preloadedState: {
+          session: {
+            user: mockUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Collaborator',
+            allowedRoles: ['Collaborator', 'Project Owner'],
+            initialized: true,
+          },
+        },
+      }
     );
 
     // Initial state: Collaborator
@@ -91,17 +85,17 @@ describe('Fix 2: Navbar and Sidebar Role Sync on a Single Click', () => {
       expect(screen.getByTestId('owner-dashboard')).toBeTruthy();
     });
 
-    // 2. The active role indicator in Navbar / Context must be "Project Owner"
+    // 2. The active role indicator in Navbar / Redux store must be "Project Owner"
     expect(screen.getByTestId('active-role-indicator').textContent).toBe('Project Owner');
 
     // 3. The Sidebar section title for "PROJECT OWNER" must now be visible
     expect(screen.getByRole('heading', { name: /PROJECT OWNER/i })).toBeTruthy();
 
-    // 4. Storage must hold Project Owner
-    expect(storage.getRole()).toBe('Project Owner');
+    // 4. Store must hold Project Owner (without touching browser storage)
+    expect(selectActiveRole(store.getState())).toBe('Project Owner');
   });
 
-  it('synchronizes role when another tab updates teamforge.role in localStorage', async () => {
+  it('synchronizes Navbar and Sidebar immediately when setActiveRole is dispatched to the store', async () => {
     const mockUser = {
       id: 'test-user-2',
       uid: 'test-user-2',
@@ -110,33 +104,24 @@ describe('Fix 2: Navbar and Sidebar Role Sync on a Single Click', () => {
       role: 'Collaborator',
     };
 
-    const mockAuthContext = {
-      user: mockUser,
-      isAuthenticated: true,
-      status: 'authenticated',
-      loading: false,
-    };
-
-    render(
-      <MemoryRouter initialEntries={['/dashboard']}>
-        <AuthContext.Provider value={mockAuthContext}>
-          <RoleProvider>
-            <MockLayout />
-          </RoleProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>
-    );
+    const { store } = renderWithStore(<MockLayout />, {
+      route: '/dashboard',
+      preloadedState: {
+        session: {
+          user: mockUser,
+          isAuthenticated: true,
+          status: 'authenticated',
+          activeRole: 'Collaborator',
+          allowedRoles: ['Collaborator', 'Project Owner'],
+          initialized: true,
+        },
+      },
+    });
 
     expect(screen.getByTestId('active-role-indicator').textContent).toBe('Collaborator');
 
-    // Simulate storage event from another tab switching to Project Owner
     act(() => {
-      window.dispatchEvent(
-        new StorageEvent('storage', {
-          key: 'teamforge.role',
-          newValue: 'Project Owner',
-        })
-      );
+      store.dispatch(setActiveRole('Project Owner'));
     });
 
     await waitFor(() => {

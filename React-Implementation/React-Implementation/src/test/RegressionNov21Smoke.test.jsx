@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { renderWithProviders } from './test-utils';
 import { setAuthMode } from '../services/apiClient';
 import Login from '../pages/Login';
-import { AuthContext } from '../context/AuthContext';
-import SuspendedAccountPanel from '../components/common/SuspendedAccountPanel';
 import AdminSupport from '../pages/admin/AdminSupport';
 import AdminReports from '../pages/admin/AdminReports';
 import AuditLog from '../pages/admin/AuditLog';
@@ -174,15 +171,9 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
         supportContact: 'support@teamforge.io',
       };
 
-      const mockLogin = vi.fn().mockRejectedValue(mockSuspendedErr);
+      mockAuthApi.login.mockRejectedValue(mockSuspendedErr);
 
-      render(
-        <AuthContext.Provider value={{ login: mockLogin, user: null, status: 'signed_out' }}>
-          <MemoryRouter initialEntries={['/login']}>
-            <Login />
-          </MemoryRouter>
-        </AuthContext.Provider>,
-      );
+      renderWithProviders(<Login />, { route: '/login' });
 
       const emailInput = screen.getByPlaceholderText(/username or name@example.com/i);
       const passwordInput = screen.getByPlaceholderText('••••••');
@@ -209,9 +200,6 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
 
   describe('Step 4 Smoke: Read-Only Ticket Drawer for Terminal Status Tickets', () => {
     it('renders read-only metadata badges, resolution note banner, and hides editing controls on resolved ticket', async () => {
-      sessionStorage.setItem('teamforge.portalRole', 'Admin');
-      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['support']));
-
       mockSupportApi.listAdminTickets.mockResolvedValue({
         items: [
           {
@@ -247,7 +235,11 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
         messages: [],
       });
 
-      renderWithProviders(<AdminSupport />);
+      renderWithProviders(<AdminSupport />, {
+        preloadedState: {
+          session: { portalRole: 'admin', permissions: ['support'], isAuthenticated: true, initialized: true },
+        },
+      });
 
       const openBtn = await screen.findByTestId('open-ticket-t-resolved-1');
       fireEvent.click(openBtn);
@@ -269,11 +261,7 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
   });
 
   describe('Step 5 Smoke: View Audit Log Navigation & Filter Chips', () => {
-    it('Report review dialog opens /admin/audit-log in a new tab, disabled without permission, and AuditLog renders chips', async () => {
-      // 1. Admin with audit permission
-      sessionStorage.setItem('teamforge.portalRole', 'Admin');
-      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['reports', 'audit']));
-
+    it('Report review dialog renders View audit log button (SPA nav, never _blank), and AuditLog renders chips', async () => {
       mockReportsApi.getAdminReports.mockResolvedValue([
         {
           id: 'rep-smoke-1',
@@ -298,17 +286,19 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
         createdAt: '2026-11-20T10:00:00.000Z',
       });
 
-      const { unmount } = renderWithProviders(<AdminReports />, { route: '/admin/reports' });
+      const { unmount } = renderWithProviders(<AdminReports />, {
+        route: '/admin/reports',
+        preloadedState: {
+          session: { portalRole: 'admin', permissions: ['reports', 'audit'], isAuthenticated: true, initialized: true },
+        },
+      });
 
       const reviewBtn = await screen.findByTestId('review-report-rep-smoke-1');
       fireEvent.click(reviewBtn);
 
-      const auditLink = await screen.findByTestId('link-view-audit');
-      expect(auditLink.tagName.toLowerCase()).toBe('a');
-      expect(auditLink.getAttribute('target')).toBe('_blank');
-      expect(auditLink.getAttribute('href')).toBe(
-        '/admin/audit-log?userId=bad-user-123&reportId=rep-smoke-1&from=report',
-      );
+      const auditBtn = await screen.findByTestId('link-view-audit');
+      expect(auditBtn.tagName.toLowerCase()).toBe('button');
+      expect(auditBtn.getAttribute('target')).toBeNull();
 
       unmount();
 
@@ -328,6 +318,9 @@ describe('Frontend Smoke Test Suite (Nov 21): Visible Behavior Across Steps 1 - 
 
       renderWithProviders(<AuditLog />, {
         route: '/admin/audit-log?userId=bad-user-123&reportId=rep-smoke-1&from=report',
+        preloadedState: {
+          session: { portalRole: 'admin', permissions: ['reports', 'audit'], isAuthenticated: true, initialized: true },
+        },
       });
 
       await waitFor(() => {

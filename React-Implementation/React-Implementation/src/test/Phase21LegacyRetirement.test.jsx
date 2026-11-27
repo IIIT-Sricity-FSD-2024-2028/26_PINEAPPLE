@@ -1,10 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import Help from '../pages/help';
 import MentorApplication from '../pages/mentor/MentorApplication';
 import mentorshipApi from '../services/mentorshipApi';
@@ -13,7 +8,7 @@ import mentorApplicationsApi from '../services/mentorApplicationsApi';
 import uploadsApi from '../services/uploadsApi';
 import usersApi from '../services/usersApi';
 import tokenManager from '../services/tokenManager';
-import storage from '../utils/storage';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/reportsApi', () => ({
   default: {
@@ -53,49 +48,24 @@ vi.mock('../services/adminApi', () => ({
 }));
 
 function renderWithContexts(ui, { user = { id: '2', name: 'Arjun Sharma', email: 'arjun@teamforge.io', emailVerified: true } } = {}) {
-  return render(
-    <MemoryRouter>
-      <UIProvider>
-        <AuthContext.Provider
-          value={{
-            user,
-            isAuthenticated: true,
-            login: vi.fn(),
-            logout: vi.fn(),
-            updateUser: vi.fn(),
-            setUser: vi.fn(),
-          }}
-        >
-          <RoleContext.Provider
-            value={{
-              currentRole: 'Collaborator',
-              switchRole: vi.fn(),
-              isMentorApproved: false,
-              mentorAppStatus: 'none',
-              refreshMentorStatus: vi.fn(),
-            }}
-          >
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                markAsRead: vi.fn(),
-                markAllAsRead: vi.fn(),
-              }}
-            >
-              {ui}
-            </NotificationContext.Provider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </UIProvider>
-    </MemoryRouter>,
-  );
+  return renderWithStore(ui, {
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'Collaborator',
+        allowedRoles: ['Collaborator'],
+        mentorApproved: false,
+        mentorAppStatus: 'none',
+      },
+    },
+  });
 }
 
 describe('Phase 21: Legacy Route Retirement & Canonical Caller Migration', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    storage.setBackendUserId('2');
     tokenManager.setTokens({
       accessToken: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjk5OTk5OTk5OTl9.signature',
       refreshToken: 'fake-refresh',

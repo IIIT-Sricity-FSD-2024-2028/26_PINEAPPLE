@@ -27,5 +27,3 @@ export function highlightMatch(text, query) {
     </>
   );
 }
-
-export default highlightMatch;

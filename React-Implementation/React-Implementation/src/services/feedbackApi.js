@@ -2,38 +2,15 @@ import { apiRequest } from './apiClient.js';
 
 export const OTHER_REASON_ID = 'OTHER';
 
-let cachedReasonsConfig = null;
-let pendingConfigRequest = null;
-
 export const feedbackApi = {
   /**
    * Fetches the universal action reason configuration from GET /feedback/reasons.
-   * Caches response in-memory so it is fetched once per session.
+   * State and deduplication live in `actionFeedbackSlice` via `fetchFeedbackReasons`.
    *
-   * @param {boolean} [forceRefresh=false]
    * @returns {Promise<Object>}
    */
-  async getFeedbackReasons(forceRefresh = false) {
-    if (!forceRefresh && cachedReasonsConfig) {
-      return cachedReasonsConfig;
-    }
-
-    if (pendingConfigRequest) {
-      return pendingConfigRequest;
-    }
-
-    pendingConfigRequest = apiRequest('/feedback/reasons', 'GET')
-      .then((data) => {
-        cachedReasonsConfig = data;
-        pendingConfigRequest = null;
-        return data;
-      })
-      .catch((err) => {
-        pendingConfigRequest = null;
-        throw err;
-      });
-
-    return pendingConfigRequest;
+  async getFeedbackReasons() {
+    return apiRequest('/feedback/reasons', 'GET');
   },
 
   /**
@@ -51,14 +28,6 @@ export const feedbackApi = {
     }).toString();
 
     return apiRequest(`/feedback?${query}`, 'GET');
-  },
-
-  /**
-   * Clears the in-memory cache (primarily for tests).
-   */
-  clearCache() {
-    cachedReasonsConfig = null;
-    pendingConfigRequest = null;
   },
 };
 

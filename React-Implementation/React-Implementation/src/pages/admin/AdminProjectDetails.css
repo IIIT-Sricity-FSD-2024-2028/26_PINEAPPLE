@@ -1,23 +1,37 @@
-/* Admin Project Details Page — Clean, Modern & Responsive */
+/* Admin Project Details Page — Responsive Grid, Cards & Controls */
 
 .admin-project-details-page {
+  width: 100%;
   max-width: 1200px;
+  min-width: 0;
   margin: 0 auto;
   padding: 24px;
   box-sizing: border-box;
+}
+
+/* Avoid double outer padding inside AdminLayout's .admin-main-content */
+.admin-main-content > .admin-project-details-page {
+  padding: 0;
 }
 
 /* Header Section */
 .admin-project-header-wrapper {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 14px;
   margin-bottom: 24px;
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-bottom: none;
+  background: transparent;
+  box-shadow: none;
 }
 
 .admin-project-header-top {
   display: flex;
   align-items: center;
+  min-width: 0;
 }
 
 .admin-back-btn {
@@ -31,9 +45,10 @@
 .admin-project-header-row {
   display: flex;
   justify-content: space-between;
-  align-items: center;
+  align-items: flex-start;
   flex-wrap: wrap;
-  gap: 16px;
+  gap: 14px 16px;
+  min-width: 0;
 }
 
 .admin-project-title-group {
@@ -42,7 +57,7 @@
   gap: 12px;
   flex-wrap: wrap;
   min-width: 0;
-  flex: 1;
+  flex: 1 1 340px;
 }
 
 .admin-project-title {
@@ -51,6 +66,8 @@
   line-height: 1.25;
   color: var(--tf-ink-900, #111827);
   margin: 0;
+  min-width: 0;
+  max-width: 100%;
   word-break: break-word;
   overflow-wrap: anywhere;
 }
@@ -58,22 +75,29 @@
 .admin-project-status-badge {
   font-size: 0.8rem;
   padding: 3px 10px;
+  flex-shrink: 0;
 }
 
 .admin-project-header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 8px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
+  flex: 0 1 auto;
 }
 
 .admin-project-tabs {
   display: inline-flex;
+  flex-wrap: wrap;
   gap: 6px;
   background: var(--tf-ink-100, #f3f4f6);
   padding: 4px;
   border-radius: 10px;
   border: 1px solid var(--tf-ink-200, #e5e7eb);
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-project-tabs .btn {
@@ -83,7 +107,8 @@
   border-radius: 6px;
   border: none;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
 }
 
 .admin-project-tabs .btn-primary {
@@ -107,10 +132,11 @@
   border-color: #fca5a5 !important;
   font-size: 0.85rem;
   font-weight: 500;
-  padding: 6px 14px;
+  padding: 7px 14px;
   border-radius: 8px;
   background: transparent;
-  transition: all 0.15s ease;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  white-space: nowrap;
 }
 
 .admin-delete-btn:hover {
@@ -119,20 +145,63 @@
   color: #b91c1c !important;
 }
 
-/* Cards & Layout Structure */
-.admin-project-details-grid {
-  display: grid;
-  grid-template-columns: minmax(0, 1.8fr) minmax(280px, 1.2fr);
-  gap: 24px;
-  align-items: start;
-}
-
 @media (max-width: 900px) {
-  .admin-project-details-grid {
-    grid-template-columns: 1fr;
+  .admin-project-header-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-project-title-group {
+    flex: 1 1 auto;
+    width: 100%;
+  }
+
+  .admin-project-header-actions {
+    width: 100%;
+    flex: 1 1 auto;
+  }
+
+  .admin-project-tabs {
+    width: 100%;
+    display: flex;
+  }
+
+  .admin-project-tabs .btn {
+    flex: 1 1 140px;
+    justify-content: center;
+    text-align: center;
+  }
+
+  .admin-delete-btn {
+    width: 100%;
+    justify-content: center;
+    text-align: center;
   }
 }
 
+/* Cards & Layout Structure */
+.admin-project-details-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 24px;
+  align-items: start;
+  min-width: 0;
+}
+
+@media (max-width: 1100px) {
+  .admin-project-details-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+.admin-project-details-grid > * {
+  min-width: 0;
+}
+
+.admin-details-card.card,
+.admin-team-card.card,
+.admin-tasks-card.card,
+.admin-escrow-card.card,
 .admin-details-card,
 .admin-team-card,
 .admin-tasks-card,
@@ -143,6 +212,8 @@
   padding: 20px;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   box-sizing: border-box;
+  min-width: 0;
+  width: 100%;
 }
 
 .admin-card-title {
@@ -151,18 +222,20 @@
   color: var(--tf-ink-900, #111827);
   margin: 0 0 18px 0;
   line-height: 1.3;
+  overflow-wrap: anywhere;
 }
 
 /* Overview Card Fields Grid */
 .admin-details-fields-grid {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px 24px;
+  min-width: 0;
 }
 
-@media (max-width: 900px) {
+@media (max-width: 700px) {
   .admin-details-fields-grid {
-    grid-template-columns: 1fr;
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 
@@ -191,6 +264,7 @@
   color: var(--fg, #1f2937);
   word-break: break-word;
   overflow-wrap: anywhere;
+  min-width: 0;
 }
 
 .admin-skills-list {
@@ -199,6 +273,8 @@
   gap: 6px;
   align-items: center;
   margin-top: 2px;
+  min-width: 0;
+  max-width: 100%;
 }
 
 .admin-skill-chip {
@@ -211,6 +287,9 @@
   background: var(--secondary, #f3f4f6);
   color: var(--fg, #374151);
   border: 1px solid var(--border, #e5e7eb);
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 /* Description Section */
@@ -221,6 +300,7 @@
   display: flex;
   flex-direction: column;
   gap: 6px;
+  min-width: 0;
 }
 
 .admin-project-description {
@@ -228,6 +308,8 @@
   font-weight: 400;
   line-height: 1.6;
   color: var(--fg, #374151);
+  min-width: 0;
+  max-width: 100%;
   overflow-wrap: anywhere;
   word-break: break-word;
   white-space: pre-wrap;
@@ -236,6 +318,7 @@
 .admin-project-description.is-clamped {
   display: -webkit-box;
   -webkit-line-clamp: 4;
+  line-clamp: 4;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -265,6 +348,9 @@
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .admin-notice-box--closed {
@@ -289,6 +375,7 @@
   justify-content: space-between;
   gap: 12px;
   flex-wrap: wrap;
+  min-width: 0;
 }
 
 .admin-notice-date {
@@ -300,42 +387,45 @@
   font-size: 0.88rem;
   color: #991b1b;
   line-height: 1.5;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.admin-notice-title,
+.admin-notice-subtext,
+.admin-notice-text,
+.admin-notice-error {
+  margin: 0;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .admin-notice-title {
-  margin: 0;
   font-size: 0.88rem;
   font-weight: 600;
   color: #991b1b;
 }
 
 .admin-notice-subtext {
-  margin: 0;
   font-size: 0.82rem;
   color: #b91c1c;
 }
 
 .admin-notice-text {
-  margin: 0;
   font-size: 0.88rem;
   color: #991b1b;
 }
 
 .admin-notice-error {
-  margin: 4px 0 0 0;
+  margin-top: 4px;
   font-size: 0.82rem;
   color: #b91c1c;
 }
 
 /* Team Members Card */
-.admin-team-card {
-  min-width: 0;
-}
-
-.admin-team-card .admin-card-title {
-  white-space: nowrap;
-}
-
 .admin-team-card-body {
   min-width: 0;
 }
@@ -346,15 +436,17 @@
   margin: 0;
   display: flex;
   flex-direction: column;
+  min-width: 0;
 }
 
 .admin-team-member-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   padding: 10px 0;
   border-bottom: 1px solid var(--border, #f3f4f6);
+  min-width: 0;
 }
 
 .admin-team-member-row:last-child {
@@ -367,6 +459,10 @@
   gap: 10px;
   min-width: 0;
   flex: 1;
+}
+
+.admin-team-member-row .tf-avatar {
+  flex-shrink: 0;
 }
 
 .admin-team-member-name {
@@ -382,6 +478,8 @@
 
 .admin-team-member-badge {
   flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
 }
 
 /* Tasks & Milestones Card */
@@ -391,7 +489,28 @@
 
 .admin-tasks-table-wrapper {
   margin-top: 12px;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
+}
+
+.admin-tasks-table-wrapper .tf-datatable {
+  table-layout: fixed;
+  width: 100%;
+}
+
+.admin-tasks-table-wrapper .tf-datatable th,
+.admin-tasks-table-wrapper .tf-datatable td {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  white-space: normal;
+}
+
+@media (max-width: 768px) {
+  .admin-tasks-table-wrapper .tf-datatable {
+    min-width: 540px;
+  }
 }
 
 .admin-task-status-group,
@@ -400,6 +519,8 @@
   align-items: center;
   gap: 6px;
   flex-wrap: wrap;
+  min-width: 0;
+  max-width: 100%;
 }
 
 /* Escrow & Financials Card */
@@ -425,6 +546,7 @@
   grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
   gap: 14px;
   margin-bottom: 20px;
+  min-width: 0;
 }
 
 .admin-escrow-metric-item {
@@ -432,6 +554,7 @@
   border-radius: 8px;
   background: var(--secondary, #f8fafc);
   border: 1px solid var(--border, #e2e8f0);
+  min-width: 0;
 }
 
 .admin-escrow-metric-item--held {
@@ -468,12 +591,38 @@
 }
 
 .admin-escrow-table-wrapper {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
   overflow-x: auto;
 }
 
+@media (max-width: 768px) {
+  .admin-escrow-table-wrapper .tf-datatable {
+    min-width: 640px;
+  }
+}
+
+/* Override global index.css [class*="empty"] wildcard padding collision */
+.admin-project-details-page .tf-datatable-empty-wrap {
+  padding: 12px 0;
+}
+
+.admin-project-details-page .tf-empty-state {
+  margin: 8px 0;
+  padding: 24px 16px;
+  box-sizing: border-box;
+}
+
+.admin-project-details-page .tf-empty-state-icon,
+.admin-project-details-page .tf-empty-state-title,
+.admin-project-details-page .tf-empty-state-msg {
+  padding: 0;
+}
+
 /* Focus and accessibility outlines */
-button:focus-visible,
-a:focus-visible {
+.admin-project-details-page button:focus-visible,
+.admin-project-details-page a:focus-visible {
   outline: 2px solid var(--primary, #4f46e5);
   outline-offset: 2px;
 }

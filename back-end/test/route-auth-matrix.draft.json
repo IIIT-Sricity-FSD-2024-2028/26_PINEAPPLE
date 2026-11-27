@@ -847,36 +847,6 @@
     },
     {
       "method": "GET",
-      "path": "/admin/system/demo-reset-status",
-      "access": "system",
-      "guards": [
-        "AuthGuard",
-        "RolesGuard"
-      ],
-      "roles": [
-        "superuser"
-      ],
-      "controller": "AdminController",
-      "handler": "getDemoResetStatus",
-      "hasExplicitGuardOrRole": true
-    },
-    {
-      "method": "POST",
-      "path": "/admin/system/reset-demo",
-      "access": "system",
-      "guards": [
-        "AuthGuard",
-        "RolesGuard"
-      ],
-      "roles": [
-        "superuser"
-      ],
-      "controller": "AdminController",
-      "handler": "resetDemoData",
-      "hasExplicitGuardOrRole": true
-    },
-    {
-      "method": "GET",
       "path": "/admin/users",
       "access": "permission",
       "guards": [
@@ -1935,6 +1905,23 @@
     },
     {
       "method": "GET",
+      "path": "/mentor-marketplace/mentored-projects",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMentoredProjects",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
       "path": "/mentor-marketplace/mentors",
       "access": "roles",
       "guards": [
@@ -2073,6 +2060,23 @@
       ],
       "controller": "MentorMarketplaceController",
       "handler": "createProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentor-marketplace/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateProfilePut",
       "hasExplicitGuardOrRole": true
     },
     {
@@ -2597,6 +2601,182 @@
       ],
       "controller": "MentorLifecycleController",
       "handler": "getMyOpenAbandonmentReviews",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentored-projects",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMentoredProjects",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentors",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "listMentors",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentors/:id",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMentor",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentors/availability",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateAvailability",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentors/confirm-role",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "confirmMentorRole",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentors/me",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMyProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/mentors/me/stats",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getMyStats",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PATCH",
+      "path": "/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "createProfile",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "PUT",
+      "path": "/mentors/profile",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "updateProfilePut",
       "hasExplicitGuardOrRole": true
     },
     {
@@ -3446,6 +3626,324 @@
       "controller": "ReportsController",
       "handler": "getMyReports",
       "hasExplicitGuardOrRole": false
+    },
+    {
+      "method": "GET",
+      "path": "/sessions",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getAllSessions",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/accept",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "acceptSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/cancel",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "cancelSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/cancel-payment",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "cancelPayment",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/complete",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "completeSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/confirm-payment",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "confirmPayment",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/decline",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "declineSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/dispute",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "mentor",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "openDispute",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/feedback",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "submitFeedback",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/notes",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "addSessionNote",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/pay",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "paySession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/retry-payout",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "retryPayout",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/review",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "submitReview",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/:id/start",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "startSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/sessions/admin-stats",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "getAdminStats",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "POST",
+      "path": "/sessions/book",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard",
+        "EmailVerifiedGuard"
+      ],
+      "roles": [
+        "admin",
+        "project-owner",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "bookSession",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/sessions/mentor-view",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "mentor",
+        "superuser"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "mySessionsMentor",
+      "hasExplicitGuardOrRole": true
+    },
+    {
+      "method": "GET",
+      "path": "/sessions/mine",
+      "access": "roles",
+      "guards": [
+        "AuthGuard",
+        "RolesGuard"
+      ],
+      "roles": [
+        "admin",
+        "collaborator",
+        "project-owner",
+        "superuser",
+        "user"
+      ],
+      "controller": "MentorMarketplaceController",
+      "handler": "mySessionsStudent",
+      "hasExplicitGuardOrRole": true
     },
     {
       "method": "GET",

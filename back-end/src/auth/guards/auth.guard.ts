@@ -43,13 +43,15 @@ export class AuthGuard implements CanActivate {
       return true;
     }
 
-    // Always bypass docs, health, and static upload assets
+    // Always bypass docs, health, and public GET/HEAD static upload assets
     const isDocOrStatic =
       cleanPath === '/api' ||
       cleanPath.startsWith('/api/swagger') ||
       cleanPath === '/api-json' ||
       cleanPath === '/api-yaml' ||
-      (cleanPath.startsWith('/uploads') && !cleanPath.startsWith('/uploads/cv')) ||
+      ((method === 'GET' || method === 'HEAD') &&
+        cleanPath.startsWith('/uploads') &&
+        !cleanPath.startsWith('/uploads/cv')) ||
       cleanPath === '/health' ||
       cleanPath === '';
 

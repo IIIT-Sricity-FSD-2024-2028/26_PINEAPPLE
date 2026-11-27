@@ -1,7 +1,6 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
 import fs from 'fs';
 import path from 'path';
 
@@ -10,7 +9,7 @@ import MyProjects from '../pages/owner/MyProjects';
 import CreateProject from '../pages/owner/CreateProject';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/projectsApi', () => ({
   default: {
@@ -96,15 +95,23 @@ const mockUser = {
 };
 
 const renderWithProviders = (ui, initialRoute = '/owner/workspace/p-open-1') => {
-  return render(
-    <AuthContext.Provider value={{ user: mockUser, isAuthenticated: true }}>
-      <MemoryRouter initialEntries={[initialRoute]}>
-        <Routes>
-          <Route path="/owner/workspace/:projectId" element={ui} />
-          <Route path="*" element={ui} />
-        </Routes>
-      </MemoryRouter>
-    </AuthContext.Provider>
+  return renderWithStore(
+    <Routes>
+      <Route path="/owner/workspace/:projectId" element={ui} />
+      <Route path="*" element={ui} />
+    </Routes>,
+    {
+      route: initialRoute,
+      preloadedState: {
+        session: {
+          user: mockUser,
+          isAuthenticated: true,
+          status: 'authenticated',
+          activeRole: 'Project Owner',
+          allowedRoles: ['Project Owner'],
+        },
+      },
+    },
   );
 };
 

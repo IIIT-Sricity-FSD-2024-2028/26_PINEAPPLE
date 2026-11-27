@@ -1,15 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
+import { renderWithStore } from './test-utils';
 
-import MyProjects from '../pages/owner/MyProjects';
 import AdminProjects from '../pages/admin/AdminProjects';
 import AdminProjectDetails from '../pages/admin/AdminProjectDetails';
 import Settings from '../pages/settings';
-import NotificationsPage from '../pages/notifications';
 import ChatBox from '../components/features/ChatBox';
 import TaskCard from '../components/features/TaskCard';
 import DeleteProjectDialog from '../components/features/DeleteProjectDialog';
@@ -56,8 +52,6 @@ vi.mock('../services/projectsApi', () => {
 vi.mock('../services/usersApi', () => ({
   default: {
     getMe: vi.fn(),
-    getSettings: vi.fn(),
-    updateSettings: vi.fn(),
     requestExport: vi.fn(),
     listExports: vi.fn(),
     downloadExport: vi.fn(),
@@ -86,7 +80,7 @@ vi.mock('../services/appealsApi', () => ({
   },
 }));
 
-describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & Notification Digest', () => {
+describe('Phase 18 Frontend Tests: Soft Delete, Data Export & Account Deletion', () => {
   const ownerUser = {
     id: '1',
     name: 'Priya Patel',
@@ -97,7 +91,6 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.setItem('teamforge.backendUserId', '1');
   });
 
   it('1. Owner delete project confirmation shows escrow 409 error and removes project on success', async () => {
@@ -120,20 +113,23 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     const onSuccess = vi.fn();
     const onClose = vi.fn();
 
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: ownerUser, updateUser: vi.fn() }}>
-          <UIProvider>
-            <DeleteProjectDialog
-              isOpen={true}
-              projectId="proj-del-1"
-              projectTitle="Escrow Locked Alpha"
-              onClose={onClose}
-              onSuccess={onSuccess}
-            />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
+    renderWithStore(
+      <DeleteProjectDialog
+        isOpen={true}
+        projectId="proj-del-1"
+        projectTitle="Escrow Locked Alpha"
+        onClose={onClose}
+        onSuccess={onSuccess}
+      />,
+      {
+        preloadedState: {
+          session: {
+            user: ownerUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      },
     );
 
     const titleInput = await screen.findByTestId('delete-project-confirm-title-input');
@@ -166,13 +162,7 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     });
     projectsApi.restore.mockResolvedValue({ project: { ...deletedProj, deletedAt: undefined } });
 
-    render(
-      <MemoryRouter>
-        <UIProvider>
-          <AdminProjects />
-        </UIProvider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<AdminProjects />);
 
     const deletedTab = await screen.findByRole('tab', { name: /Deleted/i });
     fireEvent.click(deletedTab);
@@ -186,12 +176,11 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     });
 
     projectsApi.get.mockResolvedValue(deletedProj);
-    render(
-      <MemoryRouter initialEntries={['/admin/projects/proj-soft-2']}>
-        <Routes>
-          <Route path="/admin/projects/:id" element={<AdminProjectDetails />} />
-        </Routes>
-      </MemoryRouter>,
+    renderWithStore(
+      <Routes>
+        <Route path="/admin/projects/:id" element={<AdminProjectDetails />} />
+      </Routes>,
+      { route: '/admin/projects/proj-soft-2' },
     );
 
     const detailRestore = await screen.findByTestId('admin-restore-project-btn');
@@ -201,12 +190,9 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     });
   });
 
-  it('3. Settings digest preferences, JSON export download, and account deletion with open obligations', async () => {
-    const mockLogout = vi.fn();
+  it('3. Settings JSON export download and account deletion with open obligations', async () => {
     usersApi.getMe.mockResolvedValue(ownerUser);
-    usersApi.getSettings.mockResolvedValue({ digestEnabled: true, digestHour: 9, utcOffsetMinutes: 330 });
     usersApi.listExports.mockResolvedValue([]);
-    usersApi.updateSettings.mockResolvedValue({ digestEnabled: false, digestHour: 18, utcOffsetMinutes: 330 });
     usersApi.requestExport.mockResolvedValue({
       exportId: 'exp_ui_123',
       status: 'ready',
@@ -225,30 +211,19 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
       })
       .mockResolvedValueOnce({ success: true });
 
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: ownerUser, updateUser: vi.fn(), logout: mockLogout }}>
-          <UIProvider>
-            <Settings />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
-
-    // Digest controls
-    const digestToggle = await screen.findByTestId('digest-enabled-toggle');
-    expect(digestToggle.checked).toBe(true);
-    fireEvent.change(screen.getByTestId('digest-hour-select'), { target: { value: '18' } });
-    fireEvent.click(digestToggle);
-    fireEvent.click(screen.getByTestId('save-digest-btn'));
-    await waitFor(() => {
-      expect(usersApi.updateSettings).toHaveBeenCalledWith(
-        expect.objectContaining({ digestEnabled: false, digestHour: 18 }),
-      );
+    const { store } = renderWithStore(<Settings />, {
+      preloadedState: {
+        session: {
+          user: ownerUser,
+          isAuthenticated: true,
+          status: 'authenticated',
+        },
+        ui: { theme: 'light' },
+      },
     });
 
     // Data Export card
-    fireEvent.click(screen.getByTestId('request-export-btn'));
+    fireEvent.click(await screen.findByTestId('request-export-btn'));
     const dlLink = await screen.findByTestId('download-export-link');
     expect(screen.getByTestId('export-status-box').textContent).toContain('ready');
     fireEvent.click(dlLink);
@@ -283,7 +258,7 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     fireEvent.click(await screen.findByTestId('delete-confirm-submit-btn'));
     await waitFor(() => {
       expect(usersApi.deleteMyAccount).toHaveBeenLastCalledWith({ username: 'priyapatel' });
-      expect(mockLogout).toHaveBeenCalled();
+      expect(store.getState().session.user).toBeNull();
       expect(mockNavigate).toHaveBeenCalledWith(
         '/',
         expect.objectContaining({
@@ -294,8 +269,8 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
     });
   });
 
-  it('4. ChatBox & TaskCard display "Deleted user" with neutral avatar, and NotificationsPage expands digest items', async () => {
-    render(
+  it('4. ChatBox & TaskCard display "Deleted user" with neutral avatar', async () => {
+    renderWithStore(
       <div>
         <ChatBox
           currentUserId="1"
@@ -327,43 +302,5 @@ describe('Phase 18 Frontend Tests: Soft Delete, Data Export, Account Deletion & 
 
     expect(screen.getAllByText(/Deleted user/i).length).toBeGreaterThanOrEqual(2);
     expect(screen.getByText('Preserved technical note')).toBeTruthy();
-
-    const digestNotif = {
-      id: 'notif-digest-1',
-      type: 'DAILY_DIGEST',
-      title: 'Daily Notification Digest',
-      message: 'Daily digest (9 events, 2 updates): 8 tasks released from Project X • 1 new comment',
-      isRead: false,
-      createdAt: '2026-11-11T09:00:00.000Z',
-      metadata: {
-        isDigest: true,
-        items: [
-          { key: 'k1', summary: '8 tasks released from Project X', link: '/projects/p1' },
-          { key: 'k2', summary: 'New comment on Task Alpha', link: '/projects/p2' },
-        ],
-      },
-    };
-
-    render(
-      <MemoryRouter>
-        <NotificationContext.Provider
-          value={{
-            notifications: [digestNotif],
-            unreadCount: 1,
-            markAsRead: vi.fn(),
-            markAllAsRead: vi.fn(),
-          }}
-        >
-          <NotificationsPage />
-        </NotificationContext.Provider>
-      </MemoryRouter>,
-    );
-
-    const expandBtn = await screen.findByTestId('notif-digest-toggle-notif-digest-1');
-    fireEvent.click(expandBtn);
-
-    const digestList = await screen.findByTestId('notif-digest-list-notif-digest-1');
-    expect(digestList.textContent).toContain('8 tasks released from Project X');
-    expect(digestList.textContent).toContain('New comment on Task Alpha');
   });
 });

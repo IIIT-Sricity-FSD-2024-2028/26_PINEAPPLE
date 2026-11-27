@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { screen } from '@testing-library/react';
 import ProjectCard from '../components/features/ProjectCard';
+import { renderWithStore } from './test-utils';
 
 describe('ProjectCard - Phase 1 Closed Status & Badges', () => {
   it('renders closed badge and closure reason banner when project is closed', () => {
@@ -15,7 +16,7 @@ describe('ProjectCard - Phase 1 Closed Status & Badges', () => {
       skills: ['Solidity', 'React'],
     };
 
-    render(<ProjectCard project={closedProject} variant="marketplace" />);
+    renderWithStore(<ProjectCard project={closedProject} variant="marketplace" />);
 
     expect(screen.getByText('Decentralized Identity Hub')).toBeDefined();
     // Badge and disabled button both show Closed
@@ -39,7 +40,7 @@ describe('ProjectCard - Phase 1 Closed Status & Badges', () => {
       skills: ['Node.js', 'React'],
     };
 
-    render(<ProjectCard project={openProject} variant="marketplace" />);
+    renderWithStore(<ProjectCard project={openProject} variant="marketplace" />);
 
     expect(screen.getByText('Campus Food Delivery')).toBeDefined();
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDefined();

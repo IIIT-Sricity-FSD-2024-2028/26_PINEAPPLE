@@ -1,9 +1,11 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams, Link, Navigate } from 'react-router-dom';
-import { verifyPasswordResetCode, confirmPasswordReset } from 'firebase/auth';
-import { auth } from '../services/firebase.js';
-import { AuthContext } from '../context/AuthContext';
-import { authApi } from '../services/authApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectIsAuthenticated } from '../store/selectors/sessionSelectors';
+import {
+  completePasswordReset,
+  verifyFirebaseResetCode,
+} from '../store/thunks/sessionThunks';
 import './Auth.css';
 
 const EyeIcon = () => (
@@ -20,7 +22,8 @@ const HomeIcon = () => (
   </svg>
 );
 
-const ResetPassword = () => {
+const ResetPasswordContent = () => {
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token') || '';
   const oobCode = searchParams.get('oobCode') || searchParams.get('code') || '';
@@ -44,7 +47,7 @@ const ResetPassword = () => {
   const toastTimeoutRef = useRef(null);
   const redirectTimeoutRef = useRef(null);
 
-  const { isAuthenticated } = useContext(AuthContext);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const navigate = useNavigate();
 
   const showToast = (message, type = 'success') => {
@@ -66,7 +69,8 @@ const ResetPassword = () => {
   useEffect(() => {
     let isMounted = true;
     if (oobCode) {
-      verifyPasswordResetCode(auth, oobCode)
+      dispatch(verifyFirebaseResetCode(oobCode))
+        .unwrap()
         .then((email) => {
           if (!isMounted) return;
           setVerifiedEmail(email);
@@ -83,7 +87,7 @@ const ResetPassword = () => {
           } else if (code === 'auth/invalid-action-code') {
             setGeneralError('This password reset link is invalid or has already been used.');
           } else {
-            setGeneralError(err?.message || 'Invalid password reset link.');
+            setGeneralError(err?.serverMessage || err?.message || 'Invalid password reset link.');
           }
         });
     }
@@ -91,7 +95,7 @@ const ResetPassword = () => {
     return () => {
       isMounted = false;
     };
-  }, [oobCode]);
+  }, [dispatch, oobCode]);
 
   // Redirect signed-in users to dashboard
   if (isAuthenticated) {
@@ -156,27 +160,19 @@ const ResetPassword = () => {
 
     setLoading(true);
     try {
-      if (oobCode) {
-        // Firebase Flow
-        await confirmPasswordReset(auth, oobCode, password);
-        setSuccessMessage('Password has been successfully reset! Redirecting to login...');
-        showToast('Password updated, please sign in', 'success');
-        if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
-        redirectTimeoutRef.current = setTimeout(() => {
-          navigate('/login');
-        }, 3000);
-      } else {
-        // JWT / Backend Flow
-        const response = await authApi.resetPassword(token, password);
-        setSuccessMessage(response?.message || 'Password has been successfully reset! Redirecting to login...');
-        showToast('Password updated, please sign in', 'success');
-        if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
-        redirectTimeoutRef.current = setTimeout(() => {
-          navigate('/login');
-        }, 3000);
-      }
+      const response = await dispatch(
+        completePasswordReset({ token, oobCode, newPassword: password }),
+      ).unwrap();
+      setSuccessMessage(
+        response?.message || 'Password has been successfully reset! Redirecting to login...',
+      );
+      showToast('Password updated, please sign in', 'success');
+      if (redirectTimeoutRef.current) clearTimeout(redirectTimeoutRef.current);
+      redirectTimeoutRef.current = setTimeout(() => {
+        navigate('/login');
+      }, 3000);
     } catch (err) {
-      const msg = err.message || 'Failed to reset password.';
+      const msg = err?.serverMessage || err?.message || 'Failed to reset password.';
       setGeneralError(msg);
       if (
         msg.toLowerCase().includes('expired') ||
@@ -422,4 +418,5 @@ const ResetPassword = () => {
   );
 };
 
+const ResetPassword = ResetPasswordContent;
 export default ResetPassword;

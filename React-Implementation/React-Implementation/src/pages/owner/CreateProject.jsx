@@ -1,8 +1,21 @@
-import { useState, useContext, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import projectsApi from '../../services/projectsApi';
-import adminApi from '../../services/adminApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { fetchPublicConfig } from '../../store/thunks/platformConfigThunks';
+import {
+  createProject as createProjectThunk,
+  fetchTaskTemplatesByCategory,
+} from '../../store/thunks/projectsThunks';
+import {
+  clearStarterTemplates,
+  setStarterError,
+} from '../../store/slices/projectsSlice';
+import {
+  selectCreateProjectStatus,
+  selectProjectsWorking,
+} from '../../store/selectors/projectsSelectors';
+import { selectPublicConfig } from '../../store/selectors/platformConfigSelectors';
 import FormInput from '../../components/common/FormInput';
 import DatePicker from '../../components/common/DatePicker';
 import StarterTaskPicker from '../../components/features/StarterTaskPicker';
@@ -13,11 +26,18 @@ import {
 } from '../../constants/projectCategories';
 import './createProject.css';
 
-const CreateProject = () => {
-  const { user } = useContext(AuthContext);
+const CreateProjectContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [maxCapacityLimit, setMaxCapacityLimit] = useState(20);
+  const working = useSelector(selectProjectsWorking);
+  const createStatus = useSelector(selectCreateProjectStatus);
+  const publicConfig = useSelector(selectPublicConfig);
+
+  const maxCapacityLimit = Number(publicConfig?.maxCollaboratorsPerProject) > 0
+    ? Number(publicConfig.maxCollaboratorsPerProject)
+    : 20;
   const [minDueDate] = useState(() => new Date(Date.now() + 24 * 60 * 60 * 1000));
   const [formData, setFormData] = useState({
     title: '',
@@ -31,7 +51,6 @@ const CreateProject = () => {
   });
 
   const [errors, setErrors] = useState({});
-  const [submitting, setSubmitting] = useState(false);
   const [feedback, setFeedback] = useState(null);
   const redirectTimerRef = useRef(null);
 
@@ -41,56 +60,40 @@ const CreateProject = () => {
     };
   }, []);
 
-  // Starter Task Templates (Phase 28)
-  const [starterTemplates, setStarterTemplates] = useState([]);
-  const [resolvedTemplateCategory, setResolvedTemplateCategory] = useState('');
-  const [loadingTemplates, setLoadingTemplates] = useState(false);
+  // Starter Task Templates (templates list/loading/error stored in Redux `working`)
+  const starterTemplates = working.starterTemplates || [];
+  const resolvedTemplateCategory = working.starterTemplatesCategory || '';
+  const loadingTemplates = Boolean(working.loadingTemplates);
+  const starterError = working.starterError || '';
+  const submitting = createStatus === 'loading';
   const [starterSelectedKeys, setStarterSelectedKeys] = useState([]);
   const [starterOverrides, setStarterOverrides] = useState({});
   const [starterStepSkipped, setStarterStepSkipped] = useState(false);
-  const [starterError, setStarterError] = useState('');
 
   useEffect(() => {
-    adminApi.getPublicConfig()
-      .then((cfg) => {
-        if (cfg?.maxCollaboratorsPerProject) {
-          setMaxCapacityLimit(cfg.maxCollaboratorsPerProject);
-        }
-      })
-      .catch(() => {});
-  }, []);
+    dispatch(fetchPublicConfig()).catch(() => {});
+  }, [dispatch]);
 
   const loadStarterTemplatesForCategory = (selectedCat) => {
     const clean = String(selectedCat || '').trim();
     if (!clean) {
-      setStarterTemplates([]);
-      setResolvedTemplateCategory('');
+      dispatch(clearStarterTemplates());
       setStarterSelectedKeys([]);
       setStarterOverrides({});
       setStarterStepSkipped(false);
-      setStarterError('');
       return;
     }
 
-    setLoadingTemplates(true);
     setStarterStepSkipped(false);
-    setStarterError('');
-
-    Promise.resolve(projectsApi.getTaskTemplatesByCategory(clean))
+    dispatch(fetchTaskTemplatesByCategory(clean))
+      .unwrap()
       .then((res) => {
         const list = Array.isArray(res?.items) ? res.items : [];
-        setStarterTemplates(list);
-        setResolvedTemplateCategory(res?.category || clean);
         setStarterSelectedKeys(list.map((item) => item.key));
         setStarterOverrides({});
       })
-      .catch((err) => {
-        setStarterTemplates([]);
+      .catch(() => {
         setStarterSelectedKeys([]);
-        setStarterError(err?.serverMessage || err?.message || 'Failed to load starter task templates.');
-      })
-      .finally(() => {
-        setLoadingTemplates(false);
       });
   };
 
@@ -107,14 +110,14 @@ const CreateProject = () => {
   };
 
   const handleToggleStarterKey = (key) => {
-    setStarterError('');
+    dispatch(setStarterError(''));
     setStarterSelectedKeys((prev) =>
       prev.includes(key) ? prev.filter((k) => k !== key) : [...prev, key],
     );
   };
 
   const handleToggleAllStarterKeys = (selectableKeys) => {
-    setStarterError('');
+    dispatch(setStarterError(''));
     const allSelected =
       selectableKeys.length > 0 &&
       selectableKeys.every((k) => starterSelectedKeys.includes(k));
@@ -122,7 +125,7 @@ const CreateProject = () => {
   };
 
   const handleStarterOverrideChange = (key, nextVal) => {
-    setStarterError('');
+    dispatch(setStarterError(''));
     setStarterOverrides((prev) => ({
       ...prev,
       [key]: nextVal,
@@ -132,13 +135,13 @@ const CreateProject = () => {
   const handleSkipStarterTasks = () => {
     setStarterStepSkipped(true);
     setStarterSelectedKeys([]);
-    setStarterError('');
+    dispatch(setStarterError(''));
   };
 
   const handleResumeStarterTasks = () => {
     setStarterStepSkipped(false);
     setStarterSelectedKeys(starterTemplates.map((item) => item.key));
-    setStarterError('');
+    dispatch(setStarterError(''));
   };
 
   const validate = () => {
@@ -202,8 +205,10 @@ const CreateProject = () => {
           title.length < STARTER_TASK_CONSTRAINTS.minTitleLength ||
           title.length > STARTER_TASK_CONSTRAINTS.maxTitleLength
         ) {
-          setStarterError(
-            `Each selected starter task title must be ${STARTER_TASK_CONSTRAINTS.minTitleLength} to ${STARTER_TASK_CONSTRAINTS.maxTitleLength} characters.`,
+          dispatch(
+            setStarterError(
+              `Each selected starter task title must be ${STARTER_TASK_CONSTRAINTS.minTitleLength} to ${STARTER_TASK_CONSTRAINTS.maxTitleLength} characters.`,
+            ),
           );
           return;
         }
@@ -211,15 +216,16 @@ const CreateProject = () => {
           description.length < STARTER_TASK_CONSTRAINTS.minDescriptionLength ||
           description.length > STARTER_TASK_CONSTRAINTS.maxDescriptionLength
         ) {
-          setStarterError(
-            `Each selected starter task description must be ${STARTER_TASK_CONSTRAINTS.minDescriptionLength} to ${STARTER_TASK_CONSTRAINTS.maxDescriptionLength} characters.`,
+          dispatch(
+            setStarterError(
+              `Each selected starter task description must be ${STARTER_TASK_CONSTRAINTS.minDescriptionLength} to ${STARTER_TASK_CONSTRAINTS.maxDescriptionLength} characters.`,
+            ),
           );
           return;
         }
       }
     }
 
-    setSubmitting(true);
     try {
       const payload = {
         title: formData.title.trim(),
@@ -243,7 +249,9 @@ const CreateProject = () => {
         collaborators: [],
       };
 
-      const created = await projectsApi.create(payload, 'Project Owner', user?.id);
+      const created = await dispatch(
+        createProjectThunk({ payload, role: 'Project Owner', userId: user?.id }),
+      ).unwrap();
       const createdStarterCount = Array.isArray(created?.starterTasksCreated)
         ? created.starterTasksCreated.length
         : 0;
@@ -288,14 +296,12 @@ const CreateProject = () => {
       } else if (code === 'TITLE_TOO_SHORT') {
         setErrors((prev) => ({ ...prev, title: err.message }));
       } else if (code === 'TASK_LIMIT_REACHED' || code === 'TEMPLATE_TASK_EXISTS') {
-        setStarterError(formatStarterTaskError(code, err.message));
+        dispatch(setStarterError(formatStarterTaskError(code, err.message)));
       }
       setFeedback({
         type: 'error',
         message: formatStarterTaskError(code, err.message || 'Failed to create project. Please verify all fields.'),
       });
-    } finally {
-      setSubmitting(false);
     }
   };
 
@@ -519,4 +525,5 @@ const CreateProject = () => {
   );
 };
 
+const CreateProject = CreateProjectContent;
 export default CreateProject;

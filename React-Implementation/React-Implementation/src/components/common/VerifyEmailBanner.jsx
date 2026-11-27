@@ -1,9 +1,18 @@
-import { useState, useEffect, useContext } from 'react';
-import { AuthContext } from '../../context/AuthContext';
-import authApi from '../../services/authApi';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from '../../store/selectors/sessionSelectors';
+import { userUpdated } from '../../store/slices/sessionSlice';
+import { refreshSessionUser } from '../../store/thunks/sessionThunks';
+import { resendEmailVerification } from '../../store/thunks/settingsThunks';
 
-const VerifyEmailBanner = ({ forceShow = false } = {}) => {
-  const { user, isAuthenticated, updateUser, refreshUser } = useContext(AuthContext);
+const VerifyEmailBannerContent = ({ forceShow = false } = {}) => {
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+
   const [sending, setSending] = useState(false);
   const [cooldownSeconds, setCooldownSeconds] = useState(0);
   const [statusMessage, setStatusMessage] = useState('');
@@ -34,7 +43,7 @@ const VerifyEmailBanner = ({ forceShow = false } = {}) => {
     setStatusMessage('');
     setErrorMessage('');
     try {
-      const res = await authApi.resendVerification();
+      const res = await dispatch(resendEmailVerification()).unwrap();
       setCooldownSeconds(Number(res?.cooldownSeconds) || 120);
       setStatusMessage(res?.message || 'Verification email sent. Please check your inbox.');
     } catch (err) {
@@ -42,11 +51,8 @@ const VerifyEmailBanner = ({ forceShow = false } = {}) => {
         setHiddenByVerified(true);
         setStatusMessage('');
         setErrorMessage('');
-        if (typeof refreshUser === 'function') {
-          await refreshUser().catch(() => {});
-        } else if (typeof updateUser === 'function') {
-          updateUser({ emailVerified: true });
-        }
+        dispatch(userUpdated({ emailVerified: true }));
+        await dispatch(refreshSessionUser()).unwrap().catch(() => {});
         return;
       }
       const retrySecs =
@@ -120,5 +126,7 @@ const VerifyEmailBanner = ({ forceShow = false } = {}) => {
     </div>
   );
 };
+
+const VerifyEmailBanner = VerifyEmailBannerContent;
 
 export default VerifyEmailBanner;

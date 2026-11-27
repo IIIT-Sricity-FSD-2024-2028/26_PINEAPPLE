@@ -1,13 +1,18 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { formatDateTime, formatCountdown, formatMemberSince, getTimeZoneAbbr } from '../utils/dateFormatter';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import {
+  formatDateTime,
+  formatCountdown,
+  formatMemberSince,
+  formatRelativeTime,
+  getTimeZoneAbbr,
+} from '../utils/dateFormatter';
 import SuperuserConfig from '../pages/admin/SuperuserConfig';
 import adminApi from '../services/adminApi';
 import usersApi from '../services/usersApi';
 import portalAdminsApi from '../services/portalAdminsApi';
 import Profile from '../pages/profile';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/adminApi', () => ({
   default: {
@@ -118,13 +123,18 @@ describe('Phase 10: Platform Durability & Local Time Zone UI', () => {
       expect(formatMemberSince('Unknown Date')).toBe('Unknown');
       expect(formatMemberSince('2026-10-26T00:00:00.000Z')).toContain('2026');
     });
+
+    it('formatRelativeTime formats seconds, minutes, hours, and days cleanly', () => {
+      expect(formatRelativeTime(null)).toBe('');
+      expect(formatRelativeTime(new Date(Date.now() - 15 * 1000).toISOString())).toBe('Just now');
+      expect(formatRelativeTime(new Date(Date.now() - 5 * 60 * 1000).toISOString())).toBe('5m ago');
+      expect(formatRelativeTime(new Date(Date.now() - 3 * 3600 * 1000).toISOString())).toBe('3h ago');
+      expect(formatRelativeTime(new Date(Date.now() - 4 * 86400 * 1000).toISOString())).toBe('4d ago');
+    });
   });
 
   describe('2. SuperuserConfig In-Memory Only (No Snapshot Card)', () => {
     beforeEach(() => {
-      sessionStorage.setItem('teamforge.isSuperUser', 'true');
-      sessionStorage.setItem('teamforge.role', 'superuser');
-
       adminApi.getStats.mockResolvedValue({ activeAdmins: 2, totalUsers: 15 });
       adminApi.getConfig.mockResolvedValue({
         maxProjectsPerUser: 10,
@@ -136,11 +146,15 @@ describe('Phase 10: Platform Durability & Local Time Zone UI', () => {
     });
 
     it('does not render any Snapshot card or Save snapshot button (FIX 1)', async () => {
-      render(
-        <MemoryRouter>
-          <SuperuserConfig />
-        </MemoryRouter>
-      );
+      renderWithStore(<SuperuserConfig />, {
+        preloadedState: {
+          session: {
+            isSuperUser: true,
+            portalRole: 'superuser',
+            permissions: ['*'],
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(adminApi.getConfig).toHaveBeenCalled();
@@ -192,13 +206,15 @@ describe('Phase 10: Platform Durability & Local Time Zone UI', () => {
     });
 
     it('renders Reputation Ledger with Type filter and paginated entries', async () => {
-      render(
-        <AuthContext.Provider value={{ user: mockAuthUser, token: 'fake-token' }}>
-          <MemoryRouter>
-            <Profile />
-          </MemoryRouter>
-        </AuthContext.Provider>
-      );
+      renderWithStore(<Profile />, {
+        preloadedState: {
+          session: {
+            user: mockAuthUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('reputation-type-filter')).toBeDefined();

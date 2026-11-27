@@ -45,21 +45,17 @@ Content-Type: application/json
   "password": "password123"
 }
 
-### 9. Get notification digest settings
+### 9. Get user settings (returns empty object; notification digest removed)
 GET {{baseUrl}}/users/me/settings
 Authorization: {{userToken}}
 
-### 10. Update notification digest settings
+### 10. Update user settings (returns empty object; unknown digest fields stripped)
 PATCH {{baseUrl}}/users/me/settings
 Authorization: {{userToken}}
 Content-Type: application/json
 
-{
-  "digestEnabled": true,
-  "digestHour": 9,
-  "utcOffsetMinutes": 330
-}
+{}
 
-### 11. Trigger hourly background jobs (cleans expired exports & flushes due digests)
+### 11. Trigger hourly background jobs (cleans expired exports)
 POST {{baseUrl}}/admin/jobs/tick
 Authorization: {{adminToken}}

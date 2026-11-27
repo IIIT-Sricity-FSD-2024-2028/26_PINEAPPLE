@@ -20,8 +20,6 @@ import { UserRole, UserStatus } from './dto/create-user.dto';
 import { DataExportService } from './data-export.service';
 import { AccountDeletionService } from './account-deletion.service';
 import { NotificationsService } from '../notifications/notifications.service';
-import { DigestService } from '../notifications/digest.service';
-import { resolveNotificationPriority } from '../notifications/notification-priority.config';
 import { CommunicationRepository } from '../communication/communication.repository';
 import { AuditService } from '../audit/audit.service';
 import { ReportsService } from '../moderation/reports.service';
@@ -31,7 +29,7 @@ import { LeaderboardService } from '../leaderboard/leaderboard.service';
 import { MentorMarketplaceService } from '../mentor-marketplace/mentor-marketplace.service';
 import { EscrowService } from '../escrow/escrow.service';
 
-describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
+describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Settings', () => {
   let appRef: { close: () => Promise<void> };
   let clockService: ClockService;
   let jobsService: JobsService;
@@ -45,7 +43,6 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
   let dataExportService: DataExportService;
   let accountDeletionService: AccountDeletionService;
   let notificationsService: NotificationsService;
-  let digestService: DigestService;
   let commRepo: CommunicationRepository;
   let auditService: AuditService;
   let reportsService: ReportsService;
@@ -93,7 +90,6 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
     dataExportService = app.get(DataExportService);
     accountDeletionService = app.get(AccountDeletionService);
     notificationsService = app.get(NotificationsService);
-    digestService = app.get(DigestService);
     commRepo = app.get(CommunicationRepository);
     auditService = app.get(AuditService);
     reportsService = app.get(ReportsService);
@@ -116,7 +112,6 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
     commRepo.reset();
     mentorService.resetLifecycle();
     dataExportService.reset();
-    digestService.reset();
     jobRunsService.reset();
     clockService.setTime('2026-11-11T08:00:00.000Z');
   });
@@ -377,7 +372,7 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
     expect(gamificationRepo.findByUserId(freshUser.id)).toHaveLength(0);
   });
 
-  it('5. Digest merges 8 tasks into "8 tasks released...", caps at 10 distinct items, respects <24h immediate, timezone/hour, and persists in snapshot', async () => {
+  it('5. Notifications are delivered immediately with no digest deferral or digest user settings', async () => {
     const project = projectsService.create('1', {
       title: 'Project X',
       description: longDesc,
@@ -385,20 +380,9 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
       dueDate: '2027-03-01T00:00:00.000Z',
     });
 
-    // User 2 sets IST (+330 mins) digest at 15:00 local (09:30 UTC)
-    usersService.updateDigestSettings('2', {
-      digestEnabled: true,
-      digestHour: 15,
-      utcOffsetMinutes: 330,
-    });
+    expect(usersService.getUserSettings('2')).toEqual({});
+    expect(usersService.updateUserSettings('2')).toEqual({});
 
-    // Validation bounds
-    expect(() => usersService.updateDigestSettings('2', { digestHour: -1 })).toThrow();
-    expect(() => usersService.updateDigestSettings('2', { digestHour: 24 })).toThrow();
-    expect(() => usersService.updateDigestSettings('2', { digestHour: 9.5 })).toThrow();
-
-    // Priority check: <24h deadline is immediate
-    expect(resolveNotificationPriority({ type: 'PROJECT_UPDATE', metadata: { deadlineHours: 12 } })).toBe('immediate');
     const beforeUnread = notificationsService.findByUser('2').filter((n) => !n.readStatus).length;
 
     notificationsService.create({
@@ -407,80 +391,13 @@ describe('Phase 18 Unit Tests: Privacy, Deletion & Notification Digest', () => {
       title: 'Warning 1/4',
       message: 'Immediate warning delivery',
     });
-    expect(notificationsService.findByUser('2').filter((n) => !n.readStatus).length).toBe(beforeUnread + 1);
-
-    // Buffer 8 TASKS_RELEASED events -> unread count stays unchanged
-    for (let i = 0; i < 8; i++) {
-      notificationsService.create({
-        userId: '2',
-        type: 'TASKS_RELEASED',
-        message: `Task #${i + 1} released`,
-        referenceId: project.id,
-        metadata: { projectTitle: 'Project X' },
-      });
-    }
-    // Buffer 14 additional distinct updates so total distinct groups = 15 (10 cap check)
-    for (let i = 1; i <= 14; i++) {
-      notificationsService.create({
-        userId: '2',
-        type: 'PROJECT_LIKE',
-        message: `Like update #${i}`,
-        referenceId: `other-proj-${i}`,
-        metadata: { projectTitle: `Other Project ${i}` },
-      });
-    }
-    expect(notificationsService.findByUser('2').filter((n) => !n.readStatus).length).toBe(beforeUnread + 1);
-    expect(digestService.getBufferForUser('2')).toHaveLength(22);
-
-    // At 09:00 UTC (14:30 IST < 15:00 local) -> NOT flushed yet
-    clockService.setTime('2026-11-11T09:00:00.000Z');
-    const preFlush = digestService.flushDueDigests();
-    expect(preFlush.digestsCreated).toBe(0);
-
-    // At 09:30 UTC (15:00 IST == chosen hour) -> Flushes ONCE
-    clockService.setTime('2026-11-11T09:30:00.000Z');
-    const flush1 = digestService.flushDueDigests();
-    expect(flush1.digestsCreated).toBe(1);
-
-    const digests = notificationsService.findByUser('2').filter((n) => n.type === 'DAILY_DIGEST');
-    expect(digests).toHaveLength(1);
-    expect(digests[0].metadata?.items).toHaveLength(10);
-    expect(digests[0].metadata?.omittedCount).toBe(5);
-    const mergedTasksLine = digestService
-      .mergeItems(
-        Array.from({ length: 8 }, (_, idx) => ({
-          id: `t-${idx}`,
-          userId: '2',
-          type: 'TASKS_RELEASED',
-          message: 'Task released',
-          referenceId: project.id,
-          targetTitle: 'Project X',
-          createdAt: '2026-11-11T08:00:00.000Z',
-        })),
-      );
-    expect(mergedTasksLine[0].summary).toContain('8 tasks released from Project X');
-
-    // Enqueue another digest item on same IST day -> second flush on same local day does NOT fire
-    notificationsService.create({
-      userId: '2',
-      type: 'TASK_COMMENT',
-      message: 'Another comment same day',
-      referenceId: project.id,
-    });
-    clockService.setTime('2026-11-11T16:00:00.000Z');
-    const flushSameDay = digestService.flushDueDigests();
-    expect(flushSameDay.digestsCreated).toBe(0);
-    expect(notificationsService.findByUser('2').filter((n) => n.type === 'DAILY_DIGEST')).toHaveLength(1);
-
-    // Disabling digest immediately flushes buffered item + delivers subsequent digest-type notifications directly
-    usersService.updateDigestSettings('2', { digestEnabled: false });
     notificationsService.create({
       userId: '2',
       type: 'PROJECT_UPDATE',
-      message: 'Direct update with digest off',
+      message: 'Immediate project update delivery',
       referenceId: project.id,
     });
-    expect(notificationsService.findByUser('2').some((n) => n.message === 'Another comment same day')).toBe(true);
-    expect(notificationsService.findByUser('2').some((n) => n.message === 'Direct update with digest off')).toBe(true);
+    expect(notificationsService.findByUser('2').filter((n) => !n.readStatus).length).toBe(beforeUnread + 2);
+    expect(notificationsService.findByUser('2').some((n) => n.type === 'DAILY_DIGEST')).toBe(false);
   });
 });

@@ -1,18 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login.jsx';
-import { AuthProvider } from '../context/AuthContext.jsx';
-import storage from '../utils/storage.js';
+import { Provider } from 'react-redux';
+import { store } from '../store/index.js';
+import { setBootId } from '../store/slices/sessionSlice.js';
+import { selectBootId } from '../store/selectors/sessionSelectors.js';
 import tokenManager from '../services/tokenManager.js';
 import { setAuthMode } from '../services/apiClient.js';
 
 describe('Fix 1: Login on first attempt after server restart / bootId change', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
     setAuthMode('jwt');
     tokenManager.clear();
   });
@@ -23,8 +22,8 @@ describe('Fix 1: Login on first attempt after server restart / bootId change', (
   });
 
   it('logs in successfully on the first attempt when server restarted (new boot ID)', async () => {
-    // Simulate user having an old boot ID in storage from before restart
-    storage.setBootId('old-server-boot-id-1234');
+    // Simulate user having an old boot ID in Redux session state from before restart
+    store.dispatch(setBootId('old-server-boot-id-1234'));
 
     const newBootId = 'new-server-boot-id-5678';
     const fakeToken = 'header.payload.signature';
@@ -106,14 +105,14 @@ describe('Fix 1: Login on first attempt after server restart / bootId change', (
     vi.stubGlobal('fetch', fetchMock);
 
     render(
-      <MemoryRouter initialEntries={['/login']}>
-        <AuthProvider>
+      <Provider store={store}>
+        <MemoryRouter initialEntries={['/login']}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/dashboard" element={<div data-testid="dashboard-page">Welcome to Dashboard</div>} />
           </Routes>
-        </AuthProvider>
-      </MemoryRouter>
+        </MemoryRouter>
+      </Provider>
     );
 
     // Fill in credentials using placeholder text
@@ -132,9 +131,9 @@ describe('Fix 1: Login on first attempt after server restart / bootId change', (
       expect(screen.getByTestId('dashboard-page')).toBeTruthy();
     });
 
-    // Boot ID must now be updated to newBootId
-    expect(storage.getBootId()).toBe(newBootId);
-    // Tokens must be saved in storage / tokenManager
+    // Boot ID must now be updated to newBootId in sessionSlice
+    expect(selectBootId(store.getState())).toBe(newBootId);
+    // Tokens must be saved in memory tokenManager
     expect(tokenManager.getAccessToken()).toBe(fakeToken);
   });
 });

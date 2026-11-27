@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import MentorsDirectory from '../pages/owner/MentorsDirectory';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationProvider } from '../context/NotificationContext';
+import { renderWithStore } from './test-utils';
 
 const { mockMentorApi, mockProjectsApi } = vi.hoisted(() => ({
   mockMentorApi: {
@@ -30,7 +26,6 @@ vi.mock('../services/mentorMarketplaceApi', async (importOriginal) => {
   return {
     ...actual,
     default: mockMentorApi,
-    mentorMarketApi: mockMentorApi,
   };
 });
 
@@ -79,26 +74,20 @@ describe('Phase 25 Frontend Tests: Mentor Booking Integrity', () => {
   };
 
   const renderDirectory = (user = ownerUser, role = 'Project Owner') =>
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user, role, isAuthenticated: true }}>
-          <RoleContext.Provider value={{ currentRole: role, switchRole: vi.fn() }}>
-            <UIProvider>
-              <NotificationProvider>
-                <MentorsDirectory />
-              </NotificationProvider>
-            </UIProvider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<MentorsDirectory />, {
+      preloadedState: {
+        session: {
+          user,
+          isAuthenticated: true,
+          status: 'authenticated',
+          activeRole: role,
+          allowedRoles: [role],
+        },
+      },
+    });
 
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
-    sessionStorage.setItem('teamforge.portalRole', 'Project Owner');
-    localStorage.setItem('teamforge.currentUser', JSON.stringify(ownerUser));
   });
 
   it('hides the owner own mentor profile so they cannot try to book themselves', async () => {

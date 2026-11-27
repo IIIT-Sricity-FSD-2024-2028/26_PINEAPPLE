@@ -32,6 +32,8 @@ export interface UserProfile {
   title?: string;
   uni?: string;
   university?: string;
+  avatar?: string | null;
+  avatarUrl?: string | null;
   joined?: string;
   createdAt?: string;
   tasksCount: number;
@@ -75,6 +77,8 @@ export interface User {
   tokenVersion?: number;
   allowedLegacyJti?: string;
   avatar?: string;
+  avatarUrl?: string;
+  updatedAt?: string;
   links?: Record<string, any>;
   refreshTokens?: RefreshTokenRecord[];
   createdAt?: string;
@@ -94,9 +98,6 @@ export interface User {
   duplicateReasons?: string[];
   isDeleted?: boolean;
   deletedAt?: string;
-  digestEnabled?: boolean;
-  digestHour?: number;
-  utcOffsetMinutes?: number;
 }
 
 @Injectable()
@@ -810,7 +811,8 @@ export class UsersRepository {
       refreshTokens: [],
       skills: Array.isArray(createUserDto.skills) ? createUserDto.skills : [],
       linkedIn: createUserDto.linkedIn,
-      avatar: createUserDto.avatar,
+      avatar: (createUserDto as any).avatarUrl || createUserDto.avatar,
+      avatarUrl: (createUserDto as any).avatarUrl || createUserDto.avatar,
       links: createUserDto.links,
       university:
         createUserDto.university ||

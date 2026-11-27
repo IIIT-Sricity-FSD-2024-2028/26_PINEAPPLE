@@ -1,167 +1,46 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import projectsApi, { isProjectLocked, isProjectActive } from '../../services/projectsApi';
-import mentorRequestsApi from '../../services/mentorRequestsApi';
-import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { isProjectLocked } from '../../utils/projectStatus';
+import { fetchMentoredProjects } from '../../store/thunks/mentorSessionsThunks';
+import { setMentoredFilter } from '../../store/slices/mentorSessionsSlice';
+import {
+  selectFilteredMentoredProjects,
+  selectMentoredFilter,
+  selectMentoredProjectsCounts,
+  selectMentoredProjectsStatus,
+} from '../../store/selectors/mentorSessionsSelectors';
+import {
+  confirmAbandonmentReview,
+  fetchMyAbandonmentReviews,
+} from '../../store/thunks/abandonmentReviewsThunks';
+import {
+  selectAbandonmentConfirmingIds,
+  selectMyOpenAbandonmentReviews,
+} from '../../store/selectors/abandonmentReviewsSelectors';
 import EmptyState from '../../components/common/EmptyState';
 import FilterTabs from '../../components/common/FilterTabs';
 import ProjectCard from '../../components/features/ProjectCard';
 import './mentoredProjects.css';
 
-const MentoredProjects = () => {
-  const { user } = useContext(AuthContext);
+const MentoredProjectsContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [mentoredProjects, setMentoredProjects] = useState([]);
-  const [counts, setCounts] = useState({ all: 0, active: 0, completed: 0 });
-  const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
-  const [openAbandonmentReviews, setOpenAbandonmentReviews] = useState([]);
-  const [confirmingReviewId, setConfirmingReviewId] = useState(null);
+  const displayedProjects = useSelector(selectFilteredMentoredProjects);
+  const counts = useSelector(selectMentoredProjectsCounts);
+  const filter = useSelector(selectMentoredFilter);
+  const status = useSelector(selectMentoredProjectsStatus);
+  const openAbandonmentReviews = useSelector(selectMyOpenAbandonmentReviews);
+  const confirmingIds = useSelector(selectAbandonmentConfirmingIds);
+  const loading = status === 'idle' || status === 'loading';
 
-  const loadMentoredProjects = useCallback(async () => {
-    try {
-      // 1. Fetch abandonment review alerts if available
-      if (typeof mentorMarketplaceApi.getMyAbandonmentReviews === 'function') {
-        try {
-          const myReviews = await mentorMarketplaceApi.getMyAbandonmentReviews();
-          setOpenAbandonmentReviews(Array.isArray(myReviews) ? myReviews : []);
-        } catch {
-          // Ignore alert fetch failure
-        }
-      }
-
-      // 2. Canonical single backend endpoint for mentored projects
-      let backendRes;
-      if (typeof mentorMarketplaceApi.getMentoredProjects === 'function') {
-        try {
-          backendRes = await mentorMarketplaceApi.getMentoredProjects();
-        } catch {
-          // If network error or endpoint unavailable, fall back
-        }
-      }
-
-      if (backendRes && Array.isArray(backendRes.items)) {
-        const items = backendRes.items;
-        const resCounts = backendRes.counts || {
-          all: items.length,
-          active: items.filter((p) => p.tab === 'active').length,
-          completed: items.filter((p) => p.tab === 'completed').length,
-        };
-        setMentoredProjects(items);
-        setCounts(resCounts);
-        return;
-      }
-
-      // 3. Fallback for environments / legacy tests with partial mock sets
-      const currentUserName = (user?.name || user?.username || '').trim().toLowerCase();
-      const currentUserId = String(user?.id || '').trim();
-      const currentUserEmail = String(user?.email || '').trim().toLowerCase();
-
-      const [allProjects, mentorReqs, marketplaceSessions] = await Promise.all([
-        typeof projectsApi.list === 'function' ? projectsApi.list().catch(() => []) : [],
-        typeof mentorRequestsApi.list === 'function' ? mentorRequestsApi.list().catch(() => []) : [],
-        typeof mentorMarketplaceApi.mentorSessions === 'function'
-          ? mentorMarketplaceApi.mentorSessions().catch(() => [])
-          : [],
-      ]);
-
-      const projectsList = Array.isArray(allProjects) ? allProjects : [];
-      const approvedProjectIds = new Set();
-
-      if (Array.isArray(mentorReqs)) {
-        mentorReqs.forEach((req) => {
-          const reqStatus = String(req.status || '').toLowerCase();
-          const reqMentorId = String(req.mentorId || '').trim();
-          const reqMentorEmail = String(req.mentorEmail || '').trim().toLowerCase();
-          const reqMentorName = String(req.mentorName || '').trim().toLowerCase();
-
-          const isMyMentorReq =
-            (currentUserId && reqMentorId === currentUserId) ||
-            (currentUserEmail && reqMentorEmail === currentUserEmail) ||
-            (currentUserName && reqMentorName === currentUserName);
-
-          if ((reqStatus === 'accepted' || reqStatus === 'approved') && isMyMentorReq && req.projectId) {
-            approvedProjectIds.add(String(req.projectId));
-          }
-        });
-      }
-
-      if (Array.isArray(marketplaceSessions)) {
-        marketplaceSessions.forEach((s) => {
-          const sStatus = String(s.status || '').toLowerCase();
-          const sessionMentorId = String(s.mentorId || '').trim();
-          const sessionMentorEmail = String(s.mentorEmail || '').trim().toLowerCase();
-
-          const isMySession =
-            (currentUserId && sessionMentorId === currentUserId) ||
-            (currentUserEmail && sessionMentorEmail === currentUserEmail);
-
-          if (
-            (sStatus === 'active' || sStatus === 'completed' || sStatus === 'in_progress' || sStatus === 'accepted') &&
-            isMySession &&
-            s.projectId
-          ) {
-            approvedProjectIds.add(String(s.projectId));
-          }
-        });
-      }
-
-      const filtered = projectsList.filter((project) => {
-        const projId = String(project.id);
-        if (approvedProjectIds.has(projId)) return true;
-
-        if (Array.isArray(project.members)) {
-          const isMemberMentor = project.members.some((member) => {
-            const memberRole = String(member.role || '').trim().toLowerCase();
-            if (memberRole !== 'mentor') return false;
-
-            const memberId = String(member.userId || member.id || '').trim();
-            const memberEmail = String(member.email || '').trim().toLowerCase();
-            const memberName = String(member.name || '').trim().toLowerCase();
-
-            return (
-              (currentUserId && memberId === currentUserId) ||
-              (currentUserEmail && memberEmail === currentUserEmail) ||
-              (currentUserName && memberName === currentUserName)
-            );
-          });
-          if (isMemberMentor) return true;
-        }
-
-        if (project.mentor) {
-          const mentorObj = typeof project.mentor === 'object' ? project.mentor : null;
-          const mentorName = String(mentorObj?.name || project.mentor).trim().toLowerCase();
-          const mentorId = String(mentorObj?.userId || mentorObj?.id || '').trim();
-          const mentorEmail = String(mentorObj?.email || '').trim().toLowerCase();
-
-          const matchesMentor =
-            (currentUserId && mentorId === currentUserId) ||
-            (currentUserEmail && mentorEmail === currentUserEmail) ||
-            (currentUserName && mentorName === currentUserName);
-
-          if (matchesMentor) return true;
-        }
-
-        return false;
-      });
-
-      const activeCount = filtered.filter(isProjectActive).length;
-      const completedCount = filtered.filter(isProjectLocked).length;
-
-      setMentoredProjects(filtered);
-      setCounts({
-        all: filtered.length,
-        active: activeCount,
-        completed: completedCount,
-      });
-    } catch (err) {
-      console.error('Failed to load mentored projects:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, [user?.email, user?.id, user?.name, user?.username]);
+  const loadMentoredProjects = useCallback(() => {
+    dispatch(fetchMyAbandonmentReviews({ force: true }));
+    dispatch(fetchMentoredProjects({ user, force: true }));
+  }, [dispatch, user]);
 
   useEffect(() => {
     loadMentoredProjects();
@@ -177,17 +56,6 @@ const MentoredProjects = () => {
       window.removeEventListener('focus', handleFocus);
     };
   }, [loadMentoredProjects]);
-
-  let displayedProjects = mentoredProjects;
-  if (filter === 'active') {
-    displayedProjects = mentoredProjects.filter(
-      (p) => p.tab === 'active' || (p.tab !== 'completed' && isProjectActive(p))
-    );
-  } else if (filter === 'completed') {
-    displayedProjects = mentoredProjects.filter(
-      (p) => p.tab === 'completed' || isProjectLocked(p)
-    );
-  }
 
   const handleCardClick = (projectId) => {
     navigate(`/mentor/workspace/${projectId}`);
@@ -225,18 +93,8 @@ const MentoredProjects = () => {
               <button
                 type="button"
                 data-testid={`mentor-confirm-active-btn-${rev.id}`}
-                disabled={confirmingReviewId === rev.id}
-                onClick={async () => {
-                  setConfirmingReviewId(rev.id);
-                  try {
-                    await mentorMarketplaceApi.confirmAbandonmentReview(rev.id);
-                    setOpenAbandonmentReviews((prev) => prev.filter((item) => item.id !== rev.id));
-                  } catch {
-                    // Preserve banner if network confirmation fails
-                  } finally {
-                    setConfirmingReviewId(null);
-                  }
-                }}
+                disabled={Boolean(confirmingIds[rev.id])}
+                onClick={() => dispatch(confirmAbandonmentReview(rev.id))}
                 style={{
                   padding: '6px 14px',
                   borderRadius: '8px',
@@ -247,7 +105,7 @@ const MentoredProjects = () => {
                   cursor: 'pointer',
                 }}
               >
-                {confirmingReviewId === rev.id ? 'Confirming...' : 'Still active'}
+                {confirmingIds[rev.id] ? 'Confirming...' : 'Still active'}
               </button>
             </div>
           ))}
@@ -262,7 +120,7 @@ const MentoredProjects = () => {
             { id: 'completed', label: 'Completed', count: counts.completed }
           ]}
           activeTab={filter}
-          onChange={setFilter}
+          onChange={(nextTab) => dispatch(setMentoredFilter(nextTab))}
         />
       </div>
 
@@ -317,4 +175,5 @@ const MentoredProjects = () => {
   );
 };
 
+const MentoredProjects = MentoredProjectsContent;
 export default MentoredProjects;

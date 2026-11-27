@@ -1,12 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import SuperuserConfig from '../pages/admin/SuperuserConfig';
 import AdminReports from '../pages/admin/AdminReports';
 import ScheduledJobsPanel from '../pages/admin/ScheduledJobsPanel';
 import adminApi from '../services/adminApi';
 import portalAdminsApi from '../services/portalAdminsApi';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/adminApi', () => ({
   default: {
@@ -20,7 +19,6 @@ vi.mock('../services/adminApi', () => ({
     decideDispute: vi.fn(),
     getNeedsReviewSessions: vi.fn(),
     clearSessionReview: vi.fn(),
-    getOwnerRejectionPatterns: vi.fn(),
     recordAuditEntry: vi.fn(),
   },
   recordPortalAuditEntry: vi.fn(),
@@ -59,15 +57,9 @@ vi.mock('../services/appealsApi', () => {
 describe('Phase 23 Frontend: No Snapshot/Integrity Panels, Needs-Review Clear & Hygiene Job Counts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
-    localStorage.clear();
   });
 
   it('1. SuperuserConfig omits removed Snapshot and Integrity cards (FIX 1)', async () => {
-    sessionStorage.setItem('teamforge.role', 'superuser');
-    sessionStorage.setItem('teamforge.portalRole', 'superuser');
-    sessionStorage.setItem('teamforge.isSuperUser', 'true');
-
     portalAdminsApi.list.mockResolvedValue([]);
     adminApi.getStats.mockResolvedValue({ activeAdmins: 1, activeUsers: 5 });
     adminApi.getConfig.mockResolvedValue({
@@ -80,11 +72,15 @@ describe('Phase 23 Frontend: No Snapshot/Integrity Panels, Needs-Review Clear & 
     });
     adminApi.getJobRuns.mockResolvedValue([]);
 
-    render(
-      <MemoryRouter>
-        <SuperuserConfig />
-      </MemoryRouter>,
-    );
+    renderWithStore(<SuperuserConfig />, {
+      preloadedState: {
+        session: {
+          portalRole: 'superuser',
+          isSuperUser: true,
+          permissions: ['*'],
+        },
+      },
+    });
 
     await waitFor(() => {
       expect(adminApi.getConfig).toHaveBeenCalled();
@@ -111,19 +107,18 @@ describe('Phase 23 Frontend: No Snapshot/Integrity Panels, Needs-Review Clear & 
       status: 'active',
     });
 
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider
-          value={{
-            user: { id: 'admin-1', role: 'admin', permissions: ['reports'] },
-            role: 'admin',
-            isAuthenticated: true,
-          }}
-        >
-          <AdminReports />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<AdminReports />, {
+      preloadedState: {
+        session: {
+          user: { id: 'admin-1', role: 'admin', permissions: ['reports'] },
+          adminUid: 'admin-1',
+          portalRole: 'admin',
+          isSuperUser: false,
+          permissions: ['reports'],
+          isAuthenticated: true,
+        },
+      },
+    });
 
     const escrowTabBtn = screen.getByRole('button', { name: /Escrow Disputes/i });
     fireEvent.click(escrowTabBtn);
@@ -181,7 +176,7 @@ describe('Phase 23 Frontend: No Snapshot/Integrity Panels, Needs-Review Clear & 
     adminApi.getJobRuns.mockResolvedValue([mockRun]);
     adminApi.getJobRun.mockResolvedValue(mockRun);
 
-    render(<ScheduledJobsPanel isSuperUser={true} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={true} />);
 
     await waitFor(() => {
       expect(screen.getByText(/run-hygiene-1/i)).toBeTruthy();

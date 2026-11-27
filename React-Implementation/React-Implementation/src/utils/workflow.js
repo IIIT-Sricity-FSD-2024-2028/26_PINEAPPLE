@@ -5,7 +5,7 @@
  * - Medium: 20 XP, +8 Rep
  * - Low: 10 XP, +8 Rep
  */
-export const TASK_REWARDS = {
+const TASK_REWARDS = {
   High: { xp: 40, rep: 8 },
   Medium: { xp: 20, rep: 8 },
   Low: { xp: 10, rep: 8 },
@@ -25,9 +25,4 @@ export const getTaskReward = (priorityOrDifficulty) => {
     return TASK_REWARDS.Low;
   }
   return TASK_REWARDS.Medium;
-};
-
-export default {
-  TASK_REWARDS,
-  getTaskReward,
 };

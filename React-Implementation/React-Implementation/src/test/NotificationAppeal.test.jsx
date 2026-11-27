@@ -2,8 +2,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, waitFor, fireEvent } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import Notifications from '../pages/notifications';
-import { NotificationContext } from '../context/NotificationContext';
-import { renderWithProviders } from './test-utils';
+import { renderWithStore } from './test-utils';
 
 const { mockAppealsApi, mockAdminApi } = vi.hoisted(() => ({
   mockAppealsApi: {
@@ -30,18 +29,16 @@ describe('Notifications - Warning Appeal Flow', () => {
     mockAppealsApi.getMyAppeals.mockResolvedValue(appeals);
     mockAdminApi.getMyWarnings.mockResolvedValue(warnings);
 
-    return renderWithProviders(
-      <NotificationContext.Provider
-        value={{
-          notifications,
+    return renderWithStore(<Notifications />, {
+      preloadedState: {
+        notifications: {
+          ids: notifications.map((n) => String(n.id)),
+          entities: Object.fromEntries(notifications.map((n) => [String(n.id), n])),
           unreadCount: notifications.filter((n) => !n.isRead).length,
-          markAsRead: vi.fn(),
-          markAllAsRead: vi.fn(),
-        }}
-      >
-        <Notifications />
-      </NotificationContext.Provider>
-    );
+          status: 'succeeded',
+        },
+      },
+    });
   };
 
   beforeEach(() => {

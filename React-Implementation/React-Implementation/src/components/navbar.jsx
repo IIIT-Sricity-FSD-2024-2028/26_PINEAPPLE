@@ -1,24 +1,37 @@
-import { useState, useRef, useEffect, useContext, useCallback } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext, useActiveRole } from '../context/RoleContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { selectUnreadNotificationsCount } from '../store/selectors/notificationsSelectors';
+import { selectChatUnreadSummary } from '../store/selectors/communicationSelectors';
+import {
+  selectActiveRole,
+  selectAllowedRoles,
+  selectCurrentUser,
+  selectIsMentorApproved,
+  selectMentorAppStatus,
+} from '../store/selectors/sessionSelectors';
+import {
+  logoutSessionUser,
+  switchUserRole,
+} from '../store/thunks/sessionThunks';
+import { useChatUnreadPolling } from '../hooks/useChatPolling';
 import Avatar from './common/Avatar';
-import communicationApi from '../services/communicationApi';
-import { useVisibilityPoll } from '../hooks/useVisibilityPoll';
 import './navbar.css';
 
-const Navbar = ({ onMenuClick }) => {
+const NavbarContent = ({ onMenuClick }) => {
   const navigate = useNavigate();
-  const { user, logout, refreshUser } = useContext(AuthContext);
-  const { isMentorApproved, mentorAppStatus } = useContext(RoleContext) || {};
-  const { activeRole, allowedRoles, switchRole } = useActiveRole();
-  const { unreadCount } = useContext(NotificationContext) || {};
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
+  const isMentorApproved = useSelector(selectIsMentorApproved);
+  const mentorAppStatus = useSelector(selectMentorAppStatus);
+  const activeRole = useSelector(selectActiveRole);
+  const allowedRoles = useSelector(selectAllowedRoles);
+  const unreadCount = useSelector(selectUnreadNotificationsCount);
+  const chatUnread = useSelector(selectChatUnreadSummary);
 
   const [roleOpen, setRoleOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const [chatUnread, setChatUnread] = useState({ total: 0, byProject: [] });
 
   const roleDropdownRef = useRef(null);
   const profileDropdownRef = useRef(null);
@@ -53,78 +66,32 @@ const Navbar = ({ onMenuClick }) => {
     };
   }, []);
 
-  const loadUnread = useCallback(async () => {
-    if (!user?.id || typeof communicationApi?.getUnread !== 'function') return;
-    if (typeof document !== 'undefined' && document.hidden) return;
-    try {
-      const res = await communicationApi.getUnread();
-      if (res && typeof res.total === 'number') {
-        setChatUnread({
-          total: res.total,
-          byProject: Array.isArray(res.byProject) ? res.byProject : [],
-        });
-      }
-    } catch {
-      // Non-blocking navbar poll
-    }
-  }, [user?.id]);
-
-  useVisibilityPoll(loadUnread, 60000, {
-    enabled: Boolean(user?.id && typeof communicationApi?.getUnread === 'function'),
+  useChatUnreadPolling(dispatch, {
+    userId: user?.id,
+    enabled: Boolean(user?.id),
+    intervalMs: 60000,
     immediate: true,
-    triggerOnVisible: true,
   });
 
-  useEffect(() => {
-    if (!user?.id || typeof communicationApi?.getUnread !== 'function') return undefined;
-    const onRefresh = () => {
-      loadUnread();
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('teamforge:chat_read', onRefresh);
-      window.addEventListener('teamforge:project_updated', onRefresh);
-    }
-
-    return () => {
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('teamforge:chat_read', onRefresh);
-        window.removeEventListener('teamforge:project_updated', onRefresh);
-      }
-    };
-  }, [user?.id, loadUnread]);
-
-  const handleRoleSelect = (newRole) => {
+  const handleRoleSelect = async (newRole) => {
     setRoleOpen(false);
     if (newRole === 'Mentor' && !isMentorApproved) {
       navigate('/mentor/apply');
       return;
     }
-    const homePath = switchRole(newRole);
+    const homePath = await dispatch(switchUserRole(newRole)).unwrap().catch(() => null);
     if (homePath) {
       navigate(homePath);
     }
   };
 
-  const handleLogout = () => {
-    logout();
+  const handleLogout = async () => {
+    await dispatch(logoutSessionUser());
     navigate('/login');
   };
 
   const activeRoleName = activeRole || 'Collaborator';
   const roleClassModifier = activeRoleName.toLowerCase().replace(/\s+/g, '-');
-
-  useEffect(() => {
-    const handleUserUpdate = () => {
-      if (typeof refreshUser === 'function') {
-        refreshUser().catch(() => {});
-      }
-    };
-    window.addEventListener('teamforge:user_updated', handleUserUpdate);
-    return () => {
-      window.removeEventListener('teamforge:user_updated', handleUserUpdate);
-    };
-  }, [refreshUser]);
 
   const displayName =
     user?.profile?.fullName ||
@@ -134,13 +101,9 @@ const Navbar = ({ onMenuClick }) => {
     user?.username ||
     'User';
 
-  const avatarUrl = user?.avatarUrl || user?.profile?.avatarUrl;
-  const apiBase = 'http://localhost:3000';
-  const fullAvatarUrl = avatarUrl
-    ? avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') || avatarUrl.startsWith('blob:')
-      ? avatarUrl
-      : `${apiBase}${avatarUrl}`
-    : null;
+  const avatarUrl =
+    user?.avatarUrl || user?.profile?.avatarUrl || user?.avatar || user?.profile?.avatar || null;
+  const avatarVersion = user?.updatedAt || user?.profile?.updatedAt || null;
 
   return (
     <nav className="navbar">
@@ -345,7 +308,8 @@ const Navbar = ({ onMenuClick }) => {
               }}
             >
               <Avatar
-                src={fullAvatarUrl}
+                src={avatarUrl}
+                version={avatarVersion}
                 name={displayName}
                 size="sm"
                 alt={displayName}
@@ -410,4 +374,5 @@ const Navbar = ({ onMenuClick }) => {
   );
 };
 
+const Navbar = NavbarContent;
 export default Navbar;

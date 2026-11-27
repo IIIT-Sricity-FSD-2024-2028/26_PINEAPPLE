@@ -1,0 +1,75 @@
+export const THEME_TOKENS = {
+  light: {
+    '--bg': '#fafaf7',
+    '--fg': '#111827',
+    '--card': '#ffffff',
+    '--card-fg': '#111827',
+    '--primary': '#5f513f',
+    '--primary-fg': '#ffffff',
+    '--secondary': '#f3f0ea',
+    '--secondary-fg': '#5f513f',
+    '--muted': '#f5f4ef',
+    '--muted-fg': '#6b7280',
+    '--accent': '#b28a64',
+    '--accent-fg': '#ffffff',
+    '--border': '#ece7dd',
+    '--sidebar-bg': '#f5f4f0',
+    '--sidebar-border': '#eae8e1',
+    '--surface': '#ffffff',
+    '--surface-alt': '#f3f0ea',
+    '--text': '#111827',
+    '--text-muted': '#6b7280',
+    '--input-bg': '#ffffff',
+    '--input-border': '#ece7dd',
+    '--table-header': '#f5f4ef',
+    '--hover-bg': '#f3f0ea',
+    '--shadow-card': '0 2px 8px rgba(0, 0, 0, 0.04)',
+    '--shadow-hover': '0 8px 24px rgba(0, 0, 0, 0.08)',
+    'color-scheme': 'light',
+  },
+  dark: {
+    '--bg': '#121110',
+    '--fg': '#f5efe4',
+    '--card': '#1e1b17',
+    '--card-fg': '#f5efe4',
+    '--primary': '#d4a373',
+    '--primary-fg': '#121110',
+    '--secondary': '#28231e',
+    '--secondary-fg': '#f5efe4',
+    '--muted': '#231f1a',
+    '--muted-fg': '#a89f91',
+    '--accent': '#e0b483',
+    '--accent-fg': '#121110',
+    '--border': '#352f28',
+    '--sidebar-bg': '#171512',
+    '--sidebar-border': '#2c2721',
+    '--surface': '#1e1b17',
+    '--surface-alt': '#28231e',
+    '--text': '#f5efe4',
+    '--text-muted': '#a89f91',
+    '--input-bg': '#1e1b17',
+    '--input-border': '#352f28',
+    '--table-header': '#28231e',
+    '--hover-bg': '#28231e',
+    '--shadow-card': '0 2px 10px rgba(0, 0, 0, 0.35)',
+    '--shadow-hover': '0 8px 28px rgba(0, 0, 0, 0.55)',
+    'color-scheme': 'dark',
+  },
+};
+
+/**
+ * Applies CSS theme custom properties to document.documentElement in memory.
+ */
+export function applyThemeTokens(mode) {
+  if (typeof document === 'undefined' || !document.documentElement) return;
+  const selectedMode = mode === 'dark' ? 'dark' : 'light';
+  const tokens = THEME_TOKENS[selectedMode] || THEME_TOKENS.light;
+  const root = document.documentElement;
+  root.setAttribute('data-theme', selectedMode);
+  root.style.colorScheme = selectedMode;
+  Object.entries(tokens).forEach(([key, value]) => {
+    if (key.startsWith('--')) {
+      root.style.setProperty(key, value);
+    }
+  });
+}

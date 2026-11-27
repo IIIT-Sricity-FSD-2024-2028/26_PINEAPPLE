@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
 import AdminReports from '../pages/admin/AdminReports';
 import AuditLog from '../pages/admin/AuditLog';
 import { renderWithProviders } from './test-utils';
@@ -14,7 +15,6 @@ const { mockReportsApi, mockAdminApi } = vi.hoisted(() => ({
     updateReportStatus: vi.fn(),
     actionReport: vi.fn(),
     getDisputes: vi.fn().mockResolvedValue([]),
-    getOwnerRejectionPatterns: vi.fn().mockResolvedValue({}),
   },
   mockAdminApi: {
     getAuditLog: vi.fn(),
@@ -46,11 +46,7 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
     localStorage.clear();
   });
 
-  it('1. Button opens /admin/audit-log in a new tab with userId, reportId, from=report and dialog stays open', async () => {
-    // Admin with reports and audit permissions
-    sessionStorage.setItem('teamforge.portalRole', 'Admin');
-    sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['reports', 'audit']));
-
+  it('1. Button closes dialog and navigates in the same tab to /admin/audit-log with userId, reportId, from=report without window.open', async () => {
     mockReportsApi.getAdminReports.mockResolvedValue([
       {
         id: 'rep-42',
@@ -87,7 +83,27 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
       createdAt: '2026-11-20T10:00:00.000Z',
     });
 
-    renderWithProviders(<AdminReports />, { route: '/admin/reports' });
+    mockAdminApi.getAuditLog.mockResolvedValue([]);
+    const openSpy = vi.spyOn(window, 'open').mockImplementation(() => null);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/admin/reports" element={<AdminReports />} />
+        <Route path="/admin/audit-log" element={<AuditLog />} />
+      </Routes>,
+      {
+        route: '/admin/reports',
+        preloadedState: {
+          session: {
+            portalRole: 'Admin',
+            isSuperUser: false,
+            permissions: ['reports', 'audit'],
+            isAuthenticated: true,
+            initialized: true,
+          },
+        },
+      },
+    );
 
     const reviewBtn = await screen.findByTestId('review-report-rep-42');
     fireEvent.click(reviewBtn);
@@ -96,20 +112,22 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
       expect(mockReportsApi.getReportDetails).toHaveBeenCalledWith('rep-42');
     });
 
-    // Check View audit log link
-    const auditLink = await screen.findByTestId('link-view-audit');
-    expect(auditLink).toBeDefined();
-    expect(auditLink.tagName.toLowerCase()).toBe('a');
-    expect(auditLink.getAttribute('target')).toBe('_blank');
-    expect(auditLink.getAttribute('rel')).toContain('noopener');
-    expect(auditLink.getAttribute('href')).toBe(
-      '/admin/audit-log?userId=bad-user-99&reportId=rep-42&from=report',
-    );
+    const auditBtn = await screen.findByTestId('link-view-audit');
+    expect(auditBtn).toBeDefined();
+    expect(auditBtn.tagName.toLowerCase()).toBe('button');
+    expect(auditBtn.getAttribute('target')).toBeNull();
 
-    // Clicking the link does not close the dialog
-    fireEvent.click(auditLink);
-    expect(screen.getByText(/Report Review: Harassment/i)).toBeDefined();
-    expect(screen.getAllByText('ToxicUser').length).toBeGreaterThan(0);
+    fireEvent.click(auditBtn);
+
+    await waitFor(() => {
+      expect(screen.queryByText(/Report Review: Harassment/i)).toBeNull();
+      expect(mockAdminApi.getAuditLog).toHaveBeenCalledWith({
+        userId: 'bad-user-99',
+        reportId: 'rep-42',
+      });
+    });
+    expect(openSpy).not.toHaveBeenCalled();
+    openSpy.mockRestore();
   });
 
   it('2. Admin without audit permission sees disabled button with tooltip', async () => {
@@ -137,7 +155,18 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
       createdAt: '2026-11-20T10:00:00.000Z',
     });
 
-    renderWithProviders(<AdminReports />, { route: '/admin/reports' });
+    renderWithProviders(<AdminReports />, {
+      route: '/admin/reports',
+      preloadedState: {
+        session: {
+          portalRole: 'Admin',
+          isSuperUser: false,
+          permissions: ['reports'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
+    });
 
     const reviewBtn = await screen.findByTestId('review-report-rep-42');
     fireEvent.click(reviewBtn);
@@ -167,6 +196,15 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
 
     renderWithProviders(<AuditLog />, {
       route: '/admin/audit-log?userId=bad-user-99&reportId=rep-42&from=report',
+      preloadedState: {
+        session: {
+          portalRole: 'SuperUser',
+          isSuperUser: true,
+          permissions: ['*'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
     });
 
     await waitFor(() => {
@@ -196,6 +234,15 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
 
     renderWithProviders(<AuditLog />, {
       route: '/admin/audit-log?userId=bad-user-99&reportId=rep-42&from=report',
+      preloadedState: {
+        session: {
+          portalRole: 'SuperUser',
+          isSuperUser: true,
+          permissions: ['*'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
     });
 
     await waitFor(() => {
@@ -229,6 +276,15 @@ describe('Step 5 Frontend: Fix View Audit Log Button in Report Review Dialog & A
 
     renderWithProviders(<AuditLog />, {
       route: '/admin/audit-log?userId=clean-user-123',
+      preloadedState: {
+        session: {
+          portalRole: 'SuperUser',
+          isSuperUser: true,
+          permissions: ['*'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
     });
 
     await waitFor(() => {

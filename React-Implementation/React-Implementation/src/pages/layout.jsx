@@ -1,22 +1,27 @@
-import { useState, useContext } from "react";
 import { Outlet } from "react-router-dom";
+import { useDispatch, useSelector } from "react-redux";
 import Navbar from "../components/navbar";
 import Sidebar from "../components/sidebar";
 import UsernameConfirmationBanner from "../components/common/UsernameConfirmationBanner";
 import VerifyEmailBanner from "../components/common/VerifyEmailBanner";
 import RoleSyncProbe from "../components/common/RoleSyncProbe";
-import { AuthContext } from "../context/AuthContext";
-import { useActiveRole } from "../utils/roleStore";
+import { toggleSidebar as toggleSidebarAction } from "../store/slices/uiSlice";
+import { selectSidebarOpen } from "../store/selectors/uiSelectors";
+import {
+  selectActiveRole,
+  selectAuthLoading,
+  selectAuthStatus,
+  selectCurrentUser,
+} from "../store/selectors/sessionSelectors";
 import "./layout.css";
 
-function Layout() {
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
-  const { status, user, loading } = useContext(AuthContext) || {};
-  const { activeRole } = useActiveRole();
-
-  const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
-  };
+function LayoutContent() {
+  const dispatch = useDispatch();
+  const isSidebarOpen = useSelector(selectSidebarOpen);
+  const status = useSelector(selectAuthStatus);
+  const user = useSelector(selectCurrentUser);
+  const loading = useSelector(selectAuthLoading);
+  const activeRole = useSelector(selectActiveRole);
 
   if (status === 'signing_out' || status === 'loading' || loading || !user) {
     return (
@@ -43,7 +48,7 @@ function Layout() {
       data-testid="page-role"
       data-active-role={activeRole}
     >
-      <Navbar onMenuClick={toggleSidebar} />
+      <Navbar onMenuClick={() => dispatch(toggleSidebarAction())} />
       <div className="app-body">
         <Sidebar isOpen={isSidebarOpen} />
         <main className="app-content">
@@ -56,5 +61,7 @@ function Layout() {
     </div>
   );
 }
+
+const Layout = LayoutContent;
 
 export default Layout;

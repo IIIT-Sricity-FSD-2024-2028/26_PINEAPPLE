@@ -1,10 +1,14 @@
 import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, Navigate, Outlet } from 'react-router-dom';
-import { roleStore, useActiveRole, ROLE_CANONICAL } from '../utils/roleStore';
+import { setActiveRole } from '../store/slices/sessionSlice';
+import { ROLE_CANONICAL } from '../store/utils/roleHelpers';
+import { selectAllowedRoles } from '../store/selectors/sessionSelectors';
 
-const MentorProtectedRoute = () => {
+const MentorProtectedRouteContent = () => {
   const location = useLocation();
-  const { allowedRoles } = useActiveRole();
+  const dispatch = useDispatch();
+  const allowedRoles = useSelector(selectAllowedRoles);
 
   const isMentorAllowed =
     allowedRoles.includes(ROLE_CANONICAL.MENTOR) ||
@@ -13,10 +17,14 @@ const MentorProtectedRoute = () => {
     allowedRoles.includes('superuser');
 
   useEffect(() => {
-    if (isMentorAllowed && location.pathname.startsWith('/mentor') && location.pathname !== '/mentor/apply') {
-      roleStore.setActiveRole(ROLE_CANONICAL.MENTOR);
+    if (
+      isMentorAllowed &&
+      location.pathname.startsWith('/mentor') &&
+      location.pathname !== '/mentor/apply'
+    ) {
+      dispatch(setActiveRole(ROLE_CANONICAL.MENTOR));
     }
-  }, [isMentorAllowed, location.pathname]);
+  }, [dispatch, isMentorAllowed, location.pathname]);
 
   if (!isMentorAllowed) {
     return <Navigate to="/mentor/apply" replace />;
@@ -24,5 +32,7 @@ const MentorProtectedRoute = () => {
 
   return <Outlet />;
 };
+
+const MentorProtectedRoute = MentorProtectedRouteContent;
 
 export default MentorProtectedRoute;

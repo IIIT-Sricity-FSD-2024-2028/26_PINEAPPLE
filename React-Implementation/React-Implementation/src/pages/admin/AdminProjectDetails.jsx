@@ -1,8 +1,25 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import adminApi from '../../services/adminApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { isProjectLocked } from '../../utils/projectStatus';
+import { fetchTasksByProject } from '../../store/thunks/tasksThunks';
+import { selectTasksByProjectId } from '../../store/selectors/tasksSelectors';
+import {
+  cancelAdminProjectDeletion,
+  closeAdminProject,
+  fetchAdminProjectDetails,
+  restoreAdminProject,
+} from '../../store/thunks/adminProjectsThunks';
+import {
+  applyAdminProjectSnapshot,
+  setAdminDeleteDialogOpen,
+  setAdminProjectActiveTab,
+} from '../../store/slices/adminProjectsSlice';
+import {
+  selectAdminProjectById,
+  selectAdminProjectEscrowById,
+  selectAdminProjectsWorking,
+} from '../../store/selectors/adminProjectsSelectors';
 import DeleteProjectDialog from '../../components/features/DeleteProjectDialog';
 import ProjectHeader from './ProjectHeader';
 import ProjectDetailsCard from './ProjectDetailsCard';
@@ -11,110 +28,47 @@ import TasksMilestonesCard from './TasksMilestonesCard';
 import EscrowFinancialsCard from './EscrowFinancialsCard';
 import './AdminProjectDetails.css';
 
-const AdminProjectDetails = () => {
+const AdminProjectDetailsContent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [project, setProject] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [closingProject, setClosingProject] = useState(false);
-  const [closeError, setCloseError] = useState(null);
-  const [restoringProject, setRestoringProject] = useState(false);
-  const [restoreError, setRestoreError] = useState(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [cancellingDeletion, setCancellingDeletion] = useState(false);
-  const [cancelDeletionError, setCancelDeletionError] = useState(null);
-  const [activeTab, setActiveTab] = useState('overview'); // 'overview' | 'escrow'
-  const [escrowSummary, setEscrowSummary] = useState(null);
+  const project = useSelector(selectAdminProjectById(id));
+  const escrowSummary = useSelector(selectAdminProjectEscrowById(id));
+  const tasks = useSelector((state) => selectTasksByProjectId(state, id));
+  const working = useSelector(selectAdminProjectsWorking);
 
-  const handleCancelDeletion = async () => {
+  const loading = Boolean(working.detailLoading && !project);
+  const error = !project ? working.detailError : null;
+  const closingProject = Boolean(working.closingProject);
+  const closeError = working.closeError;
+  const restoringProject = Boolean(working.restoringId && String(working.restoringId) === String(id));
+  const restoreError = working.restoreError;
+  const deleteDialogOpen = Boolean(working.deleteDialogOpen);
+  const cancellingDeletion = Boolean(working.cancellingDeletion);
+  const cancelDeletionError = working.cancelDeletionError;
+  const activeTab = working.activeTab || 'overview';
+
+  const handleCancelDeletion = () => {
     if (cancellingDeletion) return;
-    setCancellingDeletion(true);
-    setCancelDeletionError(null);
-    try {
-      const res = await projectsApi.cancelDeletion(id);
-      if (res?.project) {
-        setProject(res.project);
-      } else {
-        const fresh = await projectsApi.get(id);
-        setProject(fresh);
-      }
-    } catch (err) {
-      setCancelDeletionError(err?.serverMessage || err?.message || 'Failed to cancel deletion.');
-    } finally {
-      setCancellingDeletion(false);
-    }
+    dispatch(cancelAdminProjectDeletion(id));
   };
 
-  const handleRestoreProject = async () => {
-    if (restoringProject || typeof projectsApi.restore !== 'function') return;
-    setRestoringProject(true);
-    setRestoreError(null);
-    try {
-      const res = await projectsApi.restore(id);
-      if (res?.project) {
-        setProject(res.project);
-      } else {
-        setProject((prev) => (prev ? { ...prev, deletedAt: undefined, deletedBy: undefined } : prev));
-      }
-    } catch (err) {
-      setRestoreError(err?.serverMessage || err?.message || 'Failed to restore project.');
-    } finally {
-      setRestoringProject(false);
-    }
+  const handleRestoreProject = () => {
+    if (restoringProject) return;
+    dispatch(restoreAdminProject(id));
   };
 
-  const handleAdminCloseProject = async () => {
-    if (closingProject || isProjectLocked(project) || typeof projectsApi.close !== 'function') return;
-    setClosingProject(true);
-    setCloseError(null);
-    try {
-      const updated = await projectsApi.close(id, 'Owner inactive');
-      if (updated) {
-        setProject(updated);
-      }
-    } catch (err) {
-      setCloseError(err?.serverMessage || err?.message || 'Failed to close project.');
-    } finally {
-      setClosingProject(false);
-    }
+  const handleAdminCloseProject = () => {
+    if (closingProject || isProjectLocked(project)) return;
+    dispatch(closeAdminProject({ projectId: id, reason: 'Owner inactive' }));
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const loadProject = async () => {
-      try {
-        const [projectData, tasksData, escrowData] = await Promise.all([
-          projectsApi.get(id),
-          tasksApi.list({ projectId: id }).catch(() => []),
-          typeof adminApi.getProjectEscrow === 'function'
-            ? adminApi.getProjectEscrow(id).catch(() => null)
-            : Promise.resolve(null),
-        ]);
-        if (isMounted) {
-          setProject(projectData);
-          setTasks(Array.isArray(tasksData) ? tasksData : []);
-          setEscrowSummary(escrowData);
-          setError(null);
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message || 'Failed to fetch project details');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadProject();
-    return () => {
-      isMounted = false;
-    };
-  }, [id]);
+    if (!id) return;
+    dispatch(fetchAdminProjectDetails(id));
+    dispatch(fetchTasksByProject({ projectId: id, force: true }));
+  }, [dispatch, id]);
 
   if (loading) {
     return (
@@ -159,8 +113,8 @@ const AdminProjectDetails = () => {
         isClosed={isClosed}
         isCompleted={isCompleted}
         activeTab={activeTab}
-        setActiveTab={setActiveTab}
-        onDeleteProject={() => setDeleteDialogOpen(true)}
+        setActiveTab={(tab) => dispatch(setAdminProjectActiveTab(tab))}
+        onDeleteProject={() => dispatch(setAdminDeleteDialogOpen(true))}
         navigate={navigate}
       />
 
@@ -196,12 +150,12 @@ const AdminProjectDetails = () => {
         projectId={id}
         projectTitle={project?.title || project?.name}
         isAdmin={true}
-        onClose={() => setDeleteDialogOpen(false)}
+        onClose={() => dispatch(setAdminDeleteDialogOpen(false))}
         onSuccess={(result) => {
           if (result?.project) {
-            setProject(result.project);
+            dispatch(applyAdminProjectSnapshot(result.project));
           } else {
-            projectsApi.get(id).then(setProject).catch(() => {});
+            dispatch(fetchAdminProjectDetails(id));
           }
         }}
         onCloseProject={() => {
@@ -211,5 +165,7 @@ const AdminProjectDetails = () => {
     </div>
   );
 };
+
+const AdminProjectDetails = AdminProjectDetailsContent;
 
 export default AdminProjectDetails;

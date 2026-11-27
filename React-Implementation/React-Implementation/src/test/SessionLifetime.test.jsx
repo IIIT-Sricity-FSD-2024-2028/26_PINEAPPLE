@@ -1,13 +1,22 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, act } from '@testing-library/react';
-import React, { useContext } from 'react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import storage from '../utils/storage.js';
+import { screen, act } from '@testing-library/react';
+import { useEffect } from 'react';
+import { Routes, Route } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import tokenManager from '../services/tokenManager.js';
-import { apiRequest, setAccessToken, clearApiCache, setAuthMode } from '../services/apiClient.js';
-import { AuthProvider, AuthContext, useAuth } from '../context/AuthContext.jsx';
+import { apiRequest, setAccessToken, setAuthMode } from '../services/apiClient.js';
+import { store } from '../store';
+import { sessionReset } from '../store/actions/appActions.js';
+import { consumeNotice, setBootId, setNotice, setSessionStatus } from '../store/slices/sessionSlice.js';
+import {
+  selectAuthStatus,
+  selectCurrentUser,
+  selectSessionNotices,
+} from '../store/selectors/sessionSelectors.js';
+import { bootstrapSession, logoutSessionUser } from '../store/thunks/sessionThunks.js';
 import ProtectedRoute from '../routes/ProtectedRoute.jsx';
 import { useVisibilityPoll } from '../hooks/useVisibilityPoll.js';
+import { renderWithStore } from './test-utils.jsx';
 
 function base64UrlEncode(str) {
   const b64 = typeof btoa !== 'undefined'
@@ -66,15 +75,13 @@ vi.mock('../services/firebase.js', () => ({
   },
 }));
 
-describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', () => {
+describe('Session Lifetime, Silent Refresh & Graceful Logout (In-Memory Redux)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
-    clearApiCache();
     setAuthMode('jwt');
     setAccessToken(null);
     tokenManager.clear();
+    store.dispatch(sessionReset());
     Object.defineProperty(document, 'hidden', { value: false, configurable: true });
   });
 
@@ -84,8 +91,7 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
     setAuthMode(null);
   });
 
-  it('1. Token near expiry is refreshed before next request', async () => {
-    // Access token expiring in 30 seconds (< 60s window)
+  it('1. Token near expiry is refreshed before next request (in-memory only)', async () => {
     const nearExpiryToken = makeTestJwt(30);
     const freshToken = makeTestJwt(900);
     setAccessToken(nearExpiryToken);
@@ -115,11 +121,10 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
     expect(callOrder).toEqual(['refresh', 'projects']);
     expect(result.authUsed).toBe(`Bearer ${freshToken}`);
     expect(tokenManager.getAccessToken()).toBe(freshToken);
-    expect(storage.getRefreshToken()).toBe('refresh-xyz');
+    expect(tokenManager.getRefreshToken()).toBe('refresh-xyz');
   });
 
   it('2. A 401 TOKEN_EXPIRED triggers one refresh and one retry', async () => {
-    // Start with a non-expired token so pre-flight doesn't proactively refresh it
     const initialToken = makeTestJwt(900);
     const freshToken = makeTestJwt(900);
     setAccessToken(initialToken);
@@ -131,7 +136,6 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
       if (urlStr.includes('/tasks')) {
         projectCalls++;
         if (projectCalls === 1) {
-          // Backend answers with 401 TOKEN_EXPIRED
           return Promise.resolve(createJsonResponse({ code: 'TOKEN_EXPIRED', message: 'Access token has expired.' }, 401));
         }
         return Promise.resolve(createJsonResponse({ success: true, retryWorked: true }, 200));
@@ -179,7 +183,7 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
     results.forEach((token) => expect(token).toBe(freshToken));
   });
 
-  it('4. A failed refresh ends in one graceful logout with session ended notice', async () => {
+  it('4. A failed refresh ends in one graceful Redux sessionReset with sessionEnded notice', async () => {
     tokenManager.setTokens({ accessToken: makeTestJwt(-10), refreshToken: 'invalid-or-expired-ref' });
 
     const fetchMock = vi.fn().mockImplementation((url) => {
@@ -192,30 +196,25 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
 
     vi.stubGlobal('fetch', fetchMock);
 
-    const logoutEventSpy = vi.fn();
-    window.addEventListener('teamforge:force_logout', logoutEventSpy);
-
     const res = await tokenManager.refresh({ force: true });
 
     expect(res).toBeNull();
     expect(tokenManager.getAccessToken()).toBeNull();
-    expect(storage.getRefreshToken()).toBeFalsy();
-    expect(logoutEventSpy).toHaveBeenCalledTimes(1);
+    expect(tokenManager.getRefreshToken()).toBeNull();
+    expect(selectCurrentUser(store.getState())).toBeNull();
+    expect(selectSessionNotices(store.getState()).sessionEnded).toBeTruthy();
 
-    // Single-consumption notice
-    storage.setSessionEndedNotice('Your session ended. Please log in again.');
-    expect(storage.consumeSessionEndedNotice()).toBe('Your session ended. Please log in again.');
-    expect(storage.consumeSessionEndedNotice()).toBe('');
-
-    window.removeEventListener('teamforge:force_logout', logoutEventSpy);
+    store.dispatch(setNotice({ key: 'sessionEnded', message: 'Your session ended. Please log in again.' }));
+    expect(selectSessionNotices(store.getState()).sessionEnded).toBe('Your session ended. Please log in again.');
+    store.dispatch(consumeNotice('sessionEnded'));
+    expect(selectSessionNotices(store.getState()).sessionEnded).toBe('');
   });
 
   it('5. During signing_out no page component renders and no console error about null user appears', async () => {
     const errorSpy = vi.spyOn(console, 'error');
 
-    // Component that dereferences user fields without optional chaining
     const StrictUserPage = () => {
-      const { user } = useContext(AuthContext);
+      const user = useSelector(selectCurrentUser);
       return (
         <div data-testid="user-page">
           <span>{user.name}</span>
@@ -226,8 +225,14 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
 
     let logoutTrigger;
     const ParentControl = () => {
-      const { logout, status } = useContext(AuthContext);
-      logoutTrigger = logout;
+      const dispatch = useDispatch();
+      const status = useSelector(selectAuthStatus);
+      logoutTrigger = (opts) => dispatch(logoutSessionUser(opts));
+
+      useEffect(() => {
+        dispatch(bootstrapSession());
+      }, [dispatch]);
+
       return (
         <div>
           <span data-testid="auth-status">{status}</span>
@@ -238,9 +243,8 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
       );
     };
 
-    // Pre-populate authenticated user
-    storage.setBackendUserId('2');
-    storage.setBootId('boot-test');
+    store.dispatch(setBootId('boot-test'));
+    store.dispatch(setSessionStatus({ status: 'loading', loading: true }));
     const validToken = makeTestJwt(900);
     setAccessToken(validToken);
     tokenManager.setTokens({ accessToken: validToken, refreshToken: 'ref-ok' });
@@ -268,71 +272,59 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
       }),
     );
 
-    render(
-      <MemoryRouter initialEntries={['/profile']}>
-        <AuthProvider>
-          <Routes>
-            <Route path="/profile" element={<ParentControl />} />
-            <Route path="/login" element={<div data-testid="login-page">Login Page</div>} />
-          </Routes>
-        </AuthProvider>
-      </MemoryRouter>,
+    renderWithStore(
+      <Routes>
+        <Route path="/profile" element={<ParentControl />} />
+        <Route path="/login" element={<div data-testid="login-page">Login Page</div>} />
+      </Routes>,
+      { route: '/profile', store },
     );
 
-    // Wait until authenticated and user page rendered
     await screen.findByTestId('user-page');
     expect(screen.getByText('Arjun Sharma')).toBeDefined();
 
-    // Trigger graceful logout
     await act(async () => {
       logoutTrigger({ reason: 'session_expired' });
     });
 
-    // While signing_out, ProtectedRoute replaces user page with loading screen
     expect(screen.queryByTestId('user-page')).toBeNull();
 
-    // Verify no null pointer exceptions logged
     const nullErrors = errorSpy.mock.calls.filter((call) =>
       call.some((arg) => String(arg).includes('Cannot read properties of null') || String(arg).includes('Cannot read property')),
     );
     expect(nullErrors).toHaveLength(0);
   });
 
-  it('6. No poll fires after logout (teamforge:stop_polls)', () => {
+  it('6. No poll fires after logout / enabled=false (without DOM events)', () => {
     vi.useFakeTimers();
     const pollFn = vi.fn();
 
-    const PollingComponent = () => {
+    const PollingComponent = ({ active }) => {
       useVisibilityPoll(pollFn, 2000, {
-        enabled: true,
+        enabled: active,
         immediate: false,
         triggerOnVisible: false,
       });
-      return <div>polling active</div>;
+      return <div>polling</div>;
     };
 
-    render(<PollingComponent />);
+    const { rerender } = renderWithStore(<PollingComponent active={true} />);
 
-    // Advance 2s -> poll fires
     act(() => {
-      vi.advanceTimersByTime(2000);
+      vi.advanceTimersByTime(6000);
     });
-    expect(pollFn).toHaveBeenCalledTimes(1);
+    expect(pollFn).toHaveBeenCalledTimes(3);
 
-    // Dispatch stop_polls event
-    act(() => {
-      window.dispatchEvent(new CustomEvent('teamforge:stop_polls'));
-    });
+    rerender(<PollingComponent active={false} />);
 
-    // Advance another 10s -> poll should NOT fire again
     act(() => {
       vi.advanceTimersByTime(10000);
     });
-    expect(pollFn).toHaveBeenCalledTimes(1);
+    expect(pollFn).toHaveBeenCalledTimes(3);
   });
 
   it('7. Focus after 20 minute idle renews session without a visible glitch', async () => {
-    const expiredToken = makeTestJwt(-100); // already expired
+    const expiredToken = makeTestJwt(-100);
     const freshToken = makeTestJwt(900);
     setAccessToken(expiredToken);
     tokenManager.setTokens({ accessToken: expiredToken, refreshToken: 'ref-idle' });
@@ -351,7 +343,6 @@ describe('Session Lifetime, Silent Refresh & Graceful Logout (7-Day Sessions)', 
 
     tokenManager.initListeners();
 
-    // Trigger focus event simulating user returning to tab after 20 minutes
     await act(async () => {
       window.dispatchEvent(new Event('focus'));
     });

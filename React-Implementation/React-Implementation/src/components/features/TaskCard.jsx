@@ -1,8 +1,9 @@
-import { useContext, useState } from 'react';
+import { useSelector } from 'react-redux';
+import { useState } from 'react';
 import Badge from '../common/Badge';
 import SafeLink from '../common/SafeLink';
 import FeedbackHistory from './FeedbackHistory';
-import { AuthContext } from '../../context/AuthContext';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
 import { getTaskReward } from '../../utils/workflow';
 import { formatDateTime, formatCountdown } from '../../utils/dateFormatter';
 import './TaskCard.css';
@@ -17,7 +18,7 @@ import './TaskCard.css';
  * @param {(taskId: string) => void} [props.onApprove]
  * @param {(taskId: string) => void} [props.onReject]
  */
-const TaskCard = ({
+const TaskCardContent = ({
   task,
   userRole = 'Collaborator',
   isLocked = false,
@@ -33,13 +34,13 @@ const TaskCard = ({
   onUnassign,
   onDelete,
 }) => {
-  const auth = useContext(AuthContext);
+  const storeUser = useSelector(selectCurrentUser);
   const [isReassigning, setIsReassigning] = useState(false);
   const [historyExpanded, setHistoryExpanded] = useState(false);
   const [dueHistoryExpanded, setDueHistoryExpanded] = useState(false);
   const [renderNow] = useState(() => Date.now());
-  const effectiveUserId = currentUserId || auth?.user?.id;
-  const effectiveUserName = currentUserName || auth?.user?.name;
+  const effectiveUserId = currentUserId || storeUser?.id || storeUser?.uid;
+  const effectiveUserName = currentUserName || storeUser?.name;
 
   const status = task.status || 'To Do';
   const priority = task.priority || task.difficulty || 'Medium';
@@ -505,5 +506,7 @@ const TaskCard = ({
     </div>
   );
 };
+
+const TaskCard = TaskCardContent;
 
 export default TaskCard;

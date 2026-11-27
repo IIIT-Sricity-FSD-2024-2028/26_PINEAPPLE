@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
+import { renderWithStore } from './test-utils';
 import CollaboratorWorkspace from '../pages/collaborator/CollaboratorWorkspace';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import Settings from '../pages/settings';
@@ -95,7 +92,6 @@ vi.mock('../services/usersApi', () => ({
     searchUsers: vi.fn(),
     update: vi.fn(),
     checkUsernameAvailable: vi.fn().mockResolvedValue({ available: true }),
-    getSettings: vi.fn().mockResolvedValue({ digestEnabled: true, digestHour: 9, utcOffsetMinutes: 0 }),
     getPhoneOtpStatus: vi.fn().mockResolvedValue({ wrongAttempts: 0, lockedSeconds: 0 }),
     listExports: vi.fn().mockResolvedValue([]),
   },
@@ -116,43 +112,20 @@ vi.mock('../services/adminApi', () => ({
 }));
 
 function renderWithContexts(ui, { user = { id: 'u-1', name: 'Test User', email: 'test@example.com', emailVerified: true }, route = '/' } = {}) {
-  return render(
-    <MemoryRouter initialEntries={[route]}>
-      <UIProvider>
-        <AuthContext.Provider
-          value={{
-            user,
-            isAuthenticated: true,
-            login: vi.fn(),
-            logout: vi.fn(),
-            updateUser: vi.fn(),
-            setUser: vi.fn(),
-          }}
-        >
-          <RoleContext.Provider
-            value={{
-              currentRole: 'Project Owner',
-              switchRole: vi.fn(),
-              isMentorApproved: false,
-              mentorAppStatus: 'none',
-              refreshMentorStatus: vi.fn(),
-            }}
-          >
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                markAsRead: vi.fn(),
-                markAllAsRead: vi.fn(),
-              }}
-            >
-              {ui}
-            </NotificationContext.Provider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </UIProvider>
-    </MemoryRouter>,
-  );
+  return renderWithStore(ui, {
+    route,
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'Project Owner',
+        allowedRoles: ['Project Owner'],
+        mentorApproved: false,
+        mentorAppStatus: 'none',
+      },
+    },
+  });
 }
 
 describe('Phase 20: Resource Authorization, Content Filter, Uploads & EmailVerified UI', () => {

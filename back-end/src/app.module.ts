@@ -35,7 +35,6 @@ import { FeedbackModule } from './feedback/feedback.module';
 // Middleware imports:
 import { LoggerMiddleware } from './core/middleware/logger.middleware';
 import { SecurityMiddleware } from './core/middleware/security.middleware';
-import { MaintenanceMiddleware } from './core/middleware/maintenance.middleware';
 import { RateLimiterMiddleware } from './core/middleware/rate-limiter.middleware';
 import { SanitizerMiddleware } from './core/middleware/sanitizer.middleware';
 import { CompressionMiddleware } from './core/middleware/compression.middleware';
@@ -126,10 +125,6 @@ export class AppModule implements NestModule {
     // ──────────────────────────────────────────────────────────
     consumer
       .apply(CompressionMiddleware)
-      .forRoutes('*');
-
-    consumer
-      .apply(MaintenanceMiddleware)
       .forRoutes('*');
 
     // ──────────────────────────────────────────────────────────

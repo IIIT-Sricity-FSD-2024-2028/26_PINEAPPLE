@@ -1,6 +1,21 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import projectsApi, { isProjectLocked, isProjectActive } from '../../services/projectsApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchAdminProjects,
+  restoreAdminProject,
+} from '../../store/thunks/adminProjectsThunks';
+import {
+  setAdminProjectsFilter,
+  setAdminProjectsSearch,
+} from '../../store/slices/adminProjectsSlice';
+import {
+  selectAdminProjectsError,
+  selectAdminProjectsStatus,
+  selectAdminProjectsWorking,
+  selectAllAdminProjects,
+} from '../../store/selectors/adminProjectsSelectors';
+import { isProjectActive, isProjectLocked } from '../../utils/projectStatus';
 import { calculateProjectProgress } from '../../utils/progress';
 import Badge from '../../components/common/Badge';
 import SearchBar from '../../components/common/SearchBar';
@@ -9,10 +24,10 @@ import DataTable from '../../components/common/DataTable';
 import './AdminProjects.css';
 
 const OWNER_NAMES = {
-  '1': 'Priya Patel',
-  '2': 'Arjun Sharma',
-  '3': 'Kavya Nair',
-  '4': 'Rohan Iyer'
+  1: 'Priya Patel',
+  2: 'Arjun Sharma',
+  3: 'Kavya Nair',
+  4: 'Rohan Iyer',
 };
 
 const getOwnerDisplayName = (p) => {
@@ -29,67 +44,35 @@ const getCollaboratorInfo = (p) => {
   if (Array.isArray(p.collaborators)) {
     list = p.collaborators;
   } else if (Array.isArray(p.members)) {
-    list = p.members.filter(m => m.role !== 'Owner');
+    list = p.members.filter((m) => m.role !== 'Owner');
   }
   const count = list.length;
-  const names = list.map(c => (typeof c === 'object' ? (c.name || c.username || c.id) : c)).join(', ');
+  const names = list.map((c) => (typeof c === 'object' ? c.name || c.username || c.id : c)).join(', ');
   return { count, title: names || 'No collaborators assigned' };
 };
 
-const AdminProjects = () => {
+const AdminProjectsContent = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [projects, setProjects] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [search, setSearch] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [restoringId, setRestoringId] = useState(null);
 
-  const loadProjects = async () => {
-    try {
-      const [activeRes, deletedRes] = await Promise.all([
-        Promise.resolve(projectsApi.list({ status: 'all' })).catch(() => []),
-        Promise.resolve(projectsApi.list({ status: 'deleted' })).catch(() => []),
-      ]);
-      const combined = [
-        ...(Array.isArray(activeRes) ? activeRes : []),
-        ...(Array.isArray(deletedRes) ? deletedRes : []),
-      ];
-      const byId = new Map();
-      for (const p of combined) {
-        if (p && p.id) byId.set(String(p.id), p);
-      }
-      setProjects(Array.from(byId.values()));
-      setError(null);
-    } catch (err) {
-      setError(err.message || 'Failed to fetch projects');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const projects = useSelector(selectAllAdminProjects);
+  const status = useSelector(selectAdminProjectsStatus);
+  const error = useSelector(selectAdminProjectsError);
+  const working = useSelector(selectAdminProjectsWorking);
+
+  const loading = status === 'idle' || status === 'loading';
+  const filter = working.filter || 'all';
+  const search = working.search || '';
+  const restoringId = working.restoringId;
 
   useEffect(() => {
-    let isMounted = true;
-    Promise.resolve().then(async () => {
-      if (isMounted) await loadProjects();
-    });
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    dispatch(fetchAdminProjects());
+  }, [dispatch]);
 
-  const handleRestoreProject = async (e, project) => {
+  const handleRestoreProject = (e, project) => {
     e.stopPropagation();
     if (restoringId) return;
-    setRestoringId(project.id);
-    try {
-      await projectsApi.restore(project.id);
-      await loadProjects();
-    } catch (err) {
-      setError(err?.serverMessage || err?.message || 'Failed to restore project.');
-    } finally {
-      setRestoringId(null);
-    }
+    dispatch(restoreAdminProject(project.id));
   };
 
   const isDeletedProject = (p) => Boolean(p?.deletedAt);
@@ -183,8 +166,8 @@ const AdminProjects = () => {
           );
         }
         return (
-          <Badge variant={isCompleted ? 'locked' : (p.status?.toLowerCase() || 'active')}>
-            {isCompleted ? 'Completed (Locked)' : (p.status || 'Active')}
+          <Badge variant={isCompleted ? 'locked' : p.status?.toLowerCase() || 'active'}>
+            {isCompleted ? 'Completed (Locked)' : p.status || 'Active'}
           </Badge>
         );
       },
@@ -193,9 +176,10 @@ const AdminProjects = () => {
       key: 'progress',
       label: 'Progress',
       render: (p) => {
-        const progress = p.progress !== undefined && p.progress !== null
-          ? p.progress
-          : calculateProjectProgress(p.tasks);
+        const progress =
+          p.progress !== undefined && p.progress !== null
+            ? p.progress
+            : calculateProjectProgress(p.tasks);
         return (
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <div style={{ flex: 1, height: '6px', background: '#e5e7eb', borderRadius: '999px', overflow: 'hidden', minWidth: '50px' }}>
@@ -212,14 +196,14 @@ const AdminProjects = () => {
     <div id="admin-projects" className="admin-page admin-projects-page">
       <h1>Projects</h1>
       <p className="page-subtitle mt-1">View all projects on the platform</p>
-      
+
       {error && <div className="admin-projects-error">{error}</div>}
 
       <div className="admin-projects-toolbar mt-3" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap', marginBottom: '16px' }}>
         <SearchBar
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          onClear={() => setSearch('')}
+          onChange={(e) => dispatch(setAdminProjectsSearch(e.target.value))}
+          onClear={() => dispatch(setAdminProjectsSearch(''))}
           placeholder="Search projects or owners..."
         />
         <FilterTabs
@@ -228,13 +212,13 @@ const AdminProjects = () => {
             { id: 'active', label: 'Active', count: activeProjects.length },
             { id: 'completed', label: 'Completed', count: completedProjects.length },
             { id: 'closed', label: 'Closed', count: closedProjects.length },
-            { id: 'deleted', label: 'Deleted', count: deletedProjects.length }
+            { id: 'deleted', label: 'Deleted', count: deletedProjects.length },
           ]}
           activeTab={filter}
-          onChange={setFilter}
+          onChange={(val) => dispatch(setAdminProjectsFilter(val))}
         />
       </div>
-      
+
       <div className="card mt-2 admin-projects-card">
         <div id="admin-projects-list" className="overflow-x-auto">
           <DataTable
@@ -253,4 +237,5 @@ const AdminProjects = () => {
   );
 };
 
+const AdminProjects = AdminProjectsContent;
 export default AdminProjects;

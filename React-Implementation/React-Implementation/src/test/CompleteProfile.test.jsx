@@ -3,9 +3,10 @@ import { screen, waitFor, fireEvent } from '@testing-library/react';
 import CompleteProfile from '../pages/CompleteProfile';
 import { usersApi } from '../services/usersApi';
 import { authApi } from '../services/authApi';
-import { AuthContext } from '../context/AuthContext';
 import { MemoryRouter } from 'react-router-dom';
+import { Provider } from 'react-redux';
 import { render } from '@testing-library/react';
+import { createAppStore } from '../store';
 
 const mockNavigate = vi.fn();
 
@@ -43,18 +44,28 @@ function renderCompleteProfile(authContextValue = {}) {
     user: { id: 'test-user-123', email: 'alex.j@gmail.com', profileComplete: false },
     isAuthenticated: true,
     loading: false,
-    updateUser: vi.fn(),
     ...authContextValue,
   };
+  const store = createAppStore({
+    preloadedState: {
+      session: {
+        user: defaultAuth.user,
+        isAuthenticated: defaultAuth.isAuthenticated,
+        loading: defaultAuth.loading,
+        status: defaultAuth.isAuthenticated ? 'authenticated' : 'signed_out',
+      },
+    },
+  });
 
   return {
     ...render(
-      <MemoryRouter>
-        <AuthContext.Provider value={defaultAuth}>
+      <Provider store={store}>
+        <MemoryRouter>
           <CompleteProfile />
-        </AuthContext.Provider>
-      </MemoryRouter>
+        </MemoryRouter>
+      </Provider>
     ),
+    store,
     auth: defaultAuth,
   };
 }
@@ -101,7 +112,7 @@ describe('Phase 5 - CompleteProfile Component Tests', () => {
     fireEvent.change(usernameInput, { target: { value: 'alexjohnson' } });
 
     await waitFor(() => {
-      expect(usersApi.checkUsernameAvailable).toHaveBeenCalledWith('alexjohnson');
+      expect(usersApi.checkUsernameAvailable).toHaveBeenCalledWith('alexjohnson', undefined);
     });
 
     await waitFor(() => {
@@ -122,7 +133,7 @@ describe('Phase 5 - CompleteProfile Component Tests', () => {
       profileComplete: true,
     });
 
-    const { auth } = renderCompleteProfile();
+    const { store } = renderCompleteProfile();
 
     const usernameInput = screen.getByPlaceholderText(/unique_username/i);
     fireEvent.change(usernameInput, { target: { value: 'alex_j' } });
@@ -146,7 +157,7 @@ describe('Phase 5 - CompleteProfile Component Tests', () => {
         university: 'MIT',
         role: 'Collaborator',
       });
-      expect(auth.updateUser).toHaveBeenCalledWith(
+      expect(store.getState().session.user).toEqual(
         expect.objectContaining({
           username: 'alex_j',
           profileComplete: true,

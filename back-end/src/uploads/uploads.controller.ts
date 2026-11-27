@@ -17,6 +17,7 @@ import {
   Optional,
   forwardRef,
 } from '@nestjs/common';
+import { ModuleRef } from '@nestjs/core';
 import { Response, Request } from 'express';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -27,8 +28,8 @@ import {
   taskProofUploadOptions,
   resourceUploadOptions,
   cvUploadOptions,
-  SECURE_CVS_DIR,
-  UPLOADS_DIR,
+  getSecureCvsDir,
+  getUploadsDir,
 } from '../core/middleware/file-upload.middleware';
 import { RolesGuard, normalizeRole } from '../common/guards/roles.guard';
 import { Roles } from '../common/decorators/roles.decorator';
@@ -36,6 +37,7 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { AuditService } from '../audit/audit.service';
 import { MentorApplicationsService } from '../mentor-applications/mentor-applications.service';
+import { UsersService } from '../users/users.service';
 import {
   validateStoredFileMagicBytes,
   removeStoredFileSafe,
@@ -50,8 +52,19 @@ export class UploadsController {
   constructor(
     @Inject(forwardRef(() => MentorApplicationsService))
     private readonly mentorApplicationsService: MentorApplicationsService,
-    @Optional() private readonly auditService?: AuditService,
+    @Inject(ModuleRef) private readonly moduleRef: ModuleRef,
+    @Optional() @Inject(AuditService) private readonly auditService?: AuditService,
+    @Optional() @Inject(UsersService) private readonly usersService?: UsersService,
   ) {}
+
+  private resolveUsersService(): UsersService | undefined {
+    if (this.usersService) return this.usersService;
+    try {
+      return this.moduleRef?.get(UsersService, { strict: false });
+    } catch {
+      return undefined;
+    }
+  }
 
   private hasMentorAppsPermission(authUser: any, headerRole?: string): boolean {
     const isLegacy = process.env.AUTH_MODE === 'legacy';
@@ -155,7 +168,8 @@ export class UploadsController {
     const isPrivileged = this.hasMentorAppsPermission(authUser, xRole);
 
     const cleanFilename = path.basename(filename);
-    const filePath = path.join(SECURE_CVS_DIR, cleanFilename);
+    const secureCvsDir = getSecureCvsDir();
+    const filePath = path.join(secureCvsDir, cleanFilename);
 
     if (!fs.existsSync(filePath)) {
       throw new NotFoundException('CV file not found');
@@ -174,7 +188,7 @@ export class UploadsController {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Type', 'application/pdf');
     res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"`);
-    return res.sendFile(filePath);
+    return res.sendFile(cleanFilename, { root: secureCvsDir });
   }
 
   @Post('avatar')
@@ -192,15 +206,42 @@ export class UploadsController {
     },
   })
   @UseInterceptors(UploadAuditInterceptor, FileInterceptor('file', avatarUploadOptions))
-  uploadAvatar(@UploadedFile() file: Express.Multer.File, @Req() req: Request) {
+  uploadAvatar(
+    @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
+    @CurrentUser() authUser?: any,
+  ) {
     this.verifyUploadedFile(file, req, ['png', 'jpeg', 'webp']);
+    const avatarUrl = `/uploads/${file.filename}`;
+    const isLegacy = process.env.AUTH_MODE === 'legacy';
+    const callerId =
+      authUser?.uid ||
+      authUser?.id ||
+      (req as any)?.user?.uid ||
+      (req as any)?.user?.id ||
+      (isLegacy ? req?.headers?.['x-user-id'] : undefined);
+
+    const usersSvc = this.resolveUsersService();
+    let updatedUser: any = null;
+    if (callerId && usersSvc) {
+      try {
+        updatedUser = usersSvc.updateAvatar(String(callerId), avatarUrl);
+      } catch (err) {
+        if (!(err instanceof NotFoundException)) {
+          throw err;
+        }
+      }
+    }
+
     return {
       message: 'Avatar uploaded successfully',
       filename: file.filename,
       originalName: file.originalname,
       mimetype: file.mimetype,
       size: file.size,
-      url: `/uploads/${file.filename}`,
+      url: avatarUrl,
+      avatarUrl,
+      ...(updatedUser ? { user: updatedUser } : {}),
     };
   }
 
@@ -289,22 +330,35 @@ export class UploadsController {
   @Get(':filename')
   @ApiOperation({ summary: 'Serve uploaded file with safe headers (nosniff, attachment for PDFs, no SVG)' })
   serveUploadedFile(@Param('filename') filename: string, @Res() res: Response) {
-    const cleanFilename = path.basename(filename);
+    const raw = String(filename || '');
+    const cleanFilename = path.basename(raw);
+    if (
+      !cleanFilename ||
+      raw !== cleanFilename ||
+      cleanFilename.includes('..') ||
+      !/^[a-zA-Z0-9._-]+$/.test(cleanFilename)
+    ) {
+      throw new NotFoundException('File not found');
+    }
+
     const meta = getUploadServeMetadata(cleanFilename);
     if (!meta.allowed) {
       throw new NotFoundException('File not found');
     }
 
-    const filePath = path.join(UPLOADS_DIR, cleanFilename);
-    if (!fs.existsSync(filePath)) {
+    const uploadsDir = path.resolve(getUploadsDir());
+    const filePath = path.resolve(uploadsDir, cleanFilename);
+    if (!filePath.startsWith(`${uploadsDir}${path.sep}`) || !fs.existsSync(filePath)) {
       throw new NotFoundException('File not found');
     }
 
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Content-Type', meta.contentType);
-    if (meta.asAttachment) {
+    if (!meta.asAttachment) {
+      res.setHeader('Cache-Control', 'public, max-age=86400');
+    } else {
       res.setHeader('Content-Disposition', `attachment; filename="${cleanFilename}"`);
     }
-    return res.sendFile(filePath);
+    return res.sendFile(cleanFilename, { root: uploadsDir });
   }
 }

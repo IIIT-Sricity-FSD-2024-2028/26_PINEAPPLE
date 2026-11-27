@@ -2,17 +2,15 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test-utils';
 import VerifyEmailBanner from '../components/common/VerifyEmailBanner';
 import Settings from '../pages/settings';
 import Login from '../pages/Login';
 import AdminLogin from '../pages/admin/AdminLogin';
 import AdminUsers from '../pages/admin/AdminUsers';
 import usersApi from '../services/usersApi';
+import authApi from '../services/authApi';
 import adminApi from '../services/adminApi';
 
 const mockNavigate = vi.fn();
@@ -39,8 +37,6 @@ vi.mock('../services/usersApi', () => ({
     getMe: vi.fn(),
     update: vi.fn(),
     checkUsernameAvailable: vi.fn().mockResolvedValue({ available: true }),
-    getSettings: vi.fn().mockResolvedValue({ digestEnabled: true, digestHour: 9, utcOffsetMinutes: 0 }),
-    updateSettings: vi.fn(),
     listExports: vi.fn().mockResolvedValue([]),
     getPhoneOtpStatus: vi.fn().mockResolvedValue({ wrongAttempts: 0, lockedSeconds: 0 }),
   },
@@ -48,8 +44,6 @@ vi.mock('../services/usersApi', () => ({
     getMe: vi.fn(),
     update: vi.fn(),
     checkUsernameAvailable: vi.fn().mockResolvedValue({ available: true }),
-    getSettings: vi.fn().mockResolvedValue({ digestEnabled: true, digestHour: 9, utcOffsetMinutes: 0 }),
-    updateSettings: vi.fn(),
     listExports: vi.fn().mockResolvedValue([]),
     getPhoneOtpStatus: vi.fn().mockResolvedValue({ wrongAttempts: 0, lockedSeconds: 0 }),
   },
@@ -84,8 +78,6 @@ vi.mock('../services/adminApi', () => ({
 describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
   });
 
   it('1. Profile edit sends only allow-listed fields and displays verify banner after email change', async () => {
@@ -107,7 +99,6 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
       },
     };
 
-    const mockUpdateUser = vi.fn();
     usersApi.getMe.mockResolvedValue(initialUser);
     usersApi.update.mockResolvedValue({
       ...initialUser,
@@ -115,15 +106,21 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
       emailVerified: false,
     });
 
-    const { container, rerender } = render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: initialUser, isAuthenticated: true, updateUser: mockUpdateUser, logout: vi.fn() }}>
-          <UIProvider>
-            <VerifyEmailBanner />
-            <Settings />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
+    const { container, store } = renderWithStore(
+      <>
+        <VerifyEmailBanner />
+        <Settings />
+      </>,
+      {
+        preloadedState: {
+          session: {
+            user: initialUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+          ui: { theme: 'light' },
+        },
+      },
     );
 
     const emailInput = await screen.findByLabelText(/Email Address/i);
@@ -148,31 +145,15 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
 
     expect(await screen.findByTestId('email-verify-notice')).toBeTruthy();
     expect(screen.getByTestId('email-verify-notice').textContent).toContain('Check your new email to verify it');
-    expect(mockUpdateUser).toHaveBeenCalledWith(
+    expect(store.getState().session.user).toEqual(
       expect.objectContaining({
         email: 'arjun.new@teamforge.io',
         emailVerified: false,
       }),
     );
 
-    // Re-render with updated context user to confirm VerifyEmailBanner shows
-    rerender(
-      <MemoryRouter>
-        <AuthContext.Provider
-          value={{
-            user: { ...initialUser, email: 'arjun.new@teamforge.io', emailVerified: false },
-            isAuthenticated: true,
-            updateUser: mockUpdateUser,
-            logout: vi.fn(),
-          }}
-        >
-          <UIProvider>
-            <VerifyEmailBanner />
-            <Settings />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    // VerifyEmailBanner automatically reflects emailVerified: false from Redux store!
+    expect(await screen.findByTestId('verify-email-banner')).toBeTruthy();
 
     expect(screen.getByTestId('verify-email-banner')).toBeTruthy();
   });
@@ -202,15 +183,16 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
         message: 'You can only update your own account.',
       });
 
-    const { container: errContainer } = render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: initialUser, isAuthenticated: true, updateUser: vi.fn(), logout: vi.fn() }}>
-          <UIProvider>
-            <Settings />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    const { container: errContainer } = renderWithStore(<Settings />, {
+      preloadedState: {
+        session: {
+          user: initialUser,
+          isAuthenticated: true,
+          status: 'authenticated',
+        },
+        ui: { theme: 'light' },
+      },
+    });
 
     const saveBtn = await waitFor(() => {
       const btn = errContainer.querySelector('#save-profile-btn');
@@ -229,8 +211,7 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
   });
 
   it('3. User Login & Admin Login render TOO_MANY_ATTEMPTS countdown and generic invalid-credentials text', async () => {
-    const mockLogin = vi
-      .fn()
+    authApi.login
       .mockRejectedValueOnce({
         statusCode: 429,
         code: 'TOO_MANY_ATTEMPTS',
@@ -243,13 +224,7 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
         message: 'Invalid credentials',
       });
 
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ login: mockLogin, loading: false }}>
-          <Login />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<Login />);
 
     fireEvent.change(screen.getByPlaceholderText(/username or name@example\.com/i), {
       target: { value: 'arjun@teamforge.io' },
@@ -275,11 +250,7 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
       message: 'Too many failed attempts.',
     });
 
-    const { container: adminContainer } = render(
-      <MemoryRouter>
-        <AdminLogin />
-      </MemoryRouter>,
-    );
+    const { container: adminContainer } = renderWithStore(<AdminLogin />);
 
     fireEvent.change(screen.getByPlaceholderText('admin@teamforge.io'), {
       target: { value: 'admin@teamforge.io' },
@@ -299,15 +270,7 @@ describe('Phase 19 Frontend: Users Controller Lockdown & UI Contracts', () => {
       { id: '2', name: 'Arjun Sharma', email: 'arjun@teamforge.io', role: 'Collaborator', status: 'Active', xp: 2450, rep: 87 },
     ]);
 
-    render(
-      <MemoryRouter>
-        <UIProvider>
-          <NotificationContext.Provider value={{ notifications: [], unreadCount: 0 }}>
-            <AdminUsers />
-          </NotificationContext.Provider>
-        </UIProvider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<AdminUsers />);
 
     await waitFor(() => {
       expect(adminApi.listUsers).toHaveBeenCalledTimes(1);

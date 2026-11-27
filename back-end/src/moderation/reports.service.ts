@@ -352,7 +352,6 @@ export class ReportsService {
           type: 'info',
           title: 'Report Update',
           message: `Your report was reviewed and ${report.status.toLowerCase()}.`,
-          priority: 'immediate',
         });
       } catch (err: any) {
         this.logger.warn(`Reporter notification failed: ${err?.message || err}`);

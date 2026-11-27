@@ -12,5 +12,3 @@ export function calculateProjectProgress(tasks) {
   }).length;
   return Math.round((approvedTasks / tasks.length) * 100);
 }
-
-export default calculateProjectProgress;

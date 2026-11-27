@@ -3,18 +3,21 @@
   align-items: center;
   justify-content: center;
   min-height: 100vh;
-  background-color: var(--bg-main, #0d1117);
+  background-color: var(--bg, #fafaf7);
+  color: var(--fg, #111827);
   font-family: 'Inter', system-ui, sans-serif;
+  padding: 24px;
+  box-sizing: border-box;
 }
 
 .admin-login-card {
-  background: var(--bg-card, #161b22);
-  border: 1px solid var(--border-color, #30363d);
+  background: var(--card, #ffffff);
+  border: 1px solid var(--border, #ece7dd);
   border-radius: 12px;
   padding: 40px;
   width: 100%;
   max-width: 420px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+  box-shadow: var(--shadow-hover, 0 8px 24px rgba(17, 24, 39, 0.08));
   text-align: center;
 }
 
@@ -24,13 +27,13 @@
   justify-content: center;
   gap: 12px;
   margin-bottom: 32px;
-  color: var(--text-main, #c9d1d9);
+  color: var(--fg, #111827);
 }
 
 .admin-login-logo svg {
   width: 40px;
   height: 40px;
-  fill: #58a6ff;
+  fill: var(--primary, #5f513f);
 }
 
 .admin-login-logo h1 {
@@ -41,7 +44,7 @@
 
 .admin-login-title {
   font-size: 20px;
-  color: var(--text-main, #c9d1d9);
+  color: var(--fg, #111827);
   margin-bottom: 24px;
 }
 
@@ -60,7 +63,7 @@
   justify-content: flex-start;
   font-size: 14px;
   font-weight: 600;
-  color: #ffffff !important;
+  color: var(--fg, #111827);
   margin-bottom: 8px;
   text-align: left;
 }
@@ -69,10 +72,10 @@
 .admin-form-group input {
   width: 100%;
   padding: 12px;
-  background: var(--bg-input, #0d1117);
-  border: 1px solid var(--border-color, #30363d);
+  background: var(--input-bg, #ffffff);
+  border: 1px solid var(--input-border, #d1d5db);
   border-radius: 6px;
-  color: #ffffff;
+  color: var(--fg, #111827);
   font-size: 16px;
   transition: border-color 0.2s;
   box-sizing: border-box;
@@ -81,16 +84,16 @@
 .admin-login-card .tf-form-control:focus,
 .admin-form-group input:focus {
   outline: none;
-  border-color: #58a6ff;
+  border-color: var(--primary, #5f513f);
 }
 
 .admin-login-card .tf-form-control::placeholder,
 .admin-form-group input::placeholder {
-  color: #8b949e;
+  color: var(--muted-fg, #6b7280);
 }
 
 .admin-login-btn {
-  background: #238636;
+  background: #16a34a;
   color: #ffffff;
   border: none;
   border-radius: 6px;
@@ -103,27 +106,33 @@
 }
 
 .admin-login-btn:hover {
-  background: #2ea043;
+  background: #15803d;
 }
 
 .admin-login-btn:disabled {
-  background: #23863680;
+  background: #86efac;
   cursor: not-allowed;
 }
 
 .admin-login-error {
-  color: #f85149;
-  background: rgba(248, 81, 73, 0.1);
+  color: #991b1b;
+  background: #fef2f2;
   padding: 12px;
   border-radius: 6px;
-  border: 1px solid rgba(248, 81, 73, 0.4);
+  border: 1px solid #fca5a5;
   font-size: 14px;
   margin-bottom: 16px;
 }
 
+:root[data-theme="dark"] .admin-login-error {
+  color: #fca5a5;
+  background: rgba(248, 81, 73, 0.14);
+  border-color: rgba(248, 81, 73, 0.4);
+}
+
 .admin-login-hint {
   font-size: 12px;
-  color: var(--text-muted, #8b949e);
+  color: var(--muted-fg, #6b7280);
   margin-top: 24px;
   line-height: 1.5;
 }

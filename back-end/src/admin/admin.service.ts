@@ -33,6 +33,7 @@ import { GamificationService } from '../gamification/gamification.service';
 import { MentorMarketplaceService } from '../mentor-marketplace/mentor-marketplace.service';
 import { ClockService } from '../common/services/clock.service';
 import { normalizeRole } from '../common/utils/role.util';
+import { AdminUserCounts, isPlatformUser } from '../common/utils/platform-user.util';
 import { DuplicateDetectionService } from '../users/duplicate-detection.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { ReputationService } from '../moderation/reputation.service';
@@ -41,6 +42,7 @@ import { LoginThrottleService } from '../auth/login-throttle.service';
 import { stripUserSecrets } from '../users/user-serializer';
 import { BootService } from '../system/boot.service';
 import { buildSuspendedResponse } from '../common/utils/suspended-response.util';
+import { AdminRefreshService } from './admin-refresh.service';
 
 @Injectable()
 export class AdminService {
@@ -84,6 +86,8 @@ export class AdminService {
     private readonly leaderboardService?: LeaderboardService,
     @Optional()
     private readonly bootService?: BootService,
+    @Optional()
+    private readonly adminRefreshService?: AdminRefreshService,
   ) {}
 
   getDuplicateUsers() {
@@ -91,6 +95,10 @@ export class AdminService {
       return { groups: [], totalGroups: 0, totalFlaggedUsers: 0 };
     }
     return this.duplicateDetectionService.getDuplicateGroups();
+  }
+
+  revokeAdminSessions(id: string) {
+    return this.portalAdminsService.revokeSessions(id);
   }
 
   exportAuditLog(options: {
@@ -140,16 +148,12 @@ export class AdminService {
     return updated;
   }
 
+  private getEligiblePlatformUsers() {
+    return this.usersService.findAll().filter((u: any) => isPlatformUser(u));
+  }
+
   getUsers() {
-    const rawUsers = this.usersService.findAll();
-    // Exclude admins, superusers, system accounts, and duplicate/hidden accounts
-    const eligibleUsers = rawUsers.filter((u: any) => {
-      if (u.isDuplicate || u.isHidden) return false;
-      const normRole = normalizeRole(u.role);
-      if (normRole === 'admin' || normRole === 'superuser') return false;
-      if (u.id === 'u-admin' || u.id === 'u-superuser') return false;
-      return true;
-    });
+    const eligibleUsers = this.getEligiblePlatformUsers();
 
     const allProjects = this.projectsService.findAll();
     const projectCountsByOwner = new Map<string, number>();
@@ -368,10 +372,17 @@ export class AdminService {
   }
 
   private generateAdminToken(uid: string, email: string, role: string, permissions: string[]): string {
+    if (this.adminRefreshService) {
+      return this.adminRefreshService.generateAdminAccessToken(uid, email, role, permissions);
+    }
     if (process.env.AUTH_MODE === 'legacy') {
       return role === 'superuser' ? 'mock-su-token-456' : 'mock-admin-token-123';
     }
     const secret = process.env.JWT_SECRET || 'teamforge-jwt-secret-key-development-minimum-32-chars';
+    const expiresIn =
+      process.env.ADMIN_ACCESS_TOKEN_TTL ||
+      process.env.ACCESS_TOKEN_TTL ||
+      '15m';
     return this.jwtService.sign(
       {
         sub: uid,
@@ -385,14 +396,14 @@ export class AdminService {
       {
         secret,
         algorithm: 'HS256',
-        expiresIn: '8h' as any,
+        expiresIn: expiresIn as any,
         issuer: 'teamforge',
         audience: 'teamforge-web',
       },
     );
   }
 
-  login(credentials: any, clientIp = 'unknown') {
+  login(credentials: any, clientIp = 'unknown', res?: any) {
     const rawEmail = credentials?.email ?? credentials?.identifier ?? '';
     const password = credentials?.password;
     if (typeof password !== 'string' || !password.trim()) {
@@ -441,12 +452,23 @@ export class AdminService {
         target: 'Super User Portal',
         event: 'Super User (superuser@teamforge.io) logged into Portal',
       });
+      const adminProfile = {
+        id: 'u-superuser',
+        email: 'superuser@teamforge.io',
+        name: 'Super User',
+        role: 'superuser' as const,
+        permissions: ['*'],
+      };
+      if (res) {
+        this.adminRefreshService?.issueSessionForAdmin(res, adminProfile);
+      }
       return {
         token: this.generateAdminToken('u-superuser', 'superuser@teamforge.io', 'superuser', ['*']),
         role: 'superuser',
         permissions: ['*'],
         name: 'Super User',
         email: 'superuser@teamforge.io',
+        admin: adminProfile,
       };
     }
 
@@ -465,12 +487,23 @@ export class AdminService {
         target: 'Admin Portal',
         event: 'Admin (admin@teamforge.io) logged into Admin Portal',
       });
+      const adminProfile = {
+        id: 'u-admin',
+        email: 'admin@teamforge.io',
+        name: 'Default Admin',
+        role: 'admin' as const,
+        permissions: ['*'],
+      };
+      if (res) {
+        this.adminRefreshService?.issueSessionForAdmin(res, adminProfile);
+      }
       return {
         token: this.generateAdminToken('u-admin', 'admin@teamforge.io', 'admin', ['*']),
         role: 'admin',
         permissions: ['*'],
         name: 'Default Admin',
         email: 'admin@teamforge.io',
+        admin: adminProfile,
       };
     }
 
@@ -532,12 +565,23 @@ export class AdminService {
 
       const perms = Array.isArray(portalAdmin.permissions) ? portalAdmin.permissions : ['dashboard'];
       const pRole = portalAdmin.portalRole || 'admin';
+      const adminProfile = {
+        id: String(portalAdmin.id),
+        email: portalAdmin.email,
+        name: portalAdmin.name,
+        role: pRole,
+        permissions: perms,
+      };
+      if (res) {
+        this.adminRefreshService?.issueSessionForAdmin(res, adminProfile);
+      }
       return {
         token: this.generateAdminToken(String(portalAdmin.id), portalAdmin.email, pRole, perms),
         role: pRole,
         permissions: perms,
         name: portalAdmin.name,
         email: portalAdmin.email,
+        admin: adminProfile,
       };
     }
 
@@ -589,12 +633,24 @@ export class AdminService {
           event: `Admin user "${dbUser.name}" (${dbUser.email}) logged into Portal`,
         });
 
+        const adminProfile = {
+          id: String(dbUser.id),
+          email: dbUser.email,
+          name: dbUser.name,
+          role: dbNormRole,
+          permissions: perms,
+        };
+        if (res) {
+          this.adminRefreshService?.issueSessionForAdmin(res, adminProfile);
+        }
+
         return {
           token: this.generateAdminToken(String(dbUser.id), dbUser.email, dbNormRole, perms),
           role: dbNormRole,
           permissions: perms,
           name: dbUser.name,
           email: dbUser.email,
+          admin: adminProfile,
         };
       }
     }
@@ -693,6 +749,7 @@ export class AdminService {
     // Immediately kill existing JWT access tokens and refresh tokens
     this.usersService.bumpTokenVersion(id);
     this.usersService.revokeAllRefreshTokens(id);
+    this.adminRefreshService?.bumpTokenVersion(String(id));
 
     // Disable Firebase account if in firebase mode
     if (process.env.AUTH_MODE === 'firebase') {
@@ -931,21 +988,92 @@ export class AdminService {
     return updatedUser;
   }
 
-  getStats(): AdminStatsEntity {
-    if (!this.statsDirty && this.cachedStats && Date.now() - this.cachedStats.timestamp < 10000) {
-      return this.cachedStats.data;
+  /**
+   * Canonical platform-user counts shared by the Dashboard summary and Users page filter chips.
+   * Excludes admins, Super User, deleted, and anonymised accounts via isPlatformUser().
+   */
+  getUserCounts(): AdminUserCounts {
+    const platformUsers = this.getEligiblePlatformUsers();
+
+    const dupResult = this.getDuplicateUsers();
+    const dupGroups = Array.isArray(dupResult?.groups) ? dupResult.groups : [];
+    const duplicateUserIds = new Set<string>();
+    for (const group of dupGroups) {
+      if (Array.isArray(group?.users)) {
+        for (const u of group.users) {
+          if (u?.id !== undefined) duplicateUserIds.add(String(u.id));
+        }
+      }
     }
 
-    const users = this.usersService.findAll();
+    let pendingApprovals = 0;
+    if (
+      this.moderationService &&
+      typeof this.moderationService.getPendingModerationActions === 'function'
+    ) {
+      try {
+        pendingApprovals = this.moderationService.getPendingModerationActions('pending').length;
+      } catch {
+        pendingApprovals = 0;
+      }
+    }
+
+    let active = 0;
+    let suspended = 0;
+    let warned = 0;
+    let flagged = 0;
+
+    for (const u of platformUsers) {
+      const statusLower = String(u.status || 'Active').trim().toLowerCase();
+      const isSuspended = statusLower === 'suspended';
+      if (isSuspended) {
+        suspended += 1;
+      } else {
+        active += 1;
+      }
+
+      const activeWarnings =
+        typeof (u as any).activeWarningsCount === 'number'
+          ? (u as any).activeWarningsCount
+          : Array.isArray((u as any).warnings)
+            ? (u as any).warnings.filter((w: any) => String(w?.status || '').toLowerCase() === 'active').length
+            : typeof (u as any).warnings === 'number'
+              ? (u as any).warnings
+              : 0;
+      const isWarned = activeWarnings > 0 || statusLower === 'warned';
+      if (isWarned) {
+        warned += 1;
+      }
+
+      const isFlagged =
+        statusLower === 'flagged' ||
+        (u as any).flags === true ||
+        (u as any).flagged === true ||
+        (u as any).duplicateFlag === true ||
+        duplicateUserIds.has(String(u.id));
+      if (isFlagged) {
+        flagged += 1;
+      }
+    }
+
+    return {
+      total: active + suspended,
+      active,
+      suspended,
+      flagged,
+      warned,
+      possibleDuplicates: dupGroups.length,
+      pendingApprovals,
+    };
+  }
+
+  getStats(): AdminStatsEntity {
+    const counts = this.getUserCounts();
     const projects = this.projectsService.findAll();
     const tasks = this.tasksService.findAll();
-
-    const activeUsers = users.filter((user: any) => (user.status || 'Active').toLowerCase() === 'active').length;
-    const suspendedUsers = users.filter((user: any) => (user.status || '').toLowerCase() === 'suspended').length;
-    const flaggedUsers = users.filter((user: any) => (user.status || '').toLowerCase() === 'flagged').length;
-    const warnedUsers = users.filter((user: any) => (user.status || '').toLowerCase() === 'warned' || (user.flags && (user.status || '').toLowerCase() !== 'suspended' && (user.status || '').toLowerCase() !== 'flagged')).length;
-    const bannedUsers = users.filter((user: any) => (user.status || '').toLowerCase() === 'banned').length;
-    const flaggedWarned = flaggedUsers + warnedUsers;
+    const bannedUsers = this.getEligiblePlatformUsers().filter(
+      (user: any) => String(user.status || '').toLowerCase() === 'banned',
+    ).length;
 
     let pendingMentorApps = 0;
     try {
@@ -960,14 +1088,17 @@ export class AdminService {
       .filter((a) => (a.status || 'active').toLowerCase() === 'active').length;
 
     const stats: AdminStatsEntity = {
-      totalUsers: users.length,
-      activeUsers,
+      totalUsers: counts.total,
+      activeUsers: counts.active,
       activeAdmins,
-      suspendedUsers,
-      flaggedUsers,
+      suspendedUsers: counts.suspended,
+      flaggedUsers: counts.flagged,
       bannedUsers,
-      warnedUsers,
-      flaggedWarned,
+      warnedUsers: counts.warned,
+      flaggedWarned: counts.flagged,
+      possibleDuplicates: counts.possibleDuplicates,
+      pendingApprovals: counts.pendingApprovals,
+      counts,
       pendingMentorApps,
       auditEvents,
       totalProjects: projects.length,

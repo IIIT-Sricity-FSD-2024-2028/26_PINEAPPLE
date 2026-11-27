@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'fs';
 import * as path from 'path';
-import { SECURE_CVS_DIR, UPLOADS_DIR } from '../../core/middleware/file-upload.middleware';
+import { getSecureCvsDir, getUploadsDir } from '../../core/middleware/file-upload.middleware';
 
 export const UPLOAD_REF_RE = /(?:^|[/"'`(\s=])uploads\/(?!cv\/)([^?#\s"'`<>\\]+)/gi;
 export const CV_REF_RE = /(?:^|[/"'`(\s=])uploads\/cv\/([^?#\s"'`<>\\]+)/gi;
@@ -128,8 +128,8 @@ export class FileCleanupService {
   deleteUserPersonalFiles(options: DeleteUserFilesOptions): DeleteUserFilesResult {
     const uid = String(options.userId || '').trim();
     const dryRun = Boolean(options.dryRun);
-    const uploadsDir = options.uploadsDir || process.env.UPLOADS_DIR || UPLOADS_DIR;
-    const secureCvsDir = options.secureCvsDir || process.env.SECURE_CVS_DIR || SECURE_CVS_DIR;
+    const uploadsDir = options.uploadsDir || getUploadsDir();
+    const secureCvsDir = options.secureCvsDir || getSecureCvsDir();
     const protectedUploads = options.protectedUploadNames || new Set<string>();
     const protectedCvs = options.protectedCvNames || new Set<string>();
 
@@ -155,7 +155,9 @@ export class FileCleanupService {
         }
       }
       const directAvatars = [
+        (userObj as any).avatarUrl,
         (userObj as any).avatar,
+        (userObj as any).profile?.avatarUrl,
         (userObj as any).profile?.avatar,
         (userObj as any).profile?.photoUrl,
       ];

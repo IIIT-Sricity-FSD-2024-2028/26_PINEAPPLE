@@ -1,17 +1,12 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import MyMentorProfile, {
-  PRICE_MIN,
-  PRICE_MAX,
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import MyMentorProfile from '../pages/mentor/MyMentorProfile';
+import {
   INVALID_PRICE_MESSAGE,
   validatePriceInput,
-} from '../pages/mentor/MyMentorProfile';
+} from '../utils/mentorProfileValidation';
 import mentorMarketplaceApi from '../services/mentorMarketplaceApi';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/mentorMarketplaceApi', () => ({
   default: {
@@ -39,17 +34,17 @@ describe('Mentor Profile Price (INR) Component & Validation Tests', () => {
   };
 
   const renderComponent = () => {
-    return render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: mockUser }}>
-          <RoleContext.Provider value={{ currentRole: 'mentor' }}>
-            <UIProvider>
-              <MyMentorProfile />
-            </UIProvider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </MemoryRouter>
-    );
+    return renderWithStore(<MyMentorProfile />, {
+      preloadedState: {
+        session: {
+          user: mockUser,
+          isAuthenticated: true,
+          status: 'authenticated',
+          activeRole: 'mentor',
+          allowedRoles: ['mentor'],
+        },
+      },
+    });
   };
 
   beforeEach(() => {

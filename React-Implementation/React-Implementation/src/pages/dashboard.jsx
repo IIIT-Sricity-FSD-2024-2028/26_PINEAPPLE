@@ -1,15 +1,28 @@
-import { useState, useContext, useEffect } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { NotificationContext } from "../context/NotificationContext";
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import {
+  selectActiveRole,
+  selectCurrentUser,
+} from "../store/selectors/sessionSelectors";
+import { selectAllNotifications } from "../store/selectors/notificationsSelectors";
+import { selectOwnProfile } from "../store/selectors/profilesSelectors";
+import { selectAllProjects } from "../store/selectors/projectsSelectors";
+import { selectUserBadges } from "../store/selectors/gamificationSelectors";
+import {
+  confirmAbandonmentReview,
+  fetchMyAbandonmentReviews,
+} from "../store/thunks/abandonmentReviewsThunks";
+import {
+  selectAbandonmentConfirmingIds,
+  selectMyOpenAbandonmentReviews,
+} from "../store/selectors/abandonmentReviewsSelectors";
+import { fetchMyProfile } from "../store/thunks/profilesThunks";
+import { fetchProjects } from "../store/thunks/projectsThunks";
+import { fetchUserBadges } from "../store/thunks/gamificationThunks";
+import { useVisibilityPoll } from "../hooks/useVisibilityPoll";
 import StatCard from "../components/common/StatCard";
-import usersApi from "../services/usersApi";
-import projectsApi, { isProjectActive } from "../services/projectsApi";
-import mentorshipApi from "../services/mentorshipApi";
-import mentorMarketplaceApi from "../services/mentorMarketplaceApi";
-import leaderboardApi from "../services/leaderboardApi";
-import { formatRelativeTime } from "../utils/dateUtils";
-import storage from "../utils/storage";
-import { useActiveRole } from "../utils/roleStore";
+import { isProjectActive } from "../utils/projectStatus";
+import { formatRelativeTime } from "../utils/dateFormatter";
 import "./dashboard.css"; // Import page-specific stylesheet
 
 const AwardIcon = () => (
@@ -46,157 +59,127 @@ const CheckIcon = () => (
   </svg>
 );
 
-const Dashboard = () => {
-  const { user } = useContext(AuthContext);
-  const { notifications } = useContext(NotificationContext);
-  const { activeRole } = useActiveRole();
+const EMPTY_NOTIFICATIONS = [];
+
+const DashboardContent = () => {
+  const user = useSelector(selectCurrentUser);
+  const dispatch = useDispatch();
+  const notifications = useSelector(selectAllNotifications) || EMPTY_NOTIFICATIONS;
+  const activeRole = useSelector(selectActiveRole);
   const userName = user?.name || "User";
+  const userId = user?.id || user?.uid;
 
-  const [dashboardData, setDashboardData] = useState(null);
-  const [stats, setStats] = useState({ xp: 0, rep: 0, activeProjects: 0, completedTasks: 0, badgesCount: 0 });
-  const [latestBadge, setLatestBadge] = useState(null);
-  const [userActions, setUserActions] = useState([]);
+  const ownProfile = useSelector(selectOwnProfile);
+  const allProjects = useSelector(selectAllProjects);
+  const storeUserBadges = useSelector((state) => selectUserBadges(state, userId));
+
   const [loading, setLoading] = useState(true);
-  const [openAbandonmentReviews, setOpenAbandonmentReviews] = useState([]);
-  const [confirmingReviewId, setConfirmingReviewId] = useState(null);
+  const openAbandonmentReviews = useSelector(selectMyOpenAbandonmentReviews);
+  const confirmingIds = useSelector(selectAbandonmentConfirmingIds);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchDashboard = useCallback(async () => {
+    try {
+      if (!userId) return;
+      const userRole = activeRole || user?.role || "Collaborator";
 
-    const fetchDashboard = async () => {
-      try {
-        const userId = user?.id || storage.getBackendUserId();
-        if (!userId) return;
-        if (user?.id) {
-          storage.setBackendUserId(user.id);
-        }
-        const userRole = activeRole || user?.role || "Collaborator";
-
-        const isMentorAccount = String(userRole || "").toLowerCase() === "mentor" || String(user?.role || "").toLowerCase() === "mentor";
-        const [userDataRes, pRes, bRes, myOpenReviewsRes] = await Promise.all([
-          usersApi.getMe().catch((err) => {
+      const isMentorAccount =
+        String(userRole || "").toLowerCase() === "mentor" ||
+        String(user?.role || "").toLowerCase() === "mentor";
+      await Promise.all([
+        dispatch(fetchMyProfile())
+          .unwrap()
+          .catch((err) => {
             console.warn("Could not load backend user data, falling back to session user:", err);
             return user;
           }),
-          projectsApi.list({}, userRole).catch((err) => {
+        dispatch(fetchProjects({ role: userRole, force: true }))
+          .unwrap()
+          .catch((err) => {
             console.warn("Could not load projects:", err);
-            return [];
+            return { items: [] };
           }),
-          mentorshipApi.getBadges(userId).catch((err) => {
+        dispatch(fetchUserBadges({ userId }))
+          .unwrap()
+          .catch((err) => {
             console.warn("Could not load badges:", err);
-            return [];
+            return { badges: [] };
           }),
-          isMentorAccount && typeof mentorMarketplaceApi.getMyAbandonmentReviews === "function"
-            ? mentorMarketplaceApi.getMyAbandonmentReviews("mentor", userId).catch(() => [])
-            : Promise.resolve([]),
-        ]);
+        isMentorAccount
+          ? dispatch(fetchMyAbandonmentReviews({ role: "mentor", userId, force: true })).catch(() => [])
+          : Promise.resolve([]),
+      ]);
+    } catch (err) {
+      console.error("Dashboard dynamic load error:", err);
+    } finally {
+      setLoading(false);
+    }
+  }, [activeRole, dispatch, user, userId]);
 
-        if (!isMounted) return;
-        setOpenAbandonmentReviews(Array.isArray(myOpenReviewsRes) ? myOpenReviewsRes : []);
-
-        const userData = userDataRes || user;
-        const allProjects = Array.isArray(pRes) ? pRes : Array.isArray(pRes?.data) ? pRes.data : [];
-        let badgesList = Array.isArray(bRes) ? bRes : [];
-        if (badgesList.length === 0 && Array.isArray(userData?.data?.mentorRecommendations)) {
-          badgesList = userData.data.mentorRecommendations;
-        }
-
-        const userEmail = (user?.email || userData?.email || "").toLowerCase();
-        const resolvedName = (user?.name || userData?.name || "").toLowerCase();
-        const currentUserIdStr = String(userId);
-
-        // Compute active projects where current user is owner or collaborator
-        const activeProjectsCount = allProjects.filter((p) => {
-          if (!isProjectActive(p)) return false;
-          const isOwner = String(p.ownerId) === currentUserIdStr || (p.owner && p.owner.toLowerCase() === resolvedName);
-          const memberList = Array.isArray(p.members) && p.members.length > 0 ? p.members : (Array.isArray(p.collaborators) ? p.collaborators : []);
-          const isCollab = memberList.some((c) => {
-            if (typeof c === "string") {
-              return c === currentUserIdStr || c.toLowerCase() === resolvedName || c.toLowerCase() === userEmail;
-            }
-            return (
-              String(c.id || c.userId) === currentUserIdStr ||
-              (c.name && c.name.toLowerCase() === resolvedName) ||
-              (c.email && c.email.toLowerCase() === userEmail)
-            );
-          });
-          return isOwner || isCollab;
-        }).length;
-
-        const finalXp = Number(userData?.profile?.xp ?? userData?.xp ?? 0);
-        const finalRep = Number(userData?.profile?.rep ?? userData?.rep ?? 0);
-        const finalCompletedTasks = Number(userData?.profile?.tasksCount ?? userData?.tasksCount ?? 0);
-
-        setStats({
-          xp: finalXp,
-          rep: finalRep,
-          activeProjects: activeProjectsCount,
-          completedTasks: finalCompletedTasks,
-          badgesCount: badgesList.length,
-        });
-        setLatestBadge(badgesList.length > 0 ? badgesList[0] : null);
-        setDashboardData(userData);
-
-        // Build user actions for Recent Activity from recommendation badges
-        const actionsList = [];
-        badgesList.forEach((b) => {
-          actionsList.push({
-            id: `badge-${b.id || b.awardedAt}`,
-            title: 'Recommendation Badge',
-            message: `Awarded "${b.badgeName || b.badgeType || 'Recommendation'}" by ${b.mentorName || b.mentor || 'Mentor'} on "${b.projectTitle || b.project || 'Project'}".`,
-            timestamp: b.awardedAt || b.timestamp,
-            type: 'warning',
-          });
-        });
-        setUserActions(actionsList);
-      } catch (err) {
-        console.error("Dashboard dynamic load error:", err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
+  useEffect(() => {
     fetchDashboard();
+  }, [fetchDashboard]);
 
-    let lastFetchTime = Date.now();
-    const throttledUpdate = () => {
-      const now = Date.now();
-      if (now - lastFetchTime > 10000 && !document.hidden) {
-        lastFetchTime = now;
-        fetchDashboard();
-      }
+  useVisibilityPoll(fetchDashboard, 12000, {
+    enabled: Boolean(userId),
+    immediate: false,
+    triggerOnVisible: true,
+    visibleCooldownMs: 10000,
+  });
+
+  const currentActiveUser = ownProfile || user;
+
+  const { stats, latestBadge, userActions } = useMemo(() => {
+    const userData = currentActiveUser;
+    let badgesList = Array.isArray(storeUserBadges) ? storeUserBadges : [];
+    if (badgesList.length === 0 && Array.isArray(userData?.data?.mentorRecommendations)) {
+      badgesList = userData.data.mentorRecommendations;
+    }
+
+    const userEmail = (user?.email || userData?.email || "").toLowerCase();
+    const resolvedName = (user?.name || userData?.name || "").toLowerCase();
+    const currentUserIdStr = String(userId || "");
+
+    const activeProjectsCount = (Array.isArray(allProjects) ? allProjects : []).filter((p) => {
+      if (!isProjectActive(p)) return false;
+      const isOwner = String(p.ownerId) === currentUserIdStr || (p.owner && p.owner.toLowerCase() === resolvedName);
+      const memberList = Array.isArray(p.members) && p.members.length > 0 ? p.members : (Array.isArray(p.collaborators) ? p.collaborators : []);
+      const isCollab = memberList.some((c) => {
+        if (typeof c === "string") {
+          return c === currentUserIdStr || c.toLowerCase() === resolvedName || c.toLowerCase() === userEmail;
+        }
+        return (
+          String(c.id || c.userId) === currentUserIdStr ||
+          (c.name && c.name.toLowerCase() === resolvedName) ||
+          (c.email && c.email.toLowerCase() === userEmail)
+        );
+      });
+      return isOwner || isCollab;
+    }).length;
+
+    const finalXp = Number(userData?.profile?.xp ?? userData?.xp ?? 0);
+    const finalRep = Number(userData?.profile?.rep ?? userData?.rep ?? 0);
+    const finalCompletedTasks = Number(userData?.profile?.tasksCount ?? userData?.tasksCount ?? 0);
+
+    const actionsList = badgesList.map((b) => ({
+      id: `badge-${b.id || b.awardedAt}`,
+      title: 'Recommendation Badge',
+      message: `Awarded "${b.badgeName || b.badgeType || 'Recommendation'}" by ${b.mentorName || b.mentor || 'Mentor'} on "${b.projectTitle || b.project || 'Project'}".`,
+      timestamp: b.awardedAt || b.timestamp,
+      type: 'warning',
+    }));
+
+    return {
+      stats: {
+        xp: finalXp,
+        rep: finalRep,
+        activeProjects: activeProjectsCount,
+        completedTasks: finalCompletedTasks,
+        badgesCount: badgesList.length,
+      },
+      latestBadge: badgesList.length > 0 ? badgesList[0] : null,
+      userActions: actionsList,
     };
-
-    const interval = setInterval(() => {
-      if (!document.hidden) {
-        lastFetchTime = Date.now();
-        fetchDashboard();
-      }
-    }, 12000);
-
-    const handleStopPolls = () => {
-      isMounted = false;
-      clearInterval(interval);
-    };
-
-    window.addEventListener("teamforge:task_updated", throttledUpdate);
-    window.addEventListener("teamforge:project_updated", throttledUpdate);
-    window.addEventListener("teamforge:notification_updated", throttledUpdate);
-    window.addEventListener("teamforge:stop_polls", handleStopPolls);
-    window.addEventListener("focus", throttledUpdate);
-    document.addEventListener("visibilitychange", throttledUpdate);
-
-    return () => {
-      isMounted = false;
-      clearInterval(interval);
-      window.removeEventListener("teamforge:task_updated", throttledUpdate);
-      window.removeEventListener("teamforge:project_updated", throttledUpdate);
-      window.removeEventListener("teamforge:notification_updated", throttledUpdate);
-      window.removeEventListener("teamforge:stop_polls", handleStopPolls);
-      window.removeEventListener("focus", throttledUpdate);
-      document.removeEventListener("visibilitychange", throttledUpdate);
-    };
-  }, [user]);
+  }, [allProjects, currentActiveUser, storeUserBadges, user, userId]);
 
   if (loading) {
     return (
@@ -205,8 +188,6 @@ const Dashboard = () => {
       </div>
     );
   }
-
-  const currentActiveUser = dashboardData || user;
   // Recent activity logic combining user notifications and user actions, newest first with relative time
   const recentActivity = (() => {
     const activityMap = new Map();
@@ -277,18 +258,8 @@ const Dashboard = () => {
               <button
                 type="button"
                 data-testid={`dash-still-active-btn-${rev.id}`}
-                disabled={confirmingReviewId === rev.id}
-                onClick={async () => {
-                  setConfirmingReviewId(rev.id);
-                  try {
-                    await mentorMarketplaceApi.confirmAbandonmentReview(rev.id);
-                    setOpenAbandonmentReviews((prev) => prev.filter((item) => item.id !== rev.id));
-                  } catch {
-                    // Ignore transient failure
-                  } finally {
-                    setConfirmingReviewId(null);
-                  }
-                }}
+                disabled={Boolean(confirmingIds[rev.id])}
+                onClick={() => dispatch(confirmAbandonmentReview(rev.id))}
                 style={{
                   padding: "6px 14px",
                   borderRadius: "8px",
@@ -299,7 +270,7 @@ const Dashboard = () => {
                   cursor: "pointer",
                 }}
               >
-                {confirmingReviewId === rev.id ? "Confirming..." : "Still active"}
+                {confirmingIds[rev.id] ? "Confirming..." : "Still active"}
               </button>
             </div>
           ))}
@@ -395,4 +366,5 @@ const Dashboard = () => {
   );
 };
 
+const Dashboard = DashboardContent;
 export default Dashboard;

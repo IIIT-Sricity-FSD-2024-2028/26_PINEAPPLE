@@ -33,10 +33,7 @@ describe('Phase 26 E2E API Tests: Notification Aggregation', () => {
     await app.close();
   });
 
-  it('1. Suspending a collaborator with 8 Open tasks creates ONE owner notification regardless of owner digest setting', async () => {
-    const owner = ctx.usersRepository.findById('1')!;
-    owner.digestEnabled = true;
-
+  it('1. Suspending a collaborator with 8 Open tasks creates ONE owner notification', async () => {
     const proj = ctx.projectsService.create('1', {
       title: 'Project Atlas E2E',
       description: longDesc,
@@ -94,9 +91,6 @@ describe('Phase 26 E2E API Tests: Notification Aggregation', () => {
   });
 
   it('2. Deleting an account participating in 3 projects creates ONE notification per affected owner', async () => {
-    const owner = ctx.usersRepository.findById('1')!;
-    owner.digestEnabled = false;
-
     const collab = ctx.usersRepository.create({
       name: 'Multi Project Collab',
       username: 'e2e_multi_del',
@@ -162,9 +156,6 @@ describe('Phase 26 E2E API Tests: Notification Aggregation', () => {
   });
 
   it('3. Closing a project with 5 pending requests via HTTP sends 5 applicant notices and 1 owner summary notice', async () => {
-    const owner = ctx.usersRepository.findById('1')!;
-    owner.digestEnabled = false;
-
     const proj = ctx.projectsService.create('1', {
       title: 'Closure E2E Project',
       description: longDesc,
@@ -183,7 +174,6 @@ describe('Phase 26 E2E API Tests: Notification Aggregation', () => {
         emailVerified: true,
         status: UserStatus.Active,
       } as any);
-      appUser.digestEnabled = false;
       const token = ctx.loginAs(appUser.id, [], {
         email: appUser.email,
         role: 'collaborator',

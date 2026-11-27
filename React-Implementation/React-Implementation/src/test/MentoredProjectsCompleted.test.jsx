@@ -1,13 +1,8 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import MentoredProjects from '../pages/mentor/MentoredProjects';
 import mentorMarketplaceApi from '../services/mentorMarketplaceApi';
+import { renderWithStore } from './test-utils';
 
 const mockedNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -43,19 +38,19 @@ vi.mock('../services/mentorRequestsApi', () => ({
 }));
 
 const renderWithAuth = (ui, { user = { id: '7', name: 'Neha Gupta', role: 'Mentor' } } = {}) => {
-  return render(
-    <MemoryRouter initialEntries={['/mentor/projects']}>
-      <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true }}>
-        <RoleContext.Provider value={{ currentRole: 'Mentor', switchRole: vi.fn(), availableRoles: ['Mentor'] }}>
-          <UIProvider>
-            <NotificationContext.Provider value={{ notifications: [], unreadCount: 0 }}>
-              {ui}
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>
-  );
+  return renderWithStore(ui, {
+    route: '/mentor/projects',
+    preloadedState: {
+      session: {
+        user,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'Mentor',
+        allowedRoles: ['Mentor'],
+      },
+    },
+  });
 };
 
 describe('MentoredProjects - Completed & Active Projects Tests', () => {

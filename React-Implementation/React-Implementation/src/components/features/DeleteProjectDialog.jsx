@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Modal from '../common/Modal';
-import projectsApi from '../../services/projectsApi';
+import {
+  checkProjectDeletion,
+  deleteProject,
+} from '../../store/thunks/projectsThunks';
+import {
+  selectDeleteProjectStatus,
+  selectDeletionCheckStatus,
+  selectProjectDeletionCheck,
+  selectProjectsWorking,
+} from '../../store/selectors/projectsSelectors';
 import './DeleteProjectDialog.css';
 
 const DELETE_REASONS = [
@@ -13,7 +23,7 @@ const DELETE_REASONS = [
   { id: 'OTHER', label: 'Other' },
 ];
 
-export default function DeleteProjectDialog({
+function DeleteProjectDialogContent({
   isOpen,
   projectId,
   projectTitle = '',
@@ -23,63 +33,44 @@ export default function DeleteProjectDialog({
   onCloseProject,
   onReviewTasks,
 }) {
-  const [loading, setLoading] = useState(false);
-  const [checkResult, setCheckResult] = useState(null);
-  const [checkError, setCheckError] = useState('');
+  const dispatch = useDispatch();
+  const checkResult = useSelector((state) =>
+    isOpen && projectId ? selectProjectDeletionCheck(state, projectId) : null,
+  );
+  const checkStatus = useSelector(selectDeletionCheckStatus);
+  const deleteStatus = useSelector(selectDeleteProjectStatus);
+  const working = useSelector(selectProjectsWorking);
+
+  const loading = Boolean(isOpen && projectId && checkStatus === 'loading');
+  const submitting = deleteStatus === 'loading';
+  const checkError = isOpen && projectId ? working.checkError || '' : '';
 
   const [confirmTitle, setConfirmTitle] = useState('');
   const [selectedReasons, setSelectedReasons] = useState([]);
   const [explanation, setExplanation] = useState('');
-  const [adminMode, setAdminMode] = useState('scheduled'); // 'scheduled' | 'immediate'
-
-  const [submitting, setSubmitting] = useState(false);
+  const [adminModeOverride, setAdminModeOverride] = useState(null); // 'scheduled' | 'immediate'
   const [submitError, setSubmitError] = useState('');
+
+  const adminMode =
+    adminModeOverride ??
+    (checkResult?.mode === 'immediate' ? 'immediate' : 'scheduled');
+  const setAdminMode = (mode) => setAdminModeOverride(mode);
+
+  const resetDialogDraft = () => {
+    setConfirmTitle('');
+    setSelectedReasons([]);
+    setExplanation('');
+    setAdminModeOverride(null);
+    setSubmitError('');
+  };
 
   useEffect(() => {
     if (!isOpen || !projectId) {
-      setCheckResult(null);
-      setCheckError('');
-      setConfirmTitle('');
-      setSelectedReasons([]);
-      setExplanation('');
-      setSubmitError('');
-      setSubmitting(false);
-      return;
+      return undefined;
     }
-
-    let isMounted = true;
-    setLoading(true);
-    setCheckError('');
-
-    projectsApi
-      .checkDeletion(projectId)
-      .then((data) => {
-        if (isMounted) {
-          setCheckResult(data);
-          if (data?.mode === 'immediate') {
-            setAdminMode('immediate');
-          } else {
-            setAdminMode('scheduled');
-          }
-        }
-      })
-      .catch((err) => {
-        if (isMounted) {
-          setCheckError(
-            err?.serverMessage ||
-              err?.message ||
-              'Failed to evaluate deletion eligibility.',
-          );
-        }
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-
-    return () => {
-      isMounted = false;
-    };
-  }, [isOpen, projectId]);
+    dispatch(checkProjectDeletion({ id: projectId }));
+    return undefined;
+  }, [dispatch, isOpen, projectId]);
 
   const toggleReason = (reasonId) => {
     setSelectedReasons((prev) =>
@@ -115,7 +106,6 @@ export default function DeleteProjectDialog({
 
   const handleSubmit = async () => {
     if (!isFormValid || submitting) return;
-    setSubmitting(true);
     setSubmitError('');
 
     try {
@@ -131,10 +121,14 @@ export default function DeleteProjectDialog({
         }
       }
 
-      const res = await projectsApi.softDelete(projectId, payload);
+      const actionRes = await dispatch(
+        deleteProject({ id: projectId, payload }),
+      ).unwrap();
+      const res = actionRes?.result;
       if (typeof onSuccess === 'function') {
         onSuccess(res);
       }
+      resetDialogDraft();
       onClose();
     } catch (err) {
       if (err?.code === 'PROJECT_DELETE_LIMIT' || err?.statusCode === 429) {
@@ -154,9 +148,12 @@ export default function DeleteProjectDialog({
             'Failed to delete project. Please try again.',
         );
       }
-    } finally {
-      setSubmitting(false);
     }
+  };
+
+  const handleDialogClose = () => {
+    resetDialogDraft();
+    onClose();
   };
 
   return (
@@ -164,7 +161,7 @@ export default function DeleteProjectDialog({
       isOpen={isOpen}
       title="Delete Project"
       onClose={() => {
-        if (!submitting) onClose();
+        if (!submitting) handleDialogClose();
       }}
       size="md"
       testId="delete-project-modal"
@@ -173,7 +170,7 @@ export default function DeleteProjectDialog({
           <button
             type="button"
             className="tf-del-btn-secondary"
-            onClick={onClose}
+            onClick={handleDialogClose}
           >
             Close
           </button>
@@ -183,7 +180,7 @@ export default function DeleteProjectDialog({
               type="button"
               className="tf-del-btn-secondary"
               disabled={submitting}
-              onClick={onClose}
+              onClick={handleDialogClose}
             >
               Cancel
             </button>
@@ -473,3 +470,6 @@ export default function DeleteProjectDialog({
     </Modal>
   );
 }
+
+const DeleteProjectDialog = DeleteProjectDialogContent;
+export default DeleteProjectDialog;

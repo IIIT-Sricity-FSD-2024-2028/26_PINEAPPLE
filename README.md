@@ -296,6 +296,7 @@ Users with multiple personas (e.g., Collaborator applying to be Mentor, or switc
 ### 🔒 Phase 19: Users Controller Lockdown & Shared Login Throttling
 - **Privileged Creation & Public Signup Lockdown:** `POST /users` requires `@Roles('superuser')` (anonymous requests receive `401`, non-Super Users `403`), hashes an internal random password, dispatches a one-time password setup email without returning secrets, and logs `USER_CREATED_BY_SUPERUSER`. Public `/auth/signup` and `/auth/profile` permit only `Collaborator` and `Project Owner`.
 - **Single Authenticated Login Path & Throttling:** Removed passwordless `POST /users/login`. Both `POST /auth/login` and `POST /admin/login` enforce non-empty string passwords (`400 PASSWORD_REQUIRED`), share `LoginThrottleService` (10 failures/account & 30/IP per 15-minute window -> `429 TOO_MANY_ATTEMPTS` + `retryAt` + `LOGIN_THROTTLED` audit; per-account counter reset on valid login), and return identical `401 INVALID_CREDENTIALS` responses for missing users or wrong passwords.
+- **Admin Portal Refresh Cookie & Session Persistence (`POST /admin/auth/refresh`, `POST /admin/auth/logout`):** Successful `POST /admin/login` issues a separate `httpOnly`, `SameSite=Strict`, `Path=/admin/auth` opaque refresh cookie (`teamforge_admin_refresh_token`, SHA-256 hashed in `AdminRefreshService`, strict single-use rotation with `REFRESH_REUSED` chain revocation, 12h idle TTL capped at 24h max session lifetime, plus suspension/role/`tokenVersion` checks and `POST /portal-admins/:id/revoke-sessions`). The React app keeps all admin access tokens and claims strictly in memory and restores `/admin/*` sessions across browser refreshes via single-flight `restoreAdminSession()`.
 - **Self-Update Allow-List & Session Revocation:** `PATCH /users/:id` enforces own-account access (`403 NOT_YOUR_ACCOUNT`) and `SelfUpdateUserDto` + `SelfAccountUpdateGuard` allow-lists (`400 FIELD_NOT_ALLOWED` + `USER_UPDATE_REJECTED_FIELD` audit). Changing email resets `emailVerified: false`, sends a new verification link, and revokes other active sessions while retaining the caller's session.
 - **Super User Account Deletion & Privacy:** `DELETE /users/:id` is Super User-only with a mandatory reason (`400 REASON_REQUIRED`), never allowed on Super Users (`403 CANNOT_DELETE_SUPERUSER`), checks open obligations (`409 ACCOUNT_HAS_OPEN_OBLIGATIONS`), runs full anonymisation, and logs `USER_DELETED_BY_SUPERUSER`. `GET /users` and cross-user `GET /users/:id` are restricted to Admins with `'users'` permission or Super Users, and `serializeSafeUser` / `stripUserSecrets` strips password hashes, tokens, reset codes, and OTP secrets across all responses.
 
@@ -305,7 +306,7 @@ Users with multiple personas (e.g., Collaborator applying to be Mentor, or switc
 - **Committed Route Matrix & Drift Guard:** Added `npm run test:routes` (`back-end/scripts/generate-route-matrix.ts`) using `DiscoveryService` + `Reflector` to maintain `back-end/test/route-auth-matrix.json` and enforce explicit public-route allow-list and unguarded-route checks in CI (`test/phase21.e2e-spec.ts`).
 
 ### 🔄 In-Memory Storage & Clean Restart Lifecycle (Fix 1)
-- **No Disk Snapshots (In-Memory Only):** All backend stores run strictly **in memory** and always boot cleanly from seed (mock) data on every server start or restart (`src/persistence` and `snapshot.json` have been removed). Data created during a run is intentionally ephemeral until restart, and Super Users can also restore clean seed data at any time via **Reset to mock data** (`ALLOW_DEMO_RESET=true` outside production).
+- **No Disk Snapshots (In-Memory Only):** All backend stores run strictly **in memory** and always boot cleanly from seed (mock) data on every server start or restart (`src/persistence` and `snapshot.json` have been removed). Data created during a run is intentionally ephemeral until restart.
 - **Boot Identity & Automatic Stale-Session Detection (`GET /health`, `X-Boot-Id`):** Every server start generates a fresh random `bootId` (`BootService`) returned in `GET /health` (`{ status: 'ok', bootId, startedAt }`) and stamped on every response header (`X-Boot-Id`). Access and refresh JWTs embed `bootId`; tokens from an earlier server boot or deleted accounts return `401 SESSION_INVALID`, prompting the frontend (`apiClient.js` + `AuthContext.jsx` + `src/utils/storage.js`) to clear stale browser storage and redirect once to `/login` with `"The server was restarted. Please log in again."`.
 - **Upload Hygiene on Startup (`StartupCleanupService`):** When `CLEAN_UPLOADS_ON_START=true` (the default), startup automatically clears leftover files under `uploads/` and `secure-cvs/` not referenced by seed records so disk state stays aligned with in-memory seed data. Hourly runtime hygiene (`StorageHygieneService`, `STORAGE_HYGIENE_DRY_RUN`) cleans expired exports, orphan uploads, and deleted-account CVs while the server is running.
 
@@ -364,7 +365,7 @@ npm run build
 ## 🛠️ Quick Start & Running Locally
 
 ### 1. Back-End Setup
-> **Note:** Back-end data is held **in memory only** and resets to the seeded mock data on every restart (`CLEAN_UPLOADS_ON_START=true` clears unseeded local upload/export artifacts on start).
+> **Note:** Back-end data is held **in memory only** and resets to the seeded mock data on every restart (`CLEAN_UPLOADS_ON_START=true` clears unseeded local upload/export artifacts on start). Uploaded files and CVs default to `UPLOAD_DIR` (`back-end/.runtime/uploads` and `back-end/.runtime/uploads/secure-cvs`), which is gitignored and excluded from NestJS, TypeScript, Nodemon, and Vite file watchers so dev servers never restart on upload.
 
 ```bash
 cd back-end
@@ -396,13 +397,36 @@ npm run test:e2e  # Runs Supertest E2E tests (Phase 1 moderation & suspension ca
 
 # Front-end: Linting, Vitest tests, and production build
 cd ../React-Implementation/React-Implementation
-npm run lint      # ESLint verification
+npm run lint      # ESLint verification (--max-warnings 0)
 npm test          # Vitest suite (AdminUserDetails, ProjectCard)
 npm run build     # Production bundle build
 
 # API Tests (REST Client format)
 # Open docs/api-tests/phase-1.http in VS Code / IDE with REST Client extension
 ```
+
+### Before you push
+Run the verification scripts in both projects before pushing any commit:
+
+```bash
+# Front end (ESLint with --max-warnings 0 + Vitest)
+cd React-Implementation/React-Implementation
+npm run lint
+npm run check
+
+# Back end (TypeScript typecheck + lint + Jest)
+cd back-end
+npm run lint
+npm run typecheck
+npm run check
+```
+
+### Code quality rules
+- Never add `eslint-disable` comments or `@ts-ignore` without a short written reason explaining why the rule is wrong for that exact line.
+- Run `npm run check` in both `React-Implementation/React-Implementation` and `back-end` before pushing.
+- Fix warnings immediately when you see them (`--max-warnings 0` is enforced on `npm run lint`).
+- Fix React hooks dependency warnings with stable callbacks, refs, or effect-local helpers instead of suppressing them or creating fetch loops.
+- Remove unused imports, variables, parameters, and dead code as soon as they become unused.
 
 #### Legacy Test Suites (ts-node):
 ```bash

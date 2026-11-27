@@ -1,8 +1,17 @@
-import { useNavigate } from 'react-router-dom';
+import { useSelector } from 'react-redux';
+import { useNavigate, useParams } from 'react-router-dom';
+import {
+  selectProjectById,
+  selectProjectTombstoneById,
+} from '../store/selectors/projectsSelectors';
 import './ProjectTombstone.css';
 
-export default function ProjectTombstone({ project, onNavigate }) {
+export default function ProjectTombstone({ project: propProject, onNavigate }) {
   const navigate = useNavigate();
+  const { projectId } = useParams();
+  const storeTombstone = useSelector((state) => (projectId ? selectProjectTombstoneById(state, projectId) : null));
+  const storeProject = useSelector((state) => (projectId ? selectProjectById(state, projectId) : null));
+  const project = propProject || storeTombstone || storeProject;
 
   const handleBrowse = () => {
     if (typeof onNavigate === 'function') {

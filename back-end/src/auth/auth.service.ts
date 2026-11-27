@@ -19,6 +19,13 @@ import { AuditService } from '../audit/audit.service';
 import { NotificationsService } from '../notifications/notifications.service';
 import { FirebaseService } from '../firebase/firebase.service';
 import { ClockService } from '../common/services/clock.service';
+import { AdminRefreshService } from '../admin/admin-refresh.service';
+import {
+  USER_REFRESH_COOKIE_NAME,
+  clearRefreshCookie,
+  getUserRefreshCookieOptions,
+  setRefreshCookie,
+} from '../common/utils/refresh-cookie.util';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
 import { LoginDto } from './dto/login.dto';
@@ -103,6 +110,8 @@ export class AuthService implements OnModuleInit {
     private readonly loginThrottleService?: LoginThrottleService,
     @Optional()
     private readonly bootService?: BootService,
+    @Optional()
+    private readonly adminRefreshService?: AdminRefreshService,
   ) {}
 
   onModuleInit() {
@@ -233,24 +242,16 @@ export class AuthService implements OnModuleInit {
   }
 
   private setRefreshTokenCookie(res: any, refreshToken: string): void {
-    if (!res || typeof res.cookie !== 'function') return;
-    const isProduction = process.env.NODE_ENV === 'production';
-    res.cookie('teamforge_refresh_token', refreshToken, {
-      httpOnly: true,
-      sameSite: 'lax',
-      secure: isProduction,
-      maxAge: this.getRefreshTokenTtlMs(),
-      path: '/',
-    });
+    setRefreshCookie(
+      res,
+      USER_REFRESH_COOKIE_NAME,
+      refreshToken,
+      getUserRefreshCookieOptions(this.getRefreshTokenTtlMs()),
+    );
   }
 
   private clearRefreshTokenCookie(res: any): void {
-    if (!res || typeof res.clearCookie !== 'function') return;
-    res.clearCookie('teamforge_refresh_token', {
-      httpOnly: true,
-      sameSite: 'lax',
-      path: '/',
-    });
+    clearRefreshCookie(res, USER_REFRESH_COOKIE_NAME, getUserRefreshCookieOptions());
   }
 
   private getNowDate(): Date {
@@ -874,6 +875,7 @@ export class AuthService implements OnModuleInit {
 
   async logoutAll(userId: string, res: any) {
     this.usersService.revokeAllRefreshTokens(userId);
+    this.adminRefreshService?.bumpTokenVersion(String(userId));
     this.clearRefreshTokenCookie(res);
 
     const user = this.usersService.findUserSafe(userId);
@@ -919,6 +921,7 @@ export class AuthService implements OnModuleInit {
 
     // Invalidate all tokens
     this.usersService.revokeAllRefreshTokens(userId);
+    this.adminRefreshService?.bumpTokenVersion(String(userId));
     this.clearRefreshTokenCookie(res);
 
     this.auditService.log({
@@ -1270,6 +1273,7 @@ export class AuthService implements OnModuleInit {
 
     // Revoke all sessions
     this.usersService.revokeAllRefreshTokens(String(user.id));
+    this.adminRefreshService?.bumpTokenVersion(String(user.id));
 
     this.auditService.log({
       action: 'password-reset-completed',

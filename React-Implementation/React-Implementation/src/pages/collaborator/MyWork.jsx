@@ -1,9 +1,22 @@
-import { useState, useEffect, useContext } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import joinRequestsApi from '../../services/joinRequestsApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { fetchMyWork } from '../../store/thunks/projectsThunks';
+import { fetchTasksForProjects } from '../../store/thunks/tasksThunks';
+import {
+  setMyWorkFilter,
+  setSummaryProjectId,
+} from '../../store/slices/projectsSlice';
+import {
+  selectMyWorkCompletedProjects,
+  selectMyWorkOngoingProjects,
+  selectMyWorkStatus,
+  selectProjectById,
+  selectProjectSummaryCounts,
+  selectProjectsWorking,
+} from '../../store/selectors/projectsSelectors';
+import { selectTasksMapByProject } from '../../store/selectors/tasksSelectors';
 import Modal from '../../components/common/Modal';
 import EmptyState from '../../components/common/EmptyState';
 import FilterTabs from '../../components/common/FilterTabs';
@@ -12,110 +25,59 @@ import { calculateProjectProgress } from '../../utils/progress';
 import { getTaskReward } from '../../utils/workflow';
 import './myWork.css';
 
-const MyWork = () => {
-  const { user } = useContext(AuthContext);
+const MyWorkContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [filter, setFilter] = useState('ongoing');
-  const [ongoingProjects, setOngoingProjects] = useState([]);
-  const [completedProjects, setCompletedProjects] = useState([]);
-  const [ongoingCount, setOngoingCount] = useState(0);
-  const [completedCount, setCompletedCount] = useState(0);
-  const [tasksMap, setTasksMap] = useState({});
-  const [loading, setLoading] = useState(true);
-  const [summaryProject, setSummaryProject] = useState(null);
+  const ongoingProjects = useSelector(selectMyWorkOngoingProjects);
+  const completedProjects = useSelector(selectMyWorkCompletedProjects);
+  const myWorkStatus = useSelector(selectMyWorkStatus);
+  const summaryCounts = useSelector(selectProjectSummaryCounts);
+  const working = useSelector(selectProjectsWorking);
+  const filter = working.myWorkFilter || 'ongoing';
+  const summaryProjectId = working.summaryProjectId;
+  const summaryProject = useSelector((state) =>
+    summaryProjectId ? selectProjectById(state, summaryProjectId) : null,
+  );
+
+  const tasksMap = useSelector(selectTasksMapByProject);
 
   const currentUserId = user?.id;
   const currentUserName = user?.name || '';
+  const loading = myWorkStatus === 'loading';
+
+  const ongoingCount =
+    typeof summaryCounts.myWorkOngoingCount === 'number' &&
+    (summaryCounts.myWorkOngoingCount > 0 || ongoingProjects.length === 0)
+      ? summaryCounts.myWorkOngoingCount
+      : ongoingProjects.length;
+  const completedCount =
+    typeof summaryCounts.myWorkCompletedCount === 'number' &&
+    (summaryCounts.myWorkCompletedCount > 0 || completedProjects.length === 0)
+      ? summaryCounts.myWorkCompletedCount
+      : completedProjects.length;
 
   useEffect(() => {
-    let isMounted = true;
-    const loadMyWork = async () => {
-      try {
-        setLoading(true);
+    if (!currentUserId) return;
+    dispatch(fetchMyWork({ userId: currentUserId, userName: currentUserName }));
+  }, [dispatch, currentUserId, currentUserName]);
 
-        let res;
-        try {
-          res = await projectsApi.getMyWork(currentUserId);
-        } catch {
-          // Fallback if dedicated endpoint is temporarily unreachable
-          const allProjects = await projectsApi.list({ status: 'all' }).catch(() => []);
-          const collabs = (Array.isArray(allProjects) ? allProjects : []).filter((p) => {
-            const isOwner = p.owner === currentUserName || p.ownerId === currentUserId;
-            if (isOwner) return false;
-            return (
-              Array.isArray(p.collaborators) &&
-              p.collaborators.some(
-                (c) =>
-                  c === currentUserId ||
-                  c === currentUserName ||
-                  (typeof c === 'object' && (c.id === currentUserId || c.name === currentUserName))
-              )
-            );
-          });
-          const ongoing = collabs.filter(
-            (p) =>
-              String(p.status || '').toLowerCase() !== 'completed' &&
-              String(p.status || '').toLowerCase() !== 'closed' &&
-              !p.isCompleted
-          );
-          const completed = collabs.filter(
-            (p) =>
-              String(p.status || '').toLowerCase() === 'completed' ||
-              String(p.status || '').toLowerCase() === 'closed' ||
-              p.isCompleted
-          );
-          res = {
-            ongoing,
-            completed,
-            ongoingCount: ongoing.length,
-            completedCount: completed.length,
-          };
-        }
+  const allWorkProjectIds = useMemo(
+    () =>
+      [...ongoingProjects, ...completedProjects]
+        .map((p) => p.id)
+        .filter(Boolean),
+    [ongoingProjects, completedProjects],
+  );
+  const allWorkIdsKey = allWorkProjectIds.join(',');
 
-        const ongoing = Array.isArray(res?.ongoing) ? res.ongoing : [];
-        const completed = Array.isArray(res?.completed) ? res.completed : [];
-        const oCount = typeof res?.ongoingCount === 'number' ? res.ongoingCount : ongoing.length;
-        const cCount = typeof res?.completedCount === 'number' ? res.completedCount : completed.length;
-
-        if (isMounted) {
-          setOngoingProjects(ongoing);
-          setCompletedProjects(completed);
-          setOngoingCount(oCount);
-          setCompletedCount(cCount);
-        }
-
-        const allProjectIds = [...ongoing, ...completed].map((p) => p.id);
-        if (allProjectIds.length > 0) {
-          const allTasks = await tasksApi.listForProjects(allProjectIds);
-          const mapped = {};
-          (allTasks || []).forEach((t) => {
-            if (!mapped[t.projectId]) mapped[t.projectId] = [];
-            mapped[t.projectId].push(t);
-          });
-          if (isMounted) {
-            setTasksMap(mapped);
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load my work data:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    if (currentUserId) {
-      loadMyWork();
-    } else {
-      setLoading(false);
-    }
-
-    return () => {
-      isMounted = false;
-    };
-  }, [currentUserId, currentUserName]);
+  useEffect(() => {
+    if (!allWorkIdsKey) return;
+    const ids = allWorkIdsKey.split(',').filter(Boolean);
+    if (ids.length === 0) return;
+    dispatch(fetchTasksForProjects({ projectIds: ids, force: true }));
+  }, [dispatch, allWorkIdsKey]);
 
   const visibleProjects = filter === 'completed' ? completedProjects : ongoingProjects;
 
@@ -133,7 +95,7 @@ const MyWork = () => {
             { id: 'completed', label: `Completed (${completedCount})` },
           ]}
           activeTab={filter}
-          onChange={setFilter}
+          onChange={(tab) => dispatch(setMyWorkFilter(tab))}
           ariaLabel="My work status filter"
         />
       </div>
@@ -150,10 +112,9 @@ const MyWork = () => {
               const myTasks = projectTasks.filter(
                 (t) =>
                   (t.assigneeId && String(t.assigneeId) === String(currentUserId)) ||
-                  (currentUserName && (
-                    (t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
-                    (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase())
-                  ))
+                  (currentUserName &&
+                    ((t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
+                      (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase()))),
               );
               const progress = calculateProjectProgress(projectTasks);
 
@@ -166,7 +127,7 @@ const MyWork = () => {
                   taskCount={myTasks.length}
                   tasks={myTasks}
                   onSelect={() => navigate(`/workspace/${project.id}`)}
-                  onSummary={(p) => setSummaryProject(p)}
+                  onSummary={(p) => dispatch(setSummaryProjectId(p.id))}
                 />
               );
             })}
@@ -189,12 +150,12 @@ const MyWork = () => {
       <Modal
         isOpen={Boolean(summaryProject)}
         title="Your Contribution Summary"
-        onClose={() => setSummaryProject(null)}
+        onClose={() => dispatch(setSummaryProjectId(null))}
         footer={
           <button
             type="button"
             className="tf-mywork-btn-primary"
-            onClick={() => setSummaryProject(null)}
+            onClick={() => dispatch(setSummaryProjectId(null))}
           >
             Done
           </button>
@@ -208,11 +169,10 @@ const MyWork = () => {
                   {(tasksMap[summaryProject.id] || []).filter(
                     (t) =>
                       ((t.assigneeId && String(t.assigneeId) === String(currentUserId)) ||
-                       (currentUserName && (
-                         (t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
-                         (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase())
-                       ))) &&
-                      (t.status === 'Completed' || String(t.status).toLowerCase() === 'completed')
+                        (currentUserName &&
+                          ((t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
+                            (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase())))) &&
+                      (t.status === 'Completed' || String(t.status).toLowerCase() === 'completed'),
                   ).length}
                 </div>
                 <div className="tf-mywork-stat-lbl">Tasks Completed</div>
@@ -223,13 +183,13 @@ const MyWork = () => {
                     .filter(
                       (t) =>
                         ((t.assigneeId && String(t.assigneeId) === String(currentUserId)) ||
-                         (currentUserName && (
-                           (t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
-                           (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase())
-                         ))) &&
-                        (t.status === 'Completed' || String(t.status).toLowerCase() === 'completed')
+                          (currentUserName &&
+                            ((t.assigneeName && t.assigneeName.toLowerCase() === currentUserName.toLowerCase()) ||
+                              (t.assignee && t.assignee.toLowerCase() === currentUserName.toLowerCase())))) &&
+                        (t.status === 'Completed' || String(t.status).toLowerCase() === 'completed'),
                     )
-                    .reduce((sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp, 0)} XP
+                    .reduce((sum, t) => sum + getTaskReward(t.priority || t.difficulty).xp, 0)}{' '}
+                  XP
                 </div>
                 <div className="tf-mywork-stat-lbl">Total XP Earned</div>
               </div>
@@ -245,4 +205,5 @@ const MyWork = () => {
   );
 };
 
+const MyWork = MyWorkContent;
 export default MyWork;

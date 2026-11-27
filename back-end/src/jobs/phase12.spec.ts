@@ -70,9 +70,6 @@ describe('Phase 12 Unit Tests: Stuck Projects, Requests & Inactivity', () => {
 
   beforeEach(() => {
     usersRepo.reset();
-    for (const u of usersRepo.findAll(true)) {
-      u.digestEnabled = false;
-    }
     projectsRepo.reset();
     tasksRepo.reset();
     notificationsService.reset();

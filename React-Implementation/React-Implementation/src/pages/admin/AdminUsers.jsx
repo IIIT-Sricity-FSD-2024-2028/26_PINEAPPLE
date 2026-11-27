@@ -1,6 +1,45 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
-import adminApi from '../../services/adminApi';
+import {
+  fetchAdminUsers,
+  flagAdminUser,
+  updateAdminUserStatus,
+} from '../../store/thunks/adminUsersThunks';
+import {
+  setAdminUsersFilter,
+  setAdminUsersQuery,
+} from '../../store/slices/adminUsersSlice';
+import {
+  selectAdminDuplicateGroups,
+  selectAdminTrustSummaries,
+  selectAdminUserCounts,
+  selectAdminUsersError,
+  selectAdminUsersStatus,
+  selectAdminUsersWorking,
+  selectAllAdminUsers,
+} from '../../store/selectors/adminUsersSelectors';
+import { issueUserWarning } from '../../store/thunks/warningsThunks';
+import {
+  approveModerationAction,
+  fetchModerationActions,
+  reactivateUserModeration,
+  rejectModerationAction,
+  suspendUserModeration,
+} from '../../store/thunks/pendingModerationActionsThunks';
+import {
+  clearModerationError,
+  closeApprovalDecisionModal,
+  openApprovalDecisionModal,
+  setModerationActionBanner,
+} from '../../store/slices/pendingModerationActionsSlice';
+import {
+  selectAllModerationActions,
+  selectModerationWorking,
+} from '../../store/selectors/pendingModerationActionsSelectors';
+import {
+  selectCurrentAdminUid,
+} from '../../store/selectors/sessionSelectors';
 import SearchBar from '../../components/common/SearchBar';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
@@ -8,8 +47,6 @@ import FilterTabs from '../../components/common/FilterTabs';
 import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
 import UserTrustCard from '../../components/features/UserTrustCard';
-import trustApi from '../../services/trustApi';
-import storage from '../../utils/storage';
 import './AdminUsers.css';
 
 const VALID_FILTERS = ['all', 'active', 'suspended', 'flagged', 'duplicates', 'approvals'];
@@ -27,39 +64,64 @@ const FlagIcon = () => (
   <span className="admin-users-flag" title="Flagged account">🏳</span>
 );
 
-const AdminUsers = () => {
+const AdminUsersContent = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const [users, setUsers] = useState([]);
-  const [duplicateGroups, setDuplicateGroups] = useState([]);
-  const [duplicatesLoading, setDuplicatesLoading] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [query, setQuery] = useState('');
-  
+  const users = useSelector(selectAllAdminUsers);
+  const duplicateGroups = useSelector(selectAdminDuplicateGroups);
+  const userCounts = useSelector(selectAdminUserCounts);
+  const trustSummaries = useSelector(selectAdminTrustSummaries);
+  const usersStatus = useSelector(selectAdminUsersStatus);
+  const error = useSelector(selectAdminUsersError);
+  const usersWorking = useSelector(selectAdminUsersWorking);
+
+  const loading = usersStatus === 'idle' || (usersStatus === 'loading' && users.length === 0);
+  const duplicatesLoading = loading;
+  const query = usersWorking.query || '';
+  const setQuery = (val) => dispatch(setAdminUsersQuery(val));
+
   const rawParam = searchParams.get('filter') || searchParams.get('status') || searchParams.get('tab');
-  const [filter, setFilter] = useState(() => resolveFilterParam(rawParam));
+  const filter = usersWorking.filter || 'all';
+  const setFilter = (val) => dispatch(setAdminUsersFilter(val));
 
   useEffect(() => {
     const raw = searchParams.get('filter') || searchParams.get('status') || searchParams.get('tab');
-    setFilter(resolveFilterParam(raw));
-  }, [searchParams]);
+    dispatch(setAdminUsersFilter(resolveFilterParam(raw)));
+  }, [searchParams, dispatch]);
+  useEffect(() => {
+    if (rawParam && rawParam !== 'all') {
+      dispatch(setAdminUsersFilter(resolveFilterParam(rawParam)));
+    }
+  }, [rawParam, dispatch]);
   const [openMenuId, setOpenMenuId] = useState(null);
-  const [trustSummaries, setTrustSummaries] = useState({});
 
-  // Moderation modal state
+  // Moderation modal & second-approval queue (backed by pendingModerationActionsSlice + warningsSlice)
+  const moderationActions = useSelector(selectAllModerationActions);
+  const moderationWorking = useSelector(selectModerationWorking);
+  const storeAdminUid = useSelector(selectCurrentAdminUid);
+
   const [activeModal, setActiveModal] = useState(null); // { user, action: 'warn'|'suspend'|'activate' }
   const [explanation, setExplanation] = useState('');
-  const [explanationError, setExplanationError] = useState('');
+  const [localExplanationError, setLocalExplanationError] = useState('');
   const [isProcessing, setIsProcessing] = useState(false);
-  const [actionBanner, setActionBanner] = useState(null);
-  const [moderationActions, setModerationActions] = useState([]);
-  const [approvalDecisionModal, setApprovalDecisionModal] = useState(null); // { action, decision: 'approve'|'reject' }
-  const [approvalReason, setApprovalReason] = useState('');
-  const [approvalError, setApprovalError] = useState('');
-  const [approvalSubmitting, setApprovalSubmitting] = useState(false);
+  const actionBanner = moderationWorking.actionBanner;
+  const explanationError = localExplanationError || moderationWorking.error || '';
 
-  const currentAdminId = storage.getAdminSession().uid || '';
+  const approvalDecisionModal = useMemo(() => {
+    if (!moderationWorking.approvalModalActionId) return null;
+    const action = moderationActions.find(
+      (a) => String(a.id) === String(moderationWorking.approvalModalActionId),
+    );
+    if (!action) return null;
+    return { action, decision: moderationWorking.approvalModalDecision };
+  }, [moderationActions, moderationWorking.approvalModalActionId, moderationWorking.approvalModalDecision]);
+
+  const [approvalReason, setApprovalReason] = useState('');
+  const approvalError = moderationWorking.approvalError || '';
+  const approvalSubmitting = Boolean(moderationWorking.approvalSubmitting);
+
+  const currentAdminId = storeAdminUid || '';
   
   const listRef = useRef(null);
 
@@ -74,55 +136,9 @@ const AdminUsers = () => {
   }, []);
 
   useEffect(() => {
-    let isMounted = true;
-    const loadUsers = async () => {
-      try {
-        const [data, dupRes, actionsRes] = await Promise.all([
-          adminApi.listUsers(),
-          adminApi.getDuplicateUsers().catch(() => ({ groups: [] })),
-          typeof adminApi.getModerationActions === 'function'
-            ? adminApi.getModerationActions().catch(() => [])
-            : Promise.resolve([]),
-        ]);
-        if (isMounted) {
-          const userList = Array.isArray(data) ? data : [];
-          setUsers(userList);
-          setDuplicateGroups(Array.isArray(dupRes?.groups) ? dupRes.groups : []);
-          setModerationActions(Array.isArray(actionsRes) ? actionsRes : []);
-          setError(null);
-
-          if (userList.length > 0) {
-            const userIds = userList.map((u) => String(u.id || '')).filter(Boolean);
-            trustApi.getTrustSummaries(userIds.slice(0, 50)).then((summaries) => {
-              if (isMounted && Array.isArray(summaries)) {
-                const map = {};
-                summaries.forEach((s) => {
-                  if (s?.userId) map[s.userId] = s;
-                });
-                setTrustSummaries(map);
-              }
-            }).catch(() => {});
-          }
-        }
-      } catch (err) {
-        console.error('Failed to fetch admin users:', err);
-        if (isMounted) {
-          setError('Failed to load users. Please try again later.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-          setDuplicatesLoading(false);
-        }
-      }
-    };
-
-    loadUsers();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+    dispatch(fetchModerationActions());
+    dispatch(fetchAdminUsers());
+  }, [dispatch]);
 
   const toggleMenu = (id, e) => {
     e.stopPropagation();
@@ -133,59 +149,51 @@ const AdminUsers = () => {
     setOpenMenuId(null);
     setActiveModal({ user: targetUser, action });
     setExplanation('');
-    setExplanationError('');
+    setLocalExplanationError('');
+    dispatch(clearModerationError());
   };
 
   const closeModerationModal = () => {
     setActiveModal(null);
     setExplanation('');
-    setExplanationError('');
+    setLocalExplanationError('');
+    dispatch(clearModerationError());
   };
 
   const handleSubmitModeration = async () => {
     if (!activeModal?.user) return;
     const trimmed = explanation.trim();
     if (trimmed.length < 10) {
-      setExplanationError('Written explanation must be at least 10 characters.');
+      setLocalExplanationError('Written explanation must be at least 10 characters.');
       return;
     }
 
     setIsProcessing(true);
-    setActionBanner(null);
+    dispatch(setModerationActionBanner(null));
     try {
       const targetId = activeModal.user.id;
-      let res = null;
       if (activeModal.action === 'warn') {
-        res = await adminApi.warnUser(targetId, { reason: trimmed });
+        await dispatch(issueUserWarning({ userId: targetId, reason: trimmed })).unwrap();
       } else if (activeModal.action === 'suspend') {
-        res = await adminApi.suspendUser(targetId, { reason: trimmed });
+        await dispatch(
+          suspendUserModeration({
+            userId: targetId,
+            targetUserName: activeModal.user?.name,
+            reason: trimmed,
+          }),
+        ).unwrap();
       } else if (activeModal.action === 'activate') {
-        res = await adminApi.reactivateUser(targetId, { reason: trimmed });
+        await dispatch(
+          reactivateUserModeration({ userId: targetId, reason: trimmed }),
+        ).unwrap();
       }
 
       closeModerationModal();
-      if (res?.status === 'pending_second_approval') {
-        setActionBanner({
-          type: 'info',
-          message: `Pending second approval for ${activeModal.user?.name || 'user'} — waiting for another admin or Super User within 72 hours.`,
-        });
-      }
-      // Reload fresh user list & approvals
-      const [freshData, freshActions] = await Promise.all([
-        adminApi.listUsers(),
-        typeof adminApi.getModerationActions === 'function'
-          ? adminApi.getModerationActions().catch(() => [])
-          : Promise.resolve([]),
-      ]);
-      if (Array.isArray(freshData)) {
-        setUsers(freshData);
-      }
-      if (Array.isArray(freshActions)) {
-        setModerationActions(freshActions);
-      }
+      dispatch(fetchModerationActions());
+      dispatch(fetchAdminUsers());
     } catch (err) {
-      const errMsg = err.response?.data?.message || err.message || 'Action failed.';
-      setExplanationError(errMsg);
+      const errMsg = err?.response?.data?.message || err?.message || 'Action failed.';
+      setLocalExplanationError(errMsg);
     } finally {
       setIsProcessing(false);
     }
@@ -195,15 +203,15 @@ const AdminUsers = () => {
     setOpenMenuId(null);
     try {
       if (actionType === 'flag') {
-        await adminApi.flagUser(id);
-        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: 'Flagged', flags: true, flagged: true } : u));
+        await dispatch(flagAdminUser(id)).unwrap();
+        dispatch(fetchAdminUsers());
       } else if (actionType === 'unflag') {
-        await adminApi.updateUserStatus(id, { status: 'Active' });
-        setUsers((prev) => prev.map((u) => u.id === id ? { ...u, status: 'Active', flags: false, flagged: false } : u));
+        await dispatch(updateAdminUserStatus({ userId: id, status: 'Active' })).unwrap();
+        dispatch(fetchAdminUsers());
       }
     } catch (err) {
       console.error(`Failed to perform action ${actionType} on user ${id}`, err);
-      alert(`Action failed: ${err.message || 'Unknown error'}`);
+      alert(`Action failed: ${err?.serverMessage || err?.message || 'Unknown error'}`);
     }
   };
 
@@ -233,10 +241,6 @@ const AdminUsers = () => {
     });
   };
 
-  const getFilterCount = (filterId) => {
-    return users.filter(u => matchesStatusFilter(u, filterId)).length;
-  };
-
   const toTitleCase = (str) => {
     if (!str) return '';
     return str.charAt(0).toUpperCase() + str.slice(1);
@@ -248,8 +252,6 @@ const AdminUsers = () => {
     if (s === 'suspended') return 'status-rejected';
     return 'status-active';
   };
-
-  const pendingApprovalsCount = moderationActions.filter((a) => a.status === 'pending').length;
 
   const filters = [
     { id: 'all', label: 'All' },
@@ -277,9 +279,22 @@ const AdminUsers = () => {
   };
 
   const getTabCount = (filterId) => {
-    if (filterId === 'duplicates') return duplicateGroups.length;
-    if (filterId === 'approvals') return pendingApprovalsCount;
-    return getFilterCount(filterId);
+    switch (filterId) {
+      case 'all':
+        return userCounts.total ?? 0;
+      case 'active':
+        return userCounts.active ?? 0;
+      case 'suspended':
+        return userCounts.suspended ?? 0;
+      case 'flagged':
+        return userCounts.flagged ?? 0;
+      case 'duplicates':
+        return userCounts.possibleDuplicates ?? 0;
+      case 'approvals':
+        return userCounts.pendingApprovals ?? 0;
+      default:
+        return 0;
+    }
   };
 
   const filteredUsers = getFilteredUsers();
@@ -309,7 +324,7 @@ const AdminUsers = () => {
           <span>{actionBanner.message}</span>
           <button
             type="button"
-            onClick={() => setActionBanner(null)}
+            onClick={() => dispatch(setModerationActionBanner(null))}
             style={{ background: 'none', border: 'none', cursor: 'pointer', fontWeight: 700 }}
           >
             ✕
@@ -398,9 +413,13 @@ const AdminUsers = () => {
                               data-testid={`approve-mod-action-${act.id}`}
                               className="btn btn-danger btn-sm"
                               onClick={() => {
-                                setApprovalDecisionModal({ action: act, decision: 'approve' });
+                                dispatch(
+                                  openApprovalDecisionModal({
+                                    actionId: act.id,
+                                    decision: 'approve',
+                                  }),
+                                );
                                 setApprovalReason('');
-                                setApprovalError('');
                               }}
                             >
                               Approve Suspension
@@ -410,9 +429,13 @@ const AdminUsers = () => {
                               data-testid={`reject-mod-action-${act.id}`}
                               className="btn btn-outline btn-sm"
                               onClick={() => {
-                                setApprovalDecisionModal({ action: act, decision: 'reject' });
+                                dispatch(
+                                  openApprovalDecisionModal({
+                                    actionId: act.id,
+                                    decision: 'reject',
+                                  }),
+                                );
                                 setApprovalReason('');
-                                setApprovalError('');
                               }}
                             >
                               Reject
@@ -553,7 +576,7 @@ const AdminUsers = () => {
             return (
               <div key={user.id} className={`admin-user-row ${isFlagged ? 'flagged' : ''}`}>
                 <div className="admin-user-left">
-                  <Avatar name={cleanName} initials={initials} size="md" />
+                  <Avatar name={cleanName} src={user.avatarUrl || user.avatar || user.profile?.avatarUrl} version={user.updatedAt} initials={initials} size="md" />
                   <div>
                     <div className="admin-user-name">
                       {cleanName} {isFlagged && <FlagIcon />}
@@ -711,8 +734,8 @@ const AdminUsers = () => {
               value={explanation}
               onChange={(e) => {
                 setExplanation(e.target.value);
-                if (explanationError && e.target.value.trim().length >= 10) {
-                  setExplanationError('');
+                if (localExplanationError && e.target.value.trim().length >= 10) {
+                  setLocalExplanationError('');
                 }
               }}
               placeholder="Enter written explanation for this moderation action (minimum 10 characters)..."
@@ -748,14 +771,14 @@ const AdminUsers = () => {
               ? 'Approve Suspension Request'
               : 'Reject Suspension Request'
           }
-          onClose={() => !approvalSubmitting && setApprovalDecisionModal(null)}
+          onClose={() => !approvalSubmitting && dispatch(closeApprovalDecisionModal())}
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
               <button
                 type="button"
                 className="btn btn-outline"
                 disabled={approvalSubmitting}
-                onClick={() => setApprovalDecisionModal(null)}
+                onClick={() => dispatch(closeApprovalDecisionModal())}
               >
                 Cancel
               </button>
@@ -765,26 +788,26 @@ const AdminUsers = () => {
                 className={`btn ${approvalDecisionModal.decision === 'approve' ? 'btn-danger' : 'btn-primary'}`}
                 disabled={approvalSubmitting || approvalReason.trim().length < 10}
                 onClick={async () => {
-                  setApprovalSubmitting(true);
-                  setApprovalError('');
                   try {
                     const targetAction = approvalDecisionModal.action;
                     if (approvalDecisionModal.decision === 'approve') {
-                      await adminApi.approveModerationAction(targetAction.id, approvalReason.trim());
+                      await dispatch(
+                        approveModerationAction({
+                          actionId: targetAction.id,
+                          reason: approvalReason.trim(),
+                        }),
+                      ).unwrap();
                     } else {
-                      await adminApi.rejectModerationAction(targetAction.id, approvalReason.trim());
+                      await dispatch(
+                        rejectModerationAction({
+                          actionId: targetAction.id,
+                          reason: approvalReason.trim(),
+                        }),
+                      ).unwrap();
                     }
-                    setApprovalDecisionModal(null);
-                    const [freshUsers, freshActions] = await Promise.all([
-                      adminApi.listUsers(),
-                      adminApi.getModerationActions(),
-                    ]);
-                    if (Array.isArray(freshUsers)) setUsers(freshUsers);
-                    if (Array.isArray(freshActions)) setModerationActions(freshActions);
-                  } catch (err) {
-                    setApprovalError(err?.serverMessage || err?.message || 'Decision failed.');
-                  } finally {
-                    setApprovalSubmitting(false);
+                    dispatch(fetchAdminUsers());
+                  } catch {
+                    // Error stored in pendingModerationActionsSlice.working.approvalError
                   }
                 }}
               >
@@ -813,4 +836,5 @@ const AdminUsers = () => {
   );
 };
 
+const AdminUsers = AdminUsersContent;
 export default AdminUsers;

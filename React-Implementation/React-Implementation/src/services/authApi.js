@@ -1,8 +1,6 @@
 import { apiRequest } from './apiClient.js';
 
 export const authApi = {
-  getHealth: () =>
-    apiRequest('/health', 'GET', null, { skipCache: true }),
   signup: (payload) =>
     apiRequest('/auth/signup', 'POST', payload),
   login: (credentials) =>
@@ -11,12 +9,8 @@ export const authApi = {
     apiRequest('/auth/refresh', 'POST', { refreshToken }),
   logout: (refreshToken) =>
     apiRequest('/auth/logout', 'POST', { refreshToken }),
-  logoutAll: () =>
-    apiRequest('/auth/logout-all', 'POST'),
   getMe: () =>
     apiRequest('/auth/me', 'GET'),
-  changePassword: (payload) =>
-    apiRequest('/auth/change-password', 'POST', payload),
   switchRole: (role) =>
     apiRequest('/users/switch-role', 'POST', { role }),
   createProfile: (profileData) =>

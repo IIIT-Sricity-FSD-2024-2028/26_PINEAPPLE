@@ -1,28 +1,28 @@
-import { useState, useEffect, useContext, useRef } from 'react';
-import { AuthContext } from '../../context/AuthContext';
-import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import {
+  fetchMyMentorProfile,
+  saveMentorProfile,
+  toggleMentorAvailability,
+} from '../../store/thunks/mentorProfilesThunks';
+import {
+  selectHasExistingMentorProfile,
+  selectIsSavingMentorProfile,
+  selectMentorProfilesWorking,
+  selectMyMentorProfile,
+  selectMyMentorProfileStatus,
+} from '../../store/selectors/mentorProfilesSelectors';
+import { dismissToast, enqueueToast } from '../../store/slices/uiSlice';
+import { selectToasts } from '../../store/selectors/uiSelectors';
 import FormInput from '../../components/common/FormInput';
 import MentorCard from '../../components/features/MentorCard';
+import {
+  PRICE_MIN,
+  PRICE_MAX,
+  validatePriceInput,
+} from '../../utils/mentorProfileValidation';
 import './myMentorProfile.css';
-
-export const PRICE_MIN = 1;
-export const PRICE_MAX = 100000;
-export const INVALID_PRICE_MESSAGE = 'Enter a whole number between 1 and 100,000';
-
-export function validatePriceInput(val) {
-  if (val === '' || val === null || val === undefined) {
-    return INVALID_PRICE_MESSAGE;
-  }
-  const str = String(val).trim();
-  if (!/^\d+$/.test(str)) {
-    return INVALID_PRICE_MESSAGE;
-  }
-  const num = Number(str);
-  if (!Number.isInteger(num) || num < PRICE_MIN || num > PRICE_MAX) {
-    return INVALID_PRICE_MESSAGE;
-  }
-  return '';
-}
 
 const CheckIcon = () => (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -37,35 +37,44 @@ const UserIcon = () => (
   </svg>
 );
 
-const MyMentorProfile = () => {
-  const { user } = useContext(AuthContext);
+const MyMentorProfileContent = () => {
+  const user = useSelector(selectCurrentUser);
+  const dispatch = useDispatch();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [feedback, setFeedback] = useState(null);
+  const myProfile = useSelector(selectMyMentorProfile);
+  const hasExistingProfile = useSelector(selectHasExistingMentorProfile);
+  const myProfileStatus = useSelector(selectMyMentorProfileStatus);
+  const saving = useSelector(selectIsSavingMentorProfile);
+  const working = useSelector(selectMentorProfilesWorking);
+  const toasts = useSelector(selectToasts);
+  const latestToast =
+    Array.isArray(toasts) && toasts.length > 0
+      ? toasts[toasts.length - 1]
+      : null;
+
+  const loading = myProfileStatus === 'idle' || myProfileStatus === 'loading';
+  const feedback = working.feedbackNotice || null;
   const [fieldErrors, setFieldErrors] = useState({});
-  const [hasExistingProfile, setHasExistingProfile] = useState(false);
-
-  // Toast Notification state
-  const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
-  const toastTimeoutRef = useRef(null);
 
   const showToast = (message, type = 'success') => {
-    if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    setToast({ visible: true, message, type });
-    toastTimeoutRef.current = setTimeout(() => {
-      setToast((prev) => ({ ...prev, visible: false }));
-    }, 4000);
+    dispatch(enqueueToast({ message, type, durationMs: 4000 }));
   };
 
   useEffect(() => {
-    return () => {
-      if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
-    };
-  }, []);
+    if (!latestToast?.id) return undefined;
+    const t = setTimeout(() => {
+      dispatch(dismissToast(latestToast.id));
+    }, latestToast.durationMs || 4000);
+    return () => clearTimeout(t);
+  }, [dispatch, latestToast?.id, latestToast?.durationMs]);
 
-  // Form State
-  const [name, setName] = useState('');
+  // Controlled form keystroke state (local per D6 until Save; re-initialized once profile loads)
+  const [hydratedKey, setHydratedKey] = useState('init');
+  const currentSourceKey =
+    myProfileStatus === 'succeeded'
+      ? `loaded:${myProfile?.id || 'empty'}`
+      : 'init';
+  const [name, setName] = useState(() => user?.name || user?.profile?.fullName || '');
   const [title, setTitle] = useState('');
   const [bio, setBio] = useState('');
   const [skillsInput, setSkillsInput] = useState('');
@@ -74,58 +83,34 @@ const MyMentorProfile = () => {
   const [isAvailable, setIsAvailable] = useState(true);
   const [maxActiveMentees, setMaxActiveMentees] = useState(3);
 
+  if (myProfileStatus === 'succeeded' && hydratedKey !== currentSourceKey) {
+    setHydratedKey(currentSourceKey);
+    if (myProfile && myProfile.id) {
+      setName(myProfile.name || user?.name || '');
+      setTitle(myProfile.title || '');
+      setBio(myProfile.bio || '');
+      setSkillsInput(
+        Array.isArray(myProfile.skills) ? myProfile.skills.join(', ') : '',
+      );
+      setExperienceYears(myProfile.experienceYears ?? '');
+      setSessionPrice(myProfile.sessionPrice ?? '');
+      setIsAvailable(myProfile.isAvailable !== false);
+      setMaxActiveMentees(myProfile.maxActiveMentees ?? 3);
+    } else {
+      setName(user?.name || user?.profile?.fullName || '');
+      setTitle('');
+      setBio('');
+      setSkillsInput('');
+      setExperienceYears('');
+      setSessionPrice('');
+      setIsAvailable(true);
+      setMaxActiveMentees(3);
+    }
+  }
+
   useEffect(() => {
-    let isMounted = true;
-
-    const loadProfile = async () => {
-      try {
-        let data = null;
-        try {
-          data = await mentorMarketplaceApi.myProfile(undefined, user?.id);
-        } catch (err) {
-          // Treat "not found" / 404 on load as "no profile yet", do not show error
-          if (err?.message?.toLowerCase().includes('not found') || err?.message?.includes('404')) {
-            data = null;
-          } else {
-            console.error('Failed to load mentor profile:', err);
-          }
-        }
-
-        if (isMounted && data && data.id) {
-          setHasExistingProfile(true);
-          setName(data.name || user?.name || '');
-          setTitle(data.title || '');
-          setBio(data.bio || '');
-          setSkillsInput(Array.isArray(data.skills) ? data.skills.join(', ') : '');
-          setExperienceYears(data.experienceYears ?? '');
-          setSessionPrice(data.sessionPrice ?? '');
-          setIsAvailable(data.isAvailable !== false);
-          setMaxActiveMentees(data.maxActiveMentees ?? 3);
-        } else if (isMounted) {
-          // First load with no profile yet: empty form, not an error
-          setHasExistingProfile(false);
-          setName(user?.name || user?.profile?.fullName || '');
-          setTitle('');
-          setBio('');
-          setSkillsInput('');
-          setExperienceYears('');
-          setSessionPrice('');
-          setIsAvailable(true);
-          setMaxActiveMentees(3);
-        }
-      } catch (err) {
-        console.error('Failed to load mentor profile:', err);
-      } finally {
-        if (isMounted) setLoading(false);
-      }
-    };
-
-    loadProfile();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
+    dispatch(fetchMyMentorProfile({ userId: user?.id, force: true }));
+  }, [dispatch, user?.id]);
 
   const parsedSkills = skillsInput
     .split(',')
@@ -136,18 +121,29 @@ const MyMentorProfile = () => {
     const nextVal = e.target.checked;
     setIsAvailable(nextVal);
     try {
-      await mentorMarketplaceApi.updateAvailability(nextVal, undefined, user?.id);
-      showToast(nextVal ? 'You are now available for bookings' : 'You are now unavailable for bookings', 'success');
+      await dispatch(
+        toggleMentorAvailability({
+          isAvailable: nextVal,
+          userId: user?.id,
+        }),
+      ).unwrap();
+      showToast(
+        nextVal
+          ? 'You are now available for bookings'
+          : 'You are now unavailable for bookings',
+        'success',
+      );
     } catch (err) {
-      setIsAvailable(!nextVal); // revert on error
-      const msg = err?.serverMessage || err?.message || 'Failed to update availability.';
+      setIsAvailable(!nextVal);
+      const msg =
+        err?.message || 'Failed to update availability.';
       showToast(msg, 'error');
     }
   };
 
   const handleSubmit = async (e) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (saving) return; // Prevent double submission
+    if (saving) return;
 
     setFieldErrors({});
     const errors = {};
@@ -177,19 +173,25 @@ const MyMentorProfile = () => {
 
     if (Object.keys(errors).length > 0) {
       setFieldErrors(errors);
-      const firstErrMsg = errors.sessionPrice || errors.name || errors.title || errors.bio || errors.skills || errors.experienceYears;
+      const firstErrMsg =
+        errors.sessionPrice ||
+        errors.name ||
+        errors.title ||
+        errors.bio ||
+        errors.skills ||
+        errors.experienceYears;
       showToast(firstErrMsg, 'error');
       return;
     }
-
-    setSaving(true);
-    setFeedback(null);
 
     const payload = {
       name: name.trim() || user?.name || 'Mentor',
       title: title.trim() || 'Software Mentor',
       bio: bio.trim() || 'Experienced mentor ready to guide student projects.',
-      skills: parsedSkills.length > 0 ? parsedSkills : ['Mentorship', 'Software Engineering'],
+      skills:
+        parsedSkills.length > 0
+          ? parsedSkills
+          : ['Mentorship', 'Software Engineering'],
       experienceYears: Number(experienceYears) || 1,
       sessionPrice: Number(sessionPrice),
       languages: ['English'],
@@ -198,22 +200,23 @@ const MyMentorProfile = () => {
     };
 
     try {
-      let saved = null;
-      if (hasExistingProfile) {
-        saved = await mentorMarketplaceApi.updateProfile(payload, undefined, user?.id);
-      } else {
-        saved = await mentorMarketplaceApi.createProfile(payload, undefined, user?.id);
-        setHasExistingProfile(true);
-      }
+      const result = await dispatch(
+        saveMentorProfile({
+          payload,
+          isUpdate: hasExistingProfile,
+          userId: user?.id,
+          syncAvailability: true,
+        }),
+      ).unwrap();
 
-      await mentorMarketplaceApi.updateAvailability(Boolean(isAvailable), undefined, user?.id).catch(() => {});
-
+      const saved = result?.saved;
       if (saved && (saved.id || saved.userId)) {
-        setHasExistingProfile(true);
         setName(saved.name || name);
         setTitle(saved.title || title);
         setBio(saved.bio || bio);
-        setSkillsInput(Array.isArray(saved.skills) ? saved.skills.join(', ') : skillsInput);
+        setSkillsInput(
+          Array.isArray(saved.skills) ? saved.skills.join(', ') : skillsInput,
+        );
         setExperienceYears(saved.experienceYears ?? experienceYears);
         setSessionPrice(saved.sessionPrice ?? sessionPrice);
         setIsAvailable(saved.isAvailable !== false);
@@ -221,29 +224,18 @@ const MyMentorProfile = () => {
       }
 
       showToast('Mentor profile saved', 'success');
-      setFeedback({
-        type: 'success',
-        message: 'Your mentor profile and pricing have been saved and published to the marketplace!',
-      });
     } catch (err) {
-      console.error('Failed to save mentor profile:', err);
       const serverMsg =
-        err?.serverMessage ||
-        err?.data?.message ||
-        err?.response?.data?.message ||
         err?.message ||
         'Failed to save mentor profile. Please check all fields.';
-      const errCode = err?.code || err?.data?.code || err?.response?.data?.code;
-      if (errCode === 'INVALID_PRICE' || (serverMsg && serverMsg.includes('between 1 and 100,000'))) {
+      const errCode = err?.code;
+      if (
+        errCode === 'INVALID_PRICE' ||
+        (serverMsg && serverMsg.includes('between 1 and 100,000'))
+      ) {
         setFieldErrors((prev) => ({ ...prev, sessionPrice: serverMsg }));
       }
       showToast(serverMsg, 'error');
-      setFeedback({
-        type: 'error',
-        message: serverMsg,
-      });
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -434,7 +426,7 @@ const MyMentorProfile = () => {
 
             <MentorCard
               name={name || user?.name || 'Your Name'}
-              avatar={user?.avatar}
+              avatar={user?.avatarUrl || user?.profile?.avatarUrl || user?.avatar}
               headline={title || 'Professional Title'}
               bio={bio || 'Your bio will appear here to prospective project owners looking for mentorship.'}
               skills={parsedSkills.length > 0 ? parsedSkills : ['React', 'System Design']}
@@ -456,18 +448,18 @@ const MyMentorProfile = () => {
         </div>
       </div>
 
-      {/* Toast Notification */}
-      {toast.visible && (
+      {/* Toast Notification (backed by uiSlice) */}
+      {latestToast && (
         <div
           role="alert"
           data-testid="toast"
-          className={`tf-mentor-toast ${toast.type}`}
+          className={`tf-mentor-toast ${latestToast.type}`}
           style={{
             position: 'fixed',
             bottom: '24px',
             right: '24px',
             zIndex: 9999,
-            backgroundColor: toast.type === 'error' ? '#ef4444' : '#10b981',
+            backgroundColor: latestToast.type === 'error' ? '#ef4444' : '#10b981',
             color: '#ffffff',
             padding: '12px 20px',
             borderRadius: '8px',
@@ -479,12 +471,13 @@ const MyMentorProfile = () => {
             fontWeight: 500,
           }}
         >
-          <span style={{ fontWeight: 700 }}>{toast.type === 'error' ? '✕' : '✓'}</span>
-          <span>{toast.message}</span>
+          <span style={{ fontWeight: 700 }}>{latestToast.type === 'error' ? '✕' : '✓'}</span>
+          <span>{latestToast.message}</span>
         </div>
       )}
     </div>
   );
 };
 
+const MyMentorProfile = MyMentorProfileContent;
 export default MyMentorProfile;

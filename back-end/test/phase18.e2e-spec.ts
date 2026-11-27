@@ -233,30 +233,24 @@ describe('Phase 18 E2E API Tests: Soft Delete, Account Export, Account Deletion 
     expect(savedTask?.assigneeName).toBe('Deleted user');
   });
 
-  it('4. Notification settings validation & digest flush over HTTP + jobs/tick', async () => {
+  it('4. Notification settings return empty object, notifications deliver immediately over HTTP, and jobs/tick omits digest flush', async () => {
     const getInit = await request(server)
       .get('/users/me/settings')
       .set('Authorization', otherToken);
     expect(getInit.status).toBe(200);
-    expect(getInit.body.digestEnabled).toBe(true);
-    expect(getInit.body.digestHour).toBe(9);
+    expect(getInit.body.digestEnabled).toBeUndefined();
+    expect(getInit.body.digestHour).toBeUndefined();
+    expect(getInit.body.utcOffsetMinutes).toBeUndefined();
 
-    const badHour = await request(server)
-      .patch('/users/me/settings')
-      .set('Authorization', otherToken)
-      .send({ digestHour: 24 });
-    expect(badHour.status).toBe(400);
-
-    const setRes = await request(server)
+    const patchRes = await request(server)
       .patch('/users/me/settings')
       .set('Authorization', otherToken)
       .send({ digestEnabled: true, digestHour: 11, utcOffsetMinutes: 0 });
-    expect(setRes.status).toBe(200);
-    expect(setRes.body.digestHour).toBe(11);
+    expect(patchRes.status).toBe(200);
+    expect(patchRes.body).toEqual({});
 
-    // Emit digest notifications before 11:00 UTC
     const proj = ctx.projectsService.create('1', {
-      title: 'Digest E2E Proj',
+      title: 'Immediate E2E Proj',
       description: longDesc,
       teamSize: 3,
       dueDate: '2027-03-01T00:00:00.000Z',
@@ -267,11 +261,10 @@ describe('Phase 18 E2E API Tests: Soft Delete, Account Export, Account Deletion 
         type: 'TASKS_RELEASED',
         message: `Task #${i + 1}`,
         referenceId: proj.id,
-        metadata: { projectTitle: 'Digest E2E Proj' },
+        metadata: { projectTitle: 'Immediate E2E Proj' },
       });
     }
 
-    // Immediate warning bypasses digest buffer
     ctx.notificationsService.create({
       userId: '2',
       type: 'ACCOUNT_WARNED',
@@ -279,20 +272,17 @@ describe('Phase 18 E2E API Tests: Soft Delete, Account Export, Account Deletion 
       message: 'Immediate moderation warning',
     });
 
-    let notifsBefore = await request(server).get('/notifications').set('Authorization', otherToken);
-    expect(notifsBefore.status).toBe(200);
-    expect(notifsBefore.body.some((n: any) => n.title === 'Warning 1/4')).toBe(true);
-    expect(notifsBefore.body.some((n: any) => n.type === 'DAILY_DIGEST')).toBe(false);
+    const notifsNow = await request(server).get('/notifications').set('Authorization', otherToken);
+    expect(notifsNow.status).toBe(200);
+    expect(notifsNow.body.some((n: any) => n.title === 'Warning 1/4')).toBe(true);
+    expect(notifsNow.body.filter((n: any) => n.type === 'TASKS_RELEASED')).toHaveLength(8);
+    expect(notifsNow.body.some((n: any) => n.type === 'DAILY_DIGEST')).toBe(false);
 
-    // Advance to 11:05 UTC & run job tick
     ctx.clockService.setTime('2026-11-11T11:05:00.000Z');
     const superuserToken = ctx.loginAs('superuser');
     const tickRes = await request(server).post('/admin/jobs/tick').set('Authorization', superuserToken);
     expect([200, 201, 202]).toContain(tickRes.status);
-
-    const notifsAfter = await request(server).get('/notifications').set('Authorization', otherToken);
-    const digestNotif = notifsAfter.body.find((n: any) => n.type === 'DAILY_DIGEST');
-    expect(digestNotif).toBeDefined();
-    expect(digestNotif.message).toContain('8 tasks released from Digest E2E Proj');
+    const jobNames = (tickRes.body?.jobs || []).map((j: any) => j.name);
+    expect(jobNames).not.toContain('flushNotificationDigests');
   });
 });

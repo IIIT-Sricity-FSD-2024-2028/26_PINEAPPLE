@@ -29,9 +29,3 @@ export function formatStarterTaskError(code, fallbackMessage = '') {
       return fallbackMessage || 'Unable to add starter task.';
   }
 }
-
-export default {
-  PROJECT_CATEGORIES,
-  STARTER_TASK_CONSTRAINTS,
-  formatStarterTaskError,
-};

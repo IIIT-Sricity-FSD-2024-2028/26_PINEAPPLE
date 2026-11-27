@@ -1,67 +1,63 @@
-import { useContext, useEffect, useState } from "react";
-import { AuthContext } from "../context/AuthContext";
-import { RoleContext } from "../context/RoleContext";
-import { leaderboardApi } from "../services/leaderboardApi";
+import { useEffect, useRef, useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { selectActiveRole, selectCurrentUser } from "../store/selectors/sessionSelectors";
+import { setLeaderboardFilters } from "../store/slices/gamificationSlice";
+import { fetchLeaderboard } from "../store/thunks/gamificationThunks";
+import {
+  selectGamificationError,
+  selectGamificationStatus,
+  selectGamificationWorking,
+  selectLeaderboardEntries,
+  selectLeaderboardForTab,
+} from "../store/selectors/gamificationSelectors";
 import SearchBar from "../components/common/SearchBar";
 import DataTable from "../components/common/DataTable";
 import Avatar from "../components/common/Avatar";
-import { getTrustLabelConfig, getStandingBandConfig } from "../components/features/UserTrustCard";
-import storage from "../utils/storage";
+import { getTrustLabelConfig, getStandingBandConfig } from "../utils/trustConfig";
 import "./leaderboard.css";
 
-function Leaderboard() {
-  const { user } = useContext(AuthContext) || {};
-  const { currentRole } = useContext(RoleContext) || {};
-  const [activeTab, setActiveTab] = useState("xp"); // 'xp' | 'reliable' | 'standing'
-  const [searchQuery, setSearchQuery] = useState("");
-  const [period, setPeriod] = useState("alltime");
-  const [entries, setEntries] = useState([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState("");
+function LeaderboardContent() {
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
+  const currentRole = useSelector(selectActiveRole);
+
+  const working = useSelector(selectGamificationWorking);
+  const activeTab = working.activeTab || "xp";
+  const period = working.period || "alltime";
+  const searchQuery = working.searchQuery || "";
+
+  const rawEntries = useSelector(selectLeaderboardEntries);
+  const filteredEntries = useSelector(selectLeaderboardForTab);
+  const status = useSelector(selectGamificationStatus);
+  const errorObj = useSelector(selectGamificationError);
+  const isLoading = status === "loading";
+  const error = errorObj?.message || "";
   const [retryCount, setRetryCount] = useState(0);
+  const activeTabRef = useRef(activeTab);
 
   useEffect(() => {
-    let isCurrentRequest = true;
+    activeTabRef.current = activeTab;
+  }, [activeTab]);
 
-    const loadLeaderboard = async () => {
-      setIsLoading(true);
-      setError("");
-
-      try {
-        const result = await leaderboardApi.getLeaderboard({ period, tab: activeTab }, currentRole);
-        if (isCurrentRequest) {
-          setEntries(Array.isArray(result) ? result : []);
-        }
-      } catch (err) {
-        if (isCurrentRequest) {
-          setEntries([]);
-          setError(err?.message || 'Unable to load leaderboard right now.');
-        }
-      } finally {
-        if (isCurrentRequest) setIsLoading(false);
-      }
+  useEffect(() => {
+    const loadLeaderboard = () => {
+      dispatch(fetchLeaderboard({ period, tab: activeTabRef.current, role: currentRole }));
     };
 
     loadLeaderboard();
 
     const handleUpdate = () => {
-      if (isCurrentRequest) loadLeaderboard();
+      loadLeaderboard();
     };
-    window.addEventListener("teamforge:task_updated", handleUpdate);
     window.addEventListener("focus", handleUpdate);
 
     return () => {
-      isCurrentRequest = false;
-      window.removeEventListener("teamforge:task_updated", handleUpdate);
       window.removeEventListener("focus", handleUpdate);
     };
-  }, [period, activeTab, currentRole, retryCount]);
+  }, [dispatch, period, currentRole, retryCount]);
 
-  const currentUserId = user?.id || storage.getBackendUserId();
+  const currentUserId = user?.id || user?.uid || "";
   const normalizedQuery = searchQuery.trim().toLocaleLowerCase();
-  const filteredEntries = entries.filter((entry) =>
-    `${entry.user || ""} ${entry.initials || ""}`.toLocaleLowerCase().includes(normalizedQuery),
-  );
 
   const getColumns = () => {
     const contributorCol = {
@@ -77,7 +73,7 @@ function Leaderboard() {
 
         return (
           <div className="leaderboard-person" style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-            <Avatar name={cleanName} size="sm" />
+            <Avatar name={cleanName} src={row.avatarUrl || row.avatar} version={row.updatedAt} size="sm" />
             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                 <span className="leaderboard-person-name" style={{ fontWeight: 600 }}>
@@ -300,7 +296,7 @@ function Leaderboard() {
         <button
           type="button"
           className={`btn btn-sm ${activeTab === 'xp' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('xp')}
+          onClick={() => dispatch(setLeaderboardFilters({ activeTab: 'xp' }))}
           style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'xp' ? 600 : 400 }}
         >
           Top by XP
@@ -308,7 +304,7 @@ function Leaderboard() {
         <button
           type="button"
           className={`btn btn-sm ${activeTab === 'reliable' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('reliable')}
+          onClick={() => dispatch(setLeaderboardFilters({ activeTab: 'reliable' }))}
           style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'reliable' ? 600 : 400 }}
         >
           Most Reliable (≥80% on-time)
@@ -316,7 +312,7 @@ function Leaderboard() {
         <button
           type="button"
           className={`btn btn-sm ${activeTab === 'standing' ? 'btn-primary' : 'btn-secondary'}`}
-          onClick={() => setActiveTab('standing')}
+          onClick={() => dispatch(setLeaderboardFilters({ activeTab: 'standing' }))}
           style={{ padding: '6px 16px', borderRadius: '8px', fontWeight: activeTab === 'standing' ? 600 : 400 }}
         >
           Highest Standing
@@ -328,8 +324,8 @@ function Leaderboard() {
           <div style={{ flex: 1, minWidth: '220px' }}>
             <SearchBar
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onClear={() => setSearchQuery('')}
+              onChange={(e) => dispatch(setLeaderboardFilters({ searchQuery: e.target.value }))}
+              onClear={() => dispatch(setLeaderboardFilters({ searchQuery: '' }))}
               placeholder="Search contributors..."
             />
           </div>
@@ -343,7 +339,7 @@ function Leaderboard() {
                 key={p.id}
                 type="button"
                 className={`btn btn-sm ${period === p.id ? 'btn-primary' : 'btn-secondary'}`}
-                onClick={() => setPeriod(p.id)}
+                onClick={() => dispatch(setLeaderboardFilters({ period: p.id }))}
                 style={{
                   padding: '6px 14px',
                   borderRadius: '8px',
@@ -381,7 +377,7 @@ function Leaderboard() {
             tableClassName="leaderboard-table"
             loadingMessage="Loading contributors..."
             emptyMessage={
-              entries.length === 0
+              rawEntries.length === 0
                 ? "No contributors to show yet."
                 : `No contributors match: ${searchQuery.trim()}`
             }
@@ -396,5 +392,7 @@ function Leaderboard() {
     </section>
   );
 }
+
+const Leaderboard = LeaderboardContent;
 
 export default Leaderboard;

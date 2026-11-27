@@ -1,7 +1,14 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { fetchMyProjects } from '../../store/thunks/projectsThunks';
+import { setMyProjectsFilter } from '../../store/slices/projectsSlice';
+import {
+  selectMyProjectsBuckets,
+  selectMyProjectsStatus,
+  selectProjectsWorking,
+} from '../../store/selectors/projectsSelectors';
 import ProjectCard from '../../components/features/ProjectCard';
 import EmptyState from '../../components/common/EmptyState';
 import FilterTabs from '../../components/common/FilterTabs';
@@ -20,52 +27,28 @@ const FolderIcon = () => (
   </svg>
 );
 
-const MyProjects = () => {
-  const { user } = useContext(AuthContext);
+const MyProjectsContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [projects, setProjects] = useState([]);
-  const [filter, setFilter] = useState('all');
-  const [loading, setLoading] = useState(true);
+  const buckets = useSelector(selectMyProjectsBuckets);
+  const myProjectsStatus = useSelector(selectMyProjectsStatus);
+  const working = useSelector(selectProjectsWorking);
+  const filter = working.myProjectsFilter || 'all';
+
+  const projects = buckets.all;
+  const activeProjects = buckets.active;
+  const completedProjects = buckets.completed;
+  const closedProjects = buckets.closed;
+  const loading = myProjectsStatus === 'loading';
+
+  const ownerId = user?.id;
+  const ownerName = user?.name || '';
 
   useEffect(() => {
-    let isMounted = true;
-    const loadOwnedProjects = async () => {
-      try {
-        const currentUserId = user?.id;
-        const currentUserName = user?.name || '';
-
-        const allProjects = await projectsApi.list({ status: 'all' }).catch(() => []);
-        const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
-          (p) => p.ownerId === currentUserId || p.owner === currentUserName
-        );
-
-        if (isMounted) {
-          setProjects(owned);
-        }
-      } catch (err) {
-        console.error('Failed to load owned projects:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadOwnedProjects();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id, user?.name]);
-
-  const isClosedProject = (p) => String(p.status || '').toLowerCase() === 'closed';
-  const isCompletedProject = (p) => !isClosedProject(p) && (p.isCompleted === true || isProjectLocked(p));
-  const activeProjects = projects.filter((p) => !isClosedProject(p) && !isCompletedProject(p));
-  const completedProjects = projects
-    .filter(isCompletedProject)
-    .sort((a, b) => new Date(b.completedAt || 0) - new Date(a.completedAt || 0));
-  const closedProjects = projects.filter(isClosedProject);
+    dispatch(fetchMyProjects({ ownerId, ownerName }));
+  }, [dispatch, ownerId, ownerName]);
 
   const [nowTs] = useState(() => Date.now());
   const formatPauseCountdown = (proj) => {
@@ -144,10 +127,10 @@ const MyProjects = () => {
               { id: 'all', label: 'All', count: projects.length },
               { id: 'active', label: 'Active', count: activeProjects.length },
               { id: 'completed', label: 'Completed', count: completedProjects.length },
-              { id: 'closed', label: 'Closed', count: closedProjects.length }
+              { id: 'closed', label: 'Closed', count: closedProjects.length },
             ]}
             activeTab={filter}
-            onChange={setFilter}
+            onChange={(tab) => dispatch(setMyProjectsFilter(tab))}
           />
         </div>
       )}
@@ -228,4 +211,5 @@ const MyProjects = () => {
   );
 };
 
+const MyProjects = MyProjectsContent;
 export default MyProjects;

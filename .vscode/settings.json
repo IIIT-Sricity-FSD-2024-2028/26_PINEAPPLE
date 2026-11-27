@@ -1,0 +1,12 @@
+{
+  "eslint.workingDirectories": [
+    "React-Implementation/React-Implementation",
+    "back-end"
+  ],
+  "editor.formatOnSave": true,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "typescript.tsdk": "back-end/node_modules/typescript/lib",
+  "typescript.enablePromptUseWorkspaceTsdk": true
+}

@@ -1,10 +1,18 @@
 import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useLocation, Navigate, Outlet } from 'react-router-dom';
-import { roleStore, useActiveRole, ROLE_CANONICAL } from '../utils/roleStore';
+import { setActiveRole } from '../store/slices/sessionSlice';
+import { ROLE_CANONICAL } from '../store/utils/roleHelpers';
+import {
+  selectAllowedRoles,
+  selectHomePath,
+} from '../store/selectors/sessionSelectors';
 
-const OwnerProtectedRoute = () => {
+const OwnerProtectedRouteContent = () => {
   const location = useLocation();
-  const { allowedRoles, homePath } = useActiveRole();
+  const dispatch = useDispatch();
+  const allowedRoles = useSelector(selectAllowedRoles);
+  const homePath = useSelector(selectHomePath);
 
   const isOwnerAllowed =
     allowedRoles.includes(ROLE_CANONICAL.PROJECT_OWNER) ||
@@ -14,9 +22,9 @@ const OwnerProtectedRoute = () => {
 
   useEffect(() => {
     if (isOwnerAllowed && location.pathname.startsWith('/owner')) {
-      roleStore.setActiveRole(ROLE_CANONICAL.PROJECT_OWNER);
+      dispatch(setActiveRole(ROLE_CANONICAL.PROJECT_OWNER));
     }
-  }, [isOwnerAllowed, location.pathname]);
+  }, [dispatch, isOwnerAllowed, location.pathname]);
 
   if (!isOwnerAllowed) {
     return <Navigate to={homePath || '/dashboard'} replace />;
@@ -24,5 +32,7 @@ const OwnerProtectedRoute = () => {
 
   return <Outlet />;
 };
+
+const OwnerProtectedRoute = OwnerProtectedRouteContent;
 
 export default OwnerProtectedRoute;

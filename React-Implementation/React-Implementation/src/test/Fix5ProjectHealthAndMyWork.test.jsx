@@ -1,9 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import MyWork from '../pages/collaborator/MyWork';
-import { AuthContext } from '../context/AuthContext';
 import projectsApi from '../services/projectsApi';
+import { renderWithStore } from './test-utils';
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');
@@ -74,13 +73,15 @@ describe('FIX 5: Collaborator My Work', () => {
 
       const mockAuthUser = { id: 'u-collab', name: 'Test Collab', role: 'Collaborator' };
 
-      render(
-        <MemoryRouter>
-          <AuthContext.Provider value={{ user: mockAuthUser, isAuthenticated: true }}>
-            <MyWork />
-          </AuthContext.Provider>
-        </MemoryRouter>
-      );
+      renderWithStore(<MyWork />, {
+        preloadedState: {
+          session: {
+            user: mockAuthUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(projectsApi.getMyWork).toHaveBeenCalledWith('u-collab');

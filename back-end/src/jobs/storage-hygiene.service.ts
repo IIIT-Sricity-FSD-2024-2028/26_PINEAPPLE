@@ -16,7 +16,7 @@ import { MentorMarketplaceService } from '../mentor-marketplace/mentor-marketpla
 import { EscrowService } from '../escrow/escrow.service';
 import { EscrowState } from '../escrow/entities/escrow-account.entity';
 import { FileCleanupService } from '../common/services/file-cleanup.service';
-import { SECURE_CVS_DIR, UPLOADS_DIR } from '../core/middleware/file-upload.middleware';
+import { getSecureCvsDir, getUploadsDir } from '../core/middleware/file-upload.middleware';
 
 export const ORPHAN_UPLOAD_MAX_AGE_MS = 24 * 60 * 60 * 1000;
 export const PROJECT_TOMBSTONE_MAX_AGE_MS = 30 * 24 * 60 * 60 * 1000;
@@ -138,8 +138,8 @@ export class StorageHygieneService {
     const checkedAt = this.nowIso();
     const errors: string[] = [];
 
-    const uploadsDir = options?.uploadsDir || UPLOADS_DIR;
-    const secureCvsDir = options?.secureCvsDir || SECURE_CVS_DIR;
+    const uploadsDir = options?.uploadsDir || getUploadsDir();
+    const secureCvsDir = options?.secureCvsDir || getSecureCvsDir();
     const exportDir =
       options?.exportDir || process.env.EXPORT_DIR || path.join(os.tmpdir(), 'teamforge-exports');
 

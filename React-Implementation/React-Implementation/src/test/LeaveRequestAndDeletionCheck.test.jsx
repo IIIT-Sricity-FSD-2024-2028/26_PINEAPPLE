@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext.jsx';
-import { UIContext } from '../context/UIContext.jsx';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
+import { renderWithStore } from './test-utils.jsx';
 import CollaboratorWorkspace from '../pages/collaborator/CollaboratorWorkspace.jsx';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace.jsx';
 import Settings from '../pages/settings.jsx';
@@ -32,22 +30,6 @@ describe('FEATURE: Leave Request with Owner Approval and Account Deletion Guard'
     role: 'Collaborator',
     profileComplete: true,
     emailVerified: true,
-  };
-
-  const mockAuthContext = {
-    user: mockUser,
-    isAuthenticated: true,
-    status: 'authenticated',
-    loading: false,
-    login: vi.fn(),
-    logout: vi.fn(),
-    refreshUser: vi.fn(),
-  };
-
-  const mockUIContext = {
-    theme: 'light',
-    toggleTheme: vi.fn(),
-    showToast: vi.fn(),
   };
 
   it('collaborator sees Leave requested and can withdraw when pending request exists', async () => {
@@ -81,16 +63,22 @@ describe('FEATURE: Leave Request with Owner Approval and Account Deletion Guard'
     });
     vi.spyOn(projectsApi, 'withdrawLeaveRequest').mockResolvedValue({ success: true });
 
-    render(
-      <AuthContext.Provider value={mockAuthContext}>
-        <UIContext.Provider value={mockUIContext}>
-          <MemoryRouter initialEntries={['/collaborator/workspace/proj-1']}>
-            <Routes>
-              <Route path="/collaborator/workspace/:projectId" element={<CollaboratorWorkspace />} />
-            </Routes>
-          </MemoryRouter>
-        </UIContext.Provider>
-      </AuthContext.Provider>
+    renderWithStore(
+      <Routes>
+        <Route path="/collaborator/workspace/:projectId" element={<CollaboratorWorkspace />} />
+      </Routes>,
+      {
+        route: '/collaborator/workspace/proj-1',
+        preloadedState: {
+          session: {
+            user: mockUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Collaborator',
+            allowedRoles: ['Collaborator'],
+          },
+        },
+      },
     );
 
     // Verify "Leave requested" disabled button and "Withdraw request" button
@@ -169,16 +157,22 @@ describe('FEATURE: Leave Request with Owner Approval and Account Deletion Guard'
     vi.spyOn(projectsApi, 'approveLeaveRequest').mockResolvedValue({ success: true });
     vi.spyOn(projectsApi, 'rejectLeaveRequest').mockResolvedValue({ success: true });
 
-    render(
-      <AuthContext.Provider value={{ ...mockAuthContext, user: mockOwnerUser }}>
-        <UIContext.Provider value={mockUIContext}>
-          <MemoryRouter initialEntries={['/owner/workspace/proj-1?tab=members']}>
-            <Routes>
-              <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
-            </Routes>
-          </MemoryRouter>
-        </UIContext.Provider>
-      </AuthContext.Provider>
+    renderWithStore(
+      <Routes>
+        <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
+      </Routes>,
+      {
+        route: '/owner/workspace/proj-1?tab=members',
+        preloadedState: {
+          session: {
+            user: mockOwnerUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Project Owner',
+            allowedRoles: ['Project Owner'],
+          },
+        },
+      },
     );
 
     // Verify Leave Requests section on members tab
@@ -199,7 +193,6 @@ describe('FEATURE: Leave Request with Owner Approval and Account Deletion Guard'
   });
 
   it('settings screen disables delete account button and shows task blockers when user has active tasks', async () => {
-    vi.spyOn(usersApi, 'getSettings').mockResolvedValue({});
     vi.spyOn(usersApi, 'getMe').mockResolvedValue(mockUser);
     vi.spyOn(usersApi, 'checkDeletionEligibility').mockResolvedValue({
       canDelete: false,
@@ -215,16 +208,20 @@ describe('FEATURE: Leave Request with Owner Approval and Account Deletion Guard'
       obligations: [],
     });
 
-    render(
-      <AuthContext.Provider value={mockAuthContext}>
-        <UIContext.Provider value={mockUIContext}>
-          <MemoryRouter initialEntries={['/settings']}>
-            <Routes>
-              <Route path="/settings" element={<Settings />} />
-            </Routes>
-          </MemoryRouter>
-        </UIContext.Provider>
-      </AuthContext.Provider>
+    renderWithStore(
+      <Routes>
+        <Route path="/settings" element={<Settings />} />
+      </Routes>,
+      {
+        route: '/settings',
+        preloadedState: {
+          session: {
+            user: mockUser,
+            isAuthenticated: true,
+            status: 'authenticated',
+          },
+        },
+      },
     );
 
     // Wait for deletion check banner to appear

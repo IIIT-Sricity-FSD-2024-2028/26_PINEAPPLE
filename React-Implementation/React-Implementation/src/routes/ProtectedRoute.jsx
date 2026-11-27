@@ -1,11 +1,27 @@
-import { useContext } from 'react';
+import { useSelector } from 'react-redux';
 import { Navigate, Outlet } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
+import { getCurrentAuthMode } from '../store/thunks/sessionThunks';
+import {
+  selectAuthLoading,
+  selectAuthStatus,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from '../store/selectors/sessionSelectors';
 
-const ProtectedRoute = ({ children }) => {
-  const { isAuthenticated, user, loading, status } = useContext(AuthContext);
+const ProtectedRouteContent = ({ children }) => {
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const user = useSelector(selectCurrentUser);
+  const loading = useSelector(selectAuthLoading);
+  const status = useSelector(selectAuthStatus);
+  const initialized = useSelector((state) => Boolean(state?.session?.initialized));
+  const authMode = getCurrentAuthMode();
 
-  if (loading || status === 'loading' || status === 'signing_out') {
+  if (
+    loading ||
+    status === 'loading' ||
+    status === 'signing_out' ||
+    (status === 'idle' && !initialized && authMode !== 'legacy')
+  ) {
     return (
       <div
         data-testid="auth-loading-screen"
@@ -23,18 +39,17 @@ const ProtectedRoute = ({ children }) => {
     );
   }
 
-  // Behavior: If not authenticated, redirect to Login
   if (!isAuthenticated || !user) {
     return <Navigate to="/login" replace />;
   }
 
-  // If authenticated but profile is incomplete, force complete-profile step
   if (user?.profileComplete === false) {
     return <Navigate to="/complete-profile" replace />;
   }
 
-  // Otherwise, render the protected child routes or children
   return children ? children : <Outlet />;
 };
+
+const ProtectedRoute = ProtectedRouteContent;
 
 export default ProtectedRoute;

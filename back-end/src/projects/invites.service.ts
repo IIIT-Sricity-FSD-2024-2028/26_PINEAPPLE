@@ -25,6 +25,7 @@ import { ProjectsService } from './projects.service';
 import { isLiveProject, isProjectLocked } from './project-visibility.util';
 import { JoinRequestsService } from '../join-requests/join-requests.service';
 import { isProjectOwner, isPlatformAdminOrSuperUser, getProjectRole } from '../common/utils/role.util';
+import { isProjectFull } from '../common/utils/capacity.util';
 import { FeedbackService } from '../feedback/feedback.service';
 
 export type ProjectInviteStatus = 'pending' | 'accepted' | 'declined' | 'expired' | 'cancelled';
@@ -329,6 +330,20 @@ export class ProjectInvitesService implements OnModuleInit {
         error: 'Conflict',
         code: 'INVITE_ALREADY_PENDING',
         message: 'An open invitation is already pending for this user on this project.',
+      });
+    }
+
+    const full =
+      typeof this.projectsService?.isFull === 'function'
+        ? this.projectsService.isFull(project)
+        : isProjectFull(project);
+    if (full) {
+      throw new ConflictException({
+        statusCode: 409,
+        error: 'Conflict',
+        code: 'PROJECT_FULL',
+        message:
+          'Your team is full. Increase the collaborator limit in project settings, or remove a collaborator, to invite more people.',
       });
     }
 

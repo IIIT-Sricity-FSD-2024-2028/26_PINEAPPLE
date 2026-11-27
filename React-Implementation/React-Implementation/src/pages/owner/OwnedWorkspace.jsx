@@ -1,16 +1,111 @@
-import { useState, useEffect, useContext, useRef, useCallback, useMemo } from 'react';
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import { useParams, useNavigate, useLocation } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { useVisibilityPoll } from '../../hooks/useVisibilityPoll';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import joinRequestsApi from '../../services/joinRequestsApi';
-import communicationApi from '../../services/communicationApi';
-import usersApi from '../../services/usersApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { useChatMessagesPolling } from '../../hooks/useChatPolling';
+import { getProjectSeatCounts, isProjectLocked } from '../../utils/projectStatus';
+import {
+  applyProjectTaskTemplates,
+  cancelProjectDeletion,
+  changeProjectDeadline,
+  completeProject,
+  fetchProjectById,
+  fetchProjectTaskTemplates,
+  fetchRemovalCheck,
+  releaseMemberTasks,
+  removeProjectMember,
+  updateProject,
+} from '../../store/thunks/projectsThunks';
+import {
+  setRemovalCheckEntry,
+  setSelectedProjectId,
+  updateOne,
+} from '../../store/slices/projectsSlice';
+import {
+  selectProjectById,
+  selectProjectDetailStatus,
+  selectProjectRemovalChecks,
+  selectProjectTombstoneById,
+} from '../../store/selectors/projectsSelectors';
+import {
+  createTask,
+  deleteTask,
+  fetchTasksByProject,
+  reviewTask,
+  updateTask,
+} from '../../store/thunks/tasksThunks';
+import {
+  updateOne as updateTaskOne,
+  upsertMany as upsertTasks,
+} from '../../store/slices/tasksSlice';
+import {
+  selectTasksByProjectId,
+  selectTasksForbiddenForProject,
+} from '../../store/selectors/tasksSelectors';
+import {
+  fetchJoinRequests,
+  respondJoinRequest,
+} from '../../store/thunks/joinRequestsThunks';
+import {
+  cancelProjectInvite,
+  fetchProjectInvites,
+  sendProjectInvite,
+} from '../../store/thunks/invitesThunks';
+import {
+  approveLeaveRequest,
+  fetchProjectLeaveRequests,
+  rejectLeaveRequest,
+} from '../../store/thunks/leaveRequestsThunks';
+import {
+  setMembersSubSection as setMembersSubSectionAction,
+  setRequestStatusFilter as setRequestStatusFilterAction,
+} from '../../store/slices/joinRequestsSlice';
+import {
+  selectCombinedProjectRequests,
+  selectFilteredCombinedProjectRequests,
+  selectJoinRequestsByProjectId,
+  selectMembersSubSection,
+  selectRequestStatusFilter,
+} from '../../store/selectors/joinRequestsSelectors';
+import { selectInvitesSendStatus } from '../../store/selectors/invitesSelectors';
+import {
+  selectLeaveProcessingIds,
+  selectPendingLeaveRequestsByProjectId,
+} from '../../store/selectors/leaveRequestsSelectors';
+import {
+  fetchProjectAbandonmentReview,
+  openAbandonmentReview,
+} from '../../store/thunks/abandonmentReviewsThunks';
+import {
+  closeReportMentorModal,
+  openReportMentorModal,
+  setReportMentorReason,
+} from '../../store/slices/abandonmentReviewsSlice';
+import {
+  selectAbandonmentWorking,
+  selectIsOpeningAbandonmentForProject,
+  selectProjectAbandonmentInfo,
+} from '../../store/selectors/abandonmentReviewsSelectors';
+import {
+  fetchProjectMessages,
+  markProjectChatRead,
+  sendProjectMessage,
+} from '../../store/thunks/communicationThunks';
+import {
+  selectChatForbiddenMessage,
+  selectIsChatForbidden,
+  selectIsSendingMessage,
+  selectMessagesByProjectId,
+} from '../../store/selectors/communicationSelectors';
+import {
+  fetchPublicProfile,
+  fetchTrustSummaries,
+  searchUsers as searchUsersThunk,
+} from '../../store/thunks/profilesThunks';
+import { selectTrustSummariesMap } from '../../store/selectors/profilesSelectors';
 import TaskCard from '../../components/features/TaskCard';
 import JoinRequestCard from '../../components/features/JoinRequestCard';
 import UserTrustCard from '../../components/features/UserTrustCard';
-import trustApi from '../../services/trustApi';
 import ChatBox from '../../components/features/ChatBox';
 import Modal from '../../components/common/Modal';
 import SafeLink from '../../components/common/SafeLink';
@@ -24,7 +119,6 @@ import { calculateProjectProgress } from '../../utils/progress';
 import { getTaskReward } from '../../utils/workflow';
 import DatePicker from '../../components/common/DatePicker';
 import { formatMemberSince, formatDateTime, formatProjectDueDate } from '../../utils/dateFormatter';
-import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
 import StarterTaskPicker from '../../components/features/StarterTaskPicker';
 import {
   STARTER_TASK_CONSTRAINTS,
@@ -50,40 +144,88 @@ const PlusIcon = () => (
   </svg>
 );
 
-const OwnedWorkspace = () => {
+const OwnedWorkspaceContent = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
   const location = useLocation();
-  const { user } = useContext(AuthContext);
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
 
-  const [project, setProject] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [joinRequests, setJoinRequests] = useState([]);
-  const [messages, setMessages] = useState([]);
-  const [requestStatusFilter, setRequestStatusFilter] = useState('all');
-  const [membersSubSection, setMembersSubSection] = useState(() => {
+  const project = useSelector((state) => selectProjectById(state, projectId));
+  const tombstoneData = useSelector((state) =>
+    selectProjectTombstoneById(state, projectId),
+  );
+  const removalChecks = useSelector((state) =>
+    selectProjectRemovalChecks(state, projectId),
+  );
+  const detailStatus = useSelector(selectProjectDetailStatus);
+
+  const tasks = useSelector((state) =>
+    selectTasksByProjectId(state, projectId),
+  );
+  const storeTasksForbidden = useSelector((state) =>
+    selectTasksForbiddenForProject(state, projectId),
+  );
+  const joinRequests = useSelector((state) =>
+    selectJoinRequestsByProjectId(state, projectId),
+  );
+  const combinedRequestsData = useSelector((state) =>
+    selectCombinedProjectRequests(state, projectId),
+  );
+  const filteredItems = useSelector((state) =>
+    selectFilteredCombinedProjectRequests(state, projectId),
+  );
+  const requestStatusFilter = useSelector(selectRequestStatusFilter);
+  const storeMembersSubSection = useSelector(selectMembersSubSection);
+  const [urlMembersSubSection, setUrlMembersSubSection] = useState(() => {
     const sec = new URLSearchParams(location.search).get('section');
     if (sec === 'requests' || sec === 'team') return sec;
-    return 'all';
+    return null;
   });
-  const [activeTab, setActiveTab] = useState(() => {
+  const membersSubSection = urlMembersSubSection || storeMembersSubSection;
+  const setMembersSubSection = (sec) => {
+    setUrlMembersSubSection(null);
+    dispatch(setMembersSubSectionAction(sec));
+  };
+  const setRequestStatusFilter = (filterVal) => {
+    dispatch(setRequestStatusFilterAction(filterVal));
+  };
+  const messages = useSelector((state) =>
+    selectMessagesByProjectId(state, projectId),
+  );
+  const sendingMsg = useSelector((state) =>
+    selectIsSendingMessage(state, projectId),
+  );
+  const chatForbidden = useSelector((state) =>
+    selectIsChatForbidden(state, projectId),
+  );
+  const chatForbiddenMessage = useSelector((state) =>
+    selectChatForbiddenMessage(state, projectId),
+  );
+  const tabFromSearch = useMemo(() => {
     const tab = new URLSearchParams(location.search).get('tab');
-    if (['overview', 'tasks', 'members', 'chat'].includes(tab)) return tab;
-    return 'overview';
-  });
-  const [loading, setLoading] = useState(true);
+    return ['overview', 'tasks', 'members', 'chat'].includes(tab) ? tab : null;
+  }, [location.search]);
+  const [tabOverride, setTabOverride] = useState({ search: location.search, tab: null });
+  const activeTab =
+    tabOverride.search === location.search && tabOverride.tab
+      ? tabOverride.tab
+      : tabFromSearch || 'overview';
+  const setActiveTab = useCallback(
+    (tab) => setTabOverride({ search: location.search, tab }),
+    [location.search],
+  );
+  const [secondaryLoading, setSecondaryLoading] = useState(true);
+  const loading =
+    (detailStatus === 'loading' && !project && !tombstoneData) || secondaryLoading;
 
   useEffect(() => {
     const params = new URLSearchParams(location.search);
-    const tabParam = params.get('tab');
     const secParam = params.get('section');
-    if (tabParam && ['overview', 'tasks', 'members', 'chat'].includes(tabParam)) {
-      setActiveTab(tabParam);
-    }
     if (secParam && ['all', 'team', 'requests'].includes(secParam)) {
-      setMembersSubSection(secParam);
+      dispatch(setMembersSubSectionAction(secParam));
     }
-  }, [location.search]);
+  }, [dispatch, location.search]);
 
   // Create Task Modal state
   const [createTaskModalOpen, setCreateTaskModalOpen] = useState(false);
@@ -99,7 +241,8 @@ const OwnedWorkspace = () => {
     dueDate: '',
   });
   const [taskFormError, setTaskFormError] = useState('');
-  const [tasksForbidden, setTasksForbidden] = useState(false);
+  const [mutationTasksForbidden, setMutationTasksForbidden] = useState(false);
+  const tasksForbidden = storeTasksForbidden || mutationTasksForbidden;
   const [minTaskDate] = useState(() => new Date());
   const [creatingTask, setCreatingTask] = useState(false);
 
@@ -109,14 +252,12 @@ const OwnedWorkspace = () => {
   const [publishing, setPublishing] = useState(false);
   const [publishError, setPublishError] = useState('');
   const [completionBadgeNotice, setCompletionBadgeNotice] = useState(null);
-  const [sendingMsg, setSendingMsg] = useState(false);
 
   // Remove Member Modal state
   const [removeMemberTarget, setRemoveMemberTarget] = useState(null);
   const [removeReason, setRemoveReason] = useState('');
   const [removingMember, setRemovingMember] = useState(false);
   const [removeError, setRemoveError] = useState('');
-  const [removalChecks, setRemovalChecks] = useState({});
   const [removeBlockers, setRemoveBlockers] = useState([]);
   const [taskFilter, setTaskFilter] = useState(null);
 
@@ -147,41 +288,31 @@ const OwnedWorkspace = () => {
   const toastTimeoutRef = useRef(null);
 
   // Phase 15: Direct invites + Project Deletion Enhancement
-  const [projectInvites, setProjectInvites] = useState([]);
   const [deleteProjectDialogOpen, setDeleteProjectDialogOpen] = useState(false);
-  const [tombstoneData, setTombstoneData] = useState(null);
   const [cancellingDeletion, setCancellingDeletion] = useState(false);
   const [inviteQuery, setInviteQuery] = useState('');
   const [inviteSearchResults, setInviteSearchResults] = useState([]);
   const [searchingInviteUsers, setSearchingInviteUsers] = useState(false);
   const [sendingInvite, setSendingInvite] = useState(false);
+  const storeSendInviteStatus = useSelector(selectInvitesSendStatus);
   const [inviteFeedback, setInviteFeedback] = useState(null);
-  const [trustSummaries, setTrustSummaries] = useState({});
+  const trustSummaries = useSelector(selectTrustSummariesMap);
 
   // Leave Requests state (Part 1: Collaborator leaves with owner approval)
-  const [leaveRequests, setLeaveRequests] = useState([]);
+  const pendingLeaveRequests = useSelector((state) =>
+    selectPendingLeaveRequestsByProjectId(state, projectId),
+  );
+  const leaveProcessingIds = useSelector(selectLeaveProcessingIds);
   const [rejectLeaveModalOpen, setRejectLeaveModalOpen] = useState(false);
   const [rejectingLeaveRequest, setRejectingLeaveRequest] = useState(null);
   const [processingLeaveId, setProcessingLeaveId] = useState(null);
-
-  const pendingLeaveRequests = useMemo(() => {
-    return Array.isArray(leaveRequests)
-      ? leaveRequests.filter((r) => String(r.status || '').toLowerCase() === 'pending')
-      : [];
-  }, [leaveRequests]);
 
   const handleCancelDeletion = async () => {
     if (cancellingDeletion) return;
     setCancellingDeletion(true);
     try {
-      const res = await projectsApi.cancelDeletion(projectId);
+      await dispatch(cancelProjectDeletion({ id: projectId })).unwrap();
       showToast('Scheduled deletion cancelled. The project has been restored.', 'success');
-      if (res?.project) {
-        setProject(res.project);
-      } else {
-        const fresh = await projectsApi.get(projectId);
-        setProject(fresh);
-      }
     } catch (err) {
       showToast(err?.serverMessage || err?.message || 'Failed to cancel deletion.', 'error');
     } finally {
@@ -246,12 +377,17 @@ const OwnedWorkspace = () => {
   const [rejectExtendedProjectDueDate, setRejectExtendedProjectDueDate] = useState('');
   const [rejectProjectExtensionReason, setRejectProjectExtensionReason] = useState('');
 
-  // Phase 14: Mentor activity & abandonment review state
-  const [mentorAbandonmentInfo, setMentorAbandonmentInfo] = useState(null);
-  const [reportMentorModalOpen, setReportMentorModalOpen] = useState(false);
-  const [reportMentorReason, setReportMentorReason] = useState('');
-  const [reportMentorError, setReportMentorError] = useState('');
-  const [reportingMentor, setReportingMentor] = useState(false);
+  // Phase 14: Mentor activity & abandonment review state (backed by abandonmentReviewsSlice)
+  const mentorAbandonmentInfo = useSelector((state) =>
+    selectProjectAbandonmentInfo(state, projectId),
+  );
+  const abandonmentWorking = useSelector(selectAbandonmentWorking);
+  const reportingMentor = useSelector((state) =>
+    selectIsOpeningAbandonmentForProject(state, projectId),
+  );
+  const reportMentorModalOpen = Boolean(abandonmentWorking.reportModalOpen);
+  const reportMentorReason = abandonmentWorking.reportReason || '';
+  const reportMentorError = abandonmentWorking.reportError || '';
 
   // Phase 28: Starter Task Templates picker modal state
   const [starterModalOpen, setStarterModalOpen] = useState(false);
@@ -264,68 +400,54 @@ const OwnedWorkspace = () => {
   const [starterError, setStarterError] = useState('');
   const [starterSkipped, setStarterSkipped] = useState([]);
 
-  const loadMentorAbandonmentInfo = async (targetProjectId) => {
-    if (!targetProjectId || typeof mentorMarketplaceApi.getProjectAbandonmentReview !== 'function') return;
-    try {
-      const info = await mentorMarketplaceApi.getProjectAbandonmentReview(targetProjectId);
-      setMentorAbandonmentInfo(info || null);
-    } catch {
-      // Non-blocking for workspaces without a mentor or on restricted view
-    }
-  };
-
   useEffect(() => {
     let isMounted = true;
     if (!projectId) return;
 
+    dispatch(setSelectedProjectId(projectId));
+
     const fetchWorkspace = async () => {
       try {
-        const [projData, tasksData, reqsData, msgsData, invitesRes, leaveReqsRes] = await Promise.all([
-          projectsApi.get(projectId).catch((err) => {
-            if (err?.statusCode === 410 || err?.code === 'PROJECT_DELETED') {
-              if (isMounted) {
-                setTombstoneData(err.project || err.data?.project || { id: projectId });
-              }
-            }
-            return null;
-          }),
-          tasksApi.list({ projectId }).catch((err) => {
-            if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER' || err?.response?.status === 403) {
-              if (isMounted) setTasksForbidden(true);
-            }
-            return [];
-          }),
-          joinRequestsApi.list({ projectId }).catch(() => []),
-          communicationApi.getMessages(projectId).catch(() => []),
-          typeof projectsApi.listInvites === 'function' ? projectsApi.listInvites(projectId).catch(() => []) : Promise.resolve([]),
-          typeof projectsApi.listLeaveRequests === 'function' ? projectsApi.listLeaveRequests(projectId).catch(() => []) : Promise.resolve([]),
+        const [projAction, , reqsData, , invitesRes] = await Promise.all([
+          dispatch(fetchProjectById({ id: projectId, force: true }))
+            .unwrap()
+            .then((res) => res?.project || null)
+            .catch(() => null),
+          dispatch(fetchTasksByProject({ projectId, force: true }))
+            .unwrap()
+            .then((res) => res?.items || [])
+            .catch(() => []),
+          dispatch(fetchJoinRequests({ projectId, force: true }))
+            .unwrap()
+            .then((res) => res?.items || [])
+            .catch(() => []),
+          dispatch(fetchProjectMessages({ projectId, force: true })).catch(() => null),
+          dispatch(fetchProjectInvites({ projectId, force: true }))
+            .unwrap()
+            .then((res) => res?.items || [])
+            .catch(() => []),
+          dispatch(fetchProjectLeaveRequests({ projectId, force: true }))
+            .unwrap()
+            .then((res) => res?.items || [])
+            .catch(() => []),
         ]);
 
         if (isMounted) {
+          let projData = projAction;
           if (
             projData &&
             (projData.isCompleted || String(projData.status).toLowerCase() === 'completed') &&
             !projData.finalLink &&
             !projData.finishedLink
           ) {
-            projData.isCompleted = false;
-            projData.status = 'In Progress';
+            projData = { ...projData, isCompleted: false, status: 'In Progress' };
+            dispatch(updateOne({ id: projectId, changes: { isCompleted: false, status: 'In Progress' } }));
           }
-          setProject(projData);
-          setTasks(Array.isArray(tasksData) ? tasksData : []);
-          setJoinRequests(Array.isArray(reqsData) ? reqsData : []);
-          setMessages(Array.isArray(msgsData) ? msgsData : []);
-          setProjectInvites(Array.isArray(invitesRes) ? invitesRes : []);
-          setLeaveRequests(Array.isArray(leaveReqsRes) ? leaveReqsRes : []);
           if (projData?.finishedLink || projData?.finalLink) {
             setFinishedLink(projData.finishedLink || projData.finalLink);
           }
-          if (projData?.mentorId && typeof mentorMarketplaceApi.getProjectAbandonmentReview === 'function') {
-            mentorMarketplaceApi.getProjectAbandonmentReview(projectId)
-              .then((info) => {
-                if (isMounted && info) setMentorAbandonmentInfo(info);
-              })
-              .catch(() => {});
+          if (projData?.mentorId) {
+            dispatch(fetchProjectAbandonmentReview({ projectId }));
           }
 
           // Bulk fetch trust summaries for all members, applicants, and invitees
@@ -341,15 +463,7 @@ const OwnedWorkspace = () => {
               : [];
             const allUserIds = Array.from(new Set([...memberIds, ...reqUserIds, ...inviteeIds]));
             if (allUserIds.length > 0) {
-              trustApi.getTrustSummaries(allUserIds.slice(0, 50)).then((summaries) => {
-                if (isMounted && Array.isArray(summaries)) {
-                  const map = {};
-                  summaries.forEach((s) => {
-                    if (s?.userId) map[s.userId] = s;
-                  });
-                  setTrustSummaries((prev) => ({ ...prev, ...map }));
-                }
-              }).catch(() => {});
+              dispatch(fetchTrustSummaries(allUserIds.slice(0, 50)));
             }
           } catch {
             // Non-critical
@@ -359,7 +473,7 @@ const OwnedWorkspace = () => {
         console.error('Failed to load owned project workspace:', err);
       } finally {
         if (isMounted) {
-          setLoading(false);
+          setSecondaryLoading(false);
         }
       }
     };
@@ -369,40 +483,21 @@ const OwnedWorkspace = () => {
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [dispatch, projectId]);
 
-  const pollOwnerChat = useCallback(async () => {
-    if (!projectId || activeTab !== 'chat') return;
-    try {
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
-    } catch (err) {
-      console.warn('[OwnedWorkspace] Background chat polling error:', err);
-    }
-  }, [projectId, activeTab]);
-
-  useVisibilityPoll(pollOwnerChat, 6000, {
-    enabled: Boolean(projectId && activeTab === 'chat'),
+  useChatMessagesPolling(dispatch, {
+    projectId,
+    enabled: Boolean(projectId && activeTab === 'chat' && !chatForbidden),
+    intervalMs: 6000,
     immediate: false,
-    triggerOnVisible: true,
   });
 
   // Mark chat read when opening chat tab
   useEffect(() => {
     if (!projectId || activeTab !== 'chat') return undefined;
-    if (typeof communicationApi.markProjectRead === 'function') {
-      communicationApi.markProjectRead(projectId)
-        .then(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('teamforge:chat_read'));
-          }
-        })
-        .catch(() => {});
-    }
+    dispatch(markProjectChatRead({ projectId }));
     return undefined;
-  }, [projectId, activeTab]);
+  }, [dispatch, projectId, activeTab]);
 
   const fetchRemovalChecks = useCallback(async () => {
     if (!projectId || !project) return;
@@ -417,33 +512,12 @@ const OwnedWorkspace = () => {
     ));
     if (uniqueIds.length === 0) return;
 
-    try {
-      const results = await Promise.all(
-        uniqueIds.map(async (uId) => {
-          try {
-            const res = await projectsApi.getRemovalCheck(projectId, uId);
-            return { memberId: uId, data: res };
-          } catch {
-            return null;
-          }
-        })
-      );
-      setRemovalChecks((prev) => {
-        const next = { ...prev };
-        for (const r of results) {
-          if (r && r.memberId) {
-            next[r.memberId] = r.data;
-          }
-        }
-        return next;
-      });
-    } catch (err) {
-      console.warn('Failed to fetch removal checks:', err);
-    }
-  }, [projectId, project]);
+    await Promise.allSettled(
+      uniqueIds.map((uId) => dispatch(fetchRemovalCheck({ projectId, userId: uId }))),
+    );
+  }, [dispatch, projectId, project]);
 
   useEffect(() => {
-    let active = true;
     if (!projectId || !project) return undefined;
     const collabs = (Array.isArray(project.collaborators) ? project.collaborators : []).concat(
       Array.isArray(project.members) ? project.members.filter((m) => String(m.role || '').toLowerCase() === 'collaborator') : []
@@ -456,32 +530,11 @@ const OwnedWorkspace = () => {
     ));
     if (uniqueIds.length === 0) return undefined;
 
-    Promise.all(
-      uniqueIds.map(async (uId) => {
-        try {
-          const res = await projectsApi.getRemovalCheck(projectId, uId);
-          return { memberId: uId, data: res };
-        } catch {
-          return null;
-        }
-      })
-    ).then((results) => {
-      if (!active) return;
-      setRemovalChecks((prev) => {
-        const next = { ...prev };
-        for (const r of results) {
-          if (r && r.memberId) {
-            next[r.memberId] = r.data;
-          }
-        }
-        return next;
-      });
-    }).catch(() => {});
-
-    return () => {
-      active = false;
-    };
-  }, [projectId, project]);
+    uniqueIds.forEach((uId) => {
+      dispatch(fetchRemovalCheck({ projectId, userId: uId }));
+    });
+    return undefined;
+  }, [dispatch, projectId, project]);
 
   const isLocked = isProjectLocked(project);
 
@@ -521,21 +574,24 @@ const OwnedWorkspace = () => {
       const assigneeId = selectedMember ? String(selectedMember.id || selectedMember.userId) : (taskForm.assigneeId || undefined);
       const assigneeName = selectedMember?.name || (taskForm.assigneeId ? taskForm.assignee : 'Unassigned');
 
-      const newTask = await tasksApi.create({
-        projectId,
-        title: taskForm.title.trim(),
-        description: taskForm.description.trim(),
-        priority,
-        xpReward,
-        assigneeId: assigneeId || undefined,
-        assigneeName: assigneeName || 'Unassigned',
-        assignee: assigneeName || 'Unassigned',
-        difficulty: taskForm.difficulty || priority,
-        dueDate: taskForm.dueDate,
-        status: 'To Do',
-      });
+      await dispatch(
+        createTask({
+          payload: {
+            projectId,
+            title: taskForm.title.trim(),
+            description: taskForm.description.trim(),
+            priority,
+            xpReward,
+            assigneeId: assigneeId || undefined,
+            assigneeName: assigneeName || 'Unassigned',
+            assignee: assigneeName || 'Unassigned',
+            difficulty: taskForm.difficulty || priority,
+            dueDate: taskForm.dueDate,
+            status: 'To Do',
+          },
+        }),
+      ).unwrap();
 
-      setTasks((prev) => [...prev, newTask]);
       setCreateTaskModalOpen(false);
       setTaskForm({
         title: '',
@@ -552,7 +608,7 @@ const OwnedWorkspace = () => {
     } catch (err) {
       console.error('Failed to create task:', err);
       if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER') {
-        setTasksForbidden(true);
+        setMutationTasksForbidden(true);
         setTaskFormError('You are not a member of this project.');
       } else if (err?.code === 'TASK_LIMIT_REACHED' || err?.data?.code === 'TASK_LIMIT_REACHED') {
         setTaskFormError(formatStarterTaskError('TASK_LIMIT_REACHED', err?.serverMessage || err?.message));
@@ -569,21 +625,25 @@ const OwnedWorkspace = () => {
     try {
       const taskObj = tasks.find((t) => t.id === taskId);
       const reward = getTaskReward(taskObj?.priority || taskObj?.difficulty);
-      const updated =
-        typeof tasksApi.review === 'function'
-          ? await tasksApi.review(taskId, { decision: 'approve' })
-          : await tasksApi.updateStatus(taskId, { status: 'Completed' });
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? { ...t, ...(updated || {}), status: 'Completed', xpAwarded: true, xpReward: reward.xp }
-            : t
-        )
-      );
+      const res = await dispatch(
+        reviewTask({
+          id: taskId,
+          payload: { decision: 'approve' },
+          projectId,
+        }),
+      ).unwrap();
+      if (res?.task?.xpReward === undefined) {
+        dispatch(
+          updateTaskOne({
+            id: String(taskId),
+            changes: { xpAwarded: true, xpReward: reward.xp },
+          }),
+        );
+      }
       fetchRemovalChecks();
     } catch (err) {
       if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER') {
-        setTasksForbidden(true);
+        setMutationTasksForbidden(true);
         showToast('You are not a member of this project.', 'error');
       } else {
         showToast(err?.serverMessage || err?.message || 'Failed to approve task.', 'error');
@@ -592,12 +652,14 @@ const OwnedWorkspace = () => {
     }
   };
 
+  const [rejectModalOpenedAt, setRejectModalOpenedAt] = useState(0);
+
   // Phase 29: Review Time Credit helper for Rejection Modal
-  const getRejectionReviewCreditInfo = (task, proj) => {
+  const getRejectionReviewCreditInfo = (task, proj, nowMs = 0) => {
     if (!task) return null;
     const subAt = task.submittedAt || task.inReviewSince;
     const subMs = subAt ? new Date(subAt).getTime() : 0;
-    const now = Date.now();
+    const now = nowMs;
     const durationMs = subMs > 0 && now > subMs ? now - subMs : 0;
     const durationMinutes = Math.floor(durationMs / (60 * 1000));
     const days = Math.floor(durationMinutes / (24 * 60));
@@ -639,6 +701,7 @@ const OwnedWorkspace = () => {
     if (isLocked) return;
     const taskObj = tasks.find((t) => t.id === taskId);
     if (!taskObj) return;
+    setRejectModalOpenedAt(Date.now());
     setRejectTaskTarget(taskObj);
     setRejectTaskReason('');
     setRejectTaskError('');
@@ -654,7 +717,11 @@ const OwnedWorkspace = () => {
       return;
     }
 
-    const creditInfo = getRejectionReviewCreditInfo(rejectTaskTarget, project);
+    const creditInfo = getRejectionReviewCreditInfo(
+      rejectTaskTarget,
+      project,
+      rejectModalOpenedAt,
+    );
     const requiresExtension = Boolean(creditInfo?.requiresProjectExtension);
 
     if (requiresExtension) {
@@ -687,30 +754,14 @@ const OwnedWorkspace = () => {
           : {}),
       };
 
-      const updated =
-        typeof tasksApi.review === 'function'
-          ? await tasksApi.review(rejectTaskTarget.id, payload)
-          : await tasksApi.updateStatus(rejectTaskTarget.id, { status: 'Open', ...payload });
-
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === rejectTaskTarget.id
-            ? {
-                ...t,
-                ...(updated || {}),
-                status: updated?.status || 'To Do',
-                rejectionReason: updated?.rejectionReason || trimmed,
-              }
-            : t
-        )
-      );
-
-      if (requiresExtension) {
-        try {
-          const fresh = await projectsApi.get(projectId);
-          if (fresh) setProject(fresh);
-        } catch {}
-      }
+      await dispatch(
+        reviewTask({
+          id: rejectTaskTarget.id,
+          payload,
+          projectId,
+          cascadeProject: requiresExtension,
+        }),
+      ).unwrap();
 
       fetchRemovalChecks();
       showToast('Task sent back for revision.', 'success');
@@ -734,23 +785,10 @@ const OwnedWorkspace = () => {
         assigneeName: assigneeName || 'Unassigned',
         assignee: assigneeName || 'Unassigned',
       };
-      const updated = await tasksApi.update(taskId, payload);
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === taskId
-            ? {
-                ...t,
-                ...(updated || {}),
-                assigneeId: assigneeId || '',
-                assigneeName: assigneeName || 'Unassigned',
-                assignee: assigneeName || 'Unassigned',
-              }
-            : t
-        )
-      );
+      await dispatch(updateTask({ id: taskId, payload })).unwrap();
     } catch (err) {
       if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER') {
-        setTasksForbidden(true);
+        setMutationTasksForbidden(true);
         showToast('You are not a member of this project.', 'error');
       } else {
         showToast(err?.serverMessage || err?.message || 'Failed to assign task.', 'error');
@@ -762,8 +800,9 @@ const OwnedWorkspace = () => {
   const handleDeleteTask = async (taskId) => {
     if (isLocked) return;
     try {
-      await tasksApi.remove(taskId, 'Project Owner');
-      setTasks((prev) => prev.filter((t) => t.id !== taskId));
+      await dispatch(
+        deleteTask({ id: taskId, projectId, role: 'Project Owner' }),
+      ).unwrap();
       showToast('Task deleted successfully.', 'success');
     } catch (err) {
       showToast(err?.serverMessage || err?.message || 'Failed to delete task.', 'error');
@@ -777,7 +816,9 @@ const OwnedWorkspace = () => {
     setStarterSkipped([]);
     setStarterOverrides({});
     try {
-      const res = await projectsApi.getProjectTaskTemplates(projectId);
+      const res = await dispatch(
+        fetchProjectTaskTemplates({ id: projectId }),
+      ).unwrap();
       const list = Array.isArray(res?.items) ? res.items : [];
       const existingSet = new Set(
         (Array.isArray(tasks) ? tasks : [])
@@ -877,15 +918,21 @@ const OwnedWorkspace = () => {
           payloadOverrides[key] = starterOverrides[key];
         }
       }
-      const res = await projectsApi.applyProjectTaskTemplates(projectId, {
-        keys: activeKeys,
-        ...(Object.keys(payloadOverrides).length > 0 ? { overrides: payloadOverrides } : {}),
-      });
+      const actionRes = await dispatch(
+        applyProjectTaskTemplates({
+          id: projectId,
+          payload: {
+            keys: activeKeys,
+            ...(Object.keys(payloadOverrides).length > 0 ? { overrides: payloadOverrides } : {}),
+          },
+        }),
+      ).unwrap();
+      const res = actionRes?.res;
       const createdList = Array.isArray(res?.created) ? res.created : [];
       const skippedList = Array.isArray(res?.skipped) ? res.skipped : [];
 
       if (createdList.length > 0) {
-        setTasks((prev) => [...prev, ...createdList]);
+        dispatch(upsertTasks(createdList));
         showToast(`Added ${createdList.length} starter task(s) to project.`, 'success');
       }
 
@@ -950,23 +997,27 @@ const OwnedWorkspace = () => {
         .split(',')
         .map((s) => s.trim())
         .filter(Boolean);
-      const updated = await projectsApi.update(projectId, {
-        title: editProjectForm.title.trim(),
-        description: editProjectForm.description.trim(),
-        skills: skillsArr,
-        teamSize: sizeNum,
-        dueDate: new Date(editProjectForm.dueDate).toISOString(),
-      });
-      setProject((prev) => ({
-        ...prev,
-        ...(updated || {}),
+      const patch = {
         title: editProjectForm.title.trim(),
         description: editProjectForm.description.trim(),
         skills: skillsArr,
         teamSize: sizeNum,
         maxCollaborators: sizeNum,
         dueDate: new Date(editProjectForm.dueDate).toISOString(),
-      }));
+      };
+      await dispatch(
+        updateProject({
+          id: projectId,
+          payload: {
+            title: patch.title,
+            description: patch.description,
+            skills: patch.skills,
+            teamSize: patch.teamSize,
+            dueDate: patch.dueDate,
+          },
+        }),
+      ).unwrap();
+      dispatch(updateOne({ id: projectId, changes: patch }));
       setEditProjectModalOpen(false);
       showToast('Project settings updated successfully.', 'success');
     } catch (err) {
@@ -1031,18 +1082,20 @@ const OwnedWorkspace = () => {
     setChangingDeadline(true);
     setChangeDeadlineError('');
     try {
-      const updatedProject = await projectsApi.changeDeadline(projectId, {
-        dueDate: new Date(newDeadlineDate).toISOString(),
-        reason: trimmedReason,
-        shiftTasks: Boolean(shiftTasks),
-      });
-      setProject((prev) => ({
-        ...prev,
-        dueDate: updatedProject.dueDate || new Date(newDeadlineDate).toISOString(),
-      }));
+      await dispatch(
+        changeProjectDeadline({
+          id: projectId,
+          payload: {
+            dueDate: new Date(newDeadlineDate).toISOString(),
+            reason: trimmedReason,
+            shiftTasks: Boolean(shiftTasks),
+          },
+        }),
+      ).unwrap();
       if (shiftTasks) {
-        const refreshedTasks = await tasksApi.list({ projectId }).catch(() => null);
-        if (Array.isArray(refreshedTasks)) setTasks(refreshedTasks);
+        await dispatch(fetchTasksByProject({ projectId, force: true }))
+          .unwrap()
+          .catch(() => null);
       }
       setChangeDeadlineModalOpen(false);
       showToast('Project deadline updated successfully. Collaborators and mentor notified.', 'success');
@@ -1060,7 +1113,7 @@ const OwnedWorkspace = () => {
     setProfileError('');
     setApplicantProfile(null);
     try {
-      const data = await usersApi.getPublicProfile(userId);
+      const data = await dispatch(fetchPublicProfile(userId)).unwrap();
       setApplicantProfile(data);
     } catch (err) {
       console.error('Failed to load applicant profile:', err);
@@ -1087,12 +1140,14 @@ const OwnedWorkspace = () => {
     setRejecting(true);
     setRejectError('');
     try {
-      await joinRequestsApi.respond(rejectTargetRequest.id, 'rejected', { reason: trimmed });
-      setJoinRequests((prev) =>
-        prev.map((r) =>
-          r.id === rejectTargetRequest.id ? { ...r, status: 'Rejected', rejectionReason: trimmed } : r
-        )
-      );
+      await dispatch(
+        respondJoinRequest({
+          id: rejectTargetRequest.id,
+          status: 'rejected',
+          reasonOrRole: { reason: trimmed },
+          projectId,
+        }),
+      ).unwrap();
       setRejectModalOpen(false);
       showToast('Join request declined.', 'info');
     } catch (err) {
@@ -1106,7 +1161,9 @@ const OwnedWorkspace = () => {
     if (isLocked) return;
     try {
       const targetReq = joinRequests.find((r) => r.id === requestId);
-      await joinRequestsApi.respond(requestId, status);
+      await dispatch(
+        respondJoinRequest({ id: requestId, status, projectId }),
+      ).unwrap();
 
       if (status === 'Approved' && targetReq) {
         const existingCollabs = Array.isArray(project?.collaborators) ? project.collaborators : [];
@@ -1120,13 +1177,9 @@ const OwnedWorkspace = () => {
             role: targetReq.role || 'Collaborator',
           };
           const updatedCollabs = [...existingCollabs, newCollab];
-          setProject((prev) => (prev ? { ...prev, collaborators: updatedCollabs } : prev));
+          dispatch(updateOne({ id: projectId, changes: { collaborators: updatedCollabs } }));
         }
       }
-
-      setJoinRequests((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status } : r))
-      );
     } catch (err) {
       console.error('Failed to respond to join request:', err);
       showToast(err?.serverMessage || err?.message || 'Failed to respond to join request.', 'error');
@@ -1138,17 +1191,8 @@ const OwnedWorkspace = () => {
     if (processingLeaveId || isLocked) return;
     setProcessingLeaveId(requestId);
     try {
-      await projectsApi.approveLeaveRequest(requestId, projectId);
+      await dispatch(approveLeaveRequest({ requestId, projectId })).unwrap();
       showToast('Leave request approved. Member has left the project.', 'success');
-      setLeaveRequests((prev) =>
-        prev.map((r) => (r.id === requestId ? { ...r, status: 'approved' } : r))
-      );
-      const [updatedProj, updatedTasks] = await Promise.all([
-        projectsApi.get(projectId).catch(() => null),
-        tasksApi.list({ projectId }).catch(() => []),
-      ]);
-      if (updatedProj) setProject(updatedProj);
-      if (Array.isArray(updatedTasks)) setTasks(updatedTasks);
     } catch (err) {
       console.error('Failed to approve leave request:', err);
       showToast(err.serverMessage || err.message || 'Failed to approve leave request.', 'error');
@@ -1167,11 +1211,14 @@ const OwnedWorkspace = () => {
     if (!rejectingLeaveRequest) return;
     const reqId = rejectingLeaveRequest.id;
     try {
-      await projectsApi.rejectLeaveRequest(reqId, { reasons, explanation }, projectId);
+      await dispatch(
+        rejectLeaveRequest({
+          requestId: reqId,
+          payload: { reasons, explanation },
+          projectId,
+        }),
+      ).unwrap();
       showToast('Leave request rejected. Member remains on the project with 24h cooldown.', 'info');
-      setLeaveRequests((prev) =>
-        prev.map((r) => (r.id === reqId ? { ...r, status: 'rejected' } : r))
-      );
       setRejectLeaveModalOpen(false);
       setRejectingLeaveRequest(null);
     } catch (err) {
@@ -1184,6 +1231,10 @@ const OwnedWorkspace = () => {
   // Phase 15: Direct Invite handlers + Export Markdown + Clone Draft
   const handleInviteSearchChange = async (e) => {
     const val = e.target.value;
+    if (project && getProjectSeatCounts(project).isFull) {
+      setInviteSearchResults([]);
+      return;
+    }
     setInviteQuery(val);
     setInviteFeedback(null);
     const trimmed = val.trim().replace(/^@/, '');
@@ -1193,20 +1244,12 @@ const OwnedWorkspace = () => {
     }
     setSearchingInviteUsers(true);
     try {
-      const results = await usersApi.searchUsers(trimmed);
-      const list = Array.isArray(results) ? results : [];
+      const searchRes = await dispatch(searchUsersThunk(trimmed)).unwrap();
+      const list = Array.isArray(searchRes?.items) ? searchRes.items : [];
       setInviteSearchResults(list);
       const missingIds = list.map((u) => String(u.id || '')).filter((id) => id && !trustSummaries[id]);
       if (missingIds.length > 0) {
-        trustApi.getTrustSummaries(missingIds.slice(0, 50)).then((summaries) => {
-          if (Array.isArray(summaries)) {
-            const map = {};
-            summaries.forEach((s) => {
-              if (s?.userId) map[s.userId] = s;
-            });
-            setTrustSummaries((prev) => ({ ...prev, ...map }));
-          }
-        }).catch(() => {});
+        dispatch(fetchTrustSummaries(missingIds.slice(0, 50)));
       }
     } catch {
       setInviteSearchResults([]);
@@ -1221,11 +1264,13 @@ const OwnedWorkspace = () => {
     setSendingInvite(true);
     setInviteFeedback(null);
     try {
-      const created = await projectsApi.sendInvite(projectId, clean);
-      setProjectInvites((prev) => [created, ...prev]);
+      const res = await dispatch(
+        sendProjectInvite({ projectId, username: clean }),
+      ).unwrap();
+      const created = res?.invite || res;
       setInviteQuery('');
       setInviteSearchResults([]);
-      setInviteFeedback({ type: 'success', message: `Invitation sent to @${created.invitedUsername || clean}.` });
+      setInviteFeedback({ type: 'success', message: `Invitation sent to @${created?.invitedUsername || clean}.` });
     } catch (err) {
       setInviteFeedback({ type: 'error', message: err?.serverMessage || err?.message || 'Failed to send invitation.' });
     } finally {
@@ -1236,13 +1281,7 @@ const OwnedWorkspace = () => {
   const handleCancelDirectInvite = async (inviteId) => {
     if (isLocked) return;
     try {
-      await projectsApi.cancelInvite(projectId, inviteId);
-      setProjectInvites((prev) =>
-        prev.map((inv) => (inv.id === inviteId ? { ...inv, status: 'cancelled' } : inv))
-      );
-      setJoinRequests((prev) =>
-        prev.map((r) => (r.id === inviteId ? { ...r, status: 'Cancelled', filterGroup: 'All' } : r))
-      );
+      await dispatch(cancelProjectInvite({ projectId, inviteId })).unwrap();
       showToast('Invitation cancelled.', 'success');
     } catch (err) {
       showToast(err?.serverMessage || err?.message || 'Failed to cancel invitation.', 'error');
@@ -1284,25 +1323,16 @@ const OwnedWorkspace = () => {
 
     setPublishing(true);
     try {
-      const res = await projectsApi.complete(projectId, {
-        finalLink: trimmed,
-        finishedLink: trimmed,
-      });
-
-      const completedAt = res?.completedAt || new Date().toISOString();
-
-      // Rule 6: Completion writes the final state before re-rendering
-      setProject((prev) => ({
-        ...prev,
-        status: 'Completed',
-        progress: 100,
-        finishedLink: trimmed,
-        finalLink: trimmed,
-        isCompleted: true,
-        completedAt,
-        badgeAwarded: res?.badgeAwarded,
-        badgeReason: res?.badgeReason,
-      }));
+      const actionRes = await dispatch(
+        completeProject({
+          id: projectId,
+          payload: {
+            finalLink: trimmed,
+            finishedLink: trimmed,
+          },
+        }),
+      ).unwrap();
+      const res = actionRes?.res;
 
       if (res?.badgeAwarded === false) {
         const reasonMsg =
@@ -1321,15 +1351,6 @@ const OwnedWorkspace = () => {
         });
         showToast(awardedMsg, 'success');
       }
-
-      // Rule 6: Applied rows that were Approved become Completed
-      setJoinRequests((prev) =>
-        prev.map((r) =>
-          String(r.status || '').toLowerCase() === 'approved'
-            ? { ...r, status: 'Completed' }
-            : r
-        )
-      );
 
       setPublishModalOpen(false);
       setPublishError('');
@@ -1369,72 +1390,24 @@ const OwnedWorkspace = () => {
     setRemovingMember(true);
     setRemoveError('');
     try {
-      await projectsApi.removeMember(projectId, memberId, trimmed, 'Project Owner', user?.id);
+      await dispatch(
+        removeProjectMember({
+          projectId,
+          memberId,
+          memberName,
+          reason: trimmed,
+          role: 'Project Owner',
+          userId: user?.id,
+        }),
+      ).unwrap();
 
-      // 1. Update local members
-      setProject((prev) => {
-        if (!prev) return prev;
-        const currentCollabs = Array.isArray(prev.collaborators) ? prev.collaborators : [];
-        const nextCollabs = currentCollabs.filter((c) => {
-          if (typeof c === 'string') return c !== memberId && c !== memberName;
-          return c.id !== memberId && c.name !== memberName && c.userId !== memberId;
-        });
-        const currentRemoved = Array.isArray(prev.removedUsers) ? prev.removedUsers : [];
-        return {
-          ...prev,
-          collaborators: nextCollabs,
-          removedUsers: [
-            ...currentRemoved,
-            { userId: memberId, userName: memberName, reason: trimmed, removedAt: new Date().toISOString() },
-          ],
-        };
-      });
+      // 2. Unapproved member tasks are automatically reset inside tasksSlice on removeProjectMember.fulfilled
 
-      // 2. Reset unapproved tasks assigned to this member to Unassigned and Open and clear proof link
-      // Retain In Review and Completed tasks intact
-      setTasks((prev) =>
-        prev.map((t) => {
-          const isAssigned =
-            t.assignee === memberName ||
-            t.assignee === memberId ||
-            t.assigneeId === memberId;
-          const normStatus = String(t.status || '').toLowerCase().trim().replace(/[\s-_]/g, '');
-          const isCompleted = normStatus === 'completed' || normStatus === 'done' || normStatus === 'approved';
-          const isInReview = normStatus === 'inreview' || normStatus === 'underreview' || normStatus === 'submitted';
-          if (isAssigned && !isCompleted && !isInReview) {
-            return {
-              ...t,
-              assignee: 'Unassigned',
-              assigneeId: null,
-              proofLink: null,
-              proof_link: null,
-              status: 'Open',
-            };
-          }
-          return t;
-        })
-      );
-
-      // 3. Update joinRequests state so removed member's approved row becomes Removed
-      setJoinRequests((prev) =>
-        prev.map((r) => {
-          const isMatch = String(r.userId) === String(memberId) || r.userName === memberName;
-          if (isMatch) {
-            return { ...r, status: 'Removed', removalReason: trimmed };
-          }
-          return r;
-        })
-      );
-
-      // 4. Background refresh from backend for authoritative sync
+      // 4. Refresh remaining tasks & join requests (project detail refreshed inside thunk)
       Promise.all([
-        projectsApi.get(projectId).catch(() => null),
-        tasksApi.list({ projectId }).catch(() => null),
-        joinRequestsApi.list({ projectId }).catch(() => null),
-      ]).then(([freshProj, freshTasks, freshReqs]) => {
-        if (freshProj) setProject(freshProj);
-        if (Array.isArray(freshTasks)) setTasks(freshTasks);
-        if (Array.isArray(freshReqs)) setJoinRequests(freshReqs);
+        dispatch(fetchTasksByProject({ projectId, force: true })).unwrap().catch(() => null),
+        dispatch(fetchJoinRequests({ projectId, force: true })).unwrap().catch(() => null),
+      ]).then(() => {
         fetchRemovalChecks();
       });
 
@@ -1457,15 +1430,18 @@ const OwnedWorkspace = () => {
           'Review these submitted tasks first: approve them or send them back with feedback. Then you can remove this member.'
         );
         const memberIdStr = String(memberId);
-        setRemovalChecks((prev) => ({
-          ...prev,
-          [memberIdStr]: {
-            allowed: false,
-            blockers: rawBlockers,
-            tasksToRelease: prev[memberIdStr]?.tasksToRelease || [],
-            tasksKept: prev[memberIdStr]?.tasksKept || [],
-          },
-        }));
+        dispatch(
+          setRemovalCheckEntry({
+            projectId,
+            userId: memberIdStr,
+            check: {
+              allowed: false,
+              blockers: rawBlockers,
+              tasksToRelease: removalChecks[memberIdStr]?.tasksToRelease || [],
+              tasksKept: removalChecks[memberIdStr]?.tasksKept || [],
+            },
+          }),
+        );
       } else {
         const errMsg = err?.serverMessage || err?.message?.replace(/^(Access Forbidden|Validation Error):\s*/, '') || 'Failed to remove member.';
         setRemoveError(errMsg);
@@ -1491,34 +1467,17 @@ const OwnedWorkspace = () => {
   };
 
   const handleConfirmReleaseTasks = async () => {
-    if (!releaseTasksTarget || releasingTasks || typeof projectsApi.releaseMemberTasks !== 'function') return;
+    if (!releaseTasksTarget || releasingTasks) return;
     const memberId = String(releaseTasksTarget.id || releaseTasksTarget.userId);
     const memberName = releaseTasksTarget.name || memberId;
     setReleasingTasks(true);
     setReleaseTasksError('');
     try {
-      const res = await projectsApi.releaseMemberTasks(projectId, memberId);
+      const actionRes = await dispatch(
+        releaseMemberTasks({ projectId, memberId }),
+      ).unwrap();
+      const res = actionRes?.res;
       const releasedCount = res?.released ?? 0;
-      const releasedIds = new Set(Array.isArray(res?.taskIds) ? res.taskIds.map(String) : []);
-      setTasks((prev) =>
-        prev.map((t) => {
-          const st = String(t.status || '').toLowerCase();
-          const tAssignee = String(t.assigneeId || t.assignedTo || '');
-          const shouldRelease =
-            releasedIds.size > 0
-              ? releasedIds.has(String(t.id))
-              : tAssignee === memberId && (st === 'open' || st === 'to do' || st === 'todo' || st === 'in progress' || st === 'in_progress');
-          if (!shouldRelease) return t;
-          return {
-            ...t,
-            assigneeId: '',
-            assignedTo: null,
-            assigneeName: 'Unassigned',
-            assignee: 'Unassigned',
-            status: 'To Do',
-          };
-        })
-      );
       showToast(`Released ${releasedCount} task(s) from ${memberName}.`, 'success');
       setReleaseTasksTarget(null);
     } catch (err) {
@@ -1529,26 +1488,22 @@ const OwnedWorkspace = () => {
   };
 
   const handleSendMessage = async (text) => {
-    setSendingMsg(true);
+    const trimmed = String(text || '').trim();
+    if (!trimmed || chatForbidden) return;
     try {
-      const newMsg = await communicationApi.sendMessage({
-        projectId,
-        text,
-        senderName: user?.name || 'Project Owner',
-      }, 'Project Owner', user?.id);
-
-      if (newMsg) {
-        setMessages((prev) => [...prev, newMsg]);
-      }
-
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
+      await dispatch(
+        sendProjectMessage({
+          projectId,
+          text: trimmed,
+          senderId: user?.id,
+          senderName: user?.name || 'Project Owner',
+          senderRole: 'Owner',
+          role: 'Project Owner',
+          userId: user?.id,
+        }),
+      ).unwrap();
     } catch (err) {
       console.error('Failed to send message:', err);
-    } finally {
-      setSendingMsg(false);
     }
   };
 
@@ -1629,100 +1584,20 @@ const OwnedWorkspace = () => {
       ];
   const allMembers = apiMembers;
   const members = apiMembers.filter((m) => String(m.role || '').toLowerCase() === 'collaborator');
-  const approvedCollabCount = members.length;
-  const maxCollaboratorLimit = Number(project.maxCollaborators) > 0 ? Number(project.maxCollaborators) : 5;
-  const isProjectFull = Boolean(project.isFull || approvedCollabCount >= maxCollaboratorLimit);
-  const combinedItems = (() => {
-    const list = [];
-    const seenIds = new Set();
+  const {
+    used: approvedCollabCount,
+    limit: maxCollaboratorLimit,
+    isFull: isProjectFull,
+  } = getProjectSeatCounts(project);
+  const {
+    items: allItems,
+    pendingItems,
+    approvedItems,
+    rejectedItems,
+    counts: requestCounts,
+  } = combinedRequestsData;
 
-    for (const req of (joinRequests || [])) {
-      if (!req || !req.id) continue;
-      seenIds.add(String(req.id));
-      const isInv = req.type === 'Invited';
-      const type = isInv ? 'Invited' : 'Applied';
-      const statusStr = String(req.status || 'Pending');
-      const statusLower = statusStr.toLowerCase();
-      let filterGroup = req.filterGroup;
-      if (!filterGroup) {
-        if (statusLower === 'pending') {
-          filterGroup = 'Pending';
-        } else if (statusLower === 'approved' || statusLower === 'accepted') {
-          filterGroup = 'Approved';
-        } else if (statusLower === 'rejected' || statusLower === 'declined') {
-          filterGroup = 'Rejected';
-        } else {
-          filterGroup = 'All';
-        }
-      }
-      list.push({
-        ...req,
-        type,
-        filterGroup,
-        date: req.date || req.sentAt || req.createdAt,
-      });
-    }
-
-    for (const inv of (projectInvites || [])) {
-      if (!inv || !inv.id || seenIds.has(String(inv.id))) continue;
-      seenIds.add(String(inv.id));
-      const statusLower = String(inv.status || 'pending').toLowerCase();
-      let filterGroup = 'All';
-      let displayStatus = inv.status || 'Pending';
-      if (statusLower === 'pending') {
-        filterGroup = 'Pending';
-        displayStatus = 'Pending';
-      } else if (statusLower === 'accepted') {
-        filterGroup = 'Approved';
-        displayStatus = 'Accepted';
-      } else if (statusLower === 'declined') {
-        filterGroup = 'Rejected';
-        displayStatus = 'Declined';
-      } else if (statusLower === 'cancelled') {
-        displayStatus = 'Cancelled';
-      } else if (statusLower === 'expired') {
-        displayStatus = 'Expired';
-      }
-
-      const inviteeName = inv.invitedUserName || inv.invitedUsername || inv.invitedUserId || 'Invited Collaborator';
-      list.push({
-        id: inv.id,
-        projectId: inv.projectId,
-        userId: inv.invitedUserId,
-        type: 'Invited',
-        filterGroup,
-        applicantName: inviteeName,
-        userName: inviteeName,
-        name: inviteeName,
-        username: inv.invitedUsername || '',
-        applicantUsername: inv.invitedUsername || '',
-        role: 'Collaborator',
-        status: displayStatus,
-        rawStatus: inv.status,
-        message: inv.message || 'Direct invitation to join project',
-        date: inv.createdAt,
-        sentAt: inv.createdAt,
-        createdAt: inv.createdAt,
-      });
-    }
-
-    list.sort((a, b) => new Date(b.date || b.createdAt || 0) - new Date(a.date || a.createdAt || 0));
-    return list;
-  })();
-
-  const pendingItems = combinedItems.filter((item) => item.filterGroup === 'Pending');
-  const approvedItems = combinedItems.filter((item) => item.filterGroup === 'Approved');
-  const rejectedItems = combinedItems.filter((item) => item.filterGroup === 'Rejected');
-  const allItems = combinedItems;
-
-  const filteredItems = (() => {
-    if (requestStatusFilter === 'pending') return pendingItems;
-    if (requestStatusFilter === 'approved') return approvedItems;
-    if (requestStatusFilter === 'rejected') return rejectedItems;
-    return allItems;
-  })();
-
-  const totalPendingCount = pendingItems.length;
+  const totalPendingCount = requestCounts.pending ?? pendingItems.length;
   const pendingRequests = pendingItems;
   const unapprovedTasks = tasks.filter(
     (t) => t && t.status !== 'Completed' && String(t.status || '').toLowerCase() !== 'completed'
@@ -2164,10 +2039,10 @@ const OwnedWorkspace = () => {
                   </h4>
                   <FilterTabs
                     tabs={[
-                      { id: 'all', label: 'All', count: allItems.length },
-                      { id: 'pending', label: 'Pending', count: pendingItems.length },
-                      { id: 'approved', label: 'Approved', count: approvedItems.length },
-                      { id: 'rejected', label: 'Rejected', count: rejectedItems.length },
+                      { id: 'all', label: 'All', count: requestCounts.all ?? allItems.length },
+                      { id: 'pending', label: 'Pending', count: requestCounts.pending ?? pendingItems.length },
+                      { id: 'approved', label: 'Approved', count: requestCounts.approved ?? approvedItems.length },
+                      { id: 'rejected', label: 'Rejected', count: requestCounts.rejected ?? rejectedItems.length },
                     ]}
                     activeTab={requestStatusFilter}
                     onChange={setRequestStatusFilter}
@@ -2235,23 +2110,30 @@ const OwnedWorkspace = () => {
                         <input
                           type="text"
                           data-testid="invite-search-input"
-                          value={inviteQuery}
+                          value={isProjectFull ? '' : inviteQuery}
+                          disabled={isProjectFull}
                           onChange={handleInviteSearchChange}
-                          placeholder="Search by username or name (min 2 chars)..."
+                          placeholder={
+                            isProjectFull
+                              ? 'Team is full — invite disabled'
+                              : 'Search by username or name (min 2 chars)...'
+                          }
                           style={{
                             width: '100%',
                             padding: '8px 12px',
                             borderRadius: '6px',
                             border: '1px solid #cbd5e1',
                             fontSize: '0.9rem',
+                            backgroundColor: isProjectFull ? '#e2e8f0' : '#ffffff',
+                            cursor: isProjectFull ? 'not-allowed' : 'text',
                           }}
                         />
-                        {searchingInviteUsers && (
+                        {searchingInviteUsers && !isProjectFull && (
                           <div style={{ fontSize: '0.78rem', color: '#64748b', marginTop: '4px' }}>
                             Searching...
                           </div>
                         )}
-                        {inviteSearchResults.length > 0 && (
+                        {!isProjectFull && inviteSearchResults.length > 0 && (
                           <div
                             data-testid="invite-search-results"
                             style={{
@@ -2363,7 +2245,7 @@ const OwnedWorkspace = () => {
                           return cleanQ === rUname || cleanQ === rUid;
                         });
 
-                        if (queryHasApplied) {
+                        if (queryHasApplied && !isProjectFull) {
                           return (
                             <button
                               type="button"
@@ -2385,14 +2267,54 @@ const OwnedWorkspace = () => {
                             type="button"
                             data-testid="send-invite-btn"
                             className="tf-owned-ws-btn-primary"
-                            disabled={sendingInvite || !inviteQuery.trim()}
+                            disabled={
+                              isProjectFull ||
+                              sendingInvite ||
+                              storeSendInviteStatus === 'loading' ||
+                              !inviteQuery.trim()
+                            }
                             onClick={() => handleSendDirectInvite()}
                           >
-                            {sendingInvite ? 'Sending...' : 'Send Invite'}
+                            {sendingInvite || storeSendInviteStatus === 'loading' ? 'Sending...' : 'Send Invite'}
                           </button>
                         );
                       })()}
                     </div>
+                    {isProjectFull && (
+                      <div
+                        data-testid="invite-full-note"
+                        style={{
+                          marginTop: '10px',
+                          fontSize: '0.86rem',
+                          color: '#b45309',
+                          display: 'flex',
+                          alignItems: 'center',
+                          flexWrap: 'wrap',
+                          gap: '6px',
+                        }}
+                      >
+                        <span>
+                          {`Team is full (${approvedCollabCount} of ${maxCollaboratorLimit}). Increase the collaborator limit in project settings, or remove a collaborator, to invite more people.`}
+                        </span>
+                        <button
+                          type="button"
+                          data-testid="invite-full-edit-settings-link"
+                          onClick={handleOpenEditProjectModal}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            padding: 0,
+                            color: '#2563eb',
+                            textDecoration: 'underline',
+                            fontWeight: 600,
+                            cursor: 'pointer',
+                            fontSize: 'inherit',
+                          }}
+                        >
+                          Edit settings
+                        </button>
+                      </div>
+                    )}
                     {inviteFeedback && (
                       <div
                         role="alert"
@@ -2440,7 +2362,8 @@ const OwnedWorkspace = () => {
                         );
                         const displayName = req.userName || memberUser?.name || req.userId;
                         const taskSum = req.taskSummary || { open: 0, inProgress: 0, inReview: 0, approved: 0 };
-                        const isProcessing = processingLeaveId === req.id;
+                        const isProcessing =
+                          processingLeaveId === req.id || Boolean(leaveProcessingIds[req.id]);
 
                         return (
                           <div
@@ -2549,7 +2472,7 @@ const OwnedWorkspace = () => {
                       return (
                         <div key={`${memberId}-Owner`} className="tf-owned-ws-member-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                            <Avatar name={name} size="md" />
+                            <Avatar name={name} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="md" />
                             <div>
                               <h4 className="tf-owned-ws-member-name">{name}</h4>
                               <p className="tf-owned-ws-member-role">Project Lead</p>
@@ -2586,7 +2509,7 @@ const OwnedWorkspace = () => {
                         <div key={`${memberId}-Mentor`} className="tf-owned-ws-member-card" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
                           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                              <Avatar name={name} size="md" />
+                              <Avatar name={name} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="md" />
                               <div>
                                 <h4 className="tf-owned-ws-member-name">{name}</h4>
                                 <p className="tf-owned-ws-member-role">
@@ -2610,9 +2533,7 @@ const OwnedWorkspace = () => {
                                   disabled={Boolean(mentorAbandonmentInfo && inactiveDays < 7)}
                                   title={inactiveDays < 7 ? 'Available once mentor has 7 days with no activity' : 'Open a 48-hour abandonment review'}
                                   onClick={() => {
-                                    setReportMentorReason('');
-                                    setReportMentorError('');
-                                    setReportMentorModalOpen(true);
+                                    dispatch(openReportMentorModal());
                                   }}
                                 >
                                   Report inactive mentor
@@ -2670,7 +2591,7 @@ const OwnedWorkspace = () => {
                     return (
                       <div key={`${memberId}-Collaborator`} className="tf-owned-ws-member-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '10px' }}>
                         <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                          <Avatar name={name || 'Collaborator'} size="md" />
+                          <Avatar name={name || 'Collaborator'} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="md" />
                           <div>
                             <h4 className="tf-owned-ws-member-name">{name}</h4>
                             <p className="tf-owned-ws-member-role">{role}</p>
@@ -2774,13 +2695,16 @@ const OwnedWorkspace = () => {
         {/* Tab 4: Chat (Rendered via reusable ChatBox) */}
         {activeTab === 'chat' && (
           <ChatBox
+            projectId={projectId}
             messages={messages}
             currentUserId={user?.id}
             currentUserName={user?.name || 'Project Owner'}
             currentUserRole="Owner"
             onSendMessage={handleSendMessage}
-            onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
+            onRefresh={() => dispatch(fetchProjectMessages({ projectId, force: true }))}
             sending={sendingMsg}
+            isForbidden={chatForbidden}
+            forbiddenMessage={chatForbiddenMessage}
           />
         )}
       </div>
@@ -3192,7 +3116,7 @@ const OwnedWorkspace = () => {
         {!loadingProfile && !profileError && applicantProfile && (
           <div className="tf-applicant-profile-modal">
             <div style={{ display: 'flex', alignItems: 'center', gap: '16px', paddingBottom: '16px', borderBottom: '1px solid #e2e8f0' }}>
-              <Avatar name={applicantProfile.name} size="lg" />
+              <Avatar name={applicantProfile.name} src={applicantProfile.avatarUrl || applicantProfile.avatar} version={applicantProfile.updatedAt} size="lg" />
               <div>
                 <h3 style={{ margin: '0 0 4px 0', fontSize: '1.2rem', fontWeight: 700, color: '#0f172a' }}>
                   {applicantProfile.name}
@@ -3811,7 +3735,11 @@ const OwnedWorkspace = () => {
 
       {/* Send Task Back for Revision Modal (Mandatory 10-500 char Reason) */}
       {(() => {
-        const creditInfo = getRejectionReviewCreditInfo(rejectTaskTarget, project);
+        const creditInfo = getRejectionReviewCreditInfo(
+          rejectTaskTarget,
+          project,
+          rejectModalOpenedAt,
+        );
         const requiresExtension = Boolean(creditInfo?.requiresProjectExtension);
         const isConfirmDisabled =
           rejectingTask ||
@@ -4029,14 +3957,14 @@ const OwnedWorkspace = () => {
       <Modal
         isOpen={reportMentorModalOpen}
         title="Report Inactive Mentor"
-        onClose={() => !reportingMentor && setReportMentorModalOpen(false)}
+        onClose={() => !reportingMentor && dispatch(closeReportMentorModal())}
         footer={
           <>
             <button
               type="button"
               className="tf-owned-ws-btn-outline"
               disabled={reportingMentor}
-              onClick={() => setReportMentorModalOpen(false)}
+              onClick={() => dispatch(closeReportMentorModal())}
             >
               Cancel
             </button>
@@ -4048,17 +3976,16 @@ const OwnedWorkspace = () => {
               disabled={reportingMentor}
               onClick={async () => {
                 if (reportingMentor) return;
-                setReportingMentor(true);
-                setReportMentorError('');
                 try {
-                  await mentorMarketplaceApi.openAbandonmentReview(projectId, reportMentorReason.trim() || undefined);
-                  await loadMentorAbandonmentInfo(projectId);
-                  setReportMentorModalOpen(false);
+                  await dispatch(
+                    openAbandonmentReview({
+                      projectId,
+                      reason: reportMentorReason.trim() || undefined,
+                    }),
+                  ).unwrap();
                   showToast('Abandonment review opened. Mentor has 48 hours to confirm activity.', 'success');
-                } catch (err) {
-                  setReportMentorError(err?.serverMessage || err?.message || 'Unable to open abandonment review.');
-                } finally {
-                  setReportingMentor(false);
+                } catch {
+                  // Friendly error stored in abandonmentReviews.working.reportError
                 }
               }}
             >
@@ -4079,7 +4006,7 @@ const OwnedWorkspace = () => {
               id="report-mentor-reason"
               rows={3}
               value={reportMentorReason}
-              onChange={(e) => setReportMentorReason(e.target.value)}
+              onChange={(e) => dispatch(setReportMentorReason(e.target.value))}
               placeholder="Describe how long the mentor has been unreachable..."
               style={{
                 width: '100%',
@@ -4110,10 +4037,8 @@ const OwnedWorkspace = () => {
         onSuccess={(result) => {
           if (result?.mode === 'scheduled') {
             showToast('Project deletion scheduled for 48 hours from now. Members have been notified.', 'success');
-            if (result.project) {
-              setProject(result.project);
-            } else {
-              projectsApi.get(projectId).then(setProject).catch(() => {});
+            if (!result.project) {
+              dispatch(fetchProjectById({ id: projectId, force: true }));
             }
           } else {
             showToast('Project deleted successfully.', 'success');
@@ -4170,4 +4095,5 @@ const OwnedWorkspace = () => {
   );
 };
 
+const OwnedWorkspace = OwnedWorkspaceContent;
 export default OwnedWorkspace;

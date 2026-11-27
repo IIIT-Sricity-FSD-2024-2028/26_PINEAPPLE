@@ -1,11 +1,13 @@
-import { useContext } from 'react';
+import { useSelector } from 'react-redux';
+import { useCallback, useEffect, useRef } from 'react';
+import { useInRouterContext, useNavigate } from 'react-router-dom';
 import Badge from '../common/Badge';
 import ProgressBar from '../common/ProgressBar';
 import SafeLink from '../common/SafeLink';
-import { formatDateTime, formatCountdown, formatProjectDueDate } from '../../utils/dateFormatter';
+import { navigateWithAppRouter } from '../../routes/navigationRef';
+import { formatProjectDueDate } from '../../utils/dateFormatter';
 import { getRequestControlConfig } from '../../utils/requestState';
-import { AuthContext } from '../../context/AuthContext';
-import storage from '../../utils/storage';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
 import './ProjectCard.css';
 
 const UsersIcon = () => (
@@ -16,6 +18,14 @@ const UsersIcon = () => (
     <path d="M16 3.13a4 4 0 0 1 0 7.75" />
   </svg>
 );
+
+const RouterNavBridge = ({ onReady }) => {
+  const navigate = useNavigate();
+  useEffect(() => {
+    onReady(navigate);
+  }, [navigate, onReady]);
+  return null;
+};
 
 /**
  * Reusable ProjectCard component for displaying project summaries across multiple pages.
@@ -33,7 +43,7 @@ const UsersIcon = () => (
  * @param {() => void} [props.onSummary]
  * @param {React.ReactNode} [props.actionSlot]
  */
-const ProjectCard = ({
+const ProjectCardContent = ({
   project,
   variant = 'marketplace',
   onSelect,
@@ -54,9 +64,14 @@ const ProjectCard = ({
   showDelete = false,
   onDelete,
 }) => {
-  const auth = useContext(AuthContext);
-  const currentUserId = auth?.user?.id || storage?.getBackendUserId?.();
-  const currentUserName = auth?.user?.name || auth?.user?.username;
+  const inRouter = useInRouterContext();
+  const routerNavigateRef = useRef(null);
+  const handleRouterReady = useCallback((fn) => {
+    routerNavigateRef.current = fn;
+  }, []);
+  const storeUser = useSelector(selectCurrentUser);
+  const currentUserId = storeUser?.id || storeUser?.uid;
+  const currentUserName = storeUser?.name || storeUser?.username;
 
   const title = project.title || project.name || 'Untitled Project';
   const description = project.description || project.desc || 'No description provided.';
@@ -125,6 +140,7 @@ const ProjectCard = ({
 
   return (
     <div className={`tf-project-card tf-project-card--${variant}`} onClick={handleCardClick}>
+      {inRouter && <RouterNavBridge onReady={handleRouterReady} />}
       <div className="tf-project-card-header">
         <h4 className="tf-project-card-title">{title}</h4>
         <div className="tf-project-card-badges">
@@ -450,8 +466,11 @@ const ProjectCard = ({
                     if (typeof onSelect === 'function') {
                       onSelect(project, 'requests');
                     }
-                    if (typeof window !== 'undefined') {
-                      window.location.href = `/owner/workspace/${project.id}?tab=members&section=requests`;
+                    const workspaceRequestsUrl = `/owner/workspace/${project.id}?tab=members&section=requests`;
+                    if (typeof routerNavigateRef.current === 'function') {
+                      routerNavigateRef.current(workspaceRequestsUrl);
+                    } else {
+                      navigateWithAppRouter(workspaceRequestsUrl);
                     }
                   }}
                 >
@@ -535,5 +554,7 @@ const ProjectCard = ({
     </div>
   );
 };
+
+const ProjectCard = ProjectCardContent;
 
 export default ProjectCard;

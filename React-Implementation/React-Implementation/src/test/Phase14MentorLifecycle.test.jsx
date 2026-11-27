@@ -1,11 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
-import { renderWithProviders } from './test-utils';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test-utils';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import MentoredProjects from '../pages/mentor/MentoredProjects';
 import Dashboard from '../pages/dashboard';
@@ -120,19 +115,18 @@ vi.mock('../services/leaderboardApi', () => ({
 }));
 
 const renderWithAuthAndRole = (ui, { user, role = 'Project Owner' }) =>
-  render(
-    <MemoryRouter>
-      <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, refreshMentorStatus: vi.fn() }}>
-        <RoleContext.Provider value={{ currentRole: role, switchRole: vi.fn(), availableRoles: [role] }}>
-          <UIProvider>
-            <NotificationContext.Provider value={{ notifications: [], unreadCount: 0 }}>
-              {ui}
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
+  renderWithStore(ui, {
+    preloadedState: {
+      session: {
+        user,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: role,
+        allowedRoles: [role],
+      },
+    },
+  });
 
 describe('Phase 14 - Mentor Lifecycle Frontend UI', () => {
   beforeEach(() => {
@@ -414,11 +408,19 @@ describe('Phase 14 - Mentor Lifecycle Frontend UI', () => {
       ],
     });
 
-    renderWithProviders(
-      <AuthContext.Provider value={{ user: adminUser, loading: false, isAuthenticated: true }}>
-        <AdminUserDetails />
-      </AuthContext.Provider>,
-    );
+    renderWithStore(<AdminUserDetails />, {
+      preloadedState: {
+        session: {
+          user: adminUser,
+          loading: false,
+          isAuthenticated: true,
+          status: 'authenticated',
+          isSuperUser: true,
+          portalRole: 'superuser',
+          permissions: ['*'],
+        },
+      },
+    });
 
     await waitFor(() => expect(screen.getByTestId('admin-mentor-feedback-card')).toBeTruthy());
     const card = screen.getByTestId('admin-mentor-feedback-card');

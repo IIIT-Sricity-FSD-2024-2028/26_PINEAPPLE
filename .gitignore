@@ -25,9 +25,18 @@ npm-debug.log*
 yarn-debug.log*
 pnpm-debug.log*
 
-# Persistence snapshots
+# Persistence snapshots and runtime uploads
 data/
 back-end/data/
+/.runtime/
+/back-end/.runtime/
+/uploads/
+/back-end/uploads/
+/secure-cvs/
+/back-end/secure-cvs/
 *.corrupt-*
 *.tmp
+
+# Cleanup backups
+.cleanup-backup/
 

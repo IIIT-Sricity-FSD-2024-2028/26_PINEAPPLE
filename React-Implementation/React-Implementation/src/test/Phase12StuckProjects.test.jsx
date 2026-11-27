@@ -1,8 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { AuthContext } from '../context/AuthContext';
-import { NotificationContext } from '../context/NotificationContext';
-import { renderWithProviders } from './test-utils';
+import { renderWithStore } from './test-utils';
 import MyProjects from '../pages/owner/MyProjects';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import AppliedProjects from '../pages/collaborator/AppliedProjects';
@@ -79,11 +77,16 @@ vi.mock('../services/adminApi', () => ({
 }));
 
 const renderWithUser = (ui, user) =>
-  renderWithProviders(
-    <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true }}>
-      {ui}
-    </AuthContext.Provider>,
-  );
+  renderWithStore(ui, {
+    preloadedState: {
+      session: {
+        user,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+      },
+    },
+  });
 
 describe('Phase 12 - Stuck Projects, Requests & Inactivity Frontend UI', () => {
   beforeEach(() => {
@@ -309,11 +312,12 @@ describe('Phase 12 - Stuck Projects, Requests & Inactivity Frontend UI', () => {
     const reasonEl = await screen.findByTestId('admin-closure-reason');
     expect(reasonEl.textContent).toContain('Owner inactive');
 
-    renderWithProviders(
-      <NotificationContext.Provider
-        value={{
-          notifications: [
-            {
+    renderWithStore(<Notifications />, {
+      preloadedState: {
+        notifications: {
+          ids: ['n-12'],
+          entities: {
+            'n-12': {
               id: 'n-12',
               title: 'Inactivity Notice',
               message: 'You have had no task activity in Workspace Project.',
@@ -321,15 +325,12 @@ describe('Phase 12 - Stuck Projects, Requests & Inactivity Frontend UI', () => {
               referenceId: 'proj-12',
               isRead: false,
             },
-          ],
+          },
           unreadCount: 1,
-          markAsRead: vi.fn(),
-          markAllAsRead: vi.fn(),
-        }}
-      >
-        <Notifications />
-      </NotificationContext.Provider>,
-    );
+          status: 'succeeded',
+        },
+      },
+    });
 
     const notifLink = await screen.findByTestId('notif-link-n-12');
     expect(notifLink.getAttribute('href')).toBe('/collaborator/workspace/proj-12');

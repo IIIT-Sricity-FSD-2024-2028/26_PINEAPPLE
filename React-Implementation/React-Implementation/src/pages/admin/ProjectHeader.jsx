@@ -29,7 +29,7 @@ const ProjectHeader = ({
     : project.status || 'Open';
 
   return (
-    <header className="admin-project-header-wrapper">
+    <section className="admin-project-header-wrapper" aria-label="Project details header">
       <div className="admin-project-header-top">
         <button
           type="button"
@@ -85,7 +85,7 @@ const ProjectHeader = ({
           )}
         </div>
       </div>
-    </header>
+    </section>
   );
 };
 

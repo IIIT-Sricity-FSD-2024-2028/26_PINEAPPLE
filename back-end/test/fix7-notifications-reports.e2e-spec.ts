@@ -49,7 +49,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Notif 1',
         message: 'Message 1',
         readStatus: false,
-        priority: 'immediate',
       });
       notificationsService.create({
         userId: '2',
@@ -57,7 +56,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Notif 2',
         message: 'Message 2',
         readStatus: false,
-        priority: 'immediate',
       });
       notificationsService.create({
         userId: '2',
@@ -65,7 +63,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Notif 3',
         message: 'Message 3',
         readStatus: false,
-        priority: 'immediate',
       });
 
       // User 3 also has an unread notification
@@ -75,7 +72,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'User 3 Notif',
         message: 'User 3 Message',
         readStatus: false,
-        priority: 'immediate',
       });
 
       // Check unread count before
@@ -157,7 +153,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Single Read Test',
         message: 'Only user 2',
         readStatus: false,
-        priority: 'immediate',
       });
 
       // User 3 cannot read user 2's notification -> 404
@@ -203,7 +198,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Item A',
         message: 'Msg A',
         readStatus: false,
-        priority: 'immediate',
       });
       notificationsService.create({
         userId: '2',
@@ -211,7 +205,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Item B',
         message: 'Msg B',
         readStatus: true,
-        priority: 'immediate',
       });
       notificationsService.create({
         userId: '2',
@@ -219,7 +212,6 @@ describe('Fix 7 E2E Tests: Notifications Read-All & Chat Reports Visibility', ()
         title: 'Item C',
         message: 'Msg C',
         readStatus: false,
-        priority: 'immediate',
       });
 
       const countRes = await request(server)

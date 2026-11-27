@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import AdminLayout from '../pages/admin/AdminLayout';
 import AdminSupport from '../pages/admin/AdminSupport';
 import Help from '../pages/help';
@@ -111,36 +110,46 @@ describe('Phase 27 Frontend Tests: Admin Support Inbox, Closure Panel, My Ticket
 
   describe('1. Permission-based Admin Menu & Page Guard', () => {
     it('shows Support Inbox link in AdminLayout when admin has "support" permission and hides it otherwise', () => {
-      sessionStorage.setItem('teamforge.portalRole', 'admin');
-      sessionStorage.setItem('teamforge.isSuperUser', 'false');
-      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['users', 'support']));
-
-      const { rerender } = render(
-        <MemoryRouter>
-          <AdminLayout />
-        </MemoryRouter>,
-      );
+      const { unmount } = renderWithProviders(<AdminLayout />, {
+        preloadedState: {
+          session: {
+            portalRole: 'admin',
+            isSuperUser: false,
+            permissions: ['users', 'support'],
+            isAuthenticated: true,
+            initialized: true,
+          },
+        },
+      });
       expect(screen.getByText(/support inbox/i)).toBeDefined();
+      unmount();
 
-      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['users', 'reports']));
-      rerender(
-        <MemoryRouter>
-          <AdminLayout />
-        </MemoryRouter>,
-      );
+      renderWithProviders(<AdminLayout />, {
+        preloadedState: {
+          session: {
+            portalRole: 'admin',
+            isSuperUser: false,
+            permissions: ['users', 'reports'],
+            isAuthenticated: true,
+            initialized: true,
+          },
+        },
+      });
       expect(screen.queryByText(/support inbox/i)).toBeNull();
     });
 
     it('blocks AdminSupport screen when admin lacks "support" permission', () => {
-      sessionStorage.setItem('teamforge.portalRole', 'admin');
-      sessionStorage.setItem('teamforge.isSuperUser', 'false');
-      sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['users']));
-
-      render(
-        <MemoryRouter>
-          <AdminSupport />
-        </MemoryRouter>,
-      );
+      renderWithProviders(<AdminSupport />, {
+        preloadedState: {
+          session: {
+            portalRole: 'admin',
+            isSuperUser: false,
+            permissions: ['users'],
+            isAuthenticated: true,
+            initialized: true,
+          },
+        },
+      });
 
       expect(screen.getByTestId('admin-support-denied')).toBeDefined();
       expect(mockSupportApi.listAdminTickets).not.toHaveBeenCalled();
@@ -149,9 +158,6 @@ describe('Phase 27 Frontend Tests: Admin Support Inbox, Closure Panel, My Ticket
 
   describe('2. AdminSupport Filters, Drawer, Replies & Closure Action', () => {
     it('renders ticket list, applies filters, opens drawer with internal/public notes, sends reply, and closes abandoned project', async () => {
-      sessionStorage.setItem('teamforge.portalRole', 'admin');
-      sessionStorage.setItem('teamforge.isSuperUser', 'true');
-
       mockSupportApi.replyAdminTicket.mockResolvedValue({
         ...closureTicket,
         replies: [
@@ -176,11 +182,17 @@ describe('Phase 27 Frontend Tests: Admin Support Inbox, Closure Panel, My Ticket
         },
       });
 
-      render(
-        <MemoryRouter>
-          <AdminSupport />
-        </MemoryRouter>,
-      );
+      renderWithProviders(<AdminSupport />, {
+        preloadedState: {
+          session: {
+            portalRole: 'admin',
+            isSuperUser: true,
+            permissions: ['*'],
+            isAuthenticated: true,
+            initialized: true,
+          },
+        },
+      });
 
       await waitFor(() => {
         expect(screen.getByTestId('admin-support-table')).toBeDefined();

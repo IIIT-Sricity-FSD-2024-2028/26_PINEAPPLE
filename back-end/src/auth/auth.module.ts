@@ -16,6 +16,8 @@ import { AuthStrategyResolver } from './strategies/auth-strategy.resolver';
 import { AuthGuard } from './guards/auth.guard';
 import { SeedingService } from './seeding.service';
 import { LoginThrottleService } from './login-throttle.service';
+import { AdminRefreshService } from '../admin/admin-refresh.service';
+import { ADMIN_REFRESH_SERVICE } from '../common/utils/refresh-cookie.util';
 
 @Global()
 @Module({
@@ -40,6 +42,8 @@ import { LoginThrottleService } from './login-throttle.service';
     AuthStrategyResolver,
     AuthGuard,
     SeedingService,
+    AdminRefreshService,
+    { provide: ADMIN_REFRESH_SERVICE, useExisting: AdminRefreshService },
   ],
   exports: [
     AuthService,
@@ -51,6 +55,8 @@ import { LoginThrottleService } from './login-throttle.service';
     AuthStrategyResolver,
     AuthGuard,
     JwtModule,
+    AdminRefreshService,
+    ADMIN_REFRESH_SERVICE,
   ],
 })
 export class AuthModule {}

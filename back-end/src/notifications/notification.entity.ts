@@ -89,6 +89,4 @@ export class Notification {
     required: false,
   })
   items?: Array<{ label: string; link?: string }>;
-
-  priority?: 'immediate' | 'digest';
 }

@@ -7,7 +7,7 @@ import joinRequestsApi from '../services/joinRequestsApi';
 import communicationApi from '../services/communicationApi';
 import usersApi from '../services/usersApi';
 import { renderWithProviders } from './test-utils';
-import { formatBookingError } from '../pages/owner/MentorsDirectory';
+import { formatPaymentError as formatBookingError } from '../store/thunks/paymentsThunks';
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');

@@ -242,9 +242,7 @@ describe('Phase 13 Unit Tests: Task Review, Retention, Review Deadlines, Unassig
       status: TaskStatus.InProgress,
       dueDate: '2027-05-01T00:00:00.000Z',
     });
-    // Pre-Phase-18 test asserts immediate reminder delivery on Day 3
-    const ownerRec = usersRepo.findById('1');
-    if (ownerRec) ownerRec.digestEnabled = false;
+    // Verify immediate reminder delivery on Day 3
     // Force an unsafe proof URL directly into repository state
     tasksRepo.update(badProofTask.id, {
       status: TaskStatus.InReview,

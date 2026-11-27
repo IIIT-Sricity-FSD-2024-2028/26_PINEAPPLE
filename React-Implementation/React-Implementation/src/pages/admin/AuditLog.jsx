@@ -1,101 +1,114 @@
 import { useState, useEffect } from 'react';
-import { useSearchParams } from 'react-router-dom';
-import adminApi from '../../services/adminApi';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  exportAuditLogs,
+  fetchAuditLogs,
+} from '../../store/thunks/auditLogThunks';
+import {
+  clearAllAuditFilters,
+  clearAuditFilterField,
+  setAuditExportFormat,
+  setAuditExportOpen,
+  setAuditPage,
+  setAuditSearch,
+  setAuditTypeFilter,
+  syncAuditFiltersFromUrl,
+} from '../../store/slices/auditLogSlice';
+import {
+  selectAllAuditLogs,
+  selectAuditFilters,
+  selectAuditLogStatus,
+  selectAuditLogWorking,
+  selectAuditTypes,
+  selectFilteredAuditLogs,
+} from '../../store/selectors/auditLogSelectors';
 import SearchBar from '../../components/common/SearchBar';
 import DataTable from '../../components/common/DataTable';
 import FilterTabs from '../../components/common/FilterTabs';
 import Modal from '../../components/common/Modal';
 import './AuditLog.css';
 
-const AuditLog = () => {
+const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
+
+const AuditLogContent = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
   const [searchParams, setSearchParams] = useSearchParams();
-  const userId = searchParams.get('userId') || '';
-  const reportId = searchParams.get('reportId') || '';
-  const [logs, setLogs] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
-  const [filter, setFilter] = useState('all');
-  const [page, setPage] = useState(1);
+
+  // Extract URL filters cleanly (note: `from=report` is a navigation referrer, not a date bound)
+  const rawFrom = searchParams.get('from') || '';
+  const urlUserId = searchParams.get('userId') || '';
+  const urlReportId = searchParams.get('reportId') || '';
+  const urlActor = searchParams.get('actor') || '';
+  const urlAction = searchParams.get('action') || '';
+  const urlRange = searchParams.get('range') || '';
+  const urlFromDate = DATE_RE.test(rawFrom) ? rawFrom : '';
+  const urlToDate = searchParams.get('to') || '';
+
+  const logs = useSelector(selectAllAuditLogs);
+  const filteredLogs = useSelector(selectFilteredAuditLogs);
+  const types = useSelector(selectAuditTypes);
+  const status = useSelector(selectAuditLogStatus);
+  const filters = useSelector(selectAuditFilters);
+  const working = useSelector(selectAuditLogWorking);
+
+  const loading = status === 'idle' || status === 'loading';
+  const filter = working.typeFilter || 'all';
+  const search = working.search || '';
+  const page = working.page || 1;
   const pageSize = 15;
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [exportOpen, setExportOpen] = useState(false);
-  const [exportFormat, setExportFormat] = useState('csv');
-  const [exportFrom, setExportFrom] = useState('');
-  const [exportTo, setExportTo] = useState('');
-  const [exportActor, setExportActor] = useState('');
-  const [exportAction, setExportAction] = useState('');
-  const [exportSubmitting, setExportSubmitting] = useState(false);
-  const [exportFeedback, setExportFeedback] = useState(null);
+  const exportOpen = Boolean(working.exportOpen);
+  const exportFormat = working.exportFormat || 'csv';
+  const exportSubmitting = Boolean(working.exportSubmitting);
+  const exportFeedback = working.exportFeedback;
 
+  // Local controlled form drafts for export modal date/text overrides
+  const [exportFrom, setExportFrom] = useState(urlFromDate);
+  const [exportTo, setExportTo] = useState(urlToDate);
+  const [exportActor, setExportActor] = useState(urlActor);
+  const [exportAction, setExportAction] = useState(urlAction);
+
+  const userId = filters.userId || '';
+  const reportId = filters.reportId || '';
+  const actor = filters.actor || '';
+  const actionFilter = filters.action || '';
+  const rangeFilter = filters.range || '';
+
+  // Single effect synchronizing URL query parameters -> slice working filters + fetching logs
   useEffect(() => {
-    let isMounted = true;
-    const loadLogs = async () => {
-      setLoading(true);
-      try {
-        const params = {};
-        if (userId) params.userId = userId;
-        if (reportId) params.reportId = reportId;
-        const data = await adminApi.getAuditLog(Object.keys(params).length > 0 ? params : undefined);
-        const entries = Array.isArray(data) ? data : (data?.data || []);
-        const formatted = entries.map((e, index) => {
-          let type = 'system';
-          const action = (e.action || e.event || '').toLowerCase();
-          if (action.includes('task')) type = 'task';
-          else if (action.includes('xp')) type = 'xp';
-          else if (action.includes('rep')) type = 'reputation';
-          else if (action.includes('warn')) type = 'warning';
-          else if (action.includes('suspend')) type = 'suspension';
-          else if (action.includes('mentor')) type = 'mentor';
-          else if (action.includes('report')) type = 'report';
-          else if (action.includes('appeal')) type = 'appeal';
-          else if (action.includes('ticket')) type = 'support';
-
-          return {
-            id: e.id || `audit-${index}`,
-            type,
-            event: e.action || e.event || 'System Action',
-            actor: e.performedBy || e.actor || e.user || 'System',
-            target: e.entityId ? `${e.entityType || 'Entity'} #${e.entityId}` : (e.target || '-'),
-            details: e.details ? (typeof e.details === 'object' ? JSON.stringify(e.details) : e.details) : '-',
-            timestamp: e.timestamp ? new Date(e.timestamp).toLocaleString() : new Date().toLocaleString()
-          };
-        });
-        if (isMounted) {
-          setLogs(formatted);
-        }
-      } catch (err) {
-        console.warn('Could not fetch audit log from backend:', err);
-        if (isMounted) {
-          setLogs([]);
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
+    const nextFilters = {
+      userId: urlUserId,
+      reportId: urlReportId,
+      actor: urlActor,
+      action: urlAction,
+      range: urlRange,
+      from: urlFromDate,
+      to: urlToDate,
     };
+    dispatch(syncAuditFiltersFromUrl(nextFilters));
+    dispatch(fetchAuditLogs(nextFilters));
+  }, [
+    dispatch,
+    urlUserId,
+    urlReportId,
+    urlActor,
+    urlAction,
+    urlRange,
+    urlFromDate,
+    urlToDate,
+  ]);
 
-    loadLogs();
+  const handleRefresh = () => {
+    dispatch(fetchAuditLogs(filters));
+  };
 
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey, userId, reportId]);
-
-  const types = ['all', ...Array.from(new Set(logs.map(l => l.type)))];
-
-  const filteredLogs = logs.filter((item) => {
-    const matchesFilter = filter === 'all' || item.type === filter;
-    if (!matchesFilter) return false;
-    if (!search.trim()) return true;
-    const q = search.toLowerCase();
-    return (
-      item.event.toLowerCase().includes(q) ||
-      item.actor.toLowerCase().includes(q) ||
-      item.target.toLowerCase().includes(q) ||
-      item.details.toLowerCase().includes(q)
-    );
-  });
+  const handleRemoveUrlParam = (key) => {
+    const next = new URLSearchParams(searchParams);
+    next.delete(key);
+    setSearchParams(next);
+    dispatch(clearAuditFilterField(key));
+  };
 
   const totalPages = Math.max(1, Math.ceil(filteredLogs.length / pageSize));
   const pagedLogs = filteredLogs.slice((page - 1) * pageSize, page * pageSize);
@@ -119,7 +132,7 @@ const AuditLog = () => {
       render: (entry) => (
         <div>
           <div className="admin-audit-event">{entry.event}</div>
-          <div className="admin-audit-time">{entry.timestamp}</div>
+          <div className="admin-audit-time">{entry.timestampFormatted || entry.timestamp}</div>
         </div>
       ),
     },
@@ -136,6 +149,7 @@ const AuditLog = () => {
     {
       header: 'Details',
       render: (entry) => {
+        if (entry.detailsText) return entry.detailsText;
         if (!entry.details) return '—';
         if (typeof entry.details === 'object') {
           try {
@@ -149,6 +163,18 @@ const AuditLog = () => {
     },
   ];
 
+  const hasAnyChip = Boolean(
+    userId ||
+      reportId ||
+      actor ||
+      actionFilter ||
+      rangeFilter ||
+      filters.from ||
+      filters.to ||
+      filter !== 'all' ||
+      search,
+  );
+
   return (
     <div className="admin-audit-container">
       <div className="admin-audit-head-row">
@@ -158,14 +184,29 @@ const AuditLog = () => {
             Immutable record of all significant platform events.
           </p>
         </div>
-        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center', flexWrap: 'wrap' }}>
+          {urlReportId && (
+            <button
+              type="button"
+              data-testid="back-to-report-btn"
+              className="btn btn-outline"
+              onClick={() =>
+                navigate(`/admin/reports?open=${encodeURIComponent(urlReportId)}`)
+              }
+            >
+              ← Back to report
+            </button>
+          )}
           <button
             type="button"
             data-testid="open-audit-export-btn"
             className="btn btn-primary"
             onClick={() => {
-              setExportFeedback(null);
-              setExportOpen(true);
+              setExportFrom(filters.from || '');
+              setExportTo(filters.to || '');
+              setExportActor(filters.actor || '');
+              setExportAction(filters.action || '');
+              dispatch(setAuditExportOpen(true));
             }}
           >
             Export Log
@@ -175,7 +216,7 @@ const AuditLog = () => {
       </div>
 
       {/* Active Filter Chips */}
-      {(userId || reportId || filter !== 'all' || search) && (
+      {hasAnyChip && (
         <div
           className="admin-audit-chips"
           data-testid="active-filter-chips"
@@ -201,12 +242,7 @@ const AuditLog = () => {
               <button
                 type="button"
                 data-testid="remove-chip-userId"
-                onClick={() => {
-                  const next = new URLSearchParams(searchParams);
-                  next.delete('userId');
-                  setSearchParams(next);
-                  setPage(1);
-                }}
+                onClick={() => handleRemoveUrlParam('userId')}
                 aria-label="Remove user filter"
                 style={{
                   background: 'none',
@@ -242,18 +278,121 @@ const AuditLog = () => {
               <button
                 type="button"
                 data-testid="remove-chip-reportId"
-                onClick={() => {
-                  const next = new URLSearchParams(searchParams);
-                  next.delete('reportId');
-                  setSearchParams(next);
-                  setPage(1);
-                }}
+                onClick={() => handleRemoveUrlParam('reportId')}
                 aria-label="Remove report filter"
                 style={{
                   background: 'none',
                   border: 'none',
                   cursor: 'pointer',
                   color: '#86198f',
+                  fontWeight: 'bold',
+                  padding: '0 2px',
+                  fontSize: '13px',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {actor && (
+            <div
+              data-testid="chip-actor"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                background: '#ecfeff',
+                border: '1px solid #a5f3fc',
+                borderRadius: '16px',
+                color: '#155e75',
+                fontSize: '12px',
+              }}
+            >
+              <span>Actor: <strong>{actor}</strong></span>
+              <button
+                type="button"
+                data-testid="remove-chip-actor"
+                onClick={() => handleRemoveUrlParam('actor')}
+                aria-label="Remove actor filter"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#155e75',
+                  fontWeight: 'bold',
+                  padding: '0 2px',
+                  fontSize: '13px',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {actionFilter && (
+            <div
+              data-testid="chip-action"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                background: '#f0fdf4',
+                border: '1px solid #bbf7d0',
+                borderRadius: '16px',
+                color: '#166534',
+                fontSize: '12px',
+              }}
+            >
+              <span>Action: <strong>{actionFilter}</strong></span>
+              <button
+                type="button"
+                data-testid="remove-chip-action"
+                onClick={() => handleRemoveUrlParam('action')}
+                aria-label="Remove action filter"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#166534',
+                  fontWeight: 'bold',
+                  padding: '0 2px',
+                  fontSize: '13px',
+                  lineHeight: 1,
+                }}
+              >
+                ✕
+              </button>
+            </div>
+          )}
+          {rangeFilter && (
+            <div
+              data-testid="chip-range"
+              style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '4px 10px',
+                background: '#fefce8',
+                border: '1px solid #fef08a',
+                borderRadius: '16px',
+                color: '#854d0e',
+                fontSize: '12px',
+              }}
+            >
+              <span>Range: <strong>{rangeFilter}</strong></span>
+              <button
+                type="button"
+                data-testid="remove-chip-range"
+                onClick={() => handleRemoveUrlParam('range')}
+                aria-label="Remove range filter"
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  cursor: 'pointer',
+                  color: '#854d0e',
                   fontWeight: 'bold',
                   padding: '0 2px',
                   fontSize: '13px',
@@ -283,10 +422,7 @@ const AuditLog = () => {
               <button
                 type="button"
                 data-testid="remove-chip-type"
-                onClick={() => {
-                  setFilter('all');
-                  setPage(1);
-                }}
+                onClick={() => dispatch(setAuditTypeFilter('all'))}
                 aria-label="Remove type filter"
                 style={{
                   background: 'none',
@@ -318,14 +454,11 @@ const AuditLog = () => {
                 fontSize: '12px',
               }}
             >
-              <span>Search: <strong>"{search}"</strong></span>
+              <span>Search: <strong>&quot;{search}&quot;</strong></span>
               <button
                 type="button"
                 data-testid="remove-chip-search"
-                onClick={() => {
-                  setSearch('');
-                  setPage(1);
-                }}
+                onClick={() => dispatch(setAuditSearch(''))}
                 aria-label="Remove search filter"
                 style={{
                   background: 'none',
@@ -349,11 +482,13 @@ const AuditLog = () => {
               const next = new URLSearchParams(searchParams);
               next.delete('userId');
               next.delete('reportId');
+              next.delete('actor');
+              next.delete('action');
+              next.delete('range');
               next.delete('from');
+              next.delete('to');
               setSearchParams(next);
-              setFilter('all');
-              setSearch('');
-              setPage(1);
+              dispatch(clearAllAuditFilters());
             }}
             style={{
               background: 'none',
@@ -374,14 +509,8 @@ const AuditLog = () => {
       <div className="admin-audit-toolbar" style={{ marginTop: '20px' }}>
         <SearchBar
           value={search}
-          onChange={(e) => {
-            setSearch(e.target.value);
-            setPage(1);
-          }}
-          onClear={() => {
-            setSearch('');
-            setPage(1);
-          }}
+          onChange={(e) => dispatch(setAuditSearch(e.target.value))}
+          onClear={() => dispatch(setAuditSearch(''))}
           placeholder="Search events, actors, targets..."
         />
         <div className="admin-audit-filters">
@@ -392,10 +521,7 @@ const AuditLog = () => {
               count: t === 'all' ? logs.length : logs.filter((l) => l.type === t).length,
             }))}
             activeTab={filter}
-            onChange={(t) => {
-              setFilter(t);
-              setPage(1);
-            }}
+            onChange={(t) => dispatch(setAuditTypeFilter(t))}
             ariaLabel="Audit event type filters"
           />
         </div>
@@ -405,7 +531,7 @@ const AuditLog = () => {
         <span>{filteredLogs.length} event{filteredLogs.length === 1 ? '' : 's'} shown</span>
         <span>·</span>
         <button
-          onClick={() => setRefreshKey((k) => k + 1)}
+          onClick={handleRefresh}
           style={{ cursor: 'pointer', background: 'none', border: 'none', color: '#6366f1', textDecoration: 'underline', padding: 0 }}
         >
           Refresh
@@ -442,7 +568,7 @@ const AuditLog = () => {
               type="button"
               className="btn btn-outline"
               disabled={page <= 1}
-              onClick={() => setPage((p) => Math.max(1, p - 1))}
+              onClick={() => dispatch(setAuditPage(Math.max(1, page - 1)))}
             >
               Previous
             </button>
@@ -450,7 +576,7 @@ const AuditLog = () => {
               type="button"
               className="btn btn-outline"
               disabled={page >= totalPages}
-              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+              onClick={() => dispatch(setAuditPage(Math.min(totalPages, page + 1)))}
             >
               Next
             </button>
@@ -461,14 +587,14 @@ const AuditLog = () => {
       <Modal
         isOpen={exportOpen}
         title="Export Audit Log"
-        onClose={() => !exportSubmitting && setExportOpen(false)}
+        onClose={() => !exportSubmitting && dispatch(setAuditExportOpen(false))}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             <button
               type="button"
               className="btn btn-outline"
               disabled={exportSubmitting}
-              onClick={() => setExportOpen(false)}
+              onClick={() => dispatch(setAuditExportOpen(false))}
             >
               Close
             </button>
@@ -477,51 +603,20 @@ const AuditLog = () => {
               data-testid="confirm-audit-export-btn"
               className="btn btn-primary"
               disabled={exportSubmitting}
-              onClick={async () => {
-                setExportSubmitting(true);
-                setExportFeedback(null);
-                try {
-                  const res = await adminApi.exportAuditLog({
+              onClick={() => {
+                dispatch(
+                  exportAuditLogs({
                     format: exportFormat,
-                    from: exportFrom,
-                    to: exportTo,
-                    actor: exportActor,
-                    action: exportAction,
+                    from: exportFrom || filters.from || '',
+                    to: exportTo || filters.to || '',
+                    actor: exportActor || filters.actor || '',
+                    action: exportAction || filters.action || '',
+                    range: filters.range || '',
                     userId: userId || undefined,
                     reportId: reportId || undefined,
-                  });
-                  const content =
-                    exportFormat === 'csv'
-                      ? (typeof res === 'string' ? res : res?.csv || '')
-                      : JSON.stringify(res, null, 2);
-                  const mime = exportFormat === 'csv' ? 'text/csv;charset=utf-8' : 'application/json';
-                  if (typeof Blob !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
-                    const blob = new Blob([content], { type: mime });
-                    const url = URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `audit-export.${exportFormat}`;
-                    document.body.appendChild(a);
-                    a.click();
-                    a.remove();
-                    URL.revokeObjectURL(url);
-                  }
-                  setExportFeedback({
-                    type: 'success',
-                    message:
-                      exportFormat === 'csv'
-                        ? 'CSV audit export downloaded successfully (max 10,000 rows). Export action logged.'
-                        : `Exported ${res?.exportedCount ?? res?.items?.length ?? 0} audit entries as JSON.`,
-                  });
-                  setRefreshKey((k) => k + 1);
-                } catch (err) {
-                  setExportFeedback({
-                    type: 'error',
-                    message: err?.serverMessage || err?.message || 'Audit export failed.',
-                  });
-                } finally {
-                  setExportSubmitting(false);
-                }
+                    currentFilters: filters,
+                  }),
+                );
               }}
             >
               {exportSubmitting ? 'Exporting...' : `Download ${exportFormat.toUpperCase()}`}
@@ -539,7 +634,7 @@ const AuditLog = () => {
               id="audit-export-format"
               data-testid="audit-export-format"
               value={exportFormat}
-              onChange={(e) => setExportFormat(e.target.value)}
+              onChange={(e) => dispatch(setAuditExportFormat(e.target.value))}
               style={{ width: '100%', padding: '8px', borderRadius: '6px', border: '1px solid #cbd5e1' }}
             >
               <option value="csv">CSV</option>
@@ -612,4 +707,5 @@ const AuditLog = () => {
   );
 };
 
+const AuditLog = AuditLogContent;
 export default AuditLog;

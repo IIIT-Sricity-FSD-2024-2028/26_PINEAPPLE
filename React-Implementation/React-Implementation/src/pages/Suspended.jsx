@@ -1,49 +1,36 @@
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useDispatch, useSelector } from 'react-redux';
 import SuspendedAccountPanel from '../components/common/SuspendedAccountPanel';
-import storage from '../utils/storage';
-import { setAccessToken } from '../services/apiClient';
-import tokenManager from '../services/tokenManager';
+import { selectSuspendedInfo } from '../store/selectors/sessionSelectors';
+import { clearSuspendedInfo } from '../store/slices/sessionSlice';
+import { sessionReset } from '../store/actions/appActions';
+import { clearTransportSession } from '../store/thunks/sessionThunks';
 import './Auth.css';
 
-const Suspended = () => {
+const SuspendedContent = () => {
+  const dispatch = useDispatch();
   const location = useLocation();
   const navigate = useNavigate();
-  const [info] = useState(() => {
-    if (location.state?.suspendedInfo) {
-      return location.state.suspendedInfo;
-    }
-    if (typeof window !== 'undefined') {
-      try {
-        const stored = sessionStorage.getItem('teamforge_suspended_info');
-        if (stored) return JSON.parse(stored);
-      } catch {
-        // ignore
-      }
-    }
-    return {
+  const storeSuspendedInfo = useSelector(selectSuspendedInfo);
+
+  const info =
+    location.state?.suspendedInfo ||
+    storeSuspendedInfo || {
       reason: 'Your account has been suspended by administration.',
       suspendedAt: new Date().toISOString(),
       suspensionType: 'manual',
       appealAvailable: false,
       supportContact: 'support@teamforge.io',
     };
-  });
 
   useEffect(() => {
-    // Clear all auth sessions on arrival
-    storage.clearUserSessionKeys();
-    storage.clearAdminSession();
-    setAccessToken(null);
-    tokenManager.clear();
-  }, []);
+    clearTransportSession();
+    dispatch(sessionReset({ keepSuspendedInfo: true }));
+  }, [dispatch]);
 
   const handleBackToLogin = () => {
-    try {
-      sessionStorage.removeItem('teamforge_suspended_info');
-    } catch {
-      // ignore
-    }
+    dispatch(clearSuspendedInfo());
     navigate('/login');
   };
 
@@ -79,4 +66,5 @@ const Suspended = () => {
   );
 };
 
+const Suspended = SuspendedContent;
 export default Suspended;

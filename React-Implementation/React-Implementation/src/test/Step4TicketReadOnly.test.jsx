@@ -1,6 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import AdminSupport from '../pages/admin/AdminSupport';
 import Help from '../pages/help';
 import { renderWithProviders } from './test-utils';
@@ -122,11 +121,7 @@ describe('Step 4 Frontend Tests: Resolved or Rejected Support Tickets Must Be Re
     });
     mockSupportApi.getAdminTicket.mockResolvedValue(resolvedTicket);
 
-    render(
-      <MemoryRouter>
-        <AdminSupport />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<AdminSupport />);
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-row-ticket-resolved-1')).toBeDefined();
@@ -153,11 +148,7 @@ describe('Step 4 Frontend Tests: Resolved or Rejected Support Tickets Must Be Re
     });
     mockSupportApi.getAdminTicket.mockResolvedValue(resolvedTicket);
 
-    render(
-      <MemoryRouter>
-        <AdminSupport />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<AdminSupport />);
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-row-ticket-resolved-1')).toBeDefined();
@@ -188,11 +179,7 @@ describe('Step 4 Frontend Tests: Resolved or Rejected Support Tickets Must Be Re
     });
     mockSupportApi.getAdminTicket.mockResolvedValue(rejectedTicket);
 
-    render(
-      <MemoryRouter>
-        <AdminSupport />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<AdminSupport />);
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-row-ticket-rejected-1')).toBeDefined();
@@ -229,11 +216,7 @@ describe('Step 4 Frontend Tests: Resolved or Rejected Support Tickets Must Be Re
     });
     mockSupportApi.getAdminTicket.mockResolvedValue(openTicket);
 
-    render(
-      <MemoryRouter>
-        <AdminSupport />
-      </MemoryRouter>,
-    );
+    renderWithProviders(<AdminSupport />);
 
     await waitFor(() => {
       expect(screen.getByTestId('ticket-row-ticket-just-closed')).toBeDefined();

@@ -1,21 +1,16 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { Link, useSearchParams } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import authApi from '../services/authApi';
+import { selectCurrentUser } from '../store/selectors/sessionSelectors';
+import { verifyEmailWithToken } from '../store/thunks/settingsThunks';
+import { refreshSessionUser } from '../store/thunks/sessionThunks';
 import './Auth.css';
 
-const VerifyEmail = () => {
+const VerifyEmailContent = () => {
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
   const token = (searchParams.get('token') || '').trim();
-  const { updateUser, refreshUser, user } = useContext(AuthContext);
-  const updateUserRef = useRef(updateUser);
-  const refreshUserRef = useRef(refreshUser);
-  const hasUserRef = useRef(Boolean(user));
-  useEffect(() => {
-    updateUserRef.current = updateUser;
-    refreshUserRef.current = refreshUser;
-    hasUserRef.current = Boolean(user);
-  }, [updateUser, refreshUser, user]);
+  const user = useSelector(selectCurrentUser);
 
   const [status, setStatus] = useState(() => (token ? 'verifying' : 'missing'));
   const [message, setMessage] = useState(() =>
@@ -26,21 +21,13 @@ const VerifyEmail = () => {
     if (!token) return;
     let active = true;
 
-    authApi
-      .verifyEmail(token)
+    dispatch(verifyEmailWithToken(token))
+      .unwrap()
       .then(async (res) => {
         if (!active) return;
         setStatus('success');
         setMessage(res?.message || 'Your email address has been verified.');
-        if (typeof refreshUserRef.current === 'function') {
-          await refreshUserRef.current().catch(() => {});
-        }
-        if (hasUserRef.current && updateUserRef.current) {
-          updateUserRef.current({
-            emailVerified: true,
-            emailVerifiedAt: res?.user?.emailVerifiedAt || new Date().toISOString(),
-          });
-        }
+        await dispatch(refreshSessionUser()).unwrap().catch(() => {});
       })
       .catch((err) => {
         if (!active) return;
@@ -51,7 +38,7 @@ const VerifyEmail = () => {
     return () => {
       active = false;
     };
-  }, [token]);
+  }, [dispatch, token]);
 
   return (
     <div className="auth-container">
@@ -93,5 +80,7 @@ const VerifyEmail = () => {
     </div>
   );
 };
+
+const VerifyEmail = VerifyEmailContent;
 
 export default VerifyEmail;

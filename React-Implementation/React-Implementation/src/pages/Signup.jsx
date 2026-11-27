@@ -1,11 +1,11 @@
-import { useState, useContext } from 'react';
+import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { createUserWithEmailAndPassword, updateProfile, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, githubProvider } from '../services/firebase.js';
-import { AuthContext } from '../context/AuthContext';
-import authApi from '../services/authApi';
-import { getAuthMode, setAccessToken } from '../services/apiClient';
-import { recordPortalAuditEntry } from '../services/adminApi';
+import { useDispatch } from 'react-redux';
+import {
+  getCurrentAuthMode,
+  signInWithOAuthProvider,
+  signupSessionUser,
+} from '../store/thunks/sessionThunks';
 import './Auth.css';
 
 const EyeIcon = () => (
@@ -37,7 +37,8 @@ const GithubIcon = () => (
   </svg>
 );
 
-const Signup = () => {
+const SignupContent = () => {
+  const dispatch = useDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
@@ -47,81 +48,43 @@ const Signup = () => {
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const { login, signup } = useContext(AuthContext);
   const navigate = useNavigate();
-  const mode = getAuthMode();
+  const mode = getCurrentAuthMode();
 
-  const handleGoogleSignIn = async () => {
+  const handleOAuthSignIn = async (providerName) => {
     setError('');
     setLoading(true);
     try {
       if (mode === 'legacy') {
-        setError('Google Sign-In is only supported under Firebase mode.');
-        setLoading(false);
+        setError(
+          `${providerName === 'github' ? 'GitHub' : 'Google'} Sign-In is only supported under Firebase mode.`,
+        );
         return;
       }
-      const result = await signInWithPopup(auth, googleProvider);
-      const fbUser = result.user;
-      const token = await fbUser.getIdToken();
-      setAccessToken(token);
-
-      const me = await authApi.getMe().catch(() => null);
-      if (me && me.profileComplete !== false) {
+      const res = await dispatch(signInWithOAuthProvider(providerName)).unwrap();
+      if (res?.me && res.me.profileComplete !== false) {
         navigate('/dashboard');
       } else {
         navigate('/complete-profile', {
-          state: {
-            name: fbUser.displayName || '',
-            email: fbUser.email || '',
-          },
+          state: res?.fallbackState || {},
         });
       }
     } catch (err) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
+      if (err?.code === 'auth/popup-closed-by-user') {
         return;
       }
-      setError(err.message || 'Google sign-in failed. Please try again.');
+      setError(
+        err?.serverMessage ||
+          err?.message ||
+          `${providerName === 'github' ? 'GitHub' : 'Google'} sign-in failed. Please try again.`,
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGithubSignIn = async () => {
-    setError('');
-    setLoading(true);
-    try {
-      if (mode === 'legacy') {
-        setError('GitHub Sign-In is only supported under Firebase mode.');
-        setLoading(false);
-        return;
-      }
-      const result = await signInWithPopup(auth, githubProvider);
-      const fbUser = result.user;
-      const token = await fbUser.getIdToken();
-      setAccessToken(token);
-
-      const me = await authApi.getMe().catch(() => null);
-      if (me && me.profileComplete !== false) {
-        navigate('/dashboard');
-      } else {
-        navigate('/complete-profile', {
-          state: {
-            name: fbUser.displayName || '',
-            email: fbUser.email || '',
-          },
-        });
-      }
-    } catch (err) {
-      if (err.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
-        return;
-      }
-      setError(err.message || 'GitHub sign-in failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleGoogleSignIn = () => handleOAuthSignIn('google');
+  const handleGithubSignIn = () => handleOAuthSignIn('github');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -148,93 +111,14 @@ const Signup = () => {
     setLoading(true);
 
     try {
-      // 1. JWT Mode
-      if (mode === 'jwt') {
-        try {
-          const createdUser = await signup({
-            email: cleanedEmail,
-            password,
-            role: "Collaborator",
-          });
-          if (createdUser?.profileComplete === false) {
-            navigate('/complete-profile', {
-              state: { email: cleanedEmail, name: createdUser?.name || emailPrefix },
-            });
-          } else {
-            navigate('/dashboard');
-          }
-          return;
-        } catch (jwtErr) {
-          setError(jwtErr?.message || 'Signup failed');
-          return;
-        }
-      }
+      const createdUser = await dispatch(
+        signupSessionUser({
+          email: cleanedEmail,
+          password,
+          role: 'Collaborator',
+        }),
+      ).unwrap();
 
-      // 2. Firebase Mode
-      if (mode === 'firebase') {
-        let userCred;
-        try {
-          userCred = await createUserWithEmailAndPassword(auth, cleanedEmail, password);
-        } catch (fbErr) {
-          if (fbErr.code === 'auth/email-already-in-use') {
-            setError('An account with this email already exists.');
-          } else {
-            setError(fbErr.message || 'Signup failed');
-          }
-          return;
-        }
-
-        try {
-          if (auth.currentUser) {
-            await updateProfile(auth.currentUser, { displayName: emailPrefix });
-          }
-
-          recordPortalAuditEntry({
-            action: 'signup',
-            actor: emailPrefix,
-            target: 'Account Registration',
-            event: `New user "${cleanedEmail}" signed up (${cleanedEmail})`,
-            details: { role: 'Collaborator' },
-          });
-
-          navigate('/complete-profile', {
-            state: { email: cleanedEmail, name: emailPrefix },
-          });
-          return;
-        } catch (profileErr) {
-          console.warn('Post-signup step failed; deleting Firebase user to prevent orphan account:', profileErr);
-          try {
-            if (userCred?.user) {
-              await userCred.user.delete();
-            }
-          } catch (delErr) {
-            console.error('Failed to rollback Firebase user:', delErr);
-          }
-          setError(profileErr.message || 'Signup failed');
-          return;
-        }
-      }
-
-      // 3. Fallback / Auth Signup
-      const signupRes = await authApi.signup({
-        email: cleanedEmail,
-        password,
-        role: "Collaborator",
-      });
-      if (signupRes?.accessToken) {
-        setAccessToken(signupRes.accessToken);
-      }
-      const createdUser = signupRes?.user || signupRes;
-
-      recordPortalAuditEntry({
-        action: 'signup',
-        actor: createdUser?.name || emailPrefix,
-        target: 'Account Registration',
-        event: `New user "${createdUser?.name || cleanedEmail}" signed up (${cleanedEmail})`,
-        details: { role: 'Collaborator' },
-      });
-
-      login(createdUser);
       if (createdUser?.profileComplete === false) {
         navigate('/complete-profile', {
           state: { email: cleanedEmail, name: createdUser?.name || emailPrefix },
@@ -243,7 +127,11 @@ const Signup = () => {
         navigate('/dashboard');
       }
     } catch (err) {
-      setError(err.message || 'Signup failed');
+      if (err?.code === 'auth/email-already-in-use') {
+        setError('An account with this email already exists.');
+      } else {
+        setError(err?.serverMessage || err?.message || 'Signup failed');
+      }
     } finally {
       setLoading(false);
     }
@@ -355,4 +243,5 @@ const Signup = () => {
   );
 };
 
+const Signup = SignupContent;
 export default Signup;

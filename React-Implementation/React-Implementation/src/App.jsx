@@ -1,11 +1,35 @@
-import { useState, useEffect } from "react";
+import { useEffect, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import AppRoutes from "./routes/AppRoutes";
-import { AuthProvider } from "./context/AuthContext";
-import { RoleProvider } from "./context/RoleContext";
-import { UIProvider } from "./context/UIContext";
-import { NotificationProvider } from "./context/NotificationContext";
+import { setAppNavigate } from "./routes/navigationRef";
 import ErrorBoundary from "./components/common/ErrorBoundary";
-import adminApi from "./services/adminApi";
+import ToastViewport from "./components/common/ToastViewport";
+import RouteResetListener from "./store/components/RouteResetListener";
+import { applyThemeTokens } from "./store/utils/themeTokens";
+import { setMaintenance } from "./store/slices/uiSlice";
+import { resetSlice as resetNotificationsSlice } from "./store/slices/notificationsSlice";
+import {
+  selectTheme,
+  selectMaintenance,
+  selectResettingBanner,
+} from "./store/selectors/uiSelectors";
+import {
+  selectCurrentUser,
+  selectIsAdminAuthenticated,
+} from "./store/selectors/sessionSelectors";
+import { selectAllNotifications } from "./store/selectors/notificationsSelectors";
+import {
+  bootstrapSession,
+  evaluateMentorStatus,
+  getCurrentAuthMode,
+  refreshSessionUser,
+  registerRestartRedirectHandler,
+  restoreAdminSession,
+} from "./store/thunks/sessionThunks";
+import { fetchPublicConfig } from "./store/thunks/platformConfigThunks";
+import { fetchNotifications } from "./store/thunks/notificationsThunks";
+import { useNotificationPolling } from "./hooks/useNotificationPolling";
 
 function MaintenanceScreen({ message }) {
   return (
@@ -64,8 +88,8 @@ function MaintenanceScreen({ message }) {
           >
             Check Status
           </button>
-          <a
-            href="/admin/login"
+          <Link
+            to="/admin/login"
             style={{
               padding: '10px 20px',
               backgroundColor: '#2563eb',
@@ -79,7 +103,7 @@ function MaintenanceScreen({ message }) {
             }}
           >
             Portal Login &rarr;
-          </a>
+          </Link>
         </div>
       </div>
     </div>
@@ -87,42 +111,114 @@ function MaintenanceScreen({ message }) {
 }
 
 function App() {
-  const [maintenance, setMaintenance] = useState(false);
-  const [maintenanceMsg, setMaintenanceMsg] = useState('');
-  const [resettingBanner, setResettingBanner] = useState('');
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const theme = useSelector(selectTheme);
+  const maintenanceState = useSelector(selectMaintenance);
+  const resettingState = useSelector(selectResettingBanner);
+  const user = useSelector(selectCurrentUser);
+  const isAdminAuthenticated = useSelector(selectIsAdminAuthenticated);
+  const adminBootstrapStatus = useSelector(
+    (state) => state?.session?.adminBootstrapStatus || 'idle',
+  );
+  const notifications = useSelector(selectAllNotifications);
 
-  const isAdminRoute = typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
+  const maintenance = maintenanceState.active;
+  const maintenanceMsg = maintenanceState.message;
+  const resettingBanner = resettingState.active ? resettingState.message : '';
+
+  const userId = user?.id ?? null;
+  const profileComplete = user?.profileComplete;
+  const isNotificationsEnabled = Boolean(userId && profileComplete !== false);
+  const prevUserIdRef = useRef(userId);
+  const prevMentorApprovedRef = useRef(false);
+
+  const isAdminRoute =
+    location.pathname === '/admin' || location.pathname.startsWith('/admin/');
+  const initialAdminScopeRef = useRef(isAdminRoute);
 
   useEffect(() => {
-    const handleMaintenanceEvent = (e) => {
-      const detail = e?.detail || {};
-      if (detail.code === 'MAINTENANCE') {
-        if (detail.active === false) {
-          setResettingBanner('');
-          return;
-        }
-        setResettingBanner(detail.message || 'The system is being reset, retrying...');
-        return;
-      }
-      if (!window.location.pathname.startsWith('/admin')) {
-        setMaintenance(true);
-        if (detail.message) setMaintenanceMsg(detail.message);
+    setAppNavigate(navigate);
+    registerRestartRedirectHandler((path) => navigate(path, { replace: true }));
+    return () => {
+      setAppNavigate(null);
+      registerRestartRedirectHandler(null);
+    };
+  }, [navigate]);
+
+  // Bootstrap authentication & session state on mount based on initial route scope
+  useEffect(() => {
+    if (initialAdminScopeRef.current) {
+      dispatch(restoreAdminSession());
+    } else {
+      dispatch(bootstrapSession());
+    }
+  }, [dispatch]);
+
+  // Reload live user profile on tab focus/visibility return when authenticated
+  useEffect(() => {
+    if (!userId || typeof document === 'undefined') return undefined;
+    const handleVisibility = () => {
+      if (!document.hidden) {
+        dispatch(refreshSessionUser());
       }
     };
-    window.addEventListener('teamforge:maintenance', handleMaintenanceEvent);
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [dispatch, userId]);
 
+  // Single store-driven effect applying CSS theme variables to document.documentElement
+  useEffect(() => {
+    applyThemeTokens(theme);
+  }, [theme]);
+
+  useEffect(() => {
     if (!isAdminRoute) {
-      adminApi.getPublicConfig()
+      dispatch(fetchPublicConfig())
+        .unwrap()
         .then((cfg) => {
           if (cfg && cfg.maintenanceMode) {
-            setMaintenance(true);
+            dispatch(setMaintenance({ active: true, message: '' }));
           }
         })
         .catch(() => {});
     }
+  }, [isAdminRoute, dispatch]);
 
-    return () => window.removeEventListener('teamforge:maintenance', handleMaintenanceEvent);
-  }, [isAdminRoute]);
+  useEffect(() => {
+    if (prevUserIdRef.current && !userId) {
+      dispatch(resetNotificationsSlice());
+    }
+    prevUserIdRef.current = userId;
+
+    if (!isNotificationsEnabled) return;
+    dispatch(fetchNotifications({ userId }));
+  }, [dispatch, isNotificationsEnabled, userId]);
+
+  useNotificationPolling(dispatch, {
+    userId,
+    enabled: isNotificationsEnabled,
+    intervalMs: 300000,
+    immediate: false,
+  });
+
+  useEffect(() => {
+    const hasMentorApproval = notifications.some((n) => {
+      const type = String(n.type || '').toUpperCase();
+      const title = String(n.title || '');
+      return (
+        type === 'MENTOR_APPLICATION_APPROVED' ||
+        title.includes('Mentor Application Approved')
+      );
+    });
+    if (hasMentorApproval && !prevMentorApprovedRef.current) {
+      dispatch(evaluateMentorStatus());
+    }
+    prevMentorApprovedRef.current = hasMentorApproval;
+  }, [dispatch, notifications]);
 
   if (maintenance && !isAdminRoute) {
     return <MaintenanceScreen message={maintenanceMsg} />;
@@ -130,6 +226,8 @@ function App() {
 
   return (
     <ErrorBoundary>
+      <RouteResetListener />
+      <ToastViewport />
       {resettingBanner && (
         <div
           role="status"
@@ -152,15 +250,14 @@ function App() {
           ⏳ {resettingBanner}
         </div>
       )}
-      <AuthProvider>
-        <RoleProvider>
-          <UIProvider>
-            <NotificationProvider>
-              <AppRoutes />
-            </NotificationProvider>
-          </UIProvider>
-        </RoleProvider>
-      </AuthProvider>
+      <AppRoutes
+        awaitingAdminRestore={
+          isAdminRoute &&
+          !isAdminAuthenticated &&
+          getCurrentAuthMode() !== 'legacy' &&
+          adminBootstrapStatus !== 'done'
+        }
+      />
     </ErrorBoundary>
   );
 }

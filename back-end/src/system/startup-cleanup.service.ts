@@ -4,7 +4,7 @@ import * as fs from 'fs';
 import * as os from 'os';
 import * as path from 'path';
 import { FileCleanupService } from '../common/services/file-cleanup.service';
-import { SECURE_CVS_DIR, UPLOADS_DIR } from '../core/middleware/file-upload.middleware';
+import { getSecureCvsDir, getUploadsDir } from '../core/middleware/file-upload.middleware';
 import { UsersRepository } from '../users/users.repository';
 import { ProjectsRepository } from '../projects/projects.repository';
 import { TasksRepository } from '../tasks/tasks.repository';
@@ -88,8 +88,8 @@ export class StartupCleanupService {
     keptSeedCount: number;
   } {
     const cleanup = this.fileCleanupService || this.fallbackFileCleanup;
-    const uploadsDir = options?.uploadsDir || process.env.UPLOADS_DIR || UPLOADS_DIR;
-    const secureCvsDir = options?.secureCvsDir || process.env.SECURE_CVS_DIR || SECURE_CVS_DIR;
+    const uploadsDir = options?.uploadsDir || getUploadsDir();
+    const secureCvsDir = options?.secureCvsDir || getSecureCvsDir();
     const exportDir =
       options?.exportDir || process.env.EXPORT_DIR || path.join(os.tmpdir(), 'teamforge-exports');
 

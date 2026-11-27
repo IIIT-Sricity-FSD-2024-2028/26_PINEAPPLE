@@ -3,6 +3,8 @@ import {
   Controller,
   Delete,
   Get,
+  HttpCode,
+  HttpStatus,
   Param,
   Post,
   Put,
@@ -68,6 +70,18 @@ export class PortalAdminsController {
   @ApiForbiddenResponse({ description: 'Forbidden - superuser or portal_admin role required' })
   update(@Param('id') id: string, @Body() dto: UpdatePortalAdminDto) {
     return stripUserSecrets(this.portalAdminsService.update(id, dto));
+  }
+
+  @Post(':id/revoke-sessions')
+  @Roles('superuser')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke all active sessions for a portal admin (Super User only)' })
+  @ApiParam({ name: 'id', description: 'Portal admin ID' })
+  @ApiOkResponse({ description: 'Admin sessions revoked successfully.', type: Object })
+  @ApiNotFoundResponse({ description: 'Portal admin not found' })
+  @ApiForbiddenResponse({ description: 'Forbidden - superuser role required' })
+  revokeSessions(@Param('id') id: string) {
+    return this.portalAdminsService.revokeSessions(id);
   }
 
   @Delete(':id')

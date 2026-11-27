@@ -27,4 +27,7 @@ export class PortalAdminEntity {
 
   @ApiPropertyOptional({ description: 'Status of admin account (active or suspended)' })
   status?: string;
+
+  @ApiPropertyOptional({ description: 'Monotonic token version for session invalidation' })
+  tokenVersion?: number;
 }

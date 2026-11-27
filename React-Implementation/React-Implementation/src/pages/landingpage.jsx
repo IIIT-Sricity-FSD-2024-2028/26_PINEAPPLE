@@ -1,15 +1,19 @@
 import "./landingpage.css";
 import { useState } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useLocation, useNavigate } from "react-router-dom";
-import storage from "../utils/storage";
+import { consumeNotice } from "../store/slices/sessionSlice";
+import { selectSessionNotices } from "../store/selectors/sessionSelectors";
 
-function LandingPage() {
+function LandingPageContent() {
   const navigate = useNavigate();
   const location = useLocation();
-  const [deletedBanner, setDeletedBanner] = useState(() => {
-    if (location.state?.accountDeletedMessage) return location.state.accountDeletedMessage;
-    return storage.consumeAccountDeletedNotice() || '';
-  });
+  const dispatch = useDispatch();
+  const notices = useSelector(selectSessionNotices);
+  const [dismissed, setDismissed] = useState(false);
+  const deletedBanner = !dismissed
+    ? location.state?.accountDeletedMessage || notices.accountDeleted || ''
+    : '';
 
   return (
     <>
@@ -32,7 +36,10 @@ function LandingPage() {
           <span>{deletedBanner}</span>
           <button
             type="button"
-            onClick={() => setDeletedBanner('')}
+            onClick={() => {
+              setDismissed(true);
+              dispatch(consumeNotice('accountDeleted'));
+            }}
             style={{
               background: 'transparent',
               border: 'none',
@@ -845,5 +852,7 @@ HEADER
     </>
   );
 }
+
+const LandingPage = LandingPageContent;
 
 export default LandingPage;

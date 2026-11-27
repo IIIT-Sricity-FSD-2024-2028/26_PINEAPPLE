@@ -1,6 +1,4 @@
-import React from 'react';
-import { render, screen, waitFor } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -10,10 +8,7 @@ import AdminMentorApps from '../pages/admin/AdminMentorApps.jsx';
 import mentorApplicationsApi from '../services/mentorApplicationsApi.js';
 import uploadsApi from '../services/uploadsApi.js';
 import adminApi from '../services/adminApi.js';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { renderWithStore } from './test-utils';
 
 const { mockMentorAppsApi, mockUploadsApi } = vi.hoisted(() => {
   const mentorApps = {
@@ -68,44 +63,21 @@ function renderWithContexts(
     route = '/',
   } = {}
 ) {
-  return render(
-    <MemoryRouter initialEntries={[route]}>
-      <UIProvider>
-        <AuthContext.Provider
-          value={{
-            user,
-            isAuthenticated: Boolean(user),
-            loading: false,
-            login: vi.fn(),
-            logout: vi.fn(),
-            updateUser: vi.fn(),
-            setUser: vi.fn(),
-            refreshUser: vi.fn().mockResolvedValue(user),
-          }}
-        >
-          <RoleContext.Provider
-            value={{
-              currentRole: 'Collaborator',
-              switchRole: vi.fn(),
-              isMentorApproved: false,
-              mentorAppStatus: 'none',
-              refreshMentorStatus: vi.fn(),
-            }}
-          >
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                markAsRead: vi.fn(),
-              }}
-            >
-              {ui}
-            </NotificationContext.Provider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </UIProvider>
-    </MemoryRouter>
-  );
+  return renderWithStore(ui, {
+    route,
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: Boolean(user),
+        loading: false,
+        status: user ? 'authenticated' : 'signed_out',
+        activeRole: 'Collaborator',
+        allowedRoles: ['Collaborator'],
+        mentorApproved: false,
+        mentorAppStatus: 'none',
+      },
+    },
+  });
 }
 
 describe('Phase 5: Remove CV Delete Option (Mentor Application & Admin Portal)', () => {

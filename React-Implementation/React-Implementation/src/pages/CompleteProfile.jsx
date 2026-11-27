@@ -1,25 +1,34 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Navigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { usersApi } from '../services/usersApi';
-import { authApi } from '../services/authApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  selectAuthLoading,
+  selectAuthStatus,
+  selectCurrentUser,
+  selectIsAuthenticated,
+} from '../store/selectors/sessionSelectors';
+import { completeUserProfile } from '../store/thunks/sessionThunks';
+import { checkUsernameAvailability } from '../store/thunks/settingsThunks';
 import './completeProfile.css';
 
-const CompleteProfile = () => {
-  const { user, isAuthenticated, loading, status, updateUser, refreshUser } = useContext(AuthContext);
+const CompleteProfileContent = () => {
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
+  const loading = useSelector(selectAuthLoading);
+  const status = useSelector(selectAuthStatus);
   const location = useLocation();
   const navigate = useNavigate();
 
-  const initialName = location.state?.name || user?.name || '';
-  const [name, setName] = useState(initialName);
+  const fallbackName =
+    location.state?.name ||
+    user?.name ||
+    (user?.email ? user.email.split('@')[0] : '') ||
+    '';
+  const [nameDraft, setNameDraft] = useState(null);
+  const name = nameDraft !== null ? nameDraft : fallbackName;
   const [username, setUsername] = useState('');
   const [university, setUniversity] = useState('');
-
-  useEffect(() => {
-    if (!name && (user?.name || user?.email)) {
-      setName(user.name || user.email.split('@')[0] || '');
-    }
-  }, [user, name]);
 
   const [asyncAvailability, setAsyncAvailability] = useState({
     checkedUsername: '',
@@ -65,7 +74,9 @@ const CompleteProfile = () => {
 
     const timer = setTimeout(async () => {
       try {
-        const res = await usersApi.checkUsernameAvailable(cleanUsername);
+        const res = await dispatch(
+          checkUsernameAvailability({ username: cleanUsername }),
+        ).unwrap();
         setAsyncAvailability({
           checkedUsername: cleanUsername,
           available: res?.available !== false,
@@ -76,7 +87,7 @@ const CompleteProfile = () => {
     }, 300);
 
     return () => clearTimeout(timer);
-  }, [cleanUsername, isFormatValid]);
+  }, [cleanUsername, dispatch, isFormatValid]);
 
   // Auth & Profile Complete Guards
   if (loading || status === 'loading') {
@@ -137,19 +148,7 @@ const CompleteProfile = () => {
         role: 'Collaborator',
       };
 
-      const res = await authApi.createProfile(payload);
-
-      if (typeof refreshUser === 'function') {
-        await refreshUser().catch(() => {});
-      } else {
-        updateUser({
-          ...(res || {}),
-          name: cleanName,
-          username: cleanUsername,
-          profileComplete: true,
-          needsUsernameConfirmation: false,
-        });
-      }
+      await dispatch(completeUserProfile(payload)).unwrap();
 
       navigate('/dashboard', { replace: true });
     } catch (err) {
@@ -255,7 +254,7 @@ const CompleteProfile = () => {
               className="form-input"
               placeholder="e.g. Jane Doe"
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) => setNameDraft(e.target.value)}
               required
             />
           </div>
@@ -287,4 +286,5 @@ const CompleteProfile = () => {
   );
 };
 
+const CompleteProfile = CompleteProfileContent;
 export default CompleteProfile;

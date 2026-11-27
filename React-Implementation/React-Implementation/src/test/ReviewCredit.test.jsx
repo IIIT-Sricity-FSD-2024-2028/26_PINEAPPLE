@@ -6,7 +6,6 @@ import TaskCard from '../components/features/TaskCard';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
 import joinRequestsApi from '../services/joinRequestsApi';
-import communicationApi from '../services/communicationApi';
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom');

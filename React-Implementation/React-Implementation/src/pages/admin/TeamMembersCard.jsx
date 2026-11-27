@@ -31,7 +31,7 @@ const TeamMembersCard = ({ project }) => {
               return (
                 <li key={member.id || index} className="admin-team-member-row">
                   <div className="admin-team-member-info">
-                    <Avatar name={memberName} size="sm" />
+                    <Avatar name={memberName} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="sm" />
                     <span className="admin-team-member-name" title={memberName}>
                       {memberName}
                     </span>

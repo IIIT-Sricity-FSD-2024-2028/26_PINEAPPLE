@@ -1,11 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import MentorsDirectory, { formatBookingError } from '../pages/owner/MentorsDirectory';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationProvider } from '../context/NotificationContext';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import MentorsDirectory from '../pages/owner/MentorsDirectory';
+import { formatPaymentError as formatBookingError } from '../store/thunks/paymentsThunks';
+import { renderWithStore } from './test-utils';
 
 const { mockMentorApi, mockProjectsApi } = vi.hoisted(() => ({
   mockMentorApi: {
@@ -26,7 +23,6 @@ vi.mock('../services/mentorMarketplaceApi', async (importOriginal) => {
   return {
     ...actual,
     default: mockMentorApi,
-    mentorMarketApi: mockMentorApi,
   };
 });
 
@@ -64,33 +60,19 @@ describe('Fix 6 Frontend Tests: Payment Error Mapping & Idempotency Key Handling
   };
 
   const renderWithContext = (ui) => {
-    const authValue = {
-      user: mockUser,
-      isAuthenticated: true,
-      loading: false,
-      updateUser: vi.fn(),
-      login: vi.fn(),
-      logout: vi.fn(),
-    };
-    const roleValue = {
-      currentRole: 'Project Owner',
-      setRole: vi.fn(),
-      availableRoles: ['Project Owner', 'Collaborator', 'Mentor', 'Admin'],
-    };
-
-    return render(
-      <MemoryRouter initialEntries={['/']}>
-        <AuthContext.Provider value={authValue}>
-          <RoleContext.Provider value={roleValue}>
-            <UIProvider>
-              <NotificationProvider>
-                {ui}
-              </NotificationProvider>
-            </UIProvider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </MemoryRouter>
-    );
+    return renderWithStore(ui, {
+      route: '/',
+      preloadedState: {
+        session: {
+          user: mockUser,
+          isAuthenticated: true,
+          loading: false,
+          status: 'authenticated',
+          activeRole: 'Project Owner',
+          allowedRoles: ['Project Owner', 'Collaborator', 'Mentor', 'Admin'],
+        },
+      },
+    });
   };
 
   beforeEach(() => {

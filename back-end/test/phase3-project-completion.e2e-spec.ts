@@ -28,9 +28,6 @@ describe('Phase 3 E2E: Remove Draft & Go-Live, Make Completion Final', () => {
     ctx.clockService.setTime('2026-11-13T10:00:00.000Z');
     ctx.usersRepository.update('1', { emailVerified: true } as any);
     ctx.usersRepository.update('2', { emailVerified: true } as any);
-    for (const u of ctx.usersRepository.findAll(true)) {
-      u.digestEnabled = false;
-    }
   });
 
   afterAll(async () => {

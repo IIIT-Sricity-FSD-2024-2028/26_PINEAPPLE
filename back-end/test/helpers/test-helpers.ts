@@ -1,5 +1,6 @@
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import cookieParser from 'cookie-parser';
 import * as jwt from 'jsonwebtoken';
 import * as crypto from 'crypto';
 import { AppModule } from '../../src/app.module';
@@ -31,11 +32,10 @@ import { CommunicationRepository } from '../../src/communication/communication.r
 import { AuthService } from '../../src/auth/auth.service';
 import { DataExportService } from '../../src/users/data-export.service';
 import { AccountDeletionService } from '../../src/users/account-deletion.service';
-import { DigestService } from '../../src/notifications/digest.service';
 import { LoginThrottleService } from '../../src/auth/login-throttle.service';
-import { DemoResetService } from '../../src/system/demo-reset.service';
 import { BootService } from '../../src/system/boot.service';
 import { PortalAdminsService } from '../../src/portal-admins/portal-admins.service';
+import { AdminRefreshService } from '../../src/admin/admin-refresh.service';
 import { HttpExceptionFilter } from '../../src/common/filters/http-exception.filter';
 import { LogManagerService } from '../../src/core/services/log-manager.service';
 import { getCorsOptions } from '../../src/common/config/cors.config';
@@ -269,9 +269,8 @@ export interface TestAppContext {
   authService: AuthService;
   dataExportService: DataExportService;
   accountDeletionService: AccountDeletionService;
-  digestService: DigestService;
   loginThrottleService: LoginThrottleService;
-  demoResetService: DemoResetService;
+  adminRefreshService: AdminRefreshService;
   bootService: BootService;
   resetStores: () => void;
   advanceTime: (options: { days?: number; hours?: number; ms?: number }) => void;
@@ -296,6 +295,7 @@ export async function createTestApp(): Promise<TestAppContext> {
 
   const app = moduleRef.createNestApplication();
 
+  app.use(cookieParser());
   app.enableCors(getCorsOptions());
 
   app.useGlobalPipes(
@@ -334,11 +334,10 @@ export async function createTestApp(): Promise<TestAppContext> {
   const authService = app.get(AuthService);
   const dataExportService = app.get(DataExportService);
   const accountDeletionService = app.get(AccountDeletionService);
-  const digestService = app.get(DigestService);
   const loginThrottleService = app.get(LoginThrottleService);
-  const demoResetService = app.get(DemoResetService);
   const bootService = app.get(BootService);
   const portalAdminsService = app.get(PortalAdminsService);
+  const adminRefreshService = app.get(AdminRefreshService);
   latestTestBootId = bootService.bootId;
 
   const ensureTestPortalAdmin = (roleOrUserId: string) => {
@@ -405,10 +404,9 @@ export async function createTestApp(): Promise<TestAppContext> {
     usersService.resetPhoneVerifyRateLimitForTesting();
     dataExportService.reset();
     accountDeletionService.reset();
-    digestService.reset();
     jobRunsService.reset();
-    demoResetService.resetRateLimitForTesting();
     clockService.reset();
+    adminRefreshService.reset();
     mailServiceMock.clearSentMails();
   };
 
@@ -448,9 +446,8 @@ export async function createTestApp(): Promise<TestAppContext> {
     authService,
     dataExportService,
     accountDeletionService,
-    digestService,
     loginThrottleService,
-    demoResetService,
+    adminRefreshService,
     bootService,
     resetStores,
     advanceTime,

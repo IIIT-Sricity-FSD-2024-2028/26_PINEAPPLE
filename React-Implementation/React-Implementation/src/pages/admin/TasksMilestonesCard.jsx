@@ -13,11 +13,13 @@ const TasksMilestonesCard = ({ tasks, project }) => {
             {
               header: 'Task Title',
               key: 'title',
+              width: '36%',
               render: (task) => task.title || task.name || 'Untitled Task',
             },
             {
               header: 'Status',
               key: 'status',
+              width: '22%',
               render: (task) => {
                 const s = (task.status || '').toLowerCase();
                 const variant =
@@ -39,6 +41,7 @@ const TasksMilestonesCard = ({ tasks, project }) => {
             {
               header: 'Assignee',
               key: 'assignee',
+              width: '26%',
               render: (task) => {
                 const assigneeName =
                   task.assignee?.name || task.assignee || task.assigneeId || 'Unassigned';
@@ -75,6 +78,7 @@ const TasksMilestonesCard = ({ tasks, project }) => {
             {
               header: 'Due Date',
               key: 'dueDate',
+              width: '16%',
               render: (task) => (task.dueDate ? formatMemberSince(task.dueDate) : '—'),
             },
           ]}

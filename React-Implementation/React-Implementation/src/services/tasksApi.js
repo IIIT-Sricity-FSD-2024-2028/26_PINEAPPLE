@@ -3,9 +3,9 @@ import { apiRequest, getCurrentUserRole } from './apiClient.js';
 export const tasksApi = {
   list: (params, role) => {
     if (!params?.projectId) {
-      throw new Error("projectId is required to list tasks.");
+      throw new Error('projectId is required to list tasks.');
     }
-    return apiRequest(`/tasks/project/${params.projectId}`, "GET", null, {
+    return apiRequest(`/tasks/project/${params.projectId}`, 'GET', null, {
       role: role || getCurrentUserRole(),
     });
   },
@@ -14,10 +14,10 @@ export const tasksApi = {
     try {
       const results = await Promise.all(
         projectIds.map((pid) =>
-          apiRequest(`/tasks/project/${pid}`, "GET", null, {
+          apiRequest(`/tasks/project/${pid}`, 'GET', null, {
             role: role || getCurrentUserRole(),
-          }).catch(() => [])
-        )
+          }).catch(() => []),
+        ),
       );
       return results.flat();
     } catch (err) {
@@ -26,65 +26,37 @@ export const tasksApi = {
     }
   },
   get: (id, role) =>
-    apiRequest(`/tasks/${id}`, "GET", null, {
+    apiRequest(`/tasks/${id}`, 'GET', null, {
       role: role || getCurrentUserRole(),
     }),
-  create: async (payload, role) => {
-    const res = await apiRequest("/tasks", "POST", payload, {
+  create: async (payload, role) =>
+    apiRequest('/tasks', 'POST', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
-  update: async (id, payload, role) => {
-    const res = await apiRequest(`/tasks/${id}`, "PATCH", payload, {
+    }),
+  update: async (id, payload, role) =>
+    apiRequest(`/tasks/${id}`, 'PATCH', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
-  // Status transition. Accepts { status }.
-  // Falls back gracefully if the backend is unreachable (frontend catches).
-  updateStatus: async (id, payload, role) => {
-    const res = await apiRequest(`/tasks/${id}/status`, "PATCH", payload, {
+    }),
+  updateStatus: async (id, payload, role) =>
+    apiRequest(`/tasks/${id}/status`, 'PATCH', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
-  review: async (id, payload, role) => {
-    const res = await apiRequest(`/tasks/${id}/review`, "POST", payload, {
+    }),
+  review: async (id, payload, role) =>
+    apiRequest(`/tasks/${id}/review`, 'POST', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
-  unassign: async (id, payload = {}, role) => {
-    const res = await apiRequest(`/tasks/${id}/unassign`, "POST", payload, {
+    }),
+  unassign: async (id, payload = {}, role) =>
+    apiRequest(`/tasks/${id}/unassign`, 'POST', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
-  remove: async (id, role) => {
-    const res = await apiRequest(`/tasks/${id}`, "DELETE", null, {
+    }),
+  addComment: async (id, payload, role) =>
+    apiRequest(`/tasks/${id}/comments`, 'POST', payload, {
       role: role || getCurrentUserRole(),
-    });
-    if (typeof window !== "undefined") {
-      window.dispatchEvent(new CustomEvent("teamforge:task_updated"));
-    }
-    return res;
-  },
+    }),
+  remove: async (id, role) =>
+    apiRequest(`/tasks/${id}`, 'DELETE', null, {
+      role: role || getCurrentUserRole(),
+    }),
 };
 
 export default tasksApi;

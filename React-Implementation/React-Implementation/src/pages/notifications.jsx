@@ -1,11 +1,49 @@
-import { useContext, useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { Link, useInRouterContext } from "react-router-dom";
-import { NotificationContext } from "../context/NotificationContext";
+import {
+  selectFilteredNotifications,
+  selectUnreadNotificationsCount,
+  selectNotificationWorking,
+  selectNotificationsStatus,
+  selectNotificationsError,
+  selectNotificationsInvalidated,
+  selectNotificationsNeedsRefresh,
+} from "../store/selectors/notificationsSelectors";
+import { selectCurrentUser } from "../store/selectors/sessionSelectors";
+import {
+  clearMarkAllError,
+  setNotificationFilter,
+  setSelectedNotificationId,
+  toggleGroupExpanded,
+} from "../store/slices/notificationsSlice";
+import {
+  deleteNotification as deleteNotificationThunk,
+  fetchNotifications as fetchNotificationsThunk,
+  markAllRead as markAllReadThunk,
+  markRead as markReadThunk,
+} from "../store/thunks/notificationsThunks";
+import { fetchMyInvites } from "../store/thunks/invitesThunks";
+import {
+  selectInviteActingIds,
+  selectMyInvites,
+} from "../store/selectors/invitesSelectors";
+import {
+  fetchMyAppeals,
+  submitWarningAppeal,
+} from "../store/thunks/appealsThunks";
+import {
+  closeAppealSubmitModal,
+  openAppealSubmitModal,
+} from "../store/slices/appealsSlice";
+import {
+  selectAppealsWorking,
+  selectMyAppeals,
+} from "../store/selectors/appealsSelectors";
+import { fetchMyWarnings } from "../store/thunks/warningsThunks";
+import { selectMyWarnings } from "../store/selectors/warningsSelectors";
 import EmptyState from "../components/common/EmptyState";
-import { formatRelativeTime } from "../utils/dateUtils";
-import appealsApi from "../services/appealsApi";
-import adminApi from "../services/adminApi";
-import projectsApi from "../services/projectsApi";
+import { formatRelativeTime } from "../utils/dateFormatter";
 import VerifyEmailBanner from "../components/common/VerifyEmailBanner";
 import Modal from "../components/common/Modal";
 import useReasonAction from "../hooks/useReasonAction";
@@ -23,42 +61,74 @@ const getIconColorClass = (type) => {
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
-const Notifications = () => {
-  const { notifications, unreadCount, markAsRead, markAllAsRead } = useContext(NotificationContext);
+const NotificationsContent = () => {
+  const dispatch = useDispatch();
+
+  const currentUser = useSelector(selectCurrentUser);
+  const userId = currentUser?.id ?? null;
+  const notifications = useSelector(selectFilteredNotifications);
+  const unreadCount = useSelector(selectUnreadNotificationsCount);
+  const storeWorking = useSelector(selectNotificationWorking);
+  const notifStatus = useSelector(selectNotificationsStatus);
+  const notifError = useSelector(selectNotificationsError);
+  const notifInvalidated = useSelector(selectNotificationsInvalidated);
+  const needsRefresh = useSelector(selectNotificationsNeedsRefresh);
+  const invites = useSelector(selectMyInvites);
+  const actingInviteIds = useSelector(selectInviteActingIds);
+  const appeals = useSelector(selectMyAppeals);
+  const warnings = useSelector(selectMyWarnings);
+  const appealsWorking = useSelector(selectAppealsWorking);
+
   const inRouter = useInRouterContext();
   const [currentTime] = useState(() => Date.now());
 
-  const [appeals, setAppeals] = useState([]);
-  const [warnings, setWarnings] = useState([]);
-  const [appealModalOpen, setAppealModalOpen] = useState(false);
-  const [selectedWarningId, setSelectedWarningId] = useState(null);
+  const appealModalOpen = Boolean(appealsWorking.appealModalOpen);
+  const selectedWarningId = appealsWorking.selectedWarningId;
+  const submittingAppeal = Boolean(appealsWorking.submitting);
+  const appealError = appealsWorking.submitError || "";
+  const appealSuccess = appealsWorking.submitSuccess || "";
   const [explanation, setExplanation] = useState("");
-  const [submittingAppeal, setSubmittingAppeal] = useState(false);
-  const [appealError, setAppealError] = useState("");
-  const [appealSuccess, setAppealSuccess] = useState("");
   const [emailNotVerifiedError, setEmailNotVerifiedError] = useState(false);
-  const [isMarkingAllRead, setIsMarkingAllRead] = useState(false);
-  const [markAllError, setMarkAllError] = useState("");
 
-  const handleMarkAllAsRead = async () => {
-    setIsMarkingAllRead(true);
-    setMarkAllError("");
-    try {
-      await markAllAsRead();
-    } catch (err) {
-      setMarkAllError(err?.serverMessage || err?.message || "Failed to mark all notifications as read. Please try again.");
-    } finally {
-      setIsMarkingAllRead(false);
-    }
-  };
-
-  // Phase 15: Direct project invitations
-  const [invites, setInvites] = useState([]);
   const [inviteFeedback, setInviteFeedback] = useState(null);
   const [actingInviteId, setActingInviteId] = useState(null);
-  const [expandedDigestIds, setExpandedDigestIds] = useState(() => new Set());
-  const [expandedGroupIds, setExpandedGroupIds] = useState(() => new Set());
   const appealCloseTimerRef = useRef(null);
+
+  const readFilter = storeWorking?.readFilter || "all";
+  const selectedNotificationId = storeWorking?.selectedNotificationId || null;
+  const isMarkingAllRead = Boolean(storeWorking?.isMarkingAllRead);
+  const markAllError = storeWorking?.markAllError || "";
+
+  const markAsRead = useCallback(
+    async (id) => {
+      try {
+        await dispatch(markReadThunk({ id })).unwrap();
+      } catch (err) {
+        console.error("Failed to mark notification as read:", err);
+      }
+    },
+    [dispatch],
+  );
+
+  const handleDeleteNotification = useCallback(
+    async (e, id) => {
+      e.stopPropagation();
+      try {
+        await dispatch(deleteNotificationThunk({ id })).unwrap();
+      } catch (err) {
+        console.error("Failed to delete notification:", err);
+      }
+    },
+    [dispatch],
+  );
+
+  const handleMarkAllAsRead = async () => {
+    try {
+      await dispatch(markAllReadThunk({})).unwrap();
+    } catch {
+      // Error banner state is stored synchronously via markAllRead.rejected rollback
+    }
+  };
 
   useEffect(() => {
     return () => {
@@ -66,52 +136,36 @@ const Notifications = () => {
     };
   }, []);
 
-  const toggleDigestExpand = (e, notifId) => {
-    e.stopPropagation();
-    setExpandedDigestIds((prev) => {
-      const next = new Set(prev);
-      const key = String(notifId);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
-  };
-
   const toggleGroupExpand = (e, notifId) => {
     e.stopPropagation();
-    setExpandedGroupIds((prev) => {
-      const next = new Set(prev);
-      const key = String(notifId);
-      if (next.has(key)) next.delete(key);
-      else next.add(key);
-      return next;
-    });
+    dispatch(toggleGroupExpanded(notifId));
+  };
+
+  const handleFilterChange = (nextFilter) => {
+    dispatch(setNotificationFilter({ readFilter: nextFilter }));
+    if (userId && needsRefresh) {
+      dispatch(fetchNotificationsThunk({ userId }));
+    }
+  };
+
+  const handleSelectAndReadNotification = (notif) => {
+    dispatch(setSelectedNotificationId(notif.id));
+    if (!notif.isRead) {
+      markAsRead(notif.id);
+    }
   };
 
   const loadAppealsAndWarnings = useCallback(async () => {
     try {
-      const [appealsRes, warningsRes, invitesRes] = await Promise.allSettled([
-        appealsApi.getMyAppeals(),
-        adminApi.getMyWarnings ? adminApi.getMyWarnings() : Promise.resolve([]),
-        typeof projectsApi.getMyInvites === 'function' ? projectsApi.getMyInvites() : Promise.resolve([]),
+      await Promise.allSettled([
+        dispatch(fetchMyAppeals()),
+        dispatch(fetchMyWarnings()),
+        dispatch(fetchMyInvites({ force: true })),
       ]);
-
-      if (appealsRes.status === 'fulfilled') {
-        const list = Array.isArray(appealsRes.value) ? appealsRes.value : appealsRes.value?.data || [];
-        setAppeals(list);
-      }
-      if (warningsRes.status === 'fulfilled') {
-        const list = Array.isArray(warningsRes.value) ? warningsRes.value : warningsRes.value?.data || [];
-        setWarnings(list);
-      }
-      if (invitesRes.status === 'fulfilled') {
-        const list = Array.isArray(invitesRes.value) ? invitesRes.value : invitesRes.value?.data || [];
-        setInvites(list);
-      }
     } catch (err) {
       console.warn("Could not load appeals/warnings:", err);
     }
-  }, []);
+  }, [dispatch]);
 
   const {
     renderModal: renderReasonModal,
@@ -166,23 +220,27 @@ const Notifications = () => {
   };
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadAppealsAndWarnings();
   }, [loadAppealsAndWarnings]);
 
+  useEffect(() => {
+    if (!userId) return;
+    dispatch(fetchNotificationsThunk({ userId }));
+  }, [dispatch, userId]);
+
+  useEffect(() => {
+    if (!userId || !notifInvalidated) return;
+    dispatch(fetchNotificationsThunk({ userId }));
+  }, [dispatch, userId, notifInvalidated]);
+
   const handleOpenAppealModal = (warningId) => {
-    setSelectedWarningId(warningId);
     setExplanation("");
-    setAppealError("");
-    setAppealSuccess("");
-    setAppealModalOpen(true);
+    dispatch(openAppealSubmitModal(warningId));
   };
 
   const handleCloseAppealModal = () => {
-    setAppealModalOpen(false);
-    setSelectedWarningId(null);
     setExplanation("");
-    setAppealError("");
+    dispatch(closeAppealSubmitModal());
   };
 
   const handleSubmitAppeal = async (e) => {
@@ -191,23 +249,19 @@ const Notifications = () => {
       return;
     }
 
-    setSubmittingAppeal(true);
-    setAppealError("");
     try {
-      await appealsApi.submitAppeal(selectedWarningId, {
-        explanation: explanation.trim(),
-      });
-      setAppealSuccess("Appeal submitted successfully. Administrators will review it.");
-      await loadAppealsAndWarnings();
+      await dispatch(
+        submitWarningAppeal({
+          warningId: selectedWarningId,
+          explanation: explanation.trim(),
+        }),
+      ).unwrap();
       if (appealCloseTimerRef.current) clearTimeout(appealCloseTimerRef.current);
       appealCloseTimerRef.current = setTimeout(() => {
         handleCloseAppealModal();
       }, 1200);
-    } catch (err) {
-      const msg = err?.message || err?.error || "Failed to submit appeal.";
-      setAppealError(msg);
-    } finally {
-      setSubmittingAppeal(false);
+    } catch {
+      // Friendly error stored in appealsSlice working.submitError
     }
   };
 
@@ -219,15 +273,37 @@ const Notifications = () => {
           <h1 className="notif-title-main">Notifications</h1>
           <p className="notif-subtitle">Stay updated on your projects, warnings, and tasks.</p>
         </div>
-        <button
-          type="button"
-          onClick={handleMarkAllAsRead}
-          className="notif-btn-secondary"
-          data-testid="mark-all-read-btn"
-          disabled={unreadCount === 0 || isMarkingAllRead}
-        >
-          {isMarkingAllRead ? "Marking all as read..." : "Mark all as read"}
-        </button>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', gap: '6px' }} role="group" aria-label="Notification filter">
+            <button
+              type="button"
+              data-testid="notif-filter-all"
+              className={`notif-btn-secondary${readFilter === 'all' ? ' active' : ''}`}
+              aria-pressed={readFilter === 'all'}
+              onClick={() => handleFilterChange('all')}
+            >
+              All
+            </button>
+            <button
+              type="button"
+              data-testid="notif-filter-unread"
+              className={`notif-btn-secondary${readFilter === 'unread' ? ' active' : ''}`}
+              aria-pressed={readFilter === 'unread'}
+              onClick={() => handleFilterChange('unread')}
+            >
+              Unread
+            </button>
+          </div>
+          <button
+            type="button"
+            onClick={handleMarkAllAsRead}
+            className="notif-btn-secondary"
+            data-testid="mark-all-read-btn"
+            disabled={unreadCount === 0 || isMarkingAllRead}
+          >
+            {isMarkingAllRead ? "Marking all as read..." : "Mark all as read"}
+          </button>
+        </div>
       </div>
 
       {markAllError && (
@@ -250,7 +326,7 @@ const Notifications = () => {
           <span>{markAllError}</span>
           <button
             type="button"
-            onClick={() => setMarkAllError("")}
+            onClick={() => dispatch(clearMarkAllError())}
             style={{ background: "none", border: "none", color: "#b91c1c", cursor: "pointer", fontWeight: 700 }}
             aria-label="Dismiss error"
           >
@@ -385,16 +461,16 @@ const Notifications = () => {
                       data-testid={`accept-invite-btn-${inv.id}`}
                       className="notif-btn-secondary"
                       style={{ backgroundColor: '#16a34a', color: '#ffffff', borderColor: '#16a34a' }}
-                      disabled={actingInviteId === inv.id}
+                      disabled={actingInviteId === inv.id || Boolean(actingInviteIds[inv.id])}
                       onClick={() => handleAcceptInvite(inv.id)}
                     >
-                      {actingInviteId === inv.id ? 'Processing...' : 'Accept'}
+                      {actingInviteId === inv.id || actingInviteIds[inv.id] ? 'Processing...' : 'Accept'}
                     </button>
                     <button
                       type="button"
                       data-testid={`decline-invite-btn-${inv.id}`}
                       className="notif-btn-secondary"
-                      disabled={actingInviteId === inv.id}
+                      disabled={actingInviteId === inv.id || Boolean(actingInviteIds[inv.id])}
                       onClick={() => handleDeclineInvite(inv, false)}
                     >
                       Decline
@@ -409,11 +485,27 @@ const Notifications = () => {
       {/* Notifications List */}
       <div className="notif-glass-card">
         {notifications.length === 0 ? (
-          <EmptyState
-            icon="🔔"
-            title="You're all caught up!"
-            message="There are no new notifications right now."
-          />
+          notifStatus === 'loading' || (unreadCount > 0 && notifInvalidated) ? (
+            <EmptyState
+              icon="⏳"
+              title="Loading notifications..."
+              message="Fetching your latest updates."
+            />
+          ) : notifStatus === 'failed' && notifError ? (
+            <EmptyState
+              icon="⚠️"
+              title="Unable to load notifications"
+              message={notifError?.message || "Please try refreshing your notifications."}
+              actionLabel={userId ? "Retry" : undefined}
+              onAction={userId ? () => dispatch(fetchNotificationsThunk({ userId, force: true })) : undefined}
+            />
+          ) : (
+            <EmptyState
+              icon="🔔"
+              title="You're all caught up!"
+              message="There are no new notifications right now."
+            />
+          )
         ) : (
           <div className="notif-list-container">
             {notifications.map((notif) => {
@@ -443,25 +535,26 @@ const Notifications = () => {
                 ? currentTime - new Date(warningCreatedAt).getTime() <= SEVEN_DAYS_MS
                 : true;
 
-              const isDigest = notif.type === 'DAILY_DIGEST' || Boolean(notif.metadata?.isDigest);
-              const groupedItems = !isDigest
-                ? (Array.isArray(notif.items) && notif.items.length > 0
-                    ? notif.items
-                    : Array.isArray(notif.metadata?.items) && notif.metadata.items.length > 0
-                    ? notif.metadata.items
-                    : [])
-                : [];
-              const groupedCount = !isDigest
-                ? Number(notif.count ?? notif.metadata?.count ?? groupedItems.length ?? 0)
-                : 0;
-              const isGroupExpanded = expandedGroupIds.has(String(notif.id));
+              const groupedItems =
+                Array.isArray(notif.items) && notif.items.length > 0
+                  ? notif.items
+                  : Array.isArray(notif.metadata?.items) && notif.metadata.items.length > 0
+                  ? notif.metadata.items
+                  : [];
+              const groupedCount = Number(
+                notif.count ?? notif.metadata?.count ?? groupedItems.length ?? 0,
+              );
+              const isGroupExpanded = Boolean(
+                storeWorking?.expandedGroupIds?.[String(notif.id)],
+              );
 
               return (
                 <div
                   key={notif.id}
-                  onClick={() => !notif.isRead && markAsRead(notif.id)}
-                  className={`notif-item ${notif.isRead ? 'read' : 'unread'}`}
+                  onClick={() => handleSelectAndReadNotification(notif)}
+                  className={`notif-item ${notif.isRead ? 'read' : 'unread'}${selectedNotificationId === String(notif.id) ? ' selected' : ''}`}
                   data-testid={`notif-item-${notif.id}`}
+                  data-selected={selectedNotificationId === String(notif.id) ? 'true' : 'false'}
                 >
                   <div className={`notif-dot-icon ${getIconColorClass(notif.type)} ${notif.isRead ? 'read' : ''}`}></div>
                   <div className="notif-content-col">
@@ -485,12 +578,31 @@ const Notifications = () => {
                           </span>
                         )}
                       </div>
-                      {!notif.isRead && <span className="notif-badge"></span>}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        {!notif.isRead && <span className="notif-badge"></span>}
+                        <button
+                          type="button"
+                          data-testid={`notif-delete-${notif.id}`}
+                          aria-label="Delete notification"
+                          onClick={(e) => handleDeleteNotification(e, notif.id)}
+                          style={{
+                            background: 'none',
+                            border: 'none',
+                            color: '#94a3b8',
+                            cursor: 'pointer',
+                            fontSize: '0.85rem',
+                            lineHeight: 1,
+                            padding: '2px 4px',
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
                     </div>
                     <div className={`notif-desc ${notif.isRead ? 'read' : 'unread'}`}>
                       {notif.message}
                     </div>
-                    {!isDigest && groupedItems.length > 0 && (
+                    {groupedItems.length > 0 && (
                       <div
                         data-testid={`notif-group-${notif.id}`}
                         style={{ marginTop: '6px' }}
@@ -569,75 +681,6 @@ const Notifications = () => {
                         })()}
                       </div>
                     )}
-                    {isDigest &&
-                      Array.isArray(notif.metadata?.items) &&
-                      notif.metadata.items.length > 0 && (() => {
-                        const isExpanded = expandedDigestIds.has(String(notif.id));
-                        const digestItems = notif.metadata.items;
-                        return (
-                          <div
-                            data-testid={`notif-digest-${notif.id}`}
-                            style={{ marginTop: '6px' }}
-                            onClick={(e) => e.stopPropagation()}
-                          >
-                            <button
-                              type="button"
-                              data-testid={`notif-digest-toggle-${notif.id}`}
-                              onClick={(e) => toggleDigestExpand(e, notif.id)}
-                              style={{
-                                background: 'none',
-                                border: '1px solid #cbd5e1',
-                                borderRadius: '6px',
-                                padding: '3px 10px',
-                                fontSize: '0.8rem',
-                                fontWeight: 600,
-                                color: '#2563eb',
-                                cursor: 'pointer',
-                              }}
-                            >
-                              {isExpanded
-                                ? `Hide digest items (${digestItems.length})`
-                                : `Show all ${digestItems.length} updates`}
-                            </button>
-                            {isExpanded && (
-                              <ul
-                                data-testid={`notif-digest-list-${notif.id}`}
-                                style={{
-                                  marginTop: '8px',
-                                  marginBottom: 0,
-                                  paddingLeft: '18px',
-                                  fontSize: '0.84rem',
-                                  color: '#334155',
-                                }}
-                              >
-                                {digestItems.map((item, idx) => (
-                                  <li key={item.key || idx} style={{ marginBottom: '4px' }}>
-                                    <span>{item.summary}</span>
-                                    {item.link && (
-                                      <>
-                                        {' '}
-                                        {String(item.link).startsWith('/') ? (
-                                          inRouter ? (
-                                            <Link to={item.link} style={{ color: '#2563eb', fontWeight: 500 }}>
-                                              Open →
-                                            </Link>
-                                          ) : (
-                                            <span style={{ color: '#64748b', fontSize: '0.8rem' }}>{item.link}</span>
-                                          )
-                                        ) : (
-                                          <SafeLink href={item.link} style={{ color: '#2563eb', fontWeight: 500 }}>
-                                            Open →
-                                          </SafeLink>
-                                        )}
-                                      </>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        );
-                      })()}
                     {(() => {
                       const suggestions = notif.suggestedProjects || notif.metadata?.suggestedProjects || [];
                       if (!Array.isArray(suggestions) || suggestions.length === 0) return null;
@@ -865,5 +908,7 @@ const Notifications = () => {
     </div>
   );
 };
+
+const Notifications = NotificationsContent;
 
 export default Notifications;

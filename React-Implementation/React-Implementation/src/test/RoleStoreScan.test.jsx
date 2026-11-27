@@ -22,15 +22,25 @@ describe('RoleStore Architectural Scan Test', () => {
   const srcDir = path.resolve(__dirname, '..');
   const allFiles = getAllSourceFiles(srcDir);
 
-  it('asserts no file outside roleStore.js and storage.js reads or writes role in storage', () => {
+  it('asserts zero files read or write role in storage and legacy context/store files are deleted', () => {
     const offendingFiles = [];
+    const deletedLegacyFiles = [
+      'context/AuthContext.jsx',
+      'context/RoleContext.jsx',
+      'context/NotificationContext.jsx',
+      'context/UIContext.jsx',
+      'utils/roleStore.js',
+      'utils/storage.js',
+    ];
+
+    for (const relPath of deletedLegacyFiles) {
+      if (fs.existsSync(path.join(srcDir, relPath))) {
+        offendingFiles.push(`legacy-exists:${relPath}`);
+      }
+    }
 
     for (const filePath of allFiles) {
       const rel = path.relative(srcDir, filePath).replace(/\\/g, '/');
-      if (rel === 'utils/roleStore.js' || rel === 'utils/storage.js') {
-        continue;
-      }
-
       const content = fs.readFileSync(filePath, 'utf-8');
       if (
         content.includes('storage.getRole') ||

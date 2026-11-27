@@ -1,31 +1,48 @@
 import { render } from '@testing-library/react';
+import { Provider } from 'react-redux';
 import { MemoryRouter } from 'react-router-dom';
-import { AuthProvider } from '../context/AuthContext';
-import { RoleProvider } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationProvider } from '../context/NotificationContext';
+import { createAppStore } from '../store';
 
-export function renderWithProviders(ui, { route = '/', ...renderOptions } = {}) {
+export function renderWithStore(
+  ui,
+  {
+    preloadedState,
+    route = '/',
+    store: providedStore,
+    extraReducers,
+    routeResetScope,
+    ...renderOptions
+  } = {},
+) {
+  const store =
+    providedStore ||
+    createAppStore({ preloadedState, extraReducers, routeResetScope });
+
   function Wrapper({ children }) {
     return (
-      <MemoryRouter initialEntries={[route]}>
-        <AuthProvider>
-          <RoleProvider>
-            <UIProvider>
-              <NotificationProvider>
-                {children}
-              </NotificationProvider>
-            </UIProvider>
-          </RoleProvider>
-        </AuthProvider>
-      </MemoryRouter>
+      <Provider store={store}>
+        <MemoryRouter initialEntries={[route]}>{children}</MemoryRouter>
+      </Provider>
     );
   }
 
   return {
+    store,
     ...render(ui, { wrapper: Wrapper, ...renderOptions }),
   };
 }
 
-// eslint-disable-next-line react-refresh/only-export-components
+export function renderWithProviders(
+  ui,
+  { route = '/', store, preloadedState, extraReducers, ...renderOptions } = {},
+) {
+  return renderWithStore(ui, {
+    route,
+    store,
+    preloadedState,
+    extraReducers,
+    ...renderOptions,
+  });
+}
+
 export * from '@testing-library/react';

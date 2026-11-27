@@ -7,6 +7,10 @@ export const adminApi = {
     apiRequest("/admin/users", "GET", null, {
       role: role || getCurrentUserRole(),
     }),
+  getUserCounts: (role) =>
+    apiRequest("/admin/users/counts", "GET", null, {
+      role: role || getCurrentUserRole(),
+    }),
   getUserDetails: (id, role) =>
     apiRequest(`/admin/users/${id}`, "GET", null, {
       role: role || getCurrentUserRole(),
@@ -141,10 +145,6 @@ export const adminApi = {
     apiRequest(`/admin/projects/${projectId}/escrow`, "GET", null, {
       role: role || getCurrentUserRole(),
     }),
-  getOwnerRejectionPatterns: (days = 30, role) =>
-    apiRequest(`/admin/reports/owner-patterns?days=${days}`, "GET", null, {
-      role: role || getCurrentUserRole(),
-    }),
   getNeedsReviewSessions: (role) =>
     apiRequest('/admin/mentor-sessions/needs-review', "GET", null, {
       role: role || getCurrentUserRole(),
@@ -153,14 +153,8 @@ export const adminApi = {
     apiRequest(`/admin/mentor-sessions/${sessionId}/clear-review`, "POST", { reason }, {
       role: role || getCurrentUserRole(),
     }),
-  getDemoResetStatus: (role) =>
-    apiRequest("/admin/system/demo-reset-status", "GET", null, {
-      role: role || getCurrentUserRole(),
-    }),
-  resetDemoData: (confirm, role) =>
-    apiRequest("/admin/system/reset-demo", "POST", { confirm }, {
-      role: role || getCurrentUserRole(),
-    }),
+  refresh: () => apiRequest("/admin/auth/refresh", "POST", {}),
+  logout: () => apiRequest("/admin/auth/logout", "POST", {}),
 };
 
 export const recordPortalAuditEntry = (entry) => {

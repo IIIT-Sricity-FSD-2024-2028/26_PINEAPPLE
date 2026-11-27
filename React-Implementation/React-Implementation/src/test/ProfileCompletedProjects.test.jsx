@@ -1,9 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, render, waitFor, within } from '@testing-library/react';
-import React from 'react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, within } from '@testing-library/react';
 import Profile from '../pages/profile';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 import usersApi from '../services/usersApi';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
@@ -124,13 +122,12 @@ describe('Profile: Completed Projects & Collaborator Task Guard', () => {
     vi.spyOn(usersApi, 'getMe').mockResolvedValue(OWNER_USER);
     vi.spyOn(usersApi, 'getReputation').mockResolvedValue({ items: [], total: 0 });
 
-    render(
-      <AuthContext.Provider value={{ user: OWNER_USER, isAuthenticated: true }}>
-        <MemoryRouter initialEntries={['/profile']}>
-          <Profile />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Profile />, {
+      route: '/profile',
+      preloadedState: {
+        session: { user: OWNER_USER, isAuthenticated: true, status: 'authenticated', initialized: true },
+      },
+    });
 
     // 1. Confirm projectsApi.list was called with { status: 'all' }
     await waitFor(() => {
@@ -166,13 +163,12 @@ describe('Profile: Completed Projects & Collaborator Task Guard', () => {
     vi.spyOn(usersApi, 'getMe').mockResolvedValue(COLLAB_USER_QUALIFIED);
     vi.spyOn(usersApi, 'getReputation').mockResolvedValue({ items: [], total: 0 });
 
-    render(
-      <AuthContext.Provider value={{ user: COLLAB_USER_QUALIFIED, isAuthenticated: true }}>
-        <MemoryRouter initialEntries={['/profile']}>
-          <Profile />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Profile />, {
+      route: '/profile',
+      preloadedState: {
+        session: { user: COLLAB_USER_QUALIFIED, isAuthenticated: true, status: 'authenticated', initialized: true },
+      },
+    });
 
     await waitFor(() => {
       const completedCard = screen.getByText('Completed Projects').closest('.prof-glass-card');
@@ -192,13 +188,12 @@ describe('Profile: Completed Projects & Collaborator Task Guard', () => {
     vi.spyOn(usersApi, 'getMe').mockResolvedValue(COLLAB_USER_ZERO_TASKS);
     vi.spyOn(usersApi, 'getReputation').mockResolvedValue({ items: [], total: 0 });
 
-    render(
-      <AuthContext.Provider value={{ user: COLLAB_USER_ZERO_TASKS, isAuthenticated: true }}>
-        <MemoryRouter initialEntries={['/profile']}>
-          <Profile />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Profile />, {
+      route: '/profile',
+      preloadedState: {
+        session: { user: COLLAB_USER_ZERO_TASKS, isAuthenticated: true, status: 'authenticated', initialized: true },
+      },
+    });
 
     await waitFor(() => {
       const completedCard = screen.getByText('Completed Projects').closest('.prof-glass-card');

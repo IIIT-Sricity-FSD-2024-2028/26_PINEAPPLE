@@ -1,15 +1,17 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
-import { useContext } from 'react';
-import { AuthContext, AuthProvider } from '../context/AuthContext';
-import { UIProvider } from '../context/UIContext';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
+import { useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Settings from '../pages/settings';
 import Profile from '../pages/profile';
 import VerifyEmail from '../pages/VerifyEmail';
 import VerifyEmailBanner from '../components/common/VerifyEmailBanner';
 import usersApi from '../services/usersApi';
 import authApi from '../services/authApi';
+import { selectCurrentUser } from '../store/selectors/sessionSelectors';
+import { bootstrapSession, refreshSessionUser } from '../store/thunks/sessionThunks';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/apiClient.js', async (importOriginal) => {
   const actual = await importOriginal();
@@ -41,8 +43,6 @@ vi.mock('../services/usersApi', () => ({
   default: {
     getMe: vi.fn(),
     update: vi.fn(),
-    getSettings: vi.fn().mockResolvedValue({ digestEnabled: true, digestHour: 9 }),
-    updateSettings: vi.fn(),
     listExports: vi.fn().mockResolvedValue([]),
     getReputation: vi.fn().mockResolvedValue({ items: [], total: 0 }),
     getBadges: vi.fn().mockResolvedValue([]),
@@ -95,8 +95,6 @@ vi.mock('../services/authApi', () => {
 describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    localStorage.clear();
-    sessionStorage.clear();
     Object.defineProperty(document, 'hidden', { value: false, configurable: true });
   });
 
@@ -124,15 +122,12 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
     usersApi.getMe.mockResolvedValue(sampleUser);
     usersApi.update.mockResolvedValue(sampleUser);
 
-    const { unmount } = render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: sampleUser, isAuthenticated: true, updateUser: vi.fn(), refreshUser: vi.fn().mockResolvedValue(sampleUser) }}>
-          <UIProvider>
-            <Settings />
-          </UIProvider>
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    const { unmount } = renderWithStore(<Settings />, {
+      preloadedState: {
+        session: { user: sampleUser, isAuthenticated: true, status: 'authenticated' },
+        ui: { theme: 'light' },
+      },
+    });
 
     const readonlyDisplay = await screen.findByTestId('username-readonly-display');
     expect(readonlyDisplay.textContent).toContain('arjun_locked');
@@ -153,13 +148,11 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
     unmount();
 
     // Also render Profile and verify zero editable username inputs exist
-    render(
-      <MemoryRouter>
-        <AuthContext.Provider value={{ user: sampleUser, isAuthenticated: true }}>
-          <Profile />
-        </AuthContext.Provider>
-      </MemoryRouter>,
-    );
+    renderWithStore(<Profile />, {
+      preloadedState: {
+        session: { user: sampleUser, isAuthenticated: true, status: 'authenticated' },
+      },
+    });
     await waitFor(() => {
       expect(usersApi.getMe).toHaveBeenCalled();
     });
@@ -168,22 +161,30 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
   });
 
   it('2. VerifyEmailBanner shows only when emailVerified is false and hides when true', () => {
-    const { rerender } = render(
-      <AuthContext.Provider value={{ user: { id: '2', email: 'a@b.com', emailVerified: false }, isAuthenticated: true, refreshUser: vi.fn() }}>
-        <VerifyEmailBanner />
-      </AuthContext.Provider>,
-    );
+    renderWithStore(<VerifyEmailBanner />, {
+      preloadedState: {
+        session: {
+          user: { id: '2', email: 'a@b.com', emailVerified: false },
+          isAuthenticated: true,
+          status: 'authenticated',
+        },
+      },
+    });
     expect(screen.getByTestId('verify-email-banner')).toBeTruthy();
 
-    rerender(
-      <AuthContext.Provider value={{ user: { id: '2', email: 'a@b.com', emailVerified: true }, isAuthenticated: true, refreshUser: vi.fn() }}>
-        <VerifyEmailBanner />
-      </AuthContext.Provider>,
-    );
-    expect(screen.queryByTestId('verify-email-banner')).toBeNull();
+    renderWithStore(<VerifyEmailBanner />, {
+      preloadedState: {
+        session: {
+          user: { id: '2', email: 'a@b.com', emailVerified: true },
+          isAuthenticated: true,
+          status: 'authenticated',
+        },
+      },
+    });
+    expect(screen.getAllByTestId('verify-email-banner')).toHaveLength(1);
   });
 
-  it('3. After VerifyEmail succeeds, AuthContext refreshes user and VerifyEmailBanner disappears without manual reload', async () => {
+  it('3. After VerifyEmail succeeds, sessionSlice refreshes user and VerifyEmailBanner disappears without manual reload', async () => {
     authApi.refresh.mockResolvedValue({ accessToken: 'tok-v' });
     authApi.getMe
       .mockResolvedValueOnce({
@@ -212,16 +213,16 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
       user: { id: '10', emailVerified: true },
     });
 
-    render(
-      <MemoryRouter initialEntries={['/verify-email?token=tok123']}>
-        <AuthProvider>
-          <VerifyEmailBanner />
-          <Routes>
-            <Route path="/verify-email" element={<VerifyEmail />} />
-          </Routes>
-        </AuthProvider>
-      </MemoryRouter>,
+    const { store } = renderWithStore(
+      <>
+        <VerifyEmailBanner />
+        <Routes>
+          <Route path="/verify-email" element={<VerifyEmail />} />
+        </Routes>
+      </>,
+      { route: '/verify-email?token=tok123' },
     );
+    await store.dispatch(bootstrapSession());
 
     await waitFor(() => {
       expect(screen.getByTestId('verify-email-result-msg').textContent).toContain('verified');
@@ -262,11 +263,8 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
       message: 'Your email address is already verified.',
     });
 
-    render(
-      <AuthProvider>
-        <VerifyEmailBanner />
-      </AuthProvider>,
-    );
+    const { store } = renderWithStore(<VerifyEmailBanner />);
+    await store.dispatch(bootstrapSession());
 
     const resendBtn = await screen.findByTestId('resend-verification-btn');
     fireEvent.click(resendBtn);
@@ -303,7 +301,18 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
       });
 
     const Consumer = () => {
-      const { user } = useContext(AuthContext);
+      const dispatch = useDispatch();
+      const user = useSelector(selectCurrentUser);
+
+      useEffect(() => {
+        dispatch(bootstrapSession());
+        const onVis = () => {
+          if (!document.hidden) dispatch(refreshSessionUser());
+        };
+        document.addEventListener('visibilitychange', onVis);
+        return () => document.removeEventListener('visibilitychange', onVis);
+      }, [dispatch]);
+
       return (
         <div>
           <span data-testid="verified-state">{String(user?.emailVerified)}</span>
@@ -312,11 +321,7 @@ describe('FIX 2: Immutable Username & Single-Source Email Verification Banner', 
       );
     };
 
-    render(
-      <AuthProvider>
-        <Consumer />
-      </AuthProvider>,
-    );
+    renderWithStore(<Consumer />);
 
     await waitFor(() => {
       expect(screen.getByTestId('verified-state').textContent).toBe('false');

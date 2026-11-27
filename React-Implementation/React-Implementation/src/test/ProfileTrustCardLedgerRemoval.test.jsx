@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, render, waitFor } from '@testing-library/react';
-import { BrowserRouter, MemoryRouter, Routes, Route } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
 import UserTrustCard from '../components/features/UserTrustCard';
 import Profile from '../pages/profile';
 import AdminUserDetails from '../pages/admin/AdminUserDetails';
-import { AuthContext } from '../context/AuthContext';
+import { renderWithStore } from './test-utils';
 import usersApi from '../services/usersApi';
 import projectsApi from '../services/projectsApi';
 import joinRequestsApi from '../services/joinRequestsApi';
@@ -56,13 +56,12 @@ describe('Removal: "View reputation ledger" Button on Profile Trust Card', () =>
     vi.spyOn(gamificationApi, 'getUserLedger').mockResolvedValue([]);
     vi.spyOn(trustApi, 'getMyTrust').mockResolvedValue(mockTrustSummary);
 
-    render(
-      <AuthContext.Provider value={{ user: mockUser, isAuthenticated: true }}>
-        <MemoryRouter initialEntries={['/profile']}>
-          <Profile />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Profile />, {
+      route: '/profile',
+      preloadedState: {
+        session: { user: mockUser, isAuthenticated: true, status: 'authenticated', initialized: true },
+      },
+    });
 
     // 1. Label, Band, XP
     await waitFor(() => {
@@ -93,15 +92,13 @@ describe('Removal: "View reputation ledger" Button on Profile Trust Card', () =>
   });
 
   it('renders peer view (isSelf=false) without private conduct score, ledger link, or Track Record block', () => {
-    render(
-      <BrowserRouter>
-        <UserTrustCard
-          summary={mockTrustSummary}
-          variant="expanded"
-          isSelf={false}
-          isAdminViewer={false}
-        />
-      </BrowserRouter>
+    renderWithStore(
+      <UserTrustCard
+        summary={mockTrustSummary}
+        variant="expanded"
+        isSelf={false}
+        isAdminViewer={false}
+      />,
     );
 
     // Public badges and XP render
@@ -141,12 +138,16 @@ describe('Removal: "View reputation ledger" Button on Profile Trust Card', () =>
     });
     vi.spyOn(mentorshipApi, 'getBadges').mockResolvedValue([]);
 
-    render(
-      <MemoryRouter initialEntries={['/admin/users/target-user-1']}>
-        <Routes>
-          <Route path="/admin/users/:id" element={<AdminUserDetails />} />
-        </Routes>
-      </MemoryRouter>
+    renderWithStore(
+      <Routes>
+        <Route path="/admin/users/:id" element={<AdminUserDetails />} />
+      </Routes>,
+      {
+        route: '/admin/users/target-user-1',
+        preloadedState: {
+          session: { portalRole: 'admin', permissions: ['*'], isAuthenticated: true, initialized: true },
+        },
+      }
     );
 
     await waitFor(() => {

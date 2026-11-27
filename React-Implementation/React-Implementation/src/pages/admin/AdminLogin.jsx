@@ -1,12 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { signInWithEmailAndPassword, signOut as fbSignOut } from 'firebase/auth';
-import { auth } from '../../services/firebase.js';
-import { getAuthMode, setAccessToken } from '../../services/apiClient.js';
-import adminApi from '../../services/adminApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { consumeNotice, clearSuspendedInfo } from '../../store/slices/sessionSlice';
+import {
+  selectSessionNotices,
+  selectSuspendedInfo,
+} from '../../store/selectors/sessionSelectors';
+import { loginAdminPortal } from '../../store/thunks/sessionThunks';
+import { sanitizeAdminNextPath } from '../../routes/adminNavigation';
 import FormInput from '../../components/common/FormInput';
 import SuspendedAccountPanel from '../../components/common/SuspendedAccountPanel';
-import storage from '../../utils/storage';
 import './AdminLogin.css';
 
 const TeamForgeLogo = () => (
@@ -15,35 +18,42 @@ const TeamForgeLogo = () => (
   </svg>
 );
 
-const AdminLogin = () => {
+const AdminLoginContent = () => {
+  const dispatch = useDispatch();
   const location = useLocation();
+  const navigate = useNavigate();
+  const storeSuspendedInfo = useSelector(selectSuspendedInfo);
+  const sessionNotices = useSelector(selectSessionNotices);
+
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [suspendedInfo, setSuspendedInfo] = useState(() => {
-    if (location.state?.suspendedInfo) return location.state.suspendedInfo;
-    try {
-      if (typeof window !== 'undefined') {
-        const stored = sessionStorage.getItem('teamforge_suspended_info');
-        if (stored) return JSON.parse(stored);
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  const [localSuspendedInfo, setLocalSuspendedInfo] = useState(
+    () => location.state?.suspendedInfo || null,
+  );
+  const suspendedInfo = localSuspendedInfo || storeSuspendedInfo || null;
   const [error, setError] = useState('');
-  const [notice, setNotice] = useState(() => {
-    if (location.state?.serverRestartMessage) return location.state.serverRestartMessage;
-    if (location.state?.demoResetMessage) return location.state.demoResetMessage;
-    return storage.consumeServerRestartNotice() || storage.consumeDemoResetNotice() || '';
-  });
+  const [dismissedNotice, setDismissedNotice] = useState(false);
+  const [notice, setNotice] = useState(
+    () =>
+      location.state?.serverRestartMessage ||
+      sessionNotices.serverRestart ||
+      '',
+  );
+  const effectiveNotice = dismissedNotice ? '' : notice;
   const [loading, setLoading] = useState(false);
-  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (sessionNotices.serverRestart) {
+      dispatch(consumeNotice('serverRestart'));
+    }
+  }, [dispatch, sessionNotices.serverRestart]);
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setError('');
-    
+    setLocalSuspendedInfo(null);
+    dispatch(clearSuspendedInfo());
+
     const cleanEmail = email.trim();
     if (!cleanEmail || !password) {
       setError('Email and password are required');
@@ -52,50 +62,9 @@ const AdminLogin = () => {
 
     setLoading(true);
     try {
-      const mode = getAuthMode();
-      if (mode === 'firebase') {
-        try {
-          const userCred = await signInWithEmailAndPassword(auth, cleanEmail, password);
-          const tokenResult = await userCred.user.getIdTokenResult(true);
-          const role = (tokenResult.claims.role || tokenResult.claims.portalRole || '').toLowerCase();
-          if (!['admin', 'superuser', 'portal_admin'].includes(role)) {
-            await fbSignOut(auth);
-            throw new Error('This account does not have administrator portal privileges.');
-          }
-          const perms = tokenResult.claims.permissions || ['*'];
-          storage.setAdminSession({
-            token: tokenResult.token,
-            portalRole: role === 'superuser' ? 'superuser' : 'admin',
-            email: userCred.user.email,
-            permissions: perms,
-            name: userCred.user.displayName || 'Admin',
-          });
-          setAccessToken(tokenResult.token);
-          navigate('/admin');
-          return;
-        } catch (fbErr) {
-          console.warn('[AdminLogin] Firebase auth error, attempting backend portal auth fallback:', fbErr?.code || fbErr?.message);
-          if (fbErr?.message?.includes('portal privileges')) {
-            throw fbErr;
-          }
-        }
-      }
-
-      // Backend adminApi login (works for JWT mode and seamless fallback)
-      const response = await adminApi.login({ email: cleanEmail, password });
-      
-      // Store token or session info securely
-      storage.setAdminSession({
-        token: response.token || 'mock_admin_token',
-        portalRole: response.role || 'admin',
-        email: cleanEmail,
-        permissions: response.permissions || [],
-        name: response.name || 'Admin',
-      });
-      setAccessToken(response.token || null);
-      
-      // Redirect to admin dashboard
-      navigate('/admin');
+      await dispatch(loginAdminPortal({ email: cleanEmail, password })).unwrap();
+      const rawNext = new URLSearchParams(location.search).get('next');
+      navigate(sanitizeAdminNextPath(rawNext), { replace: true });
     } catch (err) {
       console.error('Admin login failed:', err);
       if (err?.code === 'ACCOUNT_SUSPENDED' || err?.data?.code === 'ACCOUNT_SUSPENDED') {
@@ -106,18 +75,21 @@ const AdminLogin = () => {
           appealAvailable: err.appealAvailable,
           supportContact: err.supportContact,
         };
-        setSuspendedInfo(info);
+        setLocalSuspendedInfo(info);
         setPassword('');
         setError('');
         return;
       }
       const code = err?.code || err?.data?.code || '';
-      const msg = String(err?.message || '');
-      if (msg.toLowerCase().includes('suspended') || msg.toLowerCase().includes('disabled')) {
+      const msg = String(err?.serverMessage || err?.message || '');
+      if (msg.toLowerCase().includes('portal privileges')) {
+        setError(msg);
+      } else if (msg.toLowerCase().includes('suspended') || msg.toLowerCase().includes('disabled')) {
         setError('This admin account is suspended or disabled. Contact super user.');
       } else if (
         code === 'TOO_MANY_ATTEMPTS' ||
         err?.statusCode === 429 ||
+        err?.status === 429 ||
         msg.toLowerCase().includes('too many')
       ) {
         const secs =
@@ -153,14 +125,17 @@ const AdminLogin = () => {
         {suspendedInfo && (
           <SuspendedAccountPanel
             info={suspendedInfo}
-            onDismiss={() => setSuspendedInfo(null)}
+            onDismiss={() => {
+              setLocalSuspendedInfo(null);
+              if (storeSuspendedInfo) dispatch(clearSuspendedInfo());
+            }}
           />
         )}
 
-        {notice && (
+        {effectiveNotice && (
           <div
             role="status"
-            data-testid="demo-reset-login-notice"
+            data-testid="admin-login-notice"
             style={{
               background: '#ecfdf5',
               border: '1px solid #10b981',
@@ -175,10 +150,13 @@ const AdminLogin = () => {
               alignItems: 'center',
             }}
           >
-            <span>{notice}</span>
+            <span>{effectiveNotice}</span>
             <button
               type="button"
-              onClick={() => setNotice('')}
+              onClick={() => {
+                setDismissedNotice(true);
+                setNotice('');
+              }}
               aria-label="Dismiss notice"
               style={{ background: 'none', border: 'none', color: '#065f46', cursor: 'pointer', fontWeight: 700 }}
             >
@@ -227,4 +205,5 @@ const AdminLogin = () => {
   );
 };
 
+const AdminLogin = AdminLoginContent;
 export default AdminLogin;

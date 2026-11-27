@@ -1,8 +1,27 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
-import projectsApi from '../../services/projectsApi';
-import feedbackApi from '../../services/feedbackApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchFeedbackReasons } from '../../store/thunks/feedbackThunks';
+import { selectReasonsForAction } from '../../store/selectors/feedbackSelectors';
+import { fetchProjects } from '../../store/thunks/projectsThunks';
+import { selectAllProjects } from '../../store/selectors/projectsSelectors';
+import {
+  acceptMentorSession,
+  declineMentorSession,
+  fetchMentorSessions,
+} from '../../store/thunks/mentorSessionsThunks';
+import {
+  closeSessionDeclineModal,
+  openSessionDeclineModal,
+  setSessionActionFeedback,
+  setSessionDeclineError,
+} from '../../store/slices/mentorSessionsSlice';
+import {
+  selectMentorSessionsWorking,
+  selectMentorViewSessions,
+  selectMentorViewSessionsStatus,
+  selectSessionProcessingIds,
+} from '../../store/selectors/mentorSessionsSelectors';
 import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
 import { formatDateTime, formatProjectDueDate } from '../../utils/dateFormatter';
@@ -35,183 +54,156 @@ const UserIcon = () => (
   </svg>
 );
 
-const MentorRequests = () => {
+const MentorRequestsContent = () => {
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
   const [currentTime] = useState(() => Date.now());
-  const [requests, setRequests] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [actionInProgress, setActionInProgress] = useState({});
-  const [feedback, setFeedback] = useState(null);
+  const mentorSessions = useSelector(selectMentorViewSessions);
+  const sessionsStatus = useSelector(selectMentorViewSessionsStatus);
+  const allProjects = useSelector(selectAllProjects);
+  const actionInProgress = useSelector(selectSessionProcessingIds);
+  const working = useSelector(selectMentorSessionsWorking);
+  const declineReasonOptions = useSelector((state) =>
+    selectReasonsForAction(state, 'MENTOR_DECLINE_ASSIGNMENT'),
+  );
 
-  // Decline Modal state
-  const [declineModalOpen, setDeclineModalOpen] = useState(false);
-  const [selectedDeclineReq, setSelectedDeclineReq] = useState(null);
+  const loading = sessionsStatus === 'idle' || sessionsStatus === 'loading';
+  const feedback = working.actionFeedback || null;
+  const declineModalOpen = Boolean(working.declineModalOpen);
+  const declineError = working.declineError || '';
+
+  const trackedIds = useMemo(
+    () =>
+      Array.isArray(working.requestsViewIds) ? working.requestsViewIds : [],
+    [working.requestsViewIds],
+  );
+  // Local keystroke state per Decision D6
   const [declineReason, setDeclineReason] = useState('');
   const [declineReasons, setDeclineReasons] = useState([]);
-  const [declineReasonOptions, setDeclineReasonOptions] = useState([]);
-  const [declineError, setDeclineError] = useState('');
 
   useEffect(() => {
-    feedbackApi.getFeedbackReasons().then((cfg) => {
-      const list = cfg?.MENTOR_DECLINE_ASSIGNMENT?.reasons || cfg?.actions?.MENTOR_DECLINE_ASSIGNMENT?.reasons || [];
-      if (Array.isArray(list) && list.length > 0) {
-        setDeclineReasonOptions(list);
-      }
-    }).catch(() => {});
-  }, []);
+    dispatch(fetchFeedbackReasons());
+    dispatch(fetchMentorSessions({ force: true }));
+    dispatch(fetchProjects({ force: true }));
+  }, [dispatch]);
 
-  useEffect(() => {
-    let isMounted = true;
-    const loadRequests = async () => {
-      try {
-        const [marketplaceSessions, allProjects] = await Promise.all([
-          mentorMarketplaceApi.mentorSessions().catch(() => []),
-          projectsApi.list().catch(() => []),
-        ]);
+  const requests = useMemo(() => {
+    const projectsMap = {};
+    allProjects.forEach((p) => {
+      if (p?.id) projectsMap[String(p.id)] = p;
+    });
 
-        const projectsMap = {};
-        if (Array.isArray(allProjects)) {
-          allProjects.forEach((p) => {
-            projectsMap[p.id] = p;
-          });
-        }
+    return mentorSessions
+      .filter(
+        (s) =>
+          s.status === 'escrow_funded' || trackedIds.includes(String(s.id)),
+      )
+      .map((s) => {
+        const linkedProj = projectsMap[String(s.projectId)] || {};
+        return {
+          id: s.id,
+          projectId: s.projectId,
+          projectName:
+            linkedProj.name ||
+            linkedProj.title ||
+            s.projectName ||
+            'Project Mentorship',
+          ownerName: linkedProj.owner || s.ownerName || 'Project Owner',
+          projectDueDate: s.projectDueDate || linkedProj.dueDate || null,
+          projectDesc: s.projectDescription || linkedProj.desc || '',
+          message:
+            s.projectDescription ||
+            s.notes ||
+            'Project owner funded escrow for your mentorship.',
+          agreedPrice: s.agreedPrice || 1000,
+          skills: linkedProj.skills || [],
+          status: s.status || 'escrow_funded',
+          createdAt: s.createdAt || new Date().toISOString(),
+          respondBy: s.respondBy,
+          declineReason: s.declineReason,
+          declinedBy: s.declinedBy,
+        };
+      });
+  }, [allProjects, mentorSessions, trackedIds]);
 
-        // Rule: lists only sessions with status escrow_funded
-        const fundedSessions = (Array.isArray(marketplaceSessions) ? marketplaceSessions : []).filter(
-          (s) => s.status === 'escrow_funded'
-        );
-
-        const formatted = fundedSessions.map((s) => {
-          const linkedProj = projectsMap[s.projectId] || {};
-          return {
-            id: s.id,
-            projectId: s.projectId,
-            projectName: linkedProj.name || linkedProj.title || s.projectName || 'Project Mentorship',
-            ownerName: linkedProj.owner || s.ownerName || 'Project Owner',
-            projectDueDate: s.projectDueDate || linkedProj.dueDate || null,
-            projectDesc: s.projectDescription || linkedProj.desc || '',
-            message: s.projectDescription || s.notes || 'Project owner funded escrow for your mentorship.',
-            agreedPrice: s.agreedPrice || 1000,
-            skills: linkedProj.skills || [],
-            status: 'escrow_funded',
-            createdAt: s.createdAt || new Date().toISOString(),
-            respondBy: s.respondBy,
-            declineReason: s.declineReason,
-            declinedBy: s.declinedBy,
-          };
-        });
-
-        if (isMounted) {
-          setRequests(formatted);
-        }
-      } catch (err) {
-        console.error('Failed to load mentor requests:', err);
-        if (isMounted) {
-          setFeedback({ type: 'error', message: 'Failed to load mentor requests from the backend.' });
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadRequests();
-
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  const selectedDeclineReq = useMemo(
+    () =>
+      requests.find(
+        (r) => String(r.id) === String(working.selectedDeclineSessionId),
+      ) || null,
+    [requests, working.selectedDeclineSessionId],
+  );
 
   const handleApprove = async (req) => {
-    setActionInProgress((prev) => ({ ...prev, [req.id]: true }));
-    setFeedback(null);
+    dispatch(setSessionActionFeedback(null));
     try {
-      await mentorMarketplaceApi.acceptSession(req.id);
-
-      setFeedback({
-        type: 'success',
-        message: `Mentorship for "${req.projectName}" accepted! You have been added to the project and funds remain secured in escrow.`,
-      });
-
-      // Update local state to reflect accepted status
-      setRequests((prev) =>
-        prev.map((item) =>
-          item.id === req.id ? { ...item, status: 'active' } : item
-        )
+      await dispatch(acceptMentorSession({ sessionId: req.id })).unwrap();
+      dispatch(
+        setSessionActionFeedback({
+          type: 'success',
+          message: `Mentorship for "${req.projectName}" accepted! You have been added to the project and funds remain secured in escrow.`,
+        }),
       );
-    } catch (err) {
-      console.error('Failed to accept mentor request:', err);
-      setFeedback({
-        type: 'error',
-        message: err?.serverMessage || err?.message || 'Failed to accept mentorship request.',
-      });
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [req.id]: false }));
+    } catch {
+      // Friendly error is stored in working.actionFeedback by mentorSessionsSlice
     }
   };
 
   const handleOpenDeclineModal = (req) => {
-    setSelectedDeclineReq(req);
     setDeclineReason('');
-    setDeclineError('');
-    setDeclineModalOpen(true);
+    setDeclineReasons([]);
+    dispatch(openSessionDeclineModal(req.id));
   };
 
   const handleConfirmDecline = async () => {
     if (!selectedDeclineReq) return;
     const trimmed = declineReason.trim();
     if (!trimmed || trimmed.length < 10) {
-      setDeclineError('A decline reason of at least 10 characters (up to 500) is required.');
+      dispatch(
+        setSessionDeclineError(
+          'A decline reason of at least 10 characters (up to 500) is required.',
+        ),
+      );
       return;
     }
     if (trimmed.length > 500) {
-      setDeclineError('Decline reason cannot exceed 500 characters.');
+      dispatch(
+        setSessionDeclineError('Decline reason cannot exceed 500 characters.'),
+      );
       return;
     }
 
     const reqId = selectedDeclineReq.id;
     const reqProjName = selectedDeclineReq.projectName;
-
-    setActionInProgress((prev) => ({ ...prev, [reqId]: true }));
-    setFeedback(null);
-    try {
-      const resolvedReasons =
-        declineReasons.length > 0
-          ? declineReasons
-          : (declineReasonOptions[0]?.id ? [declineReasonOptions[0].id] : []);
-      const payload = {
-        feedback: {
-          reasons: resolvedReasons,
-          explanation: trimmed,
-        },
+    const resolvedReasons =
+      declineReasons.length > 0
+        ? declineReasons
+        : declineReasonOptions[0]?.id
+          ? [declineReasonOptions[0].id]
+          : [];
+    const payload = {
+      feedback: {
         reasons: resolvedReasons,
         explanation: trimmed,
-        reason: trimmed,
-      };
-      await mentorMarketplaceApi.declineSession(reqId, payload);
+      },
+      reasons: resolvedReasons,
+      explanation: trimmed,
+      reason: trimmed,
+    };
 
-      setFeedback({
-        type: 'info',
-        message: `Mentorship for "${reqProjName}" declined. The project owner has been notified with your reason and refunded in full from escrow.`,
-      });
-
-      // Update local state to reflect declined status
-      setRequests((prev) =>
-        prev.map((item) =>
-          item.id === reqId
-            ? { ...item, status: 'refunded', declineReason: trimmed, declinedBy: 'mentor' }
-            : item
-        )
+    try {
+      await dispatch(
+        declineMentorSession({ sessionId: reqId, payload }),
+      ).unwrap();
+      dispatch(
+        setSessionActionFeedback({
+          type: 'info',
+          message: `Mentorship for "${reqProjName}" declined. The project owner has been notified with your reason and refunded in full from escrow.`,
+        }),
       );
-      setDeclineModalOpen(false);
-      setSelectedDeclineReq(null);
-    } catch (err) {
-      console.error('Failed to decline mentor request:', err);
-      setDeclineError(err.message || 'Failed to decline mentorship request.');
-    } finally {
-      setActionInProgress((prev) => ({ ...prev, [reqId]: false }));
+    } catch {
+      // Validation / API error is stored in working.declineError by mentorSessionsSlice
     }
   };
 
@@ -230,7 +222,7 @@ const MentorRequests = () => {
           <button
             type="button"
             className="tf-mentor-req-btn-outline"
-            onClick={() => setFeedback(null)}
+            onClick={() => dispatch(setSessionActionFeedback(null))}
           >
             <XIcon />
           </button>
@@ -379,8 +371,7 @@ const MentorRequests = () => {
         title="Decline Mentorship Booking"
         onClose={() => {
           if (!actionInProgress[selectedDeclineReq?.id]) {
-            setDeclineModalOpen(false);
-            setSelectedDeclineReq(null);
+            dispatch(closeSessionDeclineModal());
           }
         }}
         size="md"
@@ -391,8 +382,7 @@ const MentorRequests = () => {
               className="tf-mentor-req-btn-outline"
               disabled={actionInProgress[selectedDeclineReq?.id]}
               onClick={() => {
-                setDeclineModalOpen(false);
-                setSelectedDeclineReq(null);
+                dispatch(closeSessionDeclineModal());
               }}
             >
               Cancel
@@ -461,7 +451,7 @@ const MentorRequests = () => {
               value={declineReason}
               onChange={(e) => {
                 setDeclineReason(e.target.value);
-                if (declineError) setDeclineError('');
+                if (declineError) dispatch(setSessionDeclineError(''));
               }}
               placeholder="Explain why you cannot take on this mentorship (e.g. current capacity limits, domain mismatch)..."
               style={{
@@ -492,5 +482,7 @@ const MentorRequests = () => {
     </div>
   );
 };
+
+const MentorRequests = MentorRequestsContent;
 
 export default MentorRequests;

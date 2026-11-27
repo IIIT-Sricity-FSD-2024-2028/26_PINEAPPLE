@@ -34,6 +34,7 @@ import { normalizeRole } from '../common/utils/role.util';
 import { UpdateUsernameDto } from './dto/update-username.dto';
 import { VerifyPhoneDto } from './dto/verify-phone.dto';
 import { DeleteAccountDto } from './dto/delete-account.dto';
+import { UpdateUserSettingsDto } from './dto/update-user-settings.dto';
 import { Roles } from '../core/decorators/roles.decorator';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -508,7 +509,7 @@ export class UsersController {
 
   @Get('me/settings')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get notification digest and timezone settings for current user' })
+  @ApiOperation({ summary: 'Get settings for current user' })
   getMySettings(
     @CurrentUser() caller: any,
     @Headers('x-user-id') headerUserId?: string,
@@ -518,19 +519,19 @@ export class UsersController {
     if (!userId) {
       throw new UnauthorizedException('Authentication required.');
     }
-    return this.usersService.getDigestSettings(userId);
+    return this.usersService.getUserSettings(userId);
   }
 
   @Patch('me/settings')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Update notification digest and timezone settings for current user' })
+  @ApiOperation({ summary: 'Update settings for current user' })
   updateMySettings(
-    @Body() body: any,
+    @Body() _body: UpdateUserSettingsDto,
     @CurrentUser() caller: any,
     @Req() req: any,
     @Headers('x-user-id') headerUserId?: string,
   ) {
-    const rawBody = req?.body || body || {};
+    const rawBody = req?.body || _body || {};
     if (
       (Object.prototype.hasOwnProperty.call(rawBody, 'username') && rawBody.username !== undefined) ||
       (rawBody.profile && Object.prototype.hasOwnProperty.call(rawBody.profile, 'username') && rawBody.profile.username !== undefined)
@@ -547,7 +548,7 @@ export class UsersController {
     if (!userId) {
       throw new UnauthorizedException('Authentication required.');
     }
-    return this.usersService.updateDigestSettings(userId, body || {});
+    return this.usersService.updateUserSettings(userId);
   }
 
   @Get()

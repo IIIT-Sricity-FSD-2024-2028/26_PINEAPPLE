@@ -1,100 +1,84 @@
-import { useState, useEffect } from "react";
-import { mentorMarketApi } from "../../services/mentorMarketplaceApi";
+import { useEffect, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
+import { fetchMentors } from "../../store/thunks/mentorProfilesThunks";
+import { selectAllDirectoryMentors } from "../../store/selectors/mentorProfilesSelectors";
+import {
+  fetchAllSessionsAdmin,
+  fetchSessionAdminStats,
+} from "../../store/thunks/mentorSessionsThunks";
+import {
+  selectAllSessionsAdmin,
+  selectAllSessionsAdminStatus,
+} from "../../store/selectors/mentorSessionsSelectors";
+import { retryPayoutAndRefresh } from "../../store/thunks/paymentsThunks";
+import {
+  selectAdminRevenueStats,
+  selectAdminRevenueStatsStatus,
+} from "../../store/selectors/paymentsSelectors";
+import { reconcileEscrowLedger } from "../../store/thunks/escrowAccountsThunks";
+import {
+  selectEscrowReconcileStatus,
+  selectEscrowReconciliation,
+} from "../../store/selectors/escrowAccountsSelectors";
 import StatCard from "../../components/common/StatCard";
 import DataTable from "../../components/common/DataTable";
 import "./MentorRevenue.css";
 
-const MentorRevenue = () => {
-  const [sessions, setSessions] = useState([]);
-  const [stats, setStats] = useState(null);
-  const [mentorMap, setMentorMap] = useState({});
-  const [isLoading, setIsLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [reconciliation, setReconciliation] = useState(null);
-  const [reconciling, setReconciling] = useState(false);
+const MentorRevenueContent = () => {
+  const dispatch = useDispatch();
+  const sessions = useSelector(selectAllSessionsAdmin);
+  const allSessionsStatus = useSelector(selectAllSessionsAdminStatus);
+  const stats = useSelector(selectAdminRevenueStats);
+  const statsStatus = useSelector(selectAdminRevenueStatsStatus);
+  const mentors = useSelector(selectAllDirectoryMentors);
+  const reconciliation = useSelector(selectEscrowReconciliation);
+  const reconcileStatus = useSelector(selectEscrowReconcileStatus);
 
-  const handleReconcile = async () => {
-    setReconciling(true);
-    try {
-      const res = await mentorMarketApi.reconcileEscrow();
-      setReconciliation(res);
-    } catch (err) {
-      console.warn("Reconcile error:", err);
-    } finally {
-      setReconciling(false);
-    }
+  const isLoading =
+    allSessionsStatus === "idle" ||
+    allSessionsStatus === "loading" ||
+    statsStatus === "loading";
+  const reconciling = reconcileStatus === "loading";
+
+  const mentorMap = useMemo(() => {
+    const mMap = {};
+    (Array.isArray(mentors) ? mentors : []).forEach((m) => {
+      if (m?.id) mMap[m.id] = m;
+    });
+    return mMap;
+  }, [mentors]);
+
+  const loadAll = () => {
+    dispatch(fetchAllSessionsAdmin({ force: true }));
+    dispatch(fetchSessionAdminStats({ force: true }));
+    dispatch(fetchMentors({ force: true }));
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const loadRevenueData = async () => {
-      try {
-        const [fetchedSessions, fetchedStats, mentors] = await Promise.all([
-          mentorMarketApi.allSessions().catch(() => []),
-          mentorMarketApi.adminStats().catch(() => null),
-          mentorMarketApi.listMentors({}).catch(() => []),
-        ]);
+    dispatch(fetchAllSessionsAdmin({ force: true }));
+    dispatch(fetchSessionAdminStats({ force: true }));
+    dispatch(fetchMentors({ force: true }));
+  }, [dispatch]);
 
-        if (isMounted) {
-          setSessions(Array.isArray(fetchedSessions) ? fetchedSessions : []);
-          setStats(fetchedStats);
-
-          const mMap = {};
-          (Array.isArray(mentors) ? mentors : []).forEach((m) => {
-            mMap[m.id] = m;
-          });
-          setMentorMap(mMap);
-        }
-      } catch (error) {
-        console.warn("Could not load mentor revenue data", error);
-      } finally {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadRevenueData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey]);
-
-  const s = stats || {
-    totalSessions: sessions.length,
-    pendingSessions: 0,
-    activeSessions: 0,
-    completedSessions: 0,
-    refundedSessions: 0,
-    totalProcessed: 0,
-    platformRevenue: 0,
-    totalPayouts: 0,
-    escrowHeld: 0,
+  const handleReconcile = () => {
+    dispatch(reconcileEscrowLedger());
   };
 
-  const completedSessions = sessions.filter((sess) => sess.status === 'completed');
-  const sumCompletedPlatformFee = completedSessions.reduce(
-    (sum, sess) => sum + (Number(sess.platformFee) || 0),
-    0
-  );
-  const platformRevenue = s.platformRevenue !== undefined && s.platformRevenue !== 0 ? s.platformRevenue : sumCompletedPlatformFee;
-
+  // All KPI totals read directly from server response stored in paymentsSlice (zero FE arithmetic)
   const kpis = [
-    { icon: "🔒", value: `₹${(s.escrowHeld || 0).toLocaleString()}`, label: "Currently in Escrow" },
-    { icon: "💰", value: `₹${(platformRevenue || 0).toLocaleString()}`, label: "Platform Revenue" },
-    { icon: "💸", value: `₹${(s.totalPayouts || 0).toLocaleString()}`, label: "Paid Out to Mentors" },
-    { icon: "🟡", value: s.pendingSessions || 0, label: "Awaiting Mentor Response" },
-    { icon: "🟢", value: s.activeSessions || 0, label: "Active Sessions" },
-    { icon: "🔴", value: s.refundedSessions || 0, label: "Refunded" },
+    { icon: "🔒", value: `₹${(stats.escrowHeld || 0).toLocaleString()}`, label: "Currently in Escrow" },
+    { icon: "💰", value: `₹${(stats.platformRevenue || 0).toLocaleString()}`, label: "Platform Revenue" },
+    { icon: "💸", value: `₹${(stats.totalPayouts || 0).toLocaleString()}`, label: "Paid Out to Mentors" },
+    { icon: "🟡", value: stats.pendingSessions || 0, label: "Awaiting Mentor Response" },
+    { icon: "🟢", value: stats.activeSessions || 0, label: "Active Sessions" },
+    { icon: "🔴", value: stats.refundedSessions || 0, label: "Refunded" },
   ];
 
   const handleRetryPayout = async (sessionId) => {
     try {
-      await mentorMarketApi.retryPayout(sessionId);
-      setRefreshKey((k) => k + 1);
+      await dispatch(retryPayoutAndRefresh({ sessionId, scope: "admin" })).unwrap();
     } catch (err) {
-      alert(err.message || "Failed to retry payout");
+      alert(err?.message || "Failed to retry payout");
     }
   };
 
@@ -252,7 +236,7 @@ const MentorRevenue = () => {
           >
             {reconciling ? 'Checking...' : '⚖️ Reconcile Escrow'}
           </button>
-          <button className="btn btn-outline btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>
+          <button className="btn btn-outline btn-sm" onClick={loadAll}>
             🔄 Refresh
           </button>
         </div>
@@ -282,4 +266,5 @@ const MentorRevenue = () => {
   );
 };
 
+const MentorRevenue = MentorRevenueContent;
 export default MentorRevenue;

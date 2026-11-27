@@ -1,14 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { fireEvent, waitFor, act } from '@testing-library/react';
 import Navbar from '../components/navbar';
 import CompleteProfile from '../pages/CompleteProfile';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
-import { usersApi } from '../services/usersApi';
-import { authApi } from '../services/authApi';
+import { renderWithStore } from './test-utils';
 
 const mockNavigate = vi.fn();
 
@@ -60,33 +54,19 @@ function renderNavbarWithUser(userOverrides = {}) {
     ...userOverrides,
   };
 
-  return render(
-    <MemoryRouter>
-      <AuthContext.Provider value={{ user, logout: vi.fn(), setUser: vi.fn() }}>
-        <RoleContext.Provider
-          value={{
-            currentRole: 'Collaborator',
-            switchRole: vi.fn(),
-            isMentorApproved: false,
-            mentorAppStatus: 'none',
-          }}
-        >
-          <UIProvider>
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                markAsRead: vi.fn(),
-                markAllAsRead: vi.fn(),
-              }}
-            >
-              <Navbar onMenuClick={vi.fn()} />
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>
-  );
+  return renderWithStore(<Navbar onMenuClick={vi.fn()} />, {
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'Collaborator',
+        allowedRoles: ['Collaborator'],
+        mentorApproved: false,
+        mentorAppStatus: 'none',
+      },
+    },
+  });
 }
 
 function renderCompleteProfile(authOverrides = {}) {
@@ -99,17 +79,17 @@ function renderCompleteProfile(authOverrides = {}) {
     },
     isAuthenticated: true,
     loading: false,
-    updateUser: vi.fn(),
     ...authOverrides,
   };
 
-  return render(
-    <MemoryRouter>
-      <AuthContext.Provider value={defaultAuth}>
-        <CompleteProfile />
-      </AuthContext.Provider>
-    </MemoryRouter>
-  );
+  return renderWithStore(<CompleteProfile />, {
+    preloadedState: {
+      session: {
+        ...defaultAuth,
+        status: defaultAuth.isAuthenticated ? 'authenticated' : 'signed_out',
+      },
+    },
+  });
 }
 
 describe('Phase 6 Layout Bugs: Navbar Profile Menu and Complete Profile Username', () => {

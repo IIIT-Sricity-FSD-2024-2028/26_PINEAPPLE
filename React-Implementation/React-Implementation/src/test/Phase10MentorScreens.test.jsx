@@ -1,19 +1,13 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import MentorRequests from '../pages/mentor/MentorRequests';
+import { renderWithStore } from './test-utils';
 import MentoredProjects from '../pages/mentor/MentoredProjects';
 import MyMentorProfile from '../pages/mentor/MyMentorProfile';
 import AdminMentorApps from '../pages/admin/AdminMentorApps';
 import mentorMarketplaceApi from '../services/mentorMarketplaceApi';
 import mentorApplicationsApi from '../services/mentorApplicationsApi';
 import projectsApi from '../services/projectsApi';
-import feedbackApi, { OTHER_REASON_ID } from '../services/feedbackApi';
 
 // Mock APIs
 vi.mock('../services/mentorMarketplaceApi', () => ({
@@ -72,19 +66,19 @@ const renderWithAuthAndRole = (
     route = '/',
   } = {}
 ) =>
-  render(
-    <MemoryRouter initialEntries={[route]}>
-      <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true, refreshMentorStatus: vi.fn() }}>
-        <RoleContext.Provider value={{ currentRole: role, switchRole: vi.fn(), availableRoles: [role] }}>
-          <UIProvider>
-            <NotificationContext.Provider value={{ notifications: [], unreadCount: 0 }}>
-              {ui}
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
+  renderWithStore(ui, {
+    route,
+    preloadedState: {
+      session: {
+        user,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: role,
+        allowedRoles: [role],
+      },
+    },
+  });
 
 describe('PHASE 10: MENTOR SCREENS FRONTEND TESTS', () => {
   beforeEach(() => {

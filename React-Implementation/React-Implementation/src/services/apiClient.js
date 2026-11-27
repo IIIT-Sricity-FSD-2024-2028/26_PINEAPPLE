@@ -1,8 +1,22 @@
 import { signOut as fbSignOut } from 'firebase/auth';
 import { auth } from './firebase.js';
-import storage from '../utils/storage.js';
-import { roleStore } from '../utils/roleStore.js';
 import tokenManager from './tokenManager.js';
+import {
+  notifyAdminSessionRefreshed,
+  runSingleFlightAdminRefresh,
+  setAdminRefreshRequester,
+} from './adminTokenManager.js';
+import { navigateWithAppRouter } from '../routes/navigationRef.js';
+import {
+  dispatchFromInterceptor,
+  getStateFromInterceptor,
+} from '../store/utils/setupInterceptors.js';
+import { setMaintenance, setResettingBanner } from '../store/slices/uiSlice.js';
+import {
+  setBootId as setBootIdAction,
+  setSuspendedInfo,
+} from '../store/slices/sessionSlice.js';
+import { sessionReset } from '../store/actions/appActions.js';
 
 export const SERVER_RESTART_MESSAGE = 'The server was restarted. Please log in again.';
 
@@ -13,11 +27,10 @@ function resolveApiBaseUrl() {
     typeof window !== "undefined" && typeof window.TEAMFORGE_API_BASE_URL === "string"
       ? window.TEAMFORGE_API_BASE_URL
       : "";
-  const storedBase = storage.getApiBaseUrl();
   const envBase = typeof import.meta !== "undefined" && import.meta.env?.VITE_API_BASE_URL
     ? import.meta.env.VITE_API_BASE_URL
     : "";
-  const rawBase = configuredBase || storedBase || envBase || "http://localhost:3000";
+  const rawBase = configuredBase || envBase || "http://localhost:3000";
   return String(rawBase).replace(/\/+$/, "");
 }
 
@@ -77,9 +90,9 @@ function normalizeRole(role) {
   return normalized;
 }
 
-// In-memory access token storage (never written to localStorage/sessionStorage)
+// In-memory access token storage (never written to browser storage)
 let inMemoryAccessToken = null;
-let refreshTokenPromise = null;
+let inMemoryBootId = null;
 let restartRedirectInFlight = false;
 let customRestartRedirectHandler = null;
 
@@ -103,10 +116,21 @@ export function getAccessToken() {
   return tokenManager.getAccessToken() || inMemoryAccessToken;
 }
 
+function getKnownBootId() {
+  return getStateFromInterceptor()?.session?.bootId || inMemoryBootId || null;
+}
+
+function storeBootId(bootId) {
+  inMemoryBootId = bootId ? String(bootId) : null;
+  tokenManager.setBootId(inMemoryBootId);
+  dispatchFromInterceptor(setBootIdAction(inMemoryBootId));
+}
+
 function hasActiveAppSession() {
   if (tokenManager.getAccessToken() || inMemoryAccessToken) return true;
   if (tokenManager.hasRefreshToken()) return true;
-  if (storage.hasStoredSessionKeys()) return true;
+  const session = getStateFromInterceptor()?.session;
+  if (session?.isAuthenticated || session?.portalRole) return true;
   try {
     if (getAuthMode() === 'firebase' && auth?.currentUser) return true;
   } catch {
@@ -115,17 +139,22 @@ function hasActiveAppSession() {
   return false;
 }
 
-export function handleServerRestart(nextBootId = null, reason = 'server_restarted') {
+export function handleServerRestart(nextBootId = null) {
   if (restartRedirectInFlight) return;
   restartRedirectInFlight = true;
 
-  clearApiCache();
   inMemoryAccessToken = null;
-  storage.clearAll();
+  tokenManager.clear();
   if (nextBootId) {
-    storage.setBootId(nextBootId);
+    inMemoryBootId = String(nextBootId);
+    tokenManager.setBootId(inMemoryBootId);
   }
-  storage.setServerRestartNotice(SERVER_RESTART_MESSAGE);
+  dispatchFromInterceptor(
+    sessionReset({
+      bootId: nextBootId ? String(nextBootId) : inMemoryBootId,
+      notices: { serverRestart: SERVER_RESTART_MESSAGE },
+    }),
+  );
 
   if (typeof window !== 'undefined') {
     try {
@@ -136,16 +165,10 @@ export function handleServerRestart(nextBootId = null, reason = 'server_restarte
       // ignore firebase signout errors
     }
 
-    window.dispatchEvent(
-      new CustomEvent('teamforge:session_invalid', {
-        detail: { reason, message: SERVER_RESTART_MESSAGE, bootId: nextBootId || null },
-      }),
-    );
-
     if (customRestartRedirectHandler) {
       customRestartRedirectHandler('/login');
     } else if (window.location.pathname !== '/login') {
-      window.location.assign('/login');
+      navigateWithAppRouter('/login', { replace: true });
     }
   }
 }
@@ -158,24 +181,23 @@ function inspectBootHeader(response, options = {}) {
   if (!responseBootId) return { restarted: false, bootId: null };
 
   // Public auth endpoints (/auth/login, /auth/signup, etc.) must NEVER trigger restart cleanup.
-  // They simply sync the stored boot ID and let the authentication flow proceed cleanly on the first try.
   if (options.isPublicAuth) {
-    storage.setBootId(responseBootId);
+    storeBootId(responseBootId);
     return { restarted: false, bootId: responseBootId };
   }
 
-  const storedBootId = storage.getBootId();
-  if (storedBootId && storedBootId !== responseBootId) {
+  const knownBootId = getKnownBootId();
+  if (knownBootId && knownBootId !== responseBootId) {
     const hadSession = options.assumeSession || hasActiveAppSession();
     if (hadSession) {
-      handleServerRestart(responseBootId, 'boot_id_changed');
+      handleServerRestart(responseBootId);
       const err = new Error(SERVER_RESTART_MESSAGE);
       err.statusCode = 401;
       err.code = 'SESSION_INVALID';
       return { restarted: true, bootId: responseBootId, error: err };
     }
   }
-  storage.setBootId(responseBootId);
+  storeBootId(responseBootId);
   return { restarted: false, bootId: responseBootId };
 }
 
@@ -194,28 +216,50 @@ export async function checkServerBoot() {
       null;
     if (!bootId) return data;
 
-    // Synchronize boot ID without wiping session during health checks
-    storage.setBootId(bootId);
+    const knownBootId = getKnownBootId();
+    if (knownBootId && knownBootId !== bootId && hasActiveAppSession()) {
+      handleServerRestart(bootId);
+      return { ...data, bootId, restarted: true };
+    }
+
+    storeBootId(bootId);
     return { ...data, bootId, restarted: false };
   } catch {
     return null;
   }
 }
 
+setAdminRefreshRequester(() => executeApiRequest('/admin/auth/refresh', 'POST', {}));
+
 async function getFreshToken(forceRefresh = false, isPortal = false) {
   const mode = getAuthMode();
   if (mode === 'legacy') return null;
 
-  const adminSession = storage.getAdminSession();
-  const adminToken = adminSession.token;
+  const session = getStateFromInterceptor()?.session;
+  const adminToken = session?.adminToken;
   const isCleanAdminToken = adminToken && adminToken !== 'mock_admin_token';
 
   const isAdminLocation =
     typeof window !== 'undefined' && window.location.pathname.startsWith('/admin');
 
-  // If in admin portal or performing portal operation, prioritize the portal admin token
-  if ((isPortal || isAdminLocation) && isCleanAdminToken) {
+  if ((isPortal || isAdminLocation) && isCleanAdminToken && !forceRefresh) {
     return adminToken;
+  }
+
+  if (isPortal || isAdminLocation) {
+    if (forceRefresh) {
+      try {
+        const refreshed = await runSingleFlightAdminRefresh();
+        if (refreshed?.token) {
+          notifyAdminSessionRefreshed(refreshed);
+          return refreshed.token;
+        }
+        notifyAdminSessionRefreshed({ error: new Error('Admin session refresh returned no token') });
+      } catch (err) {
+        notifyAdminSessionRefreshed({ error: err });
+      }
+    }
+    return null;
   }
 
   if (mode === 'firebase') {
@@ -280,23 +324,6 @@ const defaultHeaders = (role, userId, userEmail) => {
   return headers;
 };
 
-// In-memory GET request cache and in-flight promise deduplication
-const apiGetCache = new Map();
-const inFlightRequests = new Map();
-const DEFAULT_CACHE_TTL_MS = 20000; // 20 seconds TTL for read endpoints
-
-function clearApiCache(prefix = "") {
-  if (!prefix) {
-    apiGetCache.clear();
-    return;
-  }
-  for (const key of apiGetCache.keys()) {
-    if (key.includes(prefix)) {
-      apiGetCache.delete(key);
-    }
-  }
-}
-
 async function executeApiRequest(path, method, body = null, options = {}) {
   const url = `${API_BASE_URL}${path}`;
   const isFormData = typeof FormData !== "undefined" && body instanceof FormData;
@@ -317,6 +344,9 @@ async function executeApiRequest(path, method, body = null, options = {}) {
   // Attach fresh token in JWT or Firebase mode (skip for unauthenticated auth endpoints)
   const isPublicAuth =
     path === '/health' ||
+    path.startsWith('/admin/login') ||
+    path.startsWith('/admin/auth/refresh') ||
+    path.startsWith('/admin/auth/logout') ||
     path.startsWith('/auth/login') ||
     path.startsWith('/auth/refresh') ||
     path.startsWith('/auth/signup') ||
@@ -391,7 +421,7 @@ async function executeApiRequest(path, method, body = null, options = {}) {
           errorData = await response.json();
           errorMessage = errorData?.message || errorMessage;
         } catch (err) {
-          console.log('[apiClient] Response body was not JSON, using default error message:', err);
+          console.debug('[apiClient] Response body was not JSON, using default error message:', err);
         }
       } else if (errorData?.message) {
         errorMessage = errorData.message;
@@ -413,20 +443,15 @@ async function executeApiRequest(path, method, body = null, options = {}) {
             const isAuthOrSuspendedPage = ['/login', '/admin/login', '/suspended'].includes(currentPath);
 
             if (!isLoginRequest && !isAuthOrSuspendedPage) {
-              storage.clearUserSessionKeys();
-              storage.clearAdminSession();
               inMemoryAccessToken = null;
               tokenManager.clear();
+              dispatchFromInterceptor(setSuspendedInfo(errorData));
+              dispatchFromInterceptor(sessionReset({ suspendedInfo: errorData }));
               if (typeof window !== 'undefined') {
-                try {
-                  sessionStorage.setItem('teamforge_suspended_info', JSON.stringify(errorData));
-                } catch {
-                  // ignore
-                }
                 if (customRestartRedirectHandler) {
                   customRestartRedirectHandler('/suspended');
                 } else if (window.location.pathname !== '/suspended') {
-                  window.location.assign('/suspended');
+                  navigateWithAppRouter('/suspended', { replace: true });
                 }
               }
             }
@@ -440,11 +465,15 @@ async function executeApiRequest(path, method, body = null, options = {}) {
             (errorMessage.toLowerCase().includes('suspended') ||
               errorMessage.toLowerCase().includes('banned'))
           ) {
-            storage.clearUserSessionKeys();
-            storage.clearAdminSession();
             inMemoryAccessToken = null;
+            tokenManager.clear();
+            dispatchFromInterceptor(sessionReset());
             if (!window.location.pathname.startsWith('/admin') && window.location.pathname !== '/login') {
-              window.location.href = '/login?suspended=1';
+              if (customRestartRedirectHandler) {
+                customRestartRedirectHandler('/login?suspended=1');
+              } else {
+                navigateWithAppRouter('/login?suspended=1', { replace: true });
+              }
             }
           }
           err = new Error(errorMessage ? `Access Forbidden: ${errorMessage}` : "Access Forbidden");
@@ -481,45 +510,40 @@ async function executeApiRequest(path, method, body = null, options = {}) {
                 : 5;
 
           if (isMaintenanceReset && !options._maintenanceRetried) {
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent('teamforge:maintenance', {
-                  detail: {
-                    code: 'MAINTENANCE',
-                    message: 'The system is being reset, retrying...',
-                    retryAfterSeconds,
-                    active: true,
-                  },
-                }),
-              );
-            }
+            dispatchFromInterceptor(
+              setResettingBanner({
+                active: true,
+                message: 'The system is being reset, retrying...',
+              }),
+            );
             const delayMs = Math.min(Math.max(retryAfterSeconds, 1), 10) * 1000;
             await new Promise((resolve) => setTimeout(resolve, delayMs));
             const retriedResult = await executeApiRequest(path, method, body, {
               ...options,
               _maintenanceRetried: true,
             });
-            if (typeof window !== "undefined") {
-              window.dispatchEvent(
-                new CustomEvent('teamforge:maintenance', {
-                  detail: { code: 'MAINTENANCE', active: false },
-                }),
-              );
-            }
+            dispatchFromInterceptor(
+              setResettingBanner({ active: false, message: '' }),
+            );
             return retriedResult;
           }
 
           if (typeof window !== "undefined" && (isMaintenanceReset || !window.location.pathname.startsWith('/admin'))) {
-            window.dispatchEvent(
-              new CustomEvent('teamforge:maintenance', {
-                detail: {
-                  code: errorData?.code || 'SERVICE_UNAVAILABLE',
-                  message: isMaintenanceReset ? 'The system is being reset, retrying...' : errorMessage,
-                  retryAfterSeconds,
+            if (isMaintenanceReset) {
+              dispatchFromInterceptor(
+                setResettingBanner({
                   active: true,
-                },
-              }),
-            );
+                  message: 'The system is being reset, retrying...',
+                }),
+              );
+            } else {
+              dispatchFromInterceptor(
+                setMaintenance({
+                  active: true,
+                  message: errorMessage,
+                }),
+              );
+            }
           }
           err = new Error(
             isMaintenanceReset ? 'The system is being reset, retrying...' : `Service Unavailable: ${errorMessage}`,
@@ -567,7 +591,7 @@ async function executeApiRequest(path, method, body = null, options = {}) {
         const text = await response.text();
         return text ? JSON.parse(text) : { message: "Deleted successfully" };
       } catch (err) {
-        console.log('[apiClient] DELETE response parsing notice, returning fallback message:', err);
+        console.debug('[apiClient] DELETE response parsing notice, returning fallback message:', err);
         return { message: "Deleted successfully" };
       }
     }
@@ -604,43 +628,7 @@ async function executeApiRequest(path, method, body = null, options = {}) {
 }
 
 async function apiRequest(path, method, body = null, options = {}) {
-  const isGet = method === "GET";
-  const shouldCache = isGet && !options.skipCache;
-  const cacheKey = `${path}:${options.role || ""}:${options.userId || ""}`;
-
-  if (shouldCache) {
-    const cached = apiGetCache.get(cacheKey);
-    if (cached && Date.now() - cached.timestamp < (options.ttl || DEFAULT_CACHE_TTL_MS)) {
-      return JSON.parse(JSON.stringify(cached.data));
-    }
-
-    if (inFlightRequests.has(cacheKey)) {
-      return inFlightRequests.get(cacheKey);
-    }
-
-    const reqPromise = executeApiRequest(path, method, body, options)
-      .then((data) => {
-        apiGetCache.set(cacheKey, {
-          timestamp: Date.now(),
-          data,
-          ttl: options.ttl || DEFAULT_CACHE_TTL_MS,
-        });
-        return data;
-      })
-      .finally(() => {
-        inFlightRequests.delete(cacheKey);
-      });
-
-    inFlightRequests.set(cacheKey, reqPromise);
-    return reqPromise;
-  }
-
-  // Mutation: execute and invalidate cache so subsequent reads see latest data
-  const result = await executeApiRequest(path, method, body, options);
-  if (["POST", "PUT", "PATCH", "DELETE"].includes(method)) {
-    clearApiCache();
-  }
-  return result;
+  return executeApiRequest(path, method, body, options);
 }
 
 // Get current user role (fallback for display / legacy headers)
@@ -676,7 +664,7 @@ async function fetchDownloadResponse(path, options = {}) {
       errorData = await response.json();
       if (errorData?.message) msg = errorData.message;
     } catch (err) {
-      console.log('[apiClient] Error parsing download failure response JSON, falling back to statusText:', err);
+      console.debug('[apiClient] Error parsing download failure response JSON, falling back to statusText:', err);
     }
     if (response.status === 401 && errorData?.code === 'SESSION_INVALID') {
       handleServerRestart(bootCheck.bootId, 'session_invalid');
@@ -710,29 +698,27 @@ async function apiDownloadText(path, options = {}) {
 
 function getCurrentUserRole() {
   try {
-    const adminSession = storage.getAdminSession();
-    if (adminSession.isSuperUser) {
+    const session = getStateFromInterceptor()?.session;
+    if (session?.isSuperUser) {
       return "Super User";
     }
-    if (adminSession.portalRole) {
-      return adminSession.portalRole;
+    if (session?.portalRole) {
+      return session.portalRole;
     }
-    const storedRole = roleStore.getActiveRole();
-    if (storedRole) {
-      return storedRole;
+    if (session?.activeRole) {
+      return session.activeRole;
     }
     return "Collaborator";
-  } catch (err) {
-    console.warn('[apiClient] Error reading role from storage:', err);
+  } catch {
     return "Collaborator";
   }
 }
 
 function getCurrentUserId() {
   try {
-    return storage.getBackendUserId() || "";
-  } catch (err) {
-    console.warn('[apiClient] Error reading user ID from storage:', err);
+    const session = getStateFromInterceptor()?.session;
+    return session?.user?.id || session?.user?.uid || session?.adminUid || "";
+  } catch {
     return "";
   }
 }
@@ -745,26 +731,9 @@ export {
   apiRequest,
   apiDownload,
   apiDownloadText,
-  clearApiCache,
   getCurrentUserRole,
   getCurrentUserId,
   normalizeRole,
 };
-
-// Re-export domain-specific APIs for convenience and backward-compatibility
-export * from "./usersApi.js";
-export * from "./projectsApi.js";
-export * from "./tasksApi.js";
-export * from "./joinRequestsApi.js";
-export * from "./mentorApplicationsApi.js";
-export * from "./mentorRequestsApi.js";
-export * from "./supportApi.js";
-export * from "./adminApi.js";
-export * from "./portalAdminsApi.js";
-export * from "./notificationsApi.js";
-export * from "./leaderboardApi.js";
-export * from "./mentorMarketplaceApi.js";
-export * from "./mentorshipApi.js";
-export * from "./authApi.js";
 
 export default apiRequest;

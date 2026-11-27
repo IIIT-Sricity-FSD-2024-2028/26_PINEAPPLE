@@ -14,11 +14,9 @@ import {
   HttpCode,
   HttpStatus,
   NotFoundException,
-  ForbiddenException,
   BadRequestException,
   Inject,
   forwardRef,
-  Optional,
 } from '@nestjs/common';
 import type { Response } from 'express';
 import {
@@ -41,12 +39,12 @@ import { WarnUserDto } from './dto/warn-user.dto';
 import { SuspendUserDto } from './dto/suspend-user.dto';
 import { ReactivateUserDto } from './dto/reactivate-user.dto';
 import { AdminLoginDto } from './dto/admin-login.dto';
-import { ResetDemoDto } from './dto/reset-demo.dto';
+import { UpdatePlatformConfigDto } from '../platform-config/dto/update-platform-config.dto';
 import { AdminService } from './admin.service';
+import { AdminRefreshService } from './admin-refresh.service';
 import { JobsService } from '../jobs/jobs.service';
 import { JobRunsService } from '../jobs/job-runs.service';
 import { MentorMarketplaceService } from '../mentor-marketplace/mentor-marketplace.service';
-import { DemoResetService } from '../system/demo-reset.service';
 import { ReputationService } from '../moderation/reputation.service';
 import { ProjectsService } from '../projects/projects.service';
 import { CurrentUser } from '../auth/decorators/current-user.decorator';
@@ -63,13 +61,13 @@ import { CurrentUser } from '../auth/decorators/current-user.decorator';
 export class AdminController {
   constructor(
     private readonly adminService: AdminService,
+    private readonly adminRefreshService: AdminRefreshService,
     private readonly jobsService: JobsService,
     private readonly jobRunsService: JobRunsService,
     @Inject(forwardRef(() => MentorMarketplaceService))
     private readonly mentorMarketplaceService: MentorMarketplaceService,
     private readonly reputationService: ReputationService,
     private readonly projectsService: ProjectsService,
-    @Optional() private readonly demoResetService?: DemoResetService,
   ) {}
 
   @Get('users')
@@ -88,6 +86,15 @@ export class AdminController {
   @ApiForbiddenResponse({ description: 'Forbidden - users section permission required' })
   listDuplicateUsers() {
     return this.adminService.getDuplicateUsers();
+  }
+
+  @Get('users/counts')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Get canonical platform user counts for the Users page filter chips' })
+  @ApiOkResponse({ description: 'Platform user counts returned successfully.' })
+  @ApiForbiddenResponse({ description: 'Forbidden - admin users permission required' })
+  getUserCounts() {
+    return this.adminService.getUserCounts();
   }
 
   @Get('reputation/reconcile')
@@ -114,14 +121,45 @@ export class AdminController {
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Login as an admin or superuser' })
   @ApiOkResponse({ description: 'Logged in successfully.', type: Object })
-  login(@Body() credentials: AdminLoginDto, @Req() req: any) {
+  login(
+    @Body() credentials: AdminLoginDto,
+    @Req() req: any,
+    @Res({ passthrough: true }) res: Response,
+  ) {
     const forwarded = req?.headers?.['x-forwarded-for'];
     const clientIp =
       (forwarded ? String(forwarded).split(',')[0].trim() : '') ||
       req?.ip ||
       req?.socket?.remoteAddress ||
       'unknown';
-    return this.adminService.login(credentials, clientIp);
+    return this.adminService.login(credentials, clientIp, res);
+  }
+
+  @Public()
+  @Post('auth/refresh')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Refresh an admin portal access token via httpOnly refresh cookie' })
+  @ApiOkResponse({ description: 'Admin session refreshed successfully.', type: Object })
+  refreshSession(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return this.adminRefreshService.refresh(req, res);
+  }
+
+  @Public()
+  @Post('auth/logout')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Log out of admin portal and revoke the admin refresh cookie' })
+  @ApiOkResponse({ description: 'Admin session logged out.', type: Object })
+  logoutSession(@Req() req: any, @Res({ passthrough: true }) res: Response) {
+    return this.adminRefreshService.logout(req, res);
+  }
+
+  @Post('admins/:id/revoke-sessions')
+  @Roles('superuser')
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'Revoke all active sessions for an admin account (Super User only)' })
+  @ApiOkResponse({ description: 'Admin sessions revoked successfully.', type: Object })
+  revokeAdminSessions(@Param('id') id: string) {
+    return this.adminService.revokeAdminSessions(id);
   }
 
   @Patch('users/:id/status')
@@ -303,7 +341,7 @@ export class AdminController {
   @Roles('superuser')
   @ApiOperation({ summary: 'Update platform configuration (Superuser only)' })
   @ApiOkResponse({ description: 'Platform configuration updated successfully.' })
-  updateConfig(@Body() dto: any) {
+  updateConfig(@Body() dto: UpdatePlatformConfigDto) {
     return this.adminService.updateConfig(dto);
   }
 
@@ -354,54 +392,6 @@ export class AdminController {
   @ApiOkResponse({ description: 'Reconciliation result returned.' })
   reconcileEscrow() {
     return this.mentorMarketplaceService.reconcileEscrow();
-  }
-
-  @Get('system/demo-reset-status')
-  @Roles('superuser')
-  @ApiOperation({ summary: 'Check whether demo reset is enabled and last reset timestamp (Super User only)' })
-  @ApiOkResponse({ description: 'Demo reset status returned successfully.' })
-  @ApiForbiddenResponse({ description: 'Forbidden - superuser role required' })
-  getDemoResetStatus() {
-    if (!this.demoResetService) {
-      return { enabled: false, lastResetAt: null };
-    }
-    return this.demoResetService.getStatus();
-  }
-
-  @Post('system/reset-demo')
-  @Roles('superuser')
-  @HttpCode(HttpStatus.OK)
-  @ApiOperation({ summary: 'Reset all platform stores, files, and snapshot to initial mock seed state (Super User only)' })
-  @ApiOkResponse({ description: 'Demo data restored to original seed state.' })
-  @ApiForbiddenResponse({ description: 'Forbidden - superuser role required or demo reset disabled' })
-  async resetDemoData(
-    @Body() body: ResetDemoDto,
-    @CurrentUser() caller?: any,
-    @Headers('x-user-id') headerUserId?: string,
-  ) {
-    if (!this.demoResetService) {
-      return { resetAt: new Date().toISOString(), counts: { users: 0, projects: 0, tasks: 0 } };
-    }
-    if (!this.demoResetService.getStatus().enabled) {
-      throw new ForbiddenException({
-        statusCode: 403,
-        error: 'Forbidden',
-        code: 'DEMO_RESET_DISABLED',
-        message: 'Demo data reset is disabled in this environment.',
-      });
-    }
-    if (String(body?.confirm || '') !== 'RESET') {
-      throw new BadRequestException({
-        statusCode: 400,
-        error: 'Bad Request',
-        code: 'CONFIRMATION_REQUIRED',
-        message: 'Type RESET to confirm demo data reset.',
-      });
-    }
-    const isLegacy = process.env.AUTH_MODE === 'legacy';
-    const callerId = isLegacy ? (headerUserId || 'u-superuser') : (caller?.uid || caller?.id || 'u-superuser');
-    const callerLabel = caller?.email || caller?.name || callerId;
-    return this.demoResetService.reset(callerId, callerLabel);
   }
 
   @Get('users/:id/reputation')

@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { screen, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import FeedbackHistory from '../components/features/FeedbackHistory';
 import feedbackApi from '../services/feedbackApi';
+import { renderWithStore } from './test-utils';
 
 describe('FeedbackHistory (Fix 4)', () => {
   beforeEach(() => {
@@ -28,7 +29,7 @@ describe('FeedbackHistory (Fix 4)', () => {
       },
     ];
 
-    render(
+    renderWithStore(
       <FeedbackHistory
         entityType="TASK"
         entityId="task-101"
@@ -65,7 +66,7 @@ describe('FeedbackHistory (Fix 4)', () => {
       },
     ]);
 
-    render(
+    renderWithStore(
       <FeedbackHistory
         entityType="APPLICATION"
         entityId="app-50"
@@ -84,7 +85,7 @@ describe('FeedbackHistory (Fix 4)', () => {
   it('renders nothing when history is empty', async () => {
     vi.spyOn(feedbackApi, 'getEntityFeedback').mockResolvedValueOnce([]);
 
-    const { container } = render(
+    const { container } = renderWithStore(
       <FeedbackHistory
         entityType="TASK"
         entityId="empty-task"

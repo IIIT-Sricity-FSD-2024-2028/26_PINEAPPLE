@@ -3,6 +3,7 @@ import { ValidationPipe } from '@nestjs/common';
 import * as http from 'http';
 import * as fs from 'fs';
 import * as path from 'path';
+import { getSecureCvsDir } from '../src/core/middleware/file-upload.middleware';
 
 process.env.AUTH_MODE = 'jwt';
 process.env.JWT_SECRET = 'teamforge-jwt-secret-key-development-minimum-32-chars';
@@ -225,7 +226,7 @@ async function runTests() {
     );
 
     // Verify file actually exists in secure-cvs directory
-    const secureCvPath = path.join(process.cwd(), 'secure-cvs', uploadedCv.filename);
+    const secureCvPath = path.join(getSecureCvsDir(), uploadedCv.filename);
     assert(
       fs.existsSync(secureCvPath),
       `Uploaded CV is physically stored in secure directory outside public root (${secureCvPath})`,

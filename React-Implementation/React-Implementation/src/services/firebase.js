@@ -25,7 +25,7 @@ if (useEmulator && !emulatorConnected) {
   try {
     connectAuthEmulator(auth, emulatorUrl, { disableWarnings: true });
     emulatorConnected = true;
-    console.log(`[Firebase] Connected Auth to Emulator at ${emulatorUrl}`);
+    console.debug(`[Firebase] Connected Auth to Emulator at ${emulatorUrl}`);
   } catch (err) {
     // connectAuthEmulator throws if called multiple times (e.g. during Vite HMR)
     console.warn('[Firebase] Emulator connection skipped or already initialized:', err?.message);
@@ -44,7 +44,7 @@ try {
     try {
       connectAuthEmulator(phoneVerifyAuth, emulatorUrl, { disableWarnings: true });
     } catch (err) {
-      console.log('[Firebase] Phone emulator already connected or notice:', err);
+      console.debug('[Firebase] Phone emulator already connected or notice:', err);
     }
   }
 } catch (err) {

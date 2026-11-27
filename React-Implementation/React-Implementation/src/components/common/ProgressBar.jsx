@@ -13,7 +13,7 @@ import './ProgressBar.css';
  * @param {string} [props.color] - Custom bar color override.
  * @param {string} [props.className] - Additional class names.
  */
-export const ProgressBar = ({
+const ProgressBar = ({
   value,
   tasks,
   showLabel = true,

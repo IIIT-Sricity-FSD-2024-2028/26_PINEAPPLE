@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 import ProjectCard from '../components/features/ProjectCard';
@@ -203,7 +203,7 @@ describe('Phase 1 Removal & Integrity Tests: Project Health Removed Completely',
     };
 
     it('displays "Usually replies in N days" when ownerResponseTime is provided', () => {
-      render(
+      renderWithProviders(
         <ProjectCard
           project={testProject}
           ownerResponseTime="usually replies in 2 days"
@@ -215,7 +215,7 @@ describe('Phase 1 Removal & Integrity Tests: Project Health Removed Completely',
     });
 
     it('omits response time when ownerResponseTime is not provided', () => {
-      render(<ProjectCard project={testProject} />);
+      renderWithProviders(<ProjectCard project={testProject} />);
       expect(screen.queryByText(/usually replies/i)).toBeNull();
     });
   });

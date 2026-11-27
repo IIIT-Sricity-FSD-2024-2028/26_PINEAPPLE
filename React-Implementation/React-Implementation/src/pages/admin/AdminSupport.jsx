@@ -1,11 +1,43 @@
 import { useCallback, useEffect, useState } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import { useSearchParams } from 'react-router-dom';
-import supportApi from '../../services/supportApi';
+import {
+  closeProjectFromSupportTicket,
+  fetchAdminSupportTicketById,
+  fetchAdminSupportTickets,
+  fetchSupportAssignees,
+  replyAdminSupportTicket,
+  updateAdminSupportTicket,
+} from '../../store/thunks/supportTicketsThunks';
+import {
+  closeAdminTicketDrawer,
+  dismissCloseProjectModal,
+  openCloseProjectModal,
+  setDrawerError as setDrawerErrorAction,
+  setPendingTerminalStatus as setPendingTerminalStatusAction,
+  setSupportAssigneeFilter,
+  setSupportPage,
+  setSupportSearchQuery,
+  setSupportStatusFilter,
+  setSupportTypeFilter,
+} from '../../store/slices/supportTicketsSlice';
+import {
+  selectAdminSupportTickets,
+  selectAdminTicketsStatus,
+  selectSelectedAdminTicket,
+  selectSupportAssignees,
+  selectSupportTicketsWorking,
+  selectSupportTotal,
+  selectSupportTotalPages,
+} from '../../store/selectors/supportTicketsSelectors';
+import {
+  canAccess,
+  selectSession,
+} from '../../store/selectors/sessionSelectors';
 import SearchBar from '../../components/common/SearchBar';
 import Modal from '../../components/common/Modal';
 import EmptyState from '../../components/common/EmptyState';
 import { formatDateTime } from '../../utils/dateFormatter';
-import storage from '../../utils/storage';
 import './AdminSupport.css';
 
 function formatRelativeAge(iso) {
@@ -27,197 +59,126 @@ function formatStatusLabel(status) {
   return s.charAt(0).toUpperCase() + s.slice(1);
 }
 
-const AdminSupport = () => {
+const AdminSupportContent = () => {
+  const dispatch = useDispatch();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const adminSession = storage.getAdminSession();
-  const portalRole = adminSession.portalRole;
-  const role = adminSession.role || adminSession.portalRole;
-  const isSuperUser =
-    adminSession.isSuperUser ||
-    portalRole?.toLowerCase() === 'superuser' ||
-    portalRole?.toLowerCase() === 'super user' ||
-    role?.toLowerCase() === 'superuser' ||
-    role?.toLowerCase() === 'super user';
+  const sessionState = useSelector(selectSession);
+  const hasSupportPermission = canAccess(sessionState, 'support');
 
-  const permissions = Array.isArray(adminSession.permissions) ? adminSession.permissions : null;
+  // Store-backed list & working filters/drawer state (reset on routeChanged)
+  const tickets = useSelector(selectAdminSupportTickets);
+  const total = useSelector(selectSupportTotal);
+  const totalPages = useSelector(selectSupportTotalPages);
+  const ticketsStatus = useSelector(selectAdminTicketsStatus);
+  const error = useSelector((s) => s?.supportTickets?.adminTicketsError || '');
+  const assignees = useSelector(selectSupportAssignees);
+  const selectedTicket = useSelector(selectSelectedAdminTicket);
+  const working = useSelector(selectSupportTicketsWorking);
 
-  const hasSupportPermission =
-    isSuperUser ||
-    !permissions ||
-    (Array.isArray(permissions) && (permissions.includes('*') || permissions.includes('support')));
+  const statusFilter = working.statusFilter || 'all';
+  const typeFilter = working.typeFilter || 'all';
+  const assigneeFilter = working.assigneeFilter || 'all';
+  const searchQuery = working.searchQuery || '';
+  const page = working.page || 1;
+  const loading = ticketsStatus === 'idle' || ticketsStatus === 'loading';
 
-  // List & filter state
-  const [tickets, setTickets] = useState([]);
-  const [total, setTotal] = useState(0);
-  const [totalPages, setTotalPages] = useState(1);
-  const [page, setPage] = useState(1);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const detailLoading = Boolean(working.adminDetailLoading);
+  const drawerError = working.drawerError || '';
+  const drawerSuccess = working.drawerSuccess || '';
+  const updatingMeta = Boolean(working.updatingMeta);
+  const pendingTerminalStatus = working.pendingTerminalStatus || '';
+  const sendingReply = Boolean(working.sendingReply);
+  const closeProjectModalOpen = Boolean(working.closeProjectModalOpen);
+  const closingProject = Boolean(working.closingProject);
+  const closeError = working.closeError || '';
 
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [typeFilter, setTypeFilter] = useState('all');
-  const [assigneeFilter, setAssigneeFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [assignees, setAssignees] = useState([]);
+  const setStatusFilter = (val) => dispatch(setSupportStatusFilter(val));
+  const setTypeFilter = (val) => dispatch(setSupportTypeFilter(val));
+  const setAssigneeFilter = (val) => dispatch(setSupportAssigneeFilter(val));
+  const setSearchQuery = (val) => dispatch(setSupportSearchQuery(val));
+  const setPage = (valOrFn) =>
+    dispatch(
+      setSupportPage(typeof valOrFn === 'function' ? valOrFn(page) : valOrFn),
+    );
+  const setPendingTerminalStatus = (val) =>
+    dispatch(setPendingTerminalStatusAction(val));
+  const setCloseProjectModalOpen = (open) =>
+    dispatch(open ? openCloseProjectModal() : dismissCloseProjectModal());
 
-  // Drawer / detail state
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [drawerError, setDrawerError] = useState('');
-  const [drawerSuccess, setDrawerSuccess] = useState('');
-  const [updatingMeta, setUpdatingMeta] = useState(false);
-
-  // Pending terminal status transition note
-  const [pendingTerminalStatus, setPendingTerminalStatus] = useState('');
+  // Local form keystroke states
   const [terminalNote, setTerminalNote] = useState('');
-
-  // Reply state
   const [replyBody, setReplyBody] = useState('');
   const [replyInternal, setReplyInternal] = useState(false);
-  const [sendingReply, setSendingReply] = useState(false);
-
-  // Close project dialog state (for project_closure tickets)
-  const [closeProjectModalOpen, setCloseProjectModalOpen] = useState(false);
   const [closeReason, setCloseReason] = useState('');
-  const [closingProject, setClosingProject] = useState(false);
-  const [closeError, setCloseError] = useState('');
 
-  const loadAssignees = useCallback(async () => {
-    if (!hasSupportPermission) return;
-    await Promise.resolve();
-    try {
-      const list = await supportApi.listAssignees();
-      setAssignees(Array.isArray(list) ? list : []);
-    } catch {
-      setAssignees([]);
-    }
-  }, [hasSupportPermission]);
+  const listParams = {
+    status: statusFilter,
+    type: typeFilter,
+    assignee: assigneeFilter,
+    q: searchQuery,
+    page,
+    limit: 10,
+  };
 
-  const loadTickets = useCallback(async () => {
-    if (!hasSupportPermission) {
-      await Promise.resolve();
-      setLoading(false);
-      return;
-    }
-    await Promise.resolve();
-    setLoading(true);
-    setError('');
-    try {
-      const res = await supportApi.listAdminTickets({
+  const loadAssignees = useCallback(() => {
+    if (!hasSupportPermission) return Promise.resolve([]);
+    return dispatch(fetchSupportAssignees());
+  }, [dispatch, hasSupportPermission]);
+
+  const loadTickets = useCallback(() => {
+    if (!hasSupportPermission) return Promise.resolve([]);
+    return dispatch(
+      fetchAdminSupportTickets({
         status: statusFilter,
         type: typeFilter,
         assignee: assigneeFilter,
         q: searchQuery,
         page,
         limit: 10,
-      });
-      setTickets(Array.isArray(res?.items) ? res.items : []);
-      setTotal(Number(res?.total || 0));
-      setTotalPages(Math.max(1, Number(res?.totalPages || 1)));
-    } catch (err) {
-      setError(err?.serverMessage || err?.message || 'Failed to load support tickets.');
-    } finally {
-      setLoading(false);
-    }
-  }, [hasSupportPermission, statusFilter, typeFilter, assigneeFilter, searchQuery, page]);
+      }),
+    );
+  }, [dispatch, hasSupportPermission, statusFilter, typeFilter, assigneeFilter, searchQuery, page]);
 
   useEffect(() => {
-    let active = true;
-    if (!hasSupportPermission) return undefined;
-    supportApi.listAssignees()
-      .then((list) => {
-        if (active) setAssignees(Array.isArray(list) ? list : []);
-      })
-      .catch(() => {
-        if (active) setAssignees([]);
-      });
-    return () => {
-      active = false;
-    };
-  }, [hasSupportPermission]);
+    if (!hasSupportPermission) return;
+    dispatch(fetchSupportAssignees());
+  }, [dispatch, hasSupportPermission]);
 
   useEffect(() => {
-    let active = true;
-    if (!hasSupportPermission) {
-      Promise.resolve().then(() => {
-        if (active) setLoading(false);
-      });
-      return () => {
-        active = false;
-      };
-    }
-    supportApi.listAdminTickets({
-      status: statusFilter,
-      type: typeFilter,
-      assignee: assigneeFilter,
-      q: searchQuery,
-      page,
-      limit: 10,
-    })
-      .then((res) => {
-        if (!active) return;
-        setError('');
-        setTickets(Array.isArray(res?.items) ? res.items : []);
-        setTotal(Number(res?.total || 0));
-        setTotalPages(Math.max(1, Number(res?.totalPages || 1)));
-      })
-      .catch((err) => {
-        if (active) {
-          setError(err?.serverMessage || err?.message || 'Failed to load support tickets.');
-        }
-      })
-      .finally(() => {
-        if (active) setLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [hasSupportPermission, statusFilter, typeFilter, assigneeFilter, searchQuery, page]);
+    if (!hasSupportPermission) return;
+    dispatch(
+      fetchAdminSupportTickets({
+        status: statusFilter,
+        type: typeFilter,
+        assignee: assigneeFilter,
+        q: searchQuery,
+        page,
+        limit: 10,
+      }),
+    );
+  }, [dispatch, hasSupportPermission, statusFilter, typeFilter, assigneeFilter, searchQuery, page]);
 
-  const openTicketDetail = useCallback(async (ticketId) => {
-    setDetailLoading(true);
-    setDrawerError('');
-    setDrawerSuccess('');
-    setPendingTerminalStatus('');
-    setTerminalNote('');
-    setReplyBody('');
-    setReplyInternal(false);
-    try {
-      const detail = await supportApi.getAdminTicket(ticketId);
-      setSelectedTicket(detail);
-    } catch (err) {
-      setError(err?.serverMessage || err?.message || 'Could not load ticket details.');
-    } finally {
-      setDetailLoading(false);
-    }
-  }, []);
+  const openTicketDetail = useCallback(
+    (ticketId) => {
+      setTerminalNote('');
+      setReplyBody('');
+      setReplyInternal(false);
+      return dispatch(fetchAdminSupportTicketById(ticketId));
+    },
+    [dispatch],
+  );
 
   // Support deep linking via ?ticket=id
   const deepLinkedTicketId = searchParams.get('ticket');
   useEffect(() => {
-    if (!deepLinkedTicketId || !hasSupportPermission) return undefined;
-    let active = true;
-    supportApi.getAdminTicket(deepLinkedTicketId)
-      .then((detail) => {
-        if (!active) return;
-        setDrawerError('');
-        setDrawerSuccess('');
-        setSelectedTicket(detail);
-      })
-      .catch((err) => {
-        if (active) {
-          setError(err?.serverMessage || err?.message || 'Could not load ticket details.');
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [deepLinkedTicketId, hasSupportPermission]);
+    if (!deepLinkedTicketId || !hasSupportPermission) return;
+    dispatch(fetchAdminSupportTicketById(deepLinkedTicketId));
+  }, [dispatch, deepLinkedTicketId, hasSupportPermission]);
 
   const handleCloseDrawer = () => {
     if (updatingMeta || sendingReply) return;
-    setSelectedTicket(null);
+    dispatch(closeAdminTicketDrawer());
     if (searchParams.has('ticket')) {
       searchParams.delete('ticket');
       setSearchParams(searchParams, { replace: true });
@@ -227,43 +188,29 @@ const AdminSupport = () => {
   const applyTicketUpdate = async (patchPayload, successMsg = 'Ticket updated.') => {
     void loadAssignees;
     if (!selectedTicket) return;
-    setUpdatingMeta(true);
-    setDrawerError('');
-    setDrawerSuccess('');
     try {
-      const updated = await supportApi.updateAdminTicket(selectedTicket.id, patchPayload);
-      setSelectedTicket(updated);
-      setPendingTerminalStatus('');
+      await dispatch(
+        updateAdminSupportTicket({
+          ticketId: selectedTicket.id,
+          payload: patchPayload,
+          successMessage: successMsg,
+          listParams,
+        }),
+      ).unwrap();
       setTerminalNote('');
-      setDrawerSuccess(successMsg);
-      loadTickets();
-    } catch (err) {
-      if (err?.code === 'TICKET_CLOSED' || /read-only|ticket_closed/i.test(err?.serverMessage || err?.message || '')) {
-        try {
-          const fresh = await supportApi.getAdminTicket(selectedTicket.id);
-          setSelectedTicket(fresh);
-        } catch {}
-        setPendingTerminalStatus('');
-        setTerminalNote('');
-        setDrawerError('This ticket is closed and read-only.');
-        loadTickets();
-      } else {
-        setDrawerError(err?.serverMessage || err?.message || 'Failed to update ticket.');
-      }
-    } finally {
-      setUpdatingMeta(false);
+    } catch {
+      // Friendly TICKET_CLOSED & error stored in supportTicketsSlice working.drawerError
     }
   };
 
   const handleStatusChange = (nextStatus) => {
     if (!selectedTicket || nextStatus === selectedTicket.status) return;
     if (nextStatus === 'resolved' || nextStatus === 'rejected') {
-      setPendingTerminalStatus(nextStatus);
+      dispatch(setPendingTerminalStatusAction(nextStatus));
       setTerminalNote('');
-      setDrawerError('');
       return;
     }
-    setPendingTerminalStatus('');
+    dispatch(setPendingTerminalStatusAction(''));
     applyTicketUpdate({ status: nextStatus }, `Status updated to ${formatStatusLabel(nextStatus)}.`);
   };
 
@@ -271,7 +218,11 @@ const AdminSupport = () => {
     e.preventDefault();
     const trimmed = terminalNote.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
-      setDrawerError('A resolution/rejection note between 10 and 500 characters is required.');
+      dispatch(
+        setDrawerErrorAction(
+          'A resolution/rejection note between 10 and 500 characters is required.',
+        ),
+      );
       return;
     }
     applyTicketUpdate(
@@ -286,32 +237,19 @@ const AdminSupport = () => {
     const trimmed = replyBody.trim();
     if (!trimmed) return;
 
-    setSendingReply(true);
-    setDrawerError('');
-    setDrawerSuccess('');
     try {
-      const updated = await supportApi.replyAdminTicket(selectedTicket.id, {
-        body: trimmed,
-        internal: replyInternal,
-      });
-      setSelectedTicket(updated);
+      await dispatch(
+        replyAdminSupportTicket({
+          ticketId: selectedTicket.id,
+          body: trimmed,
+          internal: replyInternal,
+          listParams,
+        }),
+      ).unwrap();
       setReplyBody('');
       setReplyInternal(false);
-      setDrawerSuccess(replyInternal ? 'Internal note added.' : 'Public reply sent to user.');
-      loadTickets();
-    } catch (err) {
-      if (err?.code === 'TICKET_CLOSED' || /read-only|ticket_closed/i.test(err?.serverMessage || err?.message || '')) {
-        try {
-          const fresh = await supportApi.getAdminTicket(selectedTicket.id);
-          setSelectedTicket(fresh);
-        } catch {}
-        setDrawerError('This ticket is closed and read-only.');
-        loadTickets();
-      } else {
-        setDrawerError(err?.serverMessage || err?.message || 'Failed to post reply.');
-      }
-    } finally {
-      setSendingReply(false);
+    } catch {
+      // Friendly TICKET_CLOSED or error stored in supportTicketsSlice
     }
   };
 
@@ -320,33 +258,20 @@ const AdminSupport = () => {
     if (!selectedTicket) return;
     const trimmed = closeReason.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
-      setCloseError('Reason must be between 10 and 500 characters.');
       return;
     }
 
-    setClosingProject(true);
-    setCloseError('');
     try {
-      const res = await supportApi.closeProjectFromTicket(selectedTicket.id, trimmed);
-      setSelectedTicket(res.ticket || selectedTicket);
-      setCloseProjectModalOpen(false);
+      await dispatch(
+        closeProjectFromSupportTicket({
+          ticketId: selectedTicket.id,
+          reason: trimmed,
+          listParams,
+        }),
+      ).unwrap();
       setCloseReason('');
-      setDrawerSuccess('Project closed ("Owner inactive"), Phase 9 refunds processed, and ticket resolved.');
-      loadTickets();
-    } catch (err) {
-      if (err?.code === 'TICKET_CLOSED' || /read-only|ticket_closed/i.test(err?.serverMessage || err?.message || '')) {
-        try {
-          const fresh = await supportApi.getAdminTicket(selectedTicket.id);
-          setSelectedTicket(fresh);
-        } catch {}
-        setCloseProjectModalOpen(false);
-        setDrawerError('This ticket is closed and read-only.');
-        loadTickets();
-      } else {
-        setCloseError(err?.serverMessage || err?.message || 'Failed to close project from ticket.');
-      }
-    } finally {
-      setClosingProject(false);
+    } catch {
+      // Friendly error stored in supportTicketsSlice
     }
   };
 
@@ -901,7 +826,6 @@ const AdminSupport = () => {
                       disabled={!projectClosable}
                       onClick={() => {
                         setCloseReason('');
-                        setCloseError('');
                         setCloseProjectModalOpen(true);
                       }}
                     >
@@ -1099,4 +1023,5 @@ const AdminSupport = () => {
   );
 };
 
+const AdminSupport = AdminSupportContent;
 export default AdminSupport;

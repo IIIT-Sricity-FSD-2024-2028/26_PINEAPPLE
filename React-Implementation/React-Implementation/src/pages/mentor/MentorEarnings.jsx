@@ -1,59 +1,61 @@
-import { useState, useEffect } from 'react';
-import { mentorMarketApi } from '../../services/mentorMarketplaceApi';
+import { useMemo, useState, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchMentorSessions } from '../../store/thunks/mentorSessionsThunks';
+import {
+  selectMentorViewSessions,
+  selectMentorViewSessionsStatus,
+} from '../../store/selectors/mentorSessionsSelectors';
+import { retryPayoutAndRefresh } from '../../store/thunks/paymentsThunks';
+import { selectMentorEarningsTotals } from '../../store/selectors/paymentsSelectors';
+import { openSessionDispute } from '../../store/thunks/sessionDisputesThunks';
+import {
+  closeDisputeModal,
+  openDisputeModal,
+} from '../../store/slices/sessionDisputesSlice';
+import { selectSessionDisputesWorking } from '../../store/selectors/sessionDisputesSelectors';
 import StatCard from '../../components/common/StatCard';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import Modal from '../../components/common/Modal';
 import './mentorEarnings.css';
 
-const MentorEarnings = () => {
-  const [sessions, setSessions] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
-  const [disputeSession, setDisputeSession] = useState(null);
+const MentorEarningsContent = () => {
+  const dispatch = useDispatch();
+  const sessions = useSelector(selectMentorViewSessions);
+  const sessionsStatus = useSelector(selectMentorViewSessionsStatus);
+  const earningsTotals = useSelector(selectMentorEarningsTotals);
+  const disputesWorking = useSelector(selectSessionDisputesWorking);
+  const loading = sessionsStatus === 'idle' || sessionsStatus === 'loading';
+
+  const disputeSession = useMemo(
+    () =>
+      sessions.find(
+        (s) => String(s.id) === String(disputesWorking.targetSessionId),
+      ) || null,
+    [sessions, disputesWorking.targetSessionId],
+  );
   const [disputeReason, setDisputeReason] = useState('');
-  const [disputeError, setDisputeError] = useState('');
-  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
+  const disputeError = disputesWorking.modalError || '';
+  const disputeSubmitting = Boolean(disputesWorking.submitting);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchEarnings = async () => {
-      try {
-        const data = await mentorMarketApi.mentorSessions();
-        if (isMounted) {
-          setSessions(Array.isArray(data) ? data : []);
-        }
-      } catch (err) {
-        console.warn('Failed to load mentor earnings data:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchEarnings();
-    return () => {
-      isMounted = false;
-    };
-  }, [refreshKey]);
+    dispatch(fetchMentorSessions({ force: true }));
+  }, [dispatch]);
 
   const handleRetryPayout = async (sessionId) => {
     try {
-      await mentorMarketApi.retryPayout(sessionId);
-      setRefreshKey((k) => k + 1);
+      await dispatch(retryPayoutAndRefresh({ sessionId, scope: 'mentor' })).unwrap();
     } catch (err) {
-      alert(err.message || 'Failed to retry payout');
+      alert(err?.message || 'Failed to retry payout');
     }
   };
 
-  // Calculate metrics
+  // Non-money session counts + server-returned earnings totals from paymentsSlice (no FE money arithmetic)
   const completedSessions = sessions.filter((s) => s.status === 'completed');
-  const activeSessions = sessions.filter((s) => s.status === 'active' || s.status === 'payout_pending');
   const pendingRequests = sessions.filter((s) => s.status === 'escrow_funded');
 
-  const totalEarned = completedSessions.reduce((sum, s) => sum + (s.payout || s.agreedPrice || 0), 0);
-  const pendingInEscrow = activeSessions.reduce((sum, s) => sum + (s.payout || s.agreedPrice || 0), 0);
+  const totalEarned = Number(earningsTotals?.totalEarned || 0);
+  const pendingInEscrow = Number(earningsTotals?.pendingInEscrow || 0);
 
   const renderStatusBadge = (status, sessionId, sess = {}) => {
     const map = {
@@ -168,9 +170,8 @@ const MentorEarnings = () => {
             className="btn btn-outline btn-sm"
             style={{ color: '#b91c1c', borderColor: '#fecaca', padding: '4px 10px', fontSize: '0.78rem' }}
             onClick={() => {
-              setDisputeSession(s);
+              dispatch(openDisputeModal(s.id));
               setDisputeReason('');
-              setDisputeError('');
             }}
           >
             Open Dispute
@@ -192,7 +193,7 @@ const MentorEarnings = () => {
           <h1>Mentor Earnings & Escrow</h1>
           <p className="subtitle">Track your completed sessions, released payouts, and funds pending in escrow.</p>
         </div>
-        <button className="btn btn-outline btn-sm" onClick={() => setRefreshKey((k) => k + 1)}>
+        <button className="btn btn-outline btn-sm" onClick={() => dispatch(fetchMentorSessions({ force: true }))}>
           🔄 Refresh
         </button>
       </div>
@@ -213,13 +214,13 @@ const MentorEarnings = () => {
         <StatCard
           icon="🟡"
           label="Awaiting Your Response"
-          value={pendingRequests.length}
+          value={earningsTotals?.awaitingResponseCount ?? pendingRequests.length}
           subtext="New booking requests"
         />
         <StatCard
           icon="✅"
           label="Sessions Completed"
-          value={completedSessions.length}
+          value={earningsTotals?.completedCount ?? completedSessions.length}
           subtext="Successfully finished"
         />
       </div>
@@ -241,14 +242,14 @@ const MentorEarnings = () => {
       <Modal
         isOpen={Boolean(disputeSession)}
         title="Open Escrow Dispute"
-        onClose={() => !disputeSubmitting && setDisputeSession(null)}
+        onClose={() => !disputeSubmitting && dispatch(closeDisputeModal())}
         footer={
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
             <button
               type="button"
               className="btn btn-outline"
               disabled={disputeSubmitting}
-              onClick={() => setDisputeSession(null)}
+              onClick={() => dispatch(closeDisputeModal())}
             >
               Cancel
             </button>
@@ -257,17 +258,17 @@ const MentorEarnings = () => {
               className="btn btn-danger"
               disabled={disputeSubmitting || disputeReason.trim().length < 10}
               onClick={async () => {
-                if (!disputeSession) return;
-                setDisputeSubmitting(true);
-                setDisputeError('');
+                if (!disputeSession || disputeSubmitting) return;
                 try {
-                  await mentorMarketApi.openDispute(disputeSession.id, disputeReason.trim());
-                  setDisputeSession(null);
-                  setRefreshKey((k) => k + 1);
-                } catch (err) {
-                  setDisputeError(err?.serverMessage || err?.message || 'Failed to open dispute.');
-                } finally {
-                  setDisputeSubmitting(false);
+                  await dispatch(
+                    openSessionDispute({
+                      sessionId: disputeSession.id,
+                      reason: disputeReason.trim(),
+                    }),
+                  ).unwrap();
+                  dispatch(fetchMentorSessions({ force: true }));
+                } catch {
+                  // Error stored in sessionDisputes.working.modalError
                 }
               }}
             >
@@ -295,4 +296,5 @@ const MentorEarnings = () => {
   );
 };
 
+const MentorEarnings = MentorEarningsContent;
 export default MentorEarnings;

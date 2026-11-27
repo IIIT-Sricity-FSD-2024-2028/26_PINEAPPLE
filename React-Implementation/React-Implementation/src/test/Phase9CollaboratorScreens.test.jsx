@@ -1,4 +1,3 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { Routes, Route } from 'react-router-dom';
@@ -7,7 +6,7 @@ import path from 'path';
 import { renderWithProviders } from './test-utils';
 import ProjectCard from '../components/features/ProjectCard';
 import CollaboratorWorkspace from '../pages/collaborator/CollaboratorWorkspace';
-import { useReasonAction, actionApi } from '../hooks/useReasonAction';
+import { useReasonAction } from '../hooks/useReasonAction';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
 import communicationApi from '../services/communicationApi';
@@ -112,9 +111,8 @@ describe('PHASE 9: COLLABORATOR SCREENS', () => {
         expect(content).not.toMatch(/projectsApi\.acceptInvite\s*\(/);
       }
 
-      // Verify actionApi exports canonical handlers
-      expect(typeof actionApi.declineInvite).toBe('function');
-      expect(typeof actionApi.acceptInvite).toBe('function');
+      // Verify useReasonAction hook is exported
+      expect(typeof useReasonAction).toBe('function');
     });
 
     it('decline invite opens reason modal whether clicked in Notifications or Projects Marketplace', async () => {
@@ -175,7 +173,7 @@ describe('PHASE 9: COLLABORATOR SCREENS', () => {
       });
     });
 
-    it('accept invite invokes actionApi.acceptInvite directly without requiring negative reason', async () => {
+    it('accept invite dispatches acceptProjectInvite via Redux without requiring negative reason', async () => {
       projectsApi.acceptInvite.mockResolvedValue({ success: true });
 
       const TestConsumer = () => {

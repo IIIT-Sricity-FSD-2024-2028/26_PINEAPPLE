@@ -90,5 +90,3 @@ export function getProjectRole(project, userIdOrUser, userName = '') {
 
   return null;
 }
-
-export default getProjectRole;

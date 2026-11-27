@@ -52,18 +52,6 @@ export function useVisibilityPoll(
       }
     };
 
-    const onStopPolls = () => {
-      isActive = false;
-      if (intervalIdRef.current !== null) {
-        clearInterval(intervalIdRef.current);
-        intervalIdRef.current = null;
-      }
-    };
-
-    if (typeof window !== 'undefined') {
-      window.addEventListener('teamforge:stop_polls', onStopPolls);
-    }
-
     if (typeof document !== 'undefined') {
       document.addEventListener('visibilitychange', onVisibilityChange);
     }
@@ -74,14 +62,9 @@ export function useVisibilityPoll(
         clearInterval(intervalIdRef.current);
         intervalIdRef.current = null;
       }
-      if (typeof window !== 'undefined') {
-        window.removeEventListener('teamforge:stop_polls', onStopPolls);
-      }
       if (typeof document !== 'undefined') {
         document.removeEventListener('visibilitychange', onVisibilityChange);
       }
     };
   }, [enabled, intervalMs, immediate, triggerOnVisible, visibleCooldownMs]);
 }
-
-export default useVisibilityPoll;

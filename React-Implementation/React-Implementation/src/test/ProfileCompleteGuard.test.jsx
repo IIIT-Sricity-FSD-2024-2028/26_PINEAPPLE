@@ -4,7 +4,8 @@ import { render } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
 import ProtectedRoute from '../routes/ProtectedRoute';
 import CompleteProfile from '../pages/CompleteProfile';
-import { AuthContext } from '../context/AuthContext';
+import { Provider } from 'react-redux';
+import { createAppStore } from '../store';
 
 function TestProtectedComponent() {
   return <div>Protected Dashboard Content</div>;
@@ -31,8 +32,17 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
       updateUser: vi.fn(),
     };
 
+    const store = createAppStore({
+      preloadedState: {
+        session: {
+          ...authValue,
+          status: authValue.isAuthenticated ? 'authenticated' : 'signed_out',
+        },
+      },
+    });
+
     render(
-      <AuthContext.Provider value={authValue}>
+      <Provider store={store}>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
             <Route element={<ProtectedRoute />}>
@@ -42,7 +52,7 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
             <Route path="/login" element={<TestLoginComponent />} />
           </Routes>
         </MemoryRouter>
-      </AuthContext.Provider>
+      </Provider>
     );
 
     expect(screen.getByText('Complete Profile Page Content')).toBeDefined();
@@ -61,8 +71,17 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
       updateUser: vi.fn(),
     };
 
+    const store = createAppStore({
+      preloadedState: {
+        session: {
+          ...authValue,
+          status: authValue.isAuthenticated ? 'authenticated' : 'signed_out',
+        },
+      },
+    });
+
     render(
-      <AuthContext.Provider value={authValue}>
+      <Provider store={store}>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
             <Route element={<ProtectedRoute />}>
@@ -72,7 +91,7 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
             <Route path="/login" element={<TestLoginComponent />} />
           </Routes>
         </MemoryRouter>
-      </AuthContext.Provider>
+      </Provider>
     );
 
     expect(screen.getByText('Protected Dashboard Content')).toBeDefined();
@@ -87,8 +106,17 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
       updateUser: vi.fn(),
     };
 
+    const store = createAppStore({
+      preloadedState: {
+        session: {
+          ...authValue,
+          status: authValue.isAuthenticated ? 'authenticated' : 'signed_out',
+        },
+      },
+    });
+
     render(
-      <AuthContext.Provider value={authValue}>
+      <Provider store={store}>
         <MemoryRouter initialEntries={['/dashboard']}>
           <Routes>
             <Route element={<ProtectedRoute />}>
@@ -98,7 +126,7 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
             <Route path="/login" element={<TestLoginComponent />} />
           </Routes>
         </MemoryRouter>
-      </AuthContext.Provider>
+      </Provider>
     );
 
     expect(screen.getByText('Login Page Content')).toBeDefined();
@@ -117,15 +145,24 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
       updateUser: vi.fn(),
     };
 
+    const store = createAppStore({
+      preloadedState: {
+        session: {
+          ...authValue,
+          status: authValue.isAuthenticated ? 'authenticated' : 'signed_out',
+        },
+      },
+    });
+
     render(
-      <AuthContext.Provider value={authValue}>
+      <Provider store={store}>
         <MemoryRouter initialEntries={['/complete-profile']}>
           <Routes>
             <Route path="/complete-profile" element={<CompleteProfile />} />
             <Route path="/dashboard" element={<TestProtectedComponent />} />
           </Routes>
         </MemoryRouter>
-      </AuthContext.Provider>
+      </Provider>
     );
 
     expect(screen.getByText('Protected Dashboard Content')).toBeDefined();
@@ -140,15 +177,24 @@ describe('Phase 5 - Profile Complete Route Guard Tests', () => {
       updateUser: vi.fn(),
     };
 
+    const store = createAppStore({
+      preloadedState: {
+        session: {
+          ...authValue,
+          status: 'signed_out',
+        },
+      },
+    });
+
     render(
-      <AuthContext.Provider value={authValue}>
+      <Provider store={store}>
         <MemoryRouter initialEntries={['/complete-profile']}>
           <Routes>
             <Route path="/complete-profile" element={<CompleteProfile />} />
             <Route path="/login" element={<TestLoginComponent />} />
           </Routes>
         </MemoryRouter>
-      </AuthContext.Provider>
+      </Provider>
     );
 
     expect(screen.getByText('Login Page Content')).toBeDefined();

@@ -32,6 +32,7 @@ const AdminReports = lazy(() => import("../pages/admin/AdminReports"));
 const AdminSupport = lazy(() => import("../pages/admin/AdminSupport"));
 const SuperuserAdmins = lazy(() => import("../pages/admin/SuperuserAdmins"));
 const SuperuserConfig = lazy(() => import("../pages/admin/SuperuserConfig"));
+const AdminNotFound = lazy(() => import("../pages/admin/AdminNotFound"));
 
 // Protected Shared pages
 const Layout = lazy(() => import("../pages/layout"));
@@ -93,7 +94,7 @@ function RouteLoadingFallback() {
   );
 }
 
-const AppRoutes = () => {
+const AppRoutes = ({ awaitingAdminRestore = false } = {}) => {
   return (
     <Suspense fallback={<RouteLoadingFallback />}>
       <Routes>
@@ -102,7 +103,6 @@ const AppRoutes = () => {
         <Route path="/login" element={<Login />} />
         <Route path="/signup" element={<Signup />} />
         <Route path="/complete-profile" element={<CompleteProfile />} />
-        <Route path="/complete_profile" element={<CompleteProfile />} />
         <Route path="/forgot-password" element={<ForgotPassword />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/verify-email" element={<VerifyEmail />} />
@@ -111,7 +111,7 @@ const AppRoutes = () => {
         {/* Admin Pages (Login is public, Dashboard is protected) */}
         <Route path="/admin/login" element={<AdminLogin />} />
 
-        <Route element={<AdminProtectedRoute />}>
+        <Route element={<AdminProtectedRoute awaitingAdminRestore={awaitingAdminRestore} />}>
           <Route path="/admin" element={<AdminLayout />}>
             <Route index element={<AdminDashboard />} />
             <Route path="users" element={<AdminUsers />} />
@@ -126,6 +126,7 @@ const AppRoutes = () => {
             <Route path="support" element={<AdminSupport />} />
             <Route path="su-admins" element={<SuperuserAdmins />} />
             <Route path="su-config" element={<SuperuserConfig />} />
+            <Route path="*" element={<AdminNotFound />} />
           </Route>
         </Route>
 

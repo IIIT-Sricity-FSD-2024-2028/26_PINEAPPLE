@@ -1,8 +1,25 @@
-import { useState, useRef, useEffect } from 'react';
+import { useRef, useEffect } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
 import Avatar from '../common/Avatar';
 import Badge from '../common/Badge';
 import Modal from '../common/Modal';
-import communicationApi from '../../services/communicationApi';
+import {
+  clearChatReportFeedback,
+  closeReportDialog,
+  openReportDialog,
+  setChatDraft,
+  setChatScrollFlag,
+  setReportError,
+  setReportReason,
+} from '../../store/slices/communicationSlice';
+import { reportChatMessage } from '../../store/thunks/communicationThunks';
+import {
+  selectChatDraftForProject,
+  selectChatSendErrorForProject,
+  selectCommunicationWorking,
+  selectReportedIdsMap,
+  selectReportStatus,
+} from '../../store/selectors/communicationSelectors';
 import './ChatBox.css';
 
 const SendIcon = () => (
@@ -60,7 +77,8 @@ const getRoleVariant = (role) => {
  * @param {boolean} [props.isForbidden=false]
  * @param {string} [props.forbiddenMessage]
  */
-const ChatBox = ({
+const ChatBoxContent = ({
+  projectId = '',
   messages = [],
   currentUserId = '',
   currentUserName = '',
@@ -70,13 +88,24 @@ const ChatBox = ({
   isForbidden = false,
   forbiddenMessage = 'You are not a member of this project.',
 }) => {
-  const [inputText, setInputText] = useState('');
-  const [reportTarget, setReportTarget] = useState(null);
-  const [reportReason, setReportReason] = useState('');
-  const [reportSubmitting, setReportSubmitting] = useState(false);
-  const [reportError, setReportError] = useState('');
-  const [reportSuccessMsg, setReportSuccessMsg] = useState('');
-  const [reportedIds, setReportedIds] = useState(() => new Set());
+  const dispatch = useDispatch();
+  const draftKey = projectId ? String(projectId) : '__default__';
+  const inputText = useSelector((state) =>
+    selectChatDraftForProject(state, draftKey),
+  );
+  const working = useSelector(selectCommunicationWorking);
+  const reportStatus = useSelector(selectReportStatus);
+  const reportedIdsMap = useSelector(selectReportedIdsMap);
+  const sendError = useSelector((state) =>
+    projectId ? selectChatSendErrorForProject(state, projectId) : null,
+  );
+  const reportTarget = working.reportTarget || null;
+  const reportReason = working.reportReason || '';
+  const reportError = working.reportError || '';
+  const reportSuccessMsg = working.reportSuccessMsg || '';
+  const reportSubmitting = reportStatus === 'loading';
+  const shouldScrollFlag = Boolean(working.shouldScrollByProject?.[draftKey]);
+
   const messagesEndRef = useRef(null);
   const refreshTimerRef = useRef(null);
 
@@ -87,20 +116,18 @@ const ChatBox = ({
   }, []);
 
   const openReportModal = (msg, senderName, text) => {
-    setReportTarget({
-      id: msg.id,
-      senderName,
-      content: text,
-    });
-    setReportReason('');
-    setReportError('');
+    dispatch(
+      openReportDialog({
+        id: msg.id,
+        senderName,
+        content: text,
+      }),
+    );
   };
 
   const closeReportModal = () => {
     if (reportSubmitting) return;
-    setReportTarget(null);
-    setReportReason('');
-    setReportError('');
+    dispatch(closeReportDialog());
   };
 
   const handleSubmitReport = async (e) => {
@@ -108,33 +135,19 @@ const ChatBox = ({
     if (!reportTarget?.id) return;
     const trimmed = reportReason.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
-      setReportError('Reason must be between 10 and 500 characters.');
+      dispatch(setReportError('Reason must be between 10 and 500 characters.'));
       return;
     }
 
-    setReportSubmitting(true);
-    setReportError('');
     try {
-      await communicationApi.reportMessage(reportTarget.id, trimmed);
-      setReportedIds((prev) => {
-        const next = new Set(prev);
-        next.add(String(reportTarget.id));
-        return next;
-      });
-      setReportTarget(null);
-      setReportReason('');
-      setReportSuccessMsg('Report sent. Admins will review it. You can track it in Help & Support under My reports.');
-    } catch (err) {
-      const code = err?.code || err?.data?.code;
-      if (code === 'ALREADY_REPORTED') {
-        setReportError('You have already reported this message.');
-      } else if (code === 'TOO_MANY_REPORTS') {
-        setReportError('Daily report limit reached. Please try again tomorrow.');
-      } else {
-        setReportError(err?.message || 'Failed to submit report.');
-      }
-    } finally {
-      setReportSubmitting(false);
+      await dispatch(
+        reportChatMessage({
+          messageId: reportTarget.id,
+          reason: trimmed,
+        }),
+      ).unwrap();
+    } catch {
+      // Friendly error message is stored in state.communication.working.reportError
     }
   };
 
@@ -143,7 +156,10 @@ const ChatBox = ({
     if (typeof messagesEndRef.current?.scrollIntoView === 'function') {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages.length]);
+    if (shouldScrollFlag) {
+      dispatch(setChatScrollFlag({ projectId: draftKey, shouldScroll: false }));
+    }
+  }, [dispatch, draftKey, messages.length, shouldScrollFlag]);
 
   if (isForbidden) {
     return (
@@ -172,7 +188,7 @@ const ChatBox = ({
     if (onSendMessage) {
       onSendMessage(trimmed);
     }
-    setInputText('');
+    dispatch(setChatDraft({ projectId: draftKey, text: '' }));
     if (onRefresh) {
       if (refreshTimerRef.current) clearTimeout(refreshTimerRef.current);
       refreshTimerRef.current = setTimeout(() => onRefresh(), 300);
@@ -188,6 +204,23 @@ const ChatBox = ({
 
   return (
     <div className="tf-chatbox">
+      {sendError && (
+        <div
+          role="alert"
+          data-testid="chat-send-error"
+          style={{
+            padding: '0.45rem 0.75rem',
+            marginBottom: '0.5rem',
+            borderRadius: '6px',
+            backgroundColor: '#fef2f2',
+            border: '1px solid #fecaca',
+            color: '#991b1b',
+            fontSize: '0.82rem',
+          }}
+        >
+          {sendError}
+        </div>
+      )}
       {reportSuccessMsg && (
         <div
           role="status"
@@ -208,7 +241,7 @@ const ChatBox = ({
           <span>{reportSuccessMsg}</span>
           <button
             type="button"
-            onClick={() => setReportSuccessMsg('')}
+            onClick={() => dispatch(clearChatReportFeedback())}
             style={{ background: 'none', border: 'none', color: '#065f46', cursor: 'pointer', fontWeight: 700 }}
             aria-label="Dismiss notice"
           >
@@ -262,11 +295,11 @@ const ChatBox = ({
                     )}
                     {isFormer && <span className="tf-chatbox-former-member" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>(Former member)</span>}
                     <span className="tf-chatbox-sender-name" title={senderName}>You</span>
-                    <Avatar name={senderName} isDeleted={isDeletedSender} size="xs" />
+                    <Avatar name={senderName} src={!isDeletedSender ? (msg.senderAvatarUrl || msg.senderAvatar) : null} version={msg.senderUpdatedAt} isDeleted={isDeletedSender} size="xs" />
                   </div>
                 ) : (
                   <div className="tf-chatbox-message-header tf-chatbox-message-header--theirs">
-                    <Avatar name={senderName} isDeleted={isDeletedSender} size="xs" />
+                    <Avatar name={senderName} src={!isDeletedSender ? (msg.senderAvatarUrl || msg.senderAvatar) : null} version={msg.senderUpdatedAt} isDeleted={isDeletedSender} size="xs" />
                     <span className="tf-chatbox-sender-name" style={isDeletedSender ? { color: '#64748b', fontStyle: 'italic' } : undefined}>
                       {senderName}
                     </span>
@@ -276,7 +309,7 @@ const ChatBox = ({
                     {isFormer && <span className="tf-chatbox-former-member" style={{ fontSize: '0.75rem', color: '#9ca3af' }}>(Former member)</span>}
                     {formattedTime && <span className="tf-chatbox-time-header">{formattedTime}</span>}
                     {msg.id && (
-                      reportedIds.has(String(msg.id)) ? (
+                      reportedIdsMap[String(msg.id)] ? (
                         <span
                           data-testid={`reported-badge-${msg.id}`}
                           style={{ fontSize: '0.72rem', color: '#b45309', marginLeft: '6px', fontWeight: 600 }}
@@ -322,7 +355,9 @@ const ChatBox = ({
           className="tf-chatbox-input"
           placeholder="Type your message and press Enter..."
           value={inputText}
-          onChange={(e) => setInputText(e.target.value)}
+          onChange={(e) =>
+            dispatch(setChatDraft({ projectId: draftKey, text: e.target.value }))
+          }
           onKeyDown={handleKeyDown}
           disabled={sending}
         />
@@ -387,8 +422,7 @@ const ChatBox = ({
               maxLength={500}
               value={reportReason}
               onChange={(e) => {
-                setReportReason(e.target.value);
-                if (reportError) setReportError('');
+                dispatch(setReportReason(e.target.value));
               }}
               placeholder="Explain why this chat message violates community rules..."
               style={{
@@ -416,4 +450,5 @@ const ChatBox = ({
   );
 };
 
+const ChatBox = ChatBoxContent;
 export default ChatBox;

@@ -260,9 +260,17 @@ export const mentorMarketplaceApi = {
       null,
       { role: role || getCurrentUserRole() || "admin", userId: getCurrentUserId() },
     ),
+  listEscrows: (role) =>
+    apiRequest("/escrow", "GET", null, {
+      role: role || getCurrentUserRole() || "admin",
+      userId: getCurrentUserId(),
+    }),
+  getEscrowById: (id, role) =>
+    apiRequest(`/escrow/${id}`, "GET", null, {
+      role: role || getCurrentUserRole(),
+      userId: getCurrentUserId(),
+    }),
 };
-
-export const mentorMarketApi = mentorMarketplaceApi;
 
 export function calculateEscrowBreakdown(sessionPrice) {
   const price = Math.round(Number(sessionPrice) || 0);

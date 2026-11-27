@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import ScheduledJobsPanel from '../pages/admin/ScheduledJobsPanel';
 import adminApi from '../services/adminApi';
+import { renderWithStore } from './test-utils';
 
 vi.mock('../services/adminApi', () => ({
   default: {
@@ -18,7 +19,7 @@ describe('ScheduledJobsPanel - Phase 7 Frontend Unit Tests', () => {
   it('1. Empty state: renders empty state when no runs have happened yet', async () => {
     adminApi.getJobRuns.mockResolvedValueOnce([]);
 
-    render(<ScheduledJobsPanel isSuperUser={true} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={true} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('empty-state')).toBeDefined();
@@ -47,7 +48,7 @@ describe('ScheduledJobsPanel - Phase 7 Frontend Unit Tests', () => {
 
     adminApi.getJobRuns.mockResolvedValueOnce(mockRuns);
 
-    render(<ScheduledJobsPanel isSuperUser={true} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={true} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('runs-table')).toBeDefined();
@@ -72,7 +73,7 @@ describe('ScheduledJobsPanel - Phase 7 Frontend Unit Tests', () => {
   it('3. Admin view has NO "Run now" button (read-only)', async () => {
     adminApi.getJobRuns.mockResolvedValueOnce([]);
 
-    render(<ScheduledJobsPanel isSuperUser={false} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={false} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('empty-state')).toBeDefined();
@@ -96,7 +97,7 @@ describe('ScheduledJobsPanel - Phase 7 Frontend Unit Tests', () => {
 
     adminApi.getJobRuns.mockResolvedValueOnce(runningRuns);
 
-    render(<ScheduledJobsPanel isSuperUser={true} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={true} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('run-now-btn')).toBeDefined();
@@ -115,7 +116,7 @@ describe('ScheduledJobsPanel - Phase 7 Frontend Unit Tests', () => {
       serverMessage: 'A job tick is already in progress.',
     });
 
-    render(<ScheduledJobsPanel isSuperUser={true} />);
+    renderWithStore(<ScheduledJobsPanel isSuperUser={true} />);
 
     await waitFor(() => {
       expect(screen.getByTestId('run-now-btn')).toBeDefined();

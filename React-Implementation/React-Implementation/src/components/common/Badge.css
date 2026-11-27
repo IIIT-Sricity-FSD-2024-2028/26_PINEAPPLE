@@ -91,6 +91,12 @@
   border-color: rgba(139, 92, 246, 0.28);
 }
 
+.tf-badge--purple {
+  background-color: rgba(124, 58, 237, 0.12);
+  color: #6d28d9;
+  border-color: rgba(124, 58, 237, 0.28);
+}
+
 /* Neutral / tag variant */
 .tf-badge--info {
   background-color: rgba(107, 114, 128, 0.12);

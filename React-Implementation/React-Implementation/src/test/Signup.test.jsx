@@ -1,14 +1,20 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { Provider } from 'react-redux';
 import Signup from '../pages/Signup';
-import { AuthContext } from '../context/AuthContext';
 import usersApi from '../services/usersApi';
+import authApi from '../services/authApi';
+import { createAppStore } from '../store';
 
-vi.mock('../services/apiClient', () => ({
-  getAuthMode: () => 'jwt',
-  setAccessToken: vi.fn(),
-}));
+vi.mock('../services/apiClient', async (importOriginal) => {
+  const actual = await importOriginal();
+  return {
+    ...actual,
+    getAuthMode: () => 'jwt',
+    setAccessToken: vi.fn(),
+  };
+});
 
 vi.mock('../services/usersApi', () => ({
   default: {
@@ -33,9 +39,10 @@ vi.mock('../services/adminApi', () => ({
   recordPortalAuditEntry: vi.fn(),
 }));
 
-function renderSignup(signupMock) {
+function renderSignup() {
+  const store = createAppStore();
   return render(
-    <AuthContext.Provider value={{ login: vi.fn(), signup: signupMock }}>
+    <Provider store={store}>
       <MemoryRouter initialEntries={['/signup']}>
         <Routes>
           <Route path="/signup" element={<Signup />} />
@@ -43,7 +50,7 @@ function renderSignup(signupMock) {
           <Route path="/dashboard" element={<div>Dashboard</div>} />
         </Routes>
       </MemoryRouter>
-    </AuthContext.Provider>,
+    </Provider>,
   );
 }
 
@@ -53,7 +60,7 @@ describe('Signup page without username field', () => {
   });
 
   it('renders only email, password, and confirm password (no username field)', () => {
-    renderSignup(vi.fn());
+    renderSignup();
 
     expect(screen.queryByPlaceholderText(/johndoe/i)).toBeNull();
     expect(screen.queryByText(/^Username$/i)).toBeNull();
@@ -62,15 +69,18 @@ describe('Signup page without username field', () => {
   });
 
   it('submits email and password without username and redirects to /complete-profile', async () => {
-    const signupMock = vi.fn().mockResolvedValueOnce({
-      id: 'u-new',
-      email: 'new.student@example.com',
-      name: 'new.student',
-      username: '',
-      profileComplete: false,
+    authApi.signup.mockResolvedValueOnce({
+      accessToken: 'jwt-tok',
+      user: {
+        id: 'u-new',
+        email: 'new.student@example.com',
+        name: 'new.student',
+        username: '',
+        profileComplete: false,
+      },
     });
 
-    renderSignup(signupMock);
+    renderSignup();
 
     fireEvent.change(screen.getByPlaceholderText(/name@example\.com/i), {
       target: { value: 'new.student@example.com' },
@@ -81,7 +91,7 @@ describe('Signup page without username field', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Sign Up$/i }));
 
     await waitFor(() => {
-      expect(signupMock).toHaveBeenCalledWith({
+      expect(authApi.signup).toHaveBeenCalledWith({
         email: 'new.student@example.com',
         password: 'Password123!',
         role: 'Collaborator',
@@ -92,8 +102,7 @@ describe('Signup page without username field', () => {
   });
 
   it('validates password match and minimum length', async () => {
-    const signupMock = vi.fn();
-    renderSignup(signupMock);
+    renderSignup();
 
     fireEvent.change(screen.getByPlaceholderText(/name@example\.com/i), {
       target: { value: 'student@example.com' },
@@ -104,6 +113,6 @@ describe('Signup page without username field', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Sign Up$/i }));
 
     expect(screen.getByText("Passwords don't match!")).toBeTruthy();
-    expect(signupMock).not.toHaveBeenCalled();
+    expect(authApi.signup).not.toHaveBeenCalled();
   });
 });

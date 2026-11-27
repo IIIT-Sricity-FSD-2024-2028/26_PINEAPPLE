@@ -9,8 +9,7 @@ import ConfirmModal from '../components/common/ConfirmModal';
 import ProjectCard from '../components/features/ProjectCard';
 import AdminMentorApps from '../pages/admin/AdminMentorApps';
 import Notifications from '../pages/notifications';
-import { NotificationContext } from '../context/NotificationContext';
-import { renderWithProviders } from './test-utils';
+import { renderWithProviders, renderWithStore } from './test-utils';
 
 const { mockMentorAppsApi, mockAdminApi, mockAppealsApi } = vi.hoisted(() => ({
   mockMentorAppsApi: {
@@ -131,7 +130,7 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
       window.alert = alertSpy;
 
       try {
-        const { container } = render(
+        const { container } = renderWithStore(
           <ProjectCard
             variant="mywork"
             project={{
@@ -161,7 +160,7 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
     });
 
     it('opens accessible Leaving TeamForge dialog for external ProjectCard finishedLink', () => {
-      render(
+      renderWithStore(
         <ProjectCard
           variant="mywork"
           project={{
@@ -325,11 +324,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
     });
 
     it('renders Notifications appeal dialog using shared Modal (role=dialog, aria-modal, Escape close)', async () => {
-      renderWithProviders(
-        <NotificationContext.Provider
-          value={{
-            notifications: [
-              {
+      renderWithStore(<Notifications />, {
+        preloadedState: {
+          notifications: {
+            ids: ['n-warn-1'],
+            entities: {
+              'n-warn-1': {
                 id: 'n-warn-1',
                 type: 'warning',
                 title: 'Warning Issued',
@@ -338,15 +338,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
                 createdAt: new Date().toISOString(),
                 metadata: { warningId: 'w-1' },
               },
-            ],
+            },
             unreadCount: 1,
-            markAsRead: vi.fn(),
-            markAllAsRead: vi.fn(),
-          }}
-        >
-          <Notifications />
-        </NotificationContext.Provider>,
-      );
+            status: 'succeeded',
+          },
+        },
+      });
 
       const appealBtn = screen.getByTestId('appeal-btn-w-1');
       fireEvent.click(appealBtn);
@@ -370,11 +367,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
         link: '/owner/workspace/proj-atlas',
       }));
 
-      renderWithProviders(
-        <NotificationContext.Provider
-          value={{
-            notifications: [
-              {
+      renderWithStore(<Notifications />, {
+        preloadedState: {
+          notifications: {
+            ids: ['notif-bulk-8'],
+            entities: {
+              'notif-bulk-8': {
                 id: 'notif-bulk-8',
                 type: 'TASK_RELEASED',
                 title: '8 tasks released in Project Atlas',
@@ -384,15 +382,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
                 isRead: false,
                 createdAt: new Date().toISOString(),
               },
-            ],
+            },
             unreadCount: 1,
-            markAsRead: vi.fn(),
-            markAllAsRead: vi.fn(),
-          }}
-        >
-          <Notifications />
-        </NotificationContext.Provider>,
-      );
+            status: 'succeeded',
+          },
+        },
+      });
 
       expect(screen.getByTestId('notif-item-notif-bulk-8')).toBeDefined();
       expect(screen.getByTestId('notif-group-count-notif-bulk-8').textContent).toBe('(8)');
@@ -416,11 +411,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
         link: idx === 0 ? 'javascript:alert(1)' : '/owner/workspace/proj-12',
       }));
 
-      renderWithProviders(
-        <NotificationContext.Provider
-          value={{
-            notifications: [
-              {
+      renderWithStore(<Notifications />, {
+        preloadedState: {
+          notifications: {
+            ids: ['notif-bulk-12'],
+            entities: {
+              'notif-bulk-12': {
                 id: 'notif-bulk-12',
                 type: 'TASK_RELEASED',
                 title: '12 tasks released',
@@ -430,15 +426,12 @@ describe('Phase 26 Frontend Tests: SafeLink Parity, Accessible Modal & Grouped N
                 isRead: false,
                 createdAt: new Date().toISOString(),
               },
-            ],
+            },
             unreadCount: 1,
-            markAsRead: vi.fn(),
-            markAllAsRead: vi.fn(),
-          }}
-        >
-          <Notifications />
-        </NotificationContext.Provider>,
-      );
+            status: 'succeeded',
+          },
+        },
+      });
 
       fireEvent.click(screen.getByTestId('notif-group-toggle-notif-bulk-12'));
       const list = screen.getByTestId('notif-group-list-notif-bulk-12');

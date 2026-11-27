@@ -844,7 +844,6 @@ export class SupportService extends BaseService<SupportRequestEntity> {
           notificationsService?.create({
             userId: String(updated.userId),
             type: 'SUPPORT_TICKET_STATUS',
-            priority: 'immediate',
             title: `Support Ticket ${nextStatus === 'resolved' ? 'Resolved' : nextStatus === 'rejected' ? 'Rejected' : 'Updated'}`,
             message: patch.resolutionNote
               ? `Your ticket "${updated.subject}" is now ${nextStatus.replace('_', ' ')}: ${patch.resolutionNote}`
@@ -886,7 +885,6 @@ export class SupportService extends BaseService<SupportRequestEntity> {
           notificationsService?.create({
             userId: newAssigneeId,
             type: 'SUPPORT_TICKET_ASSIGNED',
-            priority: 'immediate',
             title: 'Support Ticket Assigned to You',
             message: `Support ticket "${updated.subject}" (${updated.priority} priority) was assigned to you.`,
             readStatus: false,
@@ -967,7 +965,6 @@ export class SupportService extends BaseService<SupportRequestEntity> {
         notificationsService?.create({
           userId: String(updated.userId),
           type: 'SUPPORT_TICKET_REPLY',
-          priority: 'immediate',
           title: 'New Reply on Support Ticket',
           message: `Support replied to your ticket "${updated.subject}": ${trimmedBody.slice(0, 140)}`,
           readStatus: false,

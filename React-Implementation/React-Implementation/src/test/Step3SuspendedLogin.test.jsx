@@ -1,15 +1,16 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor, fireEvent, render } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
 import Login from '../pages/Login';
 import AdminLogin from '../pages/admin/AdminLogin';
 import Suspended from '../pages/Suspended';
 import SuspendedAccountPanel from '../components/common/SuspendedAccountPanel';
-import { AuthContext } from '../context/AuthContext';
-import storage from '../utils/storage';
+import { authApi } from '../services/authApi';
 import adminApi from '../services/adminApi';
 import { setAuthMode } from '../services/apiClient';
-import { renderWithProviders } from './test-utils';
+import { selectCurrentUser, selectSessionNotices, selectSuspendedInfo } from '../store/selectors/sessionSelectors';
+import { store } from '../store';
+import { renderWithProviders, renderWithStore } from './test-utils';
 
 vi.mock('../services/adminApi', () => ({
   default: {
@@ -30,8 +31,6 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     setAuthMode('jwt');
-    sessionStorage.clear();
-    localStorage.clear();
   });
 
   it('1. SuspendedAccountPanel renders all required fields: title, reason, date, type, support contact', () => {
@@ -86,15 +85,9 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
       supportContact: 'support@teamforge.io',
     };
 
-    const mockLogin = vi.fn().mockRejectedValue(mockSuspendedErr);
+    authApi.login.mockRejectedValueOnce(mockSuspendedErr);
 
-    render(
-      <AuthContext.Provider value={{ login: mockLogin, user: null, status: 'signed_out' }}>
-        <MemoryRouter initialEntries={['/login']}>
-          <Login />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Login />, { route: '/login' });
 
     const emailInput = screen.getByPlaceholderText('username or name@example.com');
     const passwordInput = screen.getByPlaceholderText('••••••');
@@ -154,25 +147,27 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
   });
 
   it('5. Suspended.jsx page clears session and renders panel with Back to login button', async () => {
-    storage.setBackendUserId('user-susp-1');
-    sessionStorage.setItem(
-      'teamforge_suspended_info',
-      JSON.stringify({
-        reason: 'Automated policy violation',
-        suspendedAt: '2026-11-21T11:00:00.000Z',
-        suspensionType: 'automatic',
-        appealAvailable: false,
-        supportContact: 'support@teamforge.io',
-      })
-    );
-
-    render(
-      <MemoryRouter initialEntries={['/suspended']}>
-        <Routes>
-          <Route path="/suspended" element={<Suspended />} />
-          <Route path="/login" element={<div>LOGIN PAGE VIEW</div>} />
-        </Routes>
-      </MemoryRouter>
+    renderWithStore(
+      <Routes>
+        <Route path="/suspended" element={<Suspended />} />
+        <Route path="/login" element={<div>LOGIN PAGE VIEW</div>} />
+      </Routes>,
+      {
+        route: '/suspended',
+        preloadedState: {
+          session: {
+            user: { id: 'user-susp-1' },
+            isAuthenticated: true,
+            suspendedInfo: {
+              reason: 'Automated policy violation',
+              suspendedAt: '2026-11-21T11:00:00.000Z',
+              suspensionType: 'automatic',
+              appealAvailable: false,
+              supportContact: 'support@teamforge.io',
+            },
+          },
+        },
+      },
     );
 
     expect(screen.getByTestId('suspended-account-panel')).toBeTruthy();
@@ -192,15 +187,9 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
     genericErr.statusCode = 401;
     genericErr.code = 'INVALID_CREDENTIALS';
 
-    const mockLogin = vi.fn().mockRejectedValue(genericErr);
+    authApi.login.mockRejectedValueOnce(genericErr);
 
-    render(
-      <AuthContext.Provider value={{ login: mockLogin, user: null, status: 'signed_out' }}>
-        <MemoryRouter initialEntries={['/login']}>
-          <Login />
-        </MemoryRouter>
-      </AuthContext.Provider>
-    );
+    renderWithStore(<Login />, { route: '/login' });
 
     const emailInput = screen.getByPlaceholderText('username or name@example.com');
     const passwordInput = screen.getByPlaceholderText('••••••');
@@ -220,8 +209,6 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
   it('7. apiClient executes mid-session 403 ACCOUNT_SUSPENDED redirecting to /suspended and not showing restart notice', async () => {
     const { apiRequest, setRestartRedirectHandler, tokenManager } = await import('../services/apiClient');
 
-    storage.setBackendUserId('user-step3');
-    storage.setRole('Collaborator');
     tokenManager.setAccessToken('sample-token');
 
     let redirectedPath = null;
@@ -252,9 +239,9 @@ describe('STEP 3 FRONTEND: Suspended User Notification & Screen', () => {
     await expect(apiRequest('/projects', 'GET')).rejects.toThrow();
 
     expect(redirectedPath).toBe('/suspended');
-    expect(storage.consumeServerRestartNotice()).toBe('');
-    expect(storage.getBackendUserId()).toBeFalsy();
-    const storedSuspended = JSON.parse(sessionStorage.getItem('teamforge_suspended_info'));
+    expect(selectSessionNotices(store.getState()).serverRestart).toBeFalsy();
+    expect(selectCurrentUser(store.getState())).toBeNull();
+    const storedSuspended = selectSuspendedInfo(store.getState());
     expect(storedSuspended.code).toBe('ACCOUNT_SUSPENDED');
     expect(storedSuspended.reason).toBe('Violation of collaboration rules');
   });

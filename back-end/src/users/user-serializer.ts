@@ -91,20 +91,31 @@ export function serializeSafeUser(
   }
   safeUser.createdAt = effectiveCreatedAt;
   safeUser.university = effectiveUni;
+  if (safeUser.updatedAt === undefined && safeUser.profile?.updatedAt !== undefined) {
+    safeUser.updatedAt = safeUser.profile.updatedAt;
+  }
+
+  const rawAvatar =
+    safeUser.avatarUrl ??
+    safeUser.avatar ??
+    safeUser.profile?.avatarUrl ??
+    safeUser.profile?.avatar ??
+    null;
+  const canonicalAvatar =
+    typeof rawAvatar === 'string' && rawAvatar.trim().length > 0 ? rawAvatar.trim() : null;
+  safeUser.avatarUrl = canonicalAvatar;
+  safeUser.avatar = canonicalAvatar;
+
+  if (safeUser.profile && typeof safeUser.profile === 'object') {
+    safeUser.profile.avatarUrl = canonicalAvatar;
+    safeUser.profile.avatar = canonicalAvatar;
+  }
 
   safeUser.phone = safeUser.phone || safeUser.profile?.phone || undefined;
   safeUser.phoneVerified = Boolean(safeUser.phoneVerified || safeUser.profile?.phoneVerified);
   safeUser.phoneVerifiedAt =
     safeUser.phoneVerifiedAt || safeUser.profile?.phoneVerifiedAt || undefined;
   safeUser.emailVerified = safeUser.emailVerified !== false;
-  safeUser.digestEnabled = safeUser.digestEnabled !== false;
-  safeUser.digestHour =
-    Number.isInteger(safeUser.digestHour) && safeUser.digestHour >= 0 && safeUser.digestHour <= 23
-      ? safeUser.digestHour
-      : 9;
-  safeUser.utcOffsetMinutes = Number.isInteger(safeUser.utcOffsetMinutes)
-    ? safeUser.utcOffsetMinutes
-    : 0;
 
   if (safeUser.profile && typeof safeUser.profile === 'object') {
     safeUser.profile.phone = safeUser.phone;

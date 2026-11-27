@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
+import { renderWithStore } from './test-utils';
 import AdminProjectDetails from '../pages/admin/AdminProjectDetails';
 import projectsApi from '../services/projectsApi';
 import tasksApi from '../services/tasksApi';
@@ -68,12 +69,11 @@ const mockClosedProject = {
 };
 
 const renderComponent = (projectId = 'proj-open-1') => {
-  return render(
-    <MemoryRouter initialEntries={[`/admin/projects/${projectId}`]}>
-      <Routes>
-        <Route path="/admin/projects/:id" element={<AdminProjectDetails />} />
-      </Routes>
-    </MemoryRouter>
+  return renderWithStore(
+    <Routes>
+      <Route path="/admin/projects/:id" element={<AdminProjectDetails />} />
+    </Routes>,
+    { route: `/admin/projects/${projectId}` },
   );
 };
 

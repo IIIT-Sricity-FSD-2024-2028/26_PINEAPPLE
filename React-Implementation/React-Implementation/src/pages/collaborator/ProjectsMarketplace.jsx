@@ -1,9 +1,34 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import joinRequestsApi from '../../services/joinRequestsApi';
-import usersApi from '../../services/usersApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { isProjectLocked } from '../../utils/projectStatus';
+import {
+  fetchProjectMatch,
+  fetchProjects,
+} from '../../store/thunks/projectsThunks';
+import {
+  createJoinRequest,
+  deleteJoinRequest,
+  fetchMyJoinRequests,
+} from '../../store/thunks/joinRequestsThunks';
+import { fetchMyInvites } from '../../store/thunks/invitesThunks';
+import { fetchUserResponseTime } from '../../store/thunks/profilesThunks';
+import { selectResponseTimeMap } from '../../store/selectors/profilesSelectors';
+import {
+  setMarketplacePreviewId,
+  setSearchQuery,
+} from '../../store/slices/projectsSlice';
+import {
+  selectMarketplaceProjects,
+  selectProjectById,
+  selectProjectMatchStatus,
+  selectProjectSkillMatch,
+  selectProjectsStatus,
+  selectProjectsWorking,
+} from '../../store/selectors/projectsSelectors';
+import { selectMyJoinRequests } from '../../store/selectors/joinRequestsSelectors';
+import { selectMyInvites } from '../../store/selectors/invitesSelectors';
 import ProjectCard from '../../components/features/ProjectCard';
 import SearchBar from '../../components/common/SearchBar';
 import Modal from '../../components/common/Modal';
@@ -11,27 +36,48 @@ import FormInput from '../../components/common/FormInput';
 import EmptyState from '../../components/common/EmptyState';
 import { getRequestControlConfig } from '../../utils/requestState';
 import { formatProjectDueDate } from '../../utils/dateFormatter';
-import storage from '../../utils/storage';
 import useReasonAction from '../../hooks/useReasonAction';
 import './projectsMarketplace.css';
 
-const ProjectsMarketplace = () => {
-  const { user } = useContext(AuthContext);
+const ProjectsMarketplaceContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
   const [searchParams] = useSearchParams();
 
-  const [projects, setProjects] = useState([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(true);
-  const [previewProject, setPreviewProject] = useState(null);
-  const [skillMatch, setSkillMatch] = useState(null);
-  const [loadingSkillMatch, setLoadingSkillMatch] = useState(false);
+  const projects = useSelector(selectMarketplaceProjects);
+  const status = useSelector(selectProjectsStatus);
+  const working = useSelector(selectProjectsWorking);
+  const searchQuery = working.searchQuery || '';
+  const previewProjectId = working.marketplacePreviewId;
+  const previewProject = useSelector((state) =>
+    previewProjectId ? selectProjectById(state, previewProjectId) : null,
+  );
+  const skillMatch = useSelector((state) =>
+    previewProjectId ? selectProjectSkillMatch(state, previewProjectId) : null,
+  );
+  const matchStatus = useSelector(selectProjectMatchStatus);
+  const loadingSkillMatch = matchStatus === 'loading';
+  const loading = status === 'loading' && projects.length === 0;
+
   const [applyMessage, setApplyMessage] = useState('');
   const [submittingApply, setSubmittingApply] = useState(false);
   const [statusFeedback, setStatusFeedback] = useState(null);
-  const [myApplications, setMyApplications] = useState([]);
-  const [myInvites, setMyInvites] = useState([]);
-  const [ownerResponseTimes, setOwnerResponseTimes] = useState({});
+  const myApplications = useSelector(selectMyJoinRequests);
+  const myInvites = useSelector(selectMyInvites);
+  const responseTimeMap = useSelector(selectResponseTimeMap);
+  const requestedResponseIdsRef = useRef(new Set());
+
+  const ownerResponseTimes = useMemo(() => {
+    const formatted = {};
+    Object.entries(responseTimeMap || {}).forEach(([uid, res]) => {
+      if (res && res.sample >= 3) {
+        const days = Math.max(1, Math.round(res.medianHours / 24));
+        formatted[uid] = `Usually replies in ${days} ${days === 1 ? 'day' : 'days'}`;
+      }
+    });
+    return formatted;
+  }, [responseTimeMap]);
 
   const [refreshKey, setRefreshKey] = useState(0);
 
@@ -50,54 +96,24 @@ const ProjectsMarketplace = () => {
   }, []);
 
   const currentUserName = user?.name || user?.username || 'Collaborator';
-  const currentUserId = user?.id || storage.getBackendUserId() || '1';
+  const currentUserId = user?.id || '1';
   const preselectApplyId = searchParams.get('apply');
 
   useEffect(() => {
-    let isMounted = true;
-    const loadMarketplaceData = async () => {
-      try {
-        const [fetchedProjects, fetchedRequests, fetchedInvites] = await Promise.all([
-          projectsApi.list().catch(() => []),
-          joinRequestsApi.getMyRequests().catch(() => joinRequestsApi.list({ userId: user?.id }).catch(() => [])),
-          typeof projectsApi.getMyInvites === 'function'
-            ? projectsApi.getMyInvites().then((res) => (Array.isArray(res) ? res : res?.invites || [])).catch(() => [])
-            : Promise.resolve([]),
-        ]);
-        if (isMounted) {
-          const list = Array.isArray(fetchedProjects) ? fetchedProjects : [];
-          setProjects(list);
-          setMyApplications(Array.isArray(fetchedRequests) ? fetchedRequests : []);
-          setMyInvites(Array.isArray(fetchedInvites) ? fetchedInvites : []);
-          if (preselectApplyId && list.length > 0) {
-            const matchProj = list.find((p) => String(p.id) === String(preselectApplyId));
-            if (matchProj) {
-              setPreviewProject(matchProj);
-              if (typeof projectsApi.getMatch === 'function') {
-                setLoadingSkillMatch(true);
-                projectsApi.getMatch(matchProj.id)
-                  .then((m) => { if (isMounted) setSkillMatch(m || null); })
-                  .catch(() => { if (isMounted) setSkillMatch(null); })
-                  .finally(() => { if (isMounted) setLoadingSkillMatch(false); });
-              }
-            }
-          }
-        }
-      } catch (err) {
-        console.error('Failed to load marketplace projects:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
+    const force = refreshKey > 0;
+    dispatch(fetchProjects({ view: 'marketplace', force }));
+    dispatch(fetchMyJoinRequests({ userId: user?.id, force }));
+    dispatch(fetchMyInvites({ userId: user?.id, force }));
+  }, [dispatch, user?.id, refreshKey]);
 
-    loadMarketplaceData();
-
-    return () => {
-      isMounted = false;
-    };
-  }, [user?.id, refreshKey, preselectApplyId]);
+  useEffect(() => {
+    if (!preselectApplyId || projects.length === 0) return;
+    const matchProj = projects.find((p) => String(p.id) === String(preselectApplyId));
+    if (matchProj && String(previewProjectId || '') !== String(matchProj.id)) {
+      dispatch(setMarketplacePreviewId(matchProj.id));
+      dispatch(fetchProjectMatch({ id: matchProj.id }));
+    }
+  }, [preselectApplyId, projects, previewProjectId, dispatch]);
 
   const applicableProjects = projects.filter((p) => {
     if (
@@ -129,28 +145,17 @@ const ProjectsMarketplace = () => {
   const recommendedProjects = filteredProjects.slice(0, 2);
   const allProjects = searchQuery ? filteredProjects : filteredProjects.slice(2);
 
-  // Fetch owner response times for projects displayed
+  // Fetch owner response times into Redux profiles slice for projects displayed
   useEffect(() => {
     if (!applicableProjects || applicableProjects.length === 0) return;
     const ownerIds = [...new Set(applicableProjects.map((p) => p.ownerId).filter(Boolean))];
-    ownerIds.forEach(async (id) => {
-      setOwnerResponseTimes((prev) => {
-        if (prev[id]) return prev;
-        usersApi.getResponseTime(id)
-          .then((res) => {
-            if (res && res.sample >= 3) {
-              const days = Math.max(1, Math.round(res.medianHours / 24));
-              setOwnerResponseTimes((p2) => ({
-                ...p2,
-                [id]: `Usually replies in ${days} ${days === 1 ? 'day' : 'days'}`,
-              }));
-            }
-          })
-          .catch(() => {});
-        return prev;
-      });
+    ownerIds.forEach((id) => {
+      const key = String(id);
+      if (responseTimeMap?.[key] || requestedResponseIdsRef.current.has(key)) return;
+      requestedResponseIdsRef.current.add(key);
+      dispatch(fetchUserResponseTime(id)).catch(() => {});
     });
-  }, [applicableProjects]);
+  }, [applicableProjects, dispatch, responseTimeMap]);
 
   const getRemovedRecord = (proj) => {
     if (!proj || !Array.isArray(proj.removedUsers)) return null;
@@ -243,32 +248,16 @@ const ProjectsMarketplace = () => {
       navigate(`/workspace/${project.id}`);
       return;
     }
-    setPreviewProject(project);
+    dispatch(setMarketplacePreviewId(project.id));
     setStatusFeedback(null);
-    setSkillMatch(null);
 
-    if (typeof projectsApi.getMatch === 'function') {
-      setLoadingSkillMatch(true);
-      projectsApi.getMatch(project.id)
-        .then((res) => setSkillMatch(res || null))
-        .catch(() => setSkillMatch(null))
-        .finally(() => setLoadingSkillMatch(false));
-    }
+    dispatch(fetchProjectMatch({ id: project.id }));
 
-    // Ensure owner response time is fetched for this preview
+    // Ensure owner response time is fetched into Redux profiles slice for this preview
     const oId = project.ownerId || (typeof project.owner === 'object' ? project.owner?.id : '');
-    if (oId && !ownerResponseTimes[oId]) {
-      usersApi.getResponseTime(oId)
-        .then((res) => {
-          if (res && res.sample >= 3) {
-            const days = Math.max(1, Math.round(res.medianHours / 24));
-            setOwnerResponseTimes((prev) => ({
-              ...prev,
-              [oId]: `Usually replies in ${days} ${days === 1 ? 'day' : 'days'}`,
-            }));
-          }
-        })
-        .catch(() => {});
+    if (oId && !responseTimeMap?.[String(oId)] && !requestedResponseIdsRef.current.has(String(oId))) {
+      requestedResponseIdsRef.current.add(String(oId));
+      dispatch(fetchUserResponseTime(oId)).catch(() => {});
     }
   };
 
@@ -300,6 +289,27 @@ const ProjectsMarketplace = () => {
     });
   };
 
+  const handleMarketWithdraw = async (projectId) => {
+    const pendingApp = (Array.isArray(myApplications) ? myApplications : []).find(
+      (a) =>
+        String(a.projectId) === String(projectId) &&
+        String(a.status || '').toLowerCase() === 'pending',
+    );
+    if (!pendingApp) return;
+    try {
+      await dispatch(
+        deleteJoinRequest({ id: pendingApp.id, projectId }),
+      ).unwrap();
+      setStatusFeedback({ type: 'success', message: 'Application request withdrawn.' });
+      setRefreshKey((k) => k + 1);
+    } catch (err) {
+      setStatusFeedback({
+        type: 'error',
+        message: err?.serverMessage || err?.message || 'Failed to withdraw application.',
+      });
+    }
+  };
+
   const handleApply = async () => {
     if (!previewProject) return;
     const statusLower = String(previewProject.status || '').toLowerCase();
@@ -322,19 +332,23 @@ const ProjectsMarketplace = () => {
     setSubmittingApply(true);
     setStatusFeedback(null);
     try {
-      await joinRequestsApi.create({
-        projectId: previewProject.id,
-        userId: currentUserId,
-        userName: currentUserName,
-        role: 'Collaborator',
-        message: applyMessage || 'I would love to contribute to this project!',
-        status: 'Pending',
-      });
+      await dispatch(
+        createJoinRequest({
+          payload: {
+            projectId: previewProject.id,
+            userId: currentUserId,
+            userName: currentUserName,
+            role: 'Collaborator',
+            message: applyMessage || 'I would love to contribute to this project!',
+            status: 'Pending',
+          },
+        }),
+      ).unwrap();
       setStatusFeedback({ type: 'success', message: 'Application submitted successfully!' });
       setRefreshKey((k) => k + 1);
       if (applyResetTimerRef.current) clearTimeout(applyResetTimerRef.current);
       applyResetTimerRef.current = setTimeout(() => {
-        setPreviewProject(null);
+        dispatch(setMarketplacePreviewId(null));
         setApplyMessage('');
         setStatusFeedback(null);
       }, 1500);
@@ -369,8 +383,8 @@ const ProjectsMarketplace = () => {
       <div className="tf-market-search-wrapper">
         <SearchBar
           value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          onClear={() => setSearchQuery('')}
+          onChange={(e) => dispatch(setSearchQuery(e.target.value))}
+          onClear={() => dispatch(setSearchQuery(''))}
           placeholder="Search projects by title, owner, skill, or keyword..."
         />
       </div>
@@ -401,6 +415,7 @@ const ProjectsMarketplace = () => {
                     variant="marketplace"
                     onSelect={handleCardClick}
                     onApply={handleCardClick}
+                    onWithdraw={handleMarketWithdraw}
                     onAcceptInvite={handleMarketAcceptInvite}
                     onDeclineInvite={(invId) => handleMarketDeclineInvite(invId, p.title || p.name)}
                     hasApplied={!reqConfig.canApply}
@@ -444,6 +459,7 @@ const ProjectsMarketplace = () => {
                     variant="marketplace"
                     onSelect={handleCardClick}
                     onApply={handleCardClick}
+                    onWithdraw={handleMarketWithdraw}
                     onAcceptInvite={handleMarketAcceptInvite}
                     onDeclineInvite={(invId) => handleMarketDeclineInvite(invId, p.title || p.name)}
                     hasApplied={!reqConfig.canApply}
@@ -459,7 +475,7 @@ const ProjectsMarketplace = () => {
             title="No projects match your search"
             message="Try searching with different keywords, skill sets, or clear your query."
             actionLabel={searchQuery ? 'Clear Search' : undefined}
-            onAction={() => setSearchQuery('')}
+            onAction={() => dispatch(setSearchQuery(''))}
           />
         )}
       </div>
@@ -468,7 +484,7 @@ const ProjectsMarketplace = () => {
       <Modal
         isOpen={Boolean(previewProject)}
         title={previewProject?.title || previewProject?.name || 'Project Details'}
-        onClose={() => setPreviewProject(null)}
+        onClose={() => dispatch(setMarketplacePreviewId(null))}
         footer={(() => {
           const reqConfig = resolveRequestConfig(previewProject);
           if (reqConfig.canApply) {
@@ -477,7 +493,7 @@ const ProjectsMarketplace = () => {
                 <button
                   type="button"
                   className="tf-market-btn-outline"
-                  onClick={() => setPreviewProject(null)}
+                  onClick={() => dispatch(setMarketplacePreviewId(null))}
                 >
                   Cancel
                 </button>
@@ -507,7 +523,7 @@ const ProjectsMarketplace = () => {
               <button
                 type="button"
                 className="tf-market-btn-outline"
-                onClick={() => setPreviewProject(null)}
+                onClick={() => dispatch(setMarketplacePreviewId(null))}
               >
                 Close
               </button>
@@ -725,4 +741,5 @@ const ProjectsMarketplace = () => {
   );
 };
 
+const ProjectsMarketplace = ProjectsMarketplaceContent;
 export default ProjectsMarketplace;

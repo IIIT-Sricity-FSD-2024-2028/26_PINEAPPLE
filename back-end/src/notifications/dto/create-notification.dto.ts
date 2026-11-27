@@ -100,14 +100,6 @@ export class CreateNotificationDto {
 
   @IsOptional()
   @IsString()
-  priority?: 'immediate' | 'digest';
-
-  @IsOptional()
-  @IsBoolean()
-  bypassDigest?: boolean;
-
-  @IsOptional()
-  @IsString()
   groupKey?: string;
 
   @IsOptional()

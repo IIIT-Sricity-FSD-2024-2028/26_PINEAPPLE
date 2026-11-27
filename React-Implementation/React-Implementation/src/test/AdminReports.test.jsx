@@ -86,21 +86,34 @@ describe('AdminReports - Reports and Appeals Management', () => {
   });
 
   it('blocks access when admin lacks "reports" permission', () => {
-    sessionStorage.setItem('teamforge.portalRole', 'Admin');
-    sessionStorage.setItem('teamforge.isSuperUser', 'false');
-    sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['users', 'audit']));
-
-    renderWithProviders(<AdminReports />);
+    renderWithProviders(<AdminReports />, {
+      preloadedState: {
+        session: {
+          portalRole: 'Admin',
+          isSuperUser: false,
+          permissions: ['users', 'audit'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
+    });
 
     expect(screen.getByText('Access Denied')).toBeDefined();
     expect(screen.getByText(/You do not have the required "reports" permission/i)).toBeDefined();
   });
 
   it('allows access and renders reports table when permission is present', async () => {
-    sessionStorage.setItem('teamforge.portalRole', 'Admin');
-    sessionStorage.setItem('teamforge.adminPermissions', JSON.stringify(['reports', 'users']));
-
-    renderWithProviders(<AdminReports />);
+    renderWithProviders(<AdminReports />, {
+      preloadedState: {
+        session: {
+          portalRole: 'Admin',
+          isSuperUser: false,
+          permissions: ['reports', 'users'],
+          isAuthenticated: true,
+          initialized: true,
+        },
+      },
+    });
 
     expect(screen.getByText('Reports & Appeals')).toBeDefined();
     expect(screen.getByTestId('tab-user-reports')).toBeDefined();
@@ -111,11 +124,18 @@ describe('AdminReports - Reports and Appeals Management', () => {
     expect(screen.getByText('Harassment')).toBeDefined();
   });
 
-  it('opens report details modal and provides a direct "View audit log" link to reported user', async () => {
-    sessionStorage.setItem('teamforge.portalRole', 'SuperUser');
-    sessionStorage.setItem('teamforge.isSuperUser', 'true');
+  const superUserState = {
+    session: {
+      portalRole: 'SuperUser',
+      isSuperUser: true,
+      permissions: ['*'],
+      isAuthenticated: true,
+      initialized: true,
+    },
+  };
 
-    renderWithProviders(<AdminReports />);
+  it('opens report details modal and provides a direct "View audit log" link to reported user', async () => {
+    renderWithProviders(<AdminReports />, { preloadedState: superUserState });
 
     const reviewBtn = await screen.findByTestId('review-report-rep-1');
     fireEvent.click(reviewBtn);
@@ -137,10 +157,7 @@ describe('AdminReports - Reports and Appeals Management', () => {
     const user = userEvent.setup();
     mockReportsApi.actionReport.mockResolvedValue({ id: 'rep-1', status: 'Dismissed' });
 
-    sessionStorage.setItem('teamforge.portalRole', 'SuperUser');
-    sessionStorage.setItem('teamforge.isSuperUser', 'true');
-
-    renderWithProviders(<AdminReports />);
+    renderWithProviders(<AdminReports />, { preloadedState: superUserState });
 
     const reviewBtn = await screen.findByTestId('review-report-rep-1');
     fireEvent.click(reviewBtn);
@@ -178,10 +195,7 @@ describe('AdminReports - Reports and Appeals Management', () => {
     const user = userEvent.setup();
     mockAppealsApi.decideAppeal.mockResolvedValue({ id: 'appeal-1', status: 'accepted' });
 
-    sessionStorage.setItem('teamforge.portalRole', 'SuperUser');
-    sessionStorage.setItem('teamforge.isSuperUser', 'true');
-
-    renderWithProviders(<AdminReports />);
+    renderWithProviders(<AdminReports />, { preloadedState: superUserState });
 
     const appealsTab = screen.getByTestId('tab-appeals');
     fireEvent.click(appealsTab);

@@ -1,5 +1,5 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, waitFor } from '@testing-library/react';
+import { describe, it, expect, vi } from 'vitest';
+import { screen } from '@testing-library/react';
 import fs from 'fs';
 import path from 'path';
 import CreateProject from '../pages/owner/CreateProject';

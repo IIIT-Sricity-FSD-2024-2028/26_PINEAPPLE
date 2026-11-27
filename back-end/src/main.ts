@@ -37,6 +37,7 @@ import { ErrorLoggerMiddleware } from './core/middleware/error-logger.middleware
 import { LogManagerService } from './core/services/log-manager.service';
 import { TimingInterceptor } from './core/interceptors/timing.interceptor';
 import { getCorsOptions } from './common/config/cors.config';
+import { ensureUploadDirectories } from './core/middleware/file-upload.middleware';
 
 function parsePort(rawPort: string | undefined): number {
   const parsed = Number(rawPort);
@@ -88,11 +89,13 @@ async function bootstrap() {
   const expressApp = app.getHttpAdapter().getInstance();
   expressApp.use(ErrorLoggerMiddleware.getExpressErrorHandler());
 
+  const { uploadsDir, secureCvsDir } = ensureUploadDirectories();
+
   await app.listen(port);
   console.log(`🚀 Backend is running on: http://localhost:${port}`);
   console.log(`📚 Swagger documentation is available at: http://localhost:${port}/api`);
   console.log(`📁 Logs directory: ./logs/ (flushed every 30 seconds)`);
-  console.log(`📤 Uploads directory: ./uploads/`);
+  console.log(`📤 Uploads directory: ${uploadsDir} (CVs: ${secureCvsDir})`);
   console.log(`🔑 Auth Mode: ${process.env.AUTH_MODE || 'jwt'}`);
   console.log('');
   console.log('🔒 Middleware active:');

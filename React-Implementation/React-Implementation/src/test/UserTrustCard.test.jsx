@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, render, waitFor } from '@testing-library/react';
-import { BrowserRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import UserTrustCard, { getTrustLabelConfig, getStandingBandConfig } from '../components/features/UserTrustCard';
+import UserTrustCard from '../components/features/UserTrustCard';
+import { getTrustLabelConfig, getStandingBandConfig } from '../utils/trustConfig';
 import Leaderboard from '../pages/leaderboard';
 import { leaderboardApi } from '../services/leaderboardApi';
 import { renderWithProviders } from './test-utils';
@@ -41,10 +41,8 @@ describe('UserTrustCard & Trust UI Component Tests', () => {
         },
       };
 
-      render(
-        <BrowserRouter>
-          <UserTrustCard summary={summary} variant="compact" />
-        </BrowserRouter>
+      renderWithProviders(
+        <UserTrustCard summary={summary} variant="compact" />
       );
 
       // Visible to peer:
@@ -77,10 +75,8 @@ describe('UserTrustCard & Trust UI Component Tests', () => {
         },
       };
 
-      render(
-        <BrowserRouter>
-          <UserTrustCard summary={summary} variant="compact" />
-        </BrowserRouter>
+      renderWithProviders(
+        <UserTrustCard summary={summary} variant="compact" />
       );
 
       expect(screen.getByText('New member')).toBeDefined();
@@ -104,14 +100,12 @@ describe('UserTrustCard & Trust UI Component Tests', () => {
         },
       };
 
-      render(
-        <BrowserRouter>
-          <UserTrustCard
-            summary={summary}
-            variant="compact"
-            isAdminViewer={true}
-          />
-        </BrowserRouter>
+      renderWithProviders(
+        <UserTrustCard
+          summary={summary}
+          variant="compact"
+          isAdminViewer={true}
+        />
       );
 
       // Admin sees exact conduct score & warning flag
@@ -139,14 +133,12 @@ describe('UserTrustCard & Trust UI Component Tests', () => {
         },
       };
 
-      render(
-        <BrowserRouter>
-          <UserTrustCard
-            summary={summary}
-            variant="expanded"
-            isSelf={true}
-          />
-        </BrowserRouter>
+      renderWithProviders(
+        <UserTrustCard
+          summary={summary}
+          variant="expanded"
+          isSelf={true}
+        />
       );
 
       expect(screen.getByText('Trusted contributor')).toBeDefined();

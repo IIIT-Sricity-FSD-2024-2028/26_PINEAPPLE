@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react';
+import { buildMediaUrl } from '../../utils/mediaUrl';
 import './Avatar.css';
 
 /**
@@ -40,6 +41,7 @@ function getBgClass(str) {
  * @param {Object} props
  * @param {string} [props.name]
  * @param {string} [props.src]
+ * @param {string|number} [props.version]
  * @param {'xs'|'sm'|'md'|'lg'|'xl'} [props.size='md']
  * @param {string} [props.alt]
  * @param {string} [props.className]
@@ -50,6 +52,7 @@ function getBgClass(str) {
 const Avatar = ({
   name = '',
   src = '',
+  version = null,
   size = 'md',
   alt = '',
   className = '',
@@ -59,14 +62,19 @@ const Avatar = ({
   children,
   ...rest
 }) => {
-  const [imgError, setImgError] = useState(false);
+  const [failedSrc, setFailedSrc] = useState(null);
 
   const deletedAccount = Boolean(isDeleted || String(name || '').trim().toLowerCase() === 'deleted user');
   const displayName = deletedAccount ? 'Deleted user' : name;
   const initials = useMemo(() => (deletedAccount ? 'DU' : getInitials(displayName)), [deletedAccount, displayName]);
   const bgClass = useMemo(() => (deletedAccount ? '' : getBgClass(displayName)), [deletedAccount, displayName]);
 
-  const hasValidImage = !deletedAccount && Boolean(src) && !imgError;
+  const resolvedSrc = useMemo(
+    () => (deletedAccount ? null : buildMediaUrl(src, version)),
+    [deletedAccount, src, version],
+  );
+
+  const hasValidImage = !deletedAccount && Boolean(resolvedSrc) && failedSrc !== resolvedSrc;
   const effectiveStyle = deletedAccount
     ? { backgroundColor: '#94a3b8', color: '#ffffff', ...style }
     : style;
@@ -82,10 +90,10 @@ const Avatar = ({
     >
       {hasValidImage ? (
         <img
-          src={src}
+          src={resolvedSrc}
           alt={alt || name || 'User avatar'}
           className="tf-avatar-img"
-          onError={() => setImgError(true)}
+          onError={() => setFailedSrc(resolvedSrc)}
         />
       ) : children ? (
         children

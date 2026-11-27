@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { screen, fireEvent, render } from '@testing-library/react';
+import { screen, fireEvent } from '@testing-library/react';
 import TaskCard from '../components/features/TaskCard';
+import { renderWithStore } from './test-utils';
 
 describe('Phase 4 - Task Due Date Display, Locking, and Move Action', () => {
   it('renders overdue badge and locked indicator when task due date is in the past', () => {
@@ -13,7 +14,7 @@ describe('Phase 4 - Task Due Date Display, Locking, and Move Action', () => {
       assigneeName: 'Arjun Sharma',
     };
 
-    render(
+    renderWithStore(
       <TaskCard
         task={pastTask}
         userRole="Project Owner"
@@ -37,7 +38,7 @@ describe('Phase 4 - Task Due Date Display, Locking, and Move Action', () => {
       assigneeName: 'Priya Patel',
     };
 
-    render(
+    renderWithStore(
       <TaskCard
         task={futureCompletedTask}
         userRole="Project Owner"
@@ -61,7 +62,7 @@ describe('Phase 4 - Task Due Date Display, Locking, and Move Action', () => {
 
     const handleMove = vi.fn();
 
-    render(
+    renderWithStore(
       <TaskCard
         task={futureOpenTask}
         userRole="Project Owner"

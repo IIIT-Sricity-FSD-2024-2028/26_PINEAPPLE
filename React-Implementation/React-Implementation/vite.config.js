@@ -8,4 +8,9 @@ export default defineConfig({
     react(),
     babel({ presets: [reactCompilerPreset()] })
   ],
+  server: {
+    watch: {
+      ignored: ['**/.runtime/**', '**/uploads/**', '**/secure-cvs/**', '**/logs/**'],
+    },
+  },
 })

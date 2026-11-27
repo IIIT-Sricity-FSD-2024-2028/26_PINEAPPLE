@@ -211,7 +211,7 @@ export class LeaveRequestsService {
 
     const user = this.usersRepo?.findById(userId);
     const userName = user?.name || user?.username || userId;
-    const userAvatar = user?.avatar || (user?.profile as any)?.avatar;
+    const userAvatar = (user as any)?.avatarUrl || user?.avatar || (user?.profile as any)?.avatarUrl || (user?.profile as any)?.avatar;
 
     const request = this.leaveRequestsRepo.create({
       projectId,
@@ -324,7 +324,8 @@ export class LeaveRequestsService {
           id: req.userId,
           name: req.userName || user?.name || user?.username || req.userId,
           username: user?.username || '',
-          avatar: req.userAvatar || user?.avatar || (user?.profile as any)?.avatar || '',
+          avatarUrl: (user as any)?.avatarUrl || user?.avatar || (user?.profile as any)?.avatarUrl || (user?.profile as any)?.avatar || req.userAvatar || null,
+          avatar: (user as any)?.avatarUrl || user?.avatar || (user?.profile as any)?.avatar || req.userAvatar || '',
         },
         taskSummary: {
           open,

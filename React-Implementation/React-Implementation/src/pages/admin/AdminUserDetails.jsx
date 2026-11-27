@@ -1,9 +1,33 @@
 import { formatMemberSince, formatDateTime } from '../../utils/dateFormatter';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import adminApi from '../../services/adminApi';
-import mentorshipApi from '../../services/mentorshipApi';
-import mentorMarketplaceApi from '../../services/mentorMarketplaceApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchAdminUserDetails,
+  fetchAdminUserReputation,
+  flagAdminUser,
+  updateAdminUserStatus,
+} from '../../store/thunks/adminUsersThunks';
+import {
+  setRepPage as setRepPageAction,
+  setRepTypeFilter as setRepTypeFilterAction,
+} from '../../store/slices/adminUsersSlice';
+import {
+  selectAdminUserDetailsById,
+  selectAdminUserReputationById,
+  selectAdminUsersWorking,
+} from '../../store/selectors/adminUsersSelectors';
+import { fetchAdminMentorFeedback } from '../../store/thunks/sessionFeedbackThunks';
+import { selectAdminMentorFeedbackById } from '../../store/selectors/sessionFeedbackSelectors';
+import {
+  fetchUserWarningsAdmin,
+  issueUserWarning,
+} from '../../store/thunks/warningsThunks';
+import { selectUserActiveWarningsCount } from '../../store/selectors/warningsSelectors';
+import {
+  reactivateUserModeration,
+  suspendUserModeration,
+} from '../../store/thunks/pendingModerationActionsThunks';
 import StatCard from '../../components/common/StatCard';
 import Badge from '../../components/common/Badge';
 import Avatar from '../../components/common/Avatar';
@@ -12,23 +36,35 @@ import EmptyState from '../../components/common/EmptyState';
 import Modal from '../../components/common/Modal';
 import './AdminUserDetails.css';
 
-const AdminUserDetails = () => {
+const AdminUserDetailsContent = () => {
   const { id } = useParams();
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const user = useSelector(selectAdminUserDetailsById(id));
+  const usersWorking = useSelector(selectAdminUsersWorking);
+  const reputationState = useSelector(selectAdminUserReputationById(id));
+
+  const loading = Boolean(usersWorking.detailLoading && !user);
+  const error = !user ? usersWorking.detailError : null;
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [isProcessing, setIsProcessing] = useState(false);
   const toastTimeoutRef = useRef(null);
 
-  // Reputation history pagination state
-  const [repTypeFilter, setRepTypeFilter] = useState('all');
-  const [repPage, setRepPage] = useState(1);
-  const [repTotal, setRepTotal] = useState(0);
-  const [reputationEntries, setReputationEntries] = useState([]);
-  const [mentorFeedbackData, setMentorFeedbackData] = useState(null);
+  // Reputation history pagination state (backed by adminUsersSlice)
+  const repTypeFilter = usersWorking.repTypeFilter || 'all';
+  const repPage = usersWorking.repPage || 1;
+  const setRepTypeFilter = (val) => dispatch(setRepTypeFilterAction(val));
+  const setRepPage = (valOrFn) =>
+    dispatch(
+      setRepPageAction(typeof valOrFn === 'function' ? valOrFn(repPage) : valOrFn),
+    );
+  const repTotal = reputationState.total || 0;
+  const reputationEntries = reputationState.items || [];
+  const mentorFeedbackData = useSelector((state) =>
+    selectAdminMentorFeedbackById(state, id),
+  );
+  const storeActiveWarningsCount = useSelector(selectUserActiveWarningsCount(id));
 
   // Moderation action modal state
   const [modalAction, setModalAction] = useState(null); // 'warn' | 'suspend' | 'activate' | null
@@ -65,26 +101,32 @@ const AdminUserDetails = () => {
     try {
       let successMsg = '';
       if (modalAction === 'warn') {
-        await adminApi.warnUser(id, { reason: trimmed });
+        await dispatch(issueUserWarning({ userId: id, reason: trimmed })).unwrap();
         successMsg = 'Warning recorded successfully.';
       } else if (modalAction === 'suspend') {
-        const res = await adminApi.suspendUser(id, { reason: trimmed });
+        const out = await dispatch(
+          suspendUserModeration({
+            userId: id,
+            targetUserName: user?.name,
+            reason: trimmed,
+          }),
+        ).unwrap();
+        const res = out?.result || out;
         if (res?.status === 'pending_second_approval') {
           successMsg = 'Pending second approval — waiting for another admin or Super User within 72 hours.';
         } else {
           successMsg = 'User suspended. Account access restricted.';
         }
       } else if (modalAction === 'activate') {
-        await adminApi.reactivateUser(id, { reason: trimmed });
+        await dispatch(
+          reactivateUserModeration({ userId: id, reason: trimmed }),
+        ).unwrap();
         successMsg = 'User account reactivated and restored.';
       }
 
       closeModerationModal();
 
-      const freshUser = await adminApi.getUserDetails(id);
-      if (freshUser) {
-        setUser(freshUser);
-      }
+      await dispatch(fetchAdminUserDetails(id));
       showToast(successMsg, 'success');
     } catch (err) {
       const errMsg = err.response?.data?.message || err.message || 'Action failed.';
@@ -99,94 +141,53 @@ const AdminUserDetails = () => {
     setIsProcessing(true);
     try {
       if (flagAction === 'flag') {
-        await adminApi.flagUser(id);
+        await dispatch(flagAdminUser(id)).unwrap();
         showToast('User account flagged for administrative monitoring.', 'success');
       } else {
-        await adminApi.updateUserStatus(id, { status: 'Active' });
+        await dispatch(updateAdminUserStatus({ userId: id, status: 'Active' })).unwrap();
         showToast('Account flag removed.', 'success');
       }
-      const freshUser = await adminApi.getUserDetails(id);
-      if (freshUser) setUser(freshUser);
+      await dispatch(fetchAdminUserDetails(id));
     } catch (err) {
-      showToast(`Action failed: ${err.message || 'Unknown error'}`, 'error');
+      showToast(`Action failed: ${err?.serverMessage || err?.message || 'Unknown error'}`, 'error');
     } finally {
       setIsProcessing(false);
     }
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchUserDetails = async () => {
-      try {
-        setLoading(true);
-        setError(null);
-        const [data, badgesData] = await Promise.all([
-          adminApi.getUserDetails(id),
-          mentorshipApi.getBadges(id).catch(() => []),
-        ]);
-        if (isMounted) {
-          const rawBadges = Array.isArray(badgesData) && badgesData.length > 0
-            ? badgesData
-            : (Array.isArray(data?.mentorRecommendations) ? data.mentorRecommendations : []);
-          setUser({
-            ...data,
-            mentorRecommendations: rawBadges,
-          });
-        }
-      } catch (err) {
-        if (isMounted) {
-          setError(err.message || 'Failed to load user details.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchUserDetails();
+    dispatch(fetchAdminUserDetails(id));
+    dispatch(fetchUserWarningsAdmin({ userId: id }));
     return () => {
-      isMounted = false;
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
-  }, [id]);
+  }, [id, dispatch]);
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchRep = async () => {
-      if (!id || typeof adminApi.getUserReputation !== 'function') return;
-      try {
-        const res = await adminApi.getUserReputation(id, { page: repPage, limit: 20, type: repTypeFilter });
-        if (isMounted && res) {
-          setReputationEntries(Array.isArray(res.items) ? res.items : []);
-          setRepTotal(Number(res.total) || 0);
-        }
-      } catch (err) {
-        console.warn('Failed to fetch user reputation entries:', err);
-      }
-    };
-    fetchRep();
-    return () => { isMounted = false; };
-  }, [id, repPage, repTypeFilter]);
+    if (!id) return;
+    dispatch(
+      fetchAdminUserReputation({
+        userId: id,
+        page: repPage,
+        limit: 20,
+        type: repTypeFilter,
+      }),
+    );
+  }, [dispatch, id, repPage, repTypeFilter]);
 
   useEffect(() => {
-    let isMounted = true;
     const isMentorUser = Boolean(
       user &&
       (String(user.role || '').toLowerCase() === 'mentor' ||
         user.mentorUnlocked ||
         user.profile?.mentorUnlocked)
     );
-    if (!id || !isMentorUser || typeof mentorMarketplaceApi.getAdminMentorFeedback !== 'function') {
-      return () => { isMounted = false; };
+    if (!id || !isMentorUser) {
+      return undefined;
     }
-    mentorMarketplaceApi.getAdminMentorFeedback(id)
-      .then((res) => {
-        if (isMounted && res) setMentorFeedbackData(res);
-      })
-      .catch(() => {});
-    return () => { isMounted = false; };
-  }, [id, user]);
+    dispatch(fetchAdminMentorFeedback({ mentorId: id }));
+    return undefined;
+  }, [dispatch, id, user]);
 
 
 
@@ -219,7 +220,7 @@ const AdminUserDetails = () => {
   const isSuspended = (user.status || '').toLowerCase() === 'suspended';
   const isFlagged = user.flags === true || user.flagged === true || (user.status || '').toLowerCase() === 'flagged';
   const isWarned = (user.status || '').toLowerCase() === 'warned' || (user.warnings && (Array.isArray(user.warnings) ? user.warnings.length > 0 : user.warnings > 0));
-  const activeWarnings = user.activeWarningsCount ?? user.warningsCount ?? (
+  const activeWarnings = storeActiveWarningsCount ?? user.activeWarningsCount ?? user.warningsCount ?? (
     Array.isArray(user.warnings)
       ? user.warnings.filter((w) => typeof w === 'object' ? w.active !== false : true).length
       : (typeof user.warnings === 'number' ? user.warnings : 0)
@@ -364,7 +365,7 @@ const AdminUserDetails = () => {
 
       {/* User Hero Banner */}
       <div className="admin-user-hero">
-        <Avatar name={user.name} size="lg" />
+        <Avatar name={user.name} src={user.avatarUrl || user.avatar || user.profile?.avatarUrl} version={user.updatedAt} size="lg" />
         <div className="admin-user-hero-info">
           <div className="admin-user-hero-title">
             <h2>{user.name}</h2>
@@ -921,4 +922,5 @@ const AdminUserDetails = () => {
   );
 };
 
+const AdminUserDetails = AdminUserDetailsContent;
 export default AdminUserDetails;

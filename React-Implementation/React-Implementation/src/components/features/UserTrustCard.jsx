@@ -1,102 +1,45 @@
-import { useState } from 'react';
-
-/**
- * Returns visual styles and icons for a Trust Label.
- */
-export function getTrustLabelConfig(label) {
-  switch (label) {
-    case 'Trusted contributor':
-      return {
-        variant: 'success',
-        icon: '★',
-        bg: '#ecfdf5',
-        color: '#065f46',
-        border: '#a7f3d0',
-      };
-    case 'Reliable':
-      return {
-        variant: 'primary',
-        icon: '✓',
-        bg: '#eff6ff',
-        color: '#1e40af',
-        border: '#bfdbfe',
-      };
-    case 'Rising':
-      return {
-        variant: 'info',
-        icon: '↗',
-        bg: '#f5f3ff',
-        color: '#5b21b6',
-        border: '#ddd6fe',
-      };
-    case 'New member':
-      return {
-        variant: 'secondary',
-        icon: '🌱',
-        bg: '#f0fdfa',
-        color: '#115e59',
-        border: '#99f6e4',
-      };
-    case 'Getting started':
-    default:
-      return {
-        variant: 'secondary',
-        icon: '•',
-        bg: '#f8fafc',
-        color: '#475569',
-        border: '#e2e8f0',
-      };
-  }
-}
-
-/**
- * Returns visual styles for a Standing Band.
- */
-export function getStandingBandConfig(band) {
-  switch (band) {
-    case 'Good standing':
-      return {
-        variant: 'success',
-        bg: '#ecfdf5',
-        color: '#047857',
-        border: '#a7f3d0',
-      };
-    case 'Fair standing':
-      return {
-        variant: 'warning',
-        bg: '#fffbeb',
-        color: '#b45309',
-        border: '#fde68a',
-      };
-    case 'Low standing':
-    default:
-      return {
-        variant: 'danger',
-        bg: '#fff1f2',
-        color: '#be123c',
-        border: '#fecdd3',
-      };
-  }
-}
+import { useSelector } from 'react-redux';
+import { useMemo, useState } from 'react';
+import { selectTrustSummaryById } from '../../store/selectors/profilesSelectors';
+import { getTrustLabelConfig, getStandingBandConfig } from '../../utils/trustConfig';
 
 /**
  * UserTrustCard component displaying conduct score, XP number, and trust label.
  *
  * @param {Object} props
- * @param {Object} props.summary - UserTrustSummary data from trustApi
+ * @param {string} [props.userId] - Optional user ID to read cached summary from profilesSlice
+ * @param {Object} [props.summary] - UserTrustSummary data (overrides store lookup if provided)
  * @param {'compact'|'expanded'} [props.variant='compact'] - Card layout variant
  * @param {boolean} [props.isAdminViewer=false] - Whether caller is an administrator
  * @param {boolean} [props.isSelf=false] - Whether caller is viewing their own card
  * @param {string} [props.className=''] - Additional custom CSS class
  */
-export const UserTrustCard = ({
-  summary,
+const UserTrustCardContent = ({
+  userId,
+  summary: summaryProp,
   variant = 'compact',
   isAdminViewer = false,
   isSelf = false,
   className = '',
 }) => {
   const [showScoreInfo, setShowScoreInfo] = useState(false);
+  const resolvedLookupId = userId || summaryProp?.userId || summaryProp?.id || '';
+  const storeSummary = useSelector((state) => (resolvedLookupId ? selectTrustSummaryById(state, resolvedLookupId) : null));
+  const rawSummary = summaryProp || storeSummary;
+  const summary = useMemo(() => {
+    if (!rawSummary) return null;
+    if (isSelf || isAdminViewer) {
+      if (isAdminViewer) return rawSummary;
+      const selfView = { ...rawSummary };
+      delete selfView.needsAttention;
+      return selfView;
+    }
+    const publicView = { ...rawSummary };
+    delete publicView.reputation;
+    delete publicView.needsAttention;
+    delete publicView.ledgerLink;
+    return publicView;
+  }, [rawSummary, isSelf, isAdminViewer]);
 
   if (!summary) return null;
 
@@ -427,5 +370,7 @@ export const UserTrustCard = ({
     </div>
   );
 };
+
+const UserTrustCard = UserTrustCardContent;
 
 export default UserTrustCard;

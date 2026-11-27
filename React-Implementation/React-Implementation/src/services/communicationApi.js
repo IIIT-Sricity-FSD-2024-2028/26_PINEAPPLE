@@ -21,19 +21,6 @@ export const communicationApi = {
     });
   },
 
-  getNotifications: (role, userId) => {
-    const activeUserId = userId || getCurrentUserId() || "";
-    return apiRequest("/communication/notifications", "GET", null, {
-      role: role || getCurrentUserRole(),
-      userId: activeUserId,
-    });
-  },
-
-  markNotificationRead: (id, role) =>
-    apiRequest(`/communication/notifications/${id}/read`, "PATCH", null, {
-      role: role || getCurrentUserRole(),
-    }),
-
   getUnread: (role, userId) =>
     apiRequest("/communication/unread", "GET", null, {
       role: role || getCurrentUserRole(),

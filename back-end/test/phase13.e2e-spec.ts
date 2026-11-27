@@ -16,9 +16,6 @@ describe('Phase 13 E2E API Tests: Task Review, Retention, Deadlines, Unassign & 
 
   beforeEach(() => {
     ctx.resetStores();
-    for (const u of ctx.usersRepository.findAll(true)) {
-      u.digestEnabled = false;
-    }
     ctx.clockService.setTime('2026-11-11T12:00:00.000Z');
   });
 

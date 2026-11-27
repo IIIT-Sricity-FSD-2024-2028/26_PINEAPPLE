@@ -1,83 +1,49 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import adminApi from '../../services/adminApi';
-import reportsApi from '../../services/reportsApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchOpenReportsCount } from '../../store/thunks/reportsThunks';
+import { selectOpenReportsCount } from '../../store/selectors/reportsSelectors';
+import { fetchDashboardStats } from '../../store/thunks/adminUsersThunks';
+import {
+  selectDashboardStats,
+  selectDashboardStatsStatus,
+} from '../../store/selectors/adminUsersSelectors';
+import { fetchAuditLogs } from '../../store/thunks/auditLogThunks';
+import {
+  selectAllAuditLogs,
+  selectAuditLogStatus,
+  selectRecentAuditEvents,
+} from '../../store/selectors/auditLogSelectors';
 import StatCard from '../../components/common/StatCard';
 import './AdminDashboard.css';
 
-const AdminDashboard = () => {
+const AdminDashboardContent = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [openReportsCount, setOpenReportsCount] = useState(0);
-  const [stats, setStats] = useState({
-    totalUsers: 0,
-    activeUsers: 0,
-    pendingMentorApps: 0,
-    flaggedWarned: 0,
-    suspendedUsers: 0,
-    auditEvents: 0
-  });
-  const [recentEvents, setRecentEvents] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const openReportsCount = useSelector(selectOpenReportsCount);
+  const stats = useSelector(selectDashboardStats);
+  const statsStatus = useSelector(selectDashboardStatsStatus);
+  const allAuditLogs = useSelector(selectAllAuditLogs);
+  const recentEvents = useSelector(selectRecentAuditEvents);
+  const auditStatus = useSelector(selectAuditLogStatus);
+
+  const loading =
+    (statsStatus === 'idle' || statsStatus === 'loading') &&
+    (auditStatus === 'idle' || auditStatus === 'loading');
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchDashboardData = async () => {
-      try {
-        const [statsData, auditData, reportsData] = await Promise.all([
-          adminApi.getStats(),
-          adminApi.getAuditLog(),
-          reportsApi.getOpenCount().catch(() => ({ count: 0 })),
-        ]);
-        
-        if (isMounted) {
-          setStats({
-            totalUsers: statsData?.totalUsers || 0,
-            activeUsers: statsData?.activeUsers || 0,
-            pendingMentorApps: statsData?.pendingMentorApps || 0,
-            flaggedWarned: statsData?.flaggedWarned || 0,
-            suspendedUsers: statsData?.suspendedUsers || 0,
-            auditEvents: statsData?.auditEvents || (auditData?.length || 0)
-          });
+    dispatch(fetchOpenReportsCount());
+    dispatch(fetchDashboardStats());
+    dispatch(fetchAuditLogs());
+  }, [dispatch]);
 
-          setOpenReportsCount(
-            typeof reportsData?.count === 'number'
-              ? reportsData.count
-              : typeof reportsData?.openCount === 'number'
-              ? reportsData.openCount
-              : 0
-          );
-
-          setRecentEvents((auditData || []).slice(0, 5));
-        }
-      } catch (error) {
-        console.error("Failed to fetch admin dashboard data", error);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    fetchDashboardData();
-
-    const handleReportUpdate = () => {
-      reportsApi.getOpenCount().then((res) => {
-        if (isMounted) {
-          const count = typeof res?.count === 'number' ? res.count : typeof res?.openCount === 'number' ? res.openCount : 0;
-          setOpenReportsCount(count);
-        }
-      }).catch(() => {});
-    };
-    window.addEventListener('teamforge:report_updated', handleReportUpdate);
-
-    return () => {
-      isMounted = false;
-      window.removeEventListener('teamforge:report_updated', handleReportUpdate);
-    };
-  }, []);
+  const auditEventsCount = stats.auditEvents || allAuditLogs.length || 0;
 
   const getPercentage = (count) => {
-    return stats.totalUsers > 0 ? Math.round((count / stats.totalUsers) * 100) : 0;
+    const total = Number(stats.totalUsers) || 0;
+    if (total <= 0) return 0;
+    const value = Number(count) || 0;
+    return Math.max(0, Math.min(100, Math.round((value / total) * 100)));
   };
 
   const formatEventText = (entry) => {
@@ -100,11 +66,12 @@ const AdminDashboard = () => {
   };
 
   const formatTime = (entry) => {
+    if (entry?.timestampFormatted) return entry.timestampFormatted;
     if (entry?.timestamp) return entry.timestamp;
     if (entry?.createdAt) {
       try {
         const d = new Date(entry.createdAt);
-        return isNaN(d.getTime()) ? 'Just now' : d.toLocaleString();
+        return Number.isNaN(d.getTime()) ? 'Just now' : d.toLocaleString();
       } catch {
         return 'Just now';
       }
@@ -121,7 +88,7 @@ const AdminDashboard = () => {
       xp: 'xp',
       reputation: 'xp',
       project: 'task',
-      system: 'system'
+      system: 'system',
     };
     return `admin-event-chip ${types[type] || 'system'}`;
   };
@@ -163,7 +130,7 @@ const AdminDashboard = () => {
         <StatCard
           icon="📜"
           label="Audit Events"
-          value={stats.auditEvents}
+          value={auditEventsCount}
           meta="Recorded events"
           onClick={() => navigate('/admin/audit')}
         />
@@ -197,10 +164,10 @@ const AdminDashboard = () => {
             <div className="admin-action-icon">📜</div>
             <div>
               <div className="admin-action-title">View Full Audit Log</div>
-              <div className="admin-action-sub" id="admin-action-audit-sub">{stats.auditEvents} entries</div>
+              <div className="admin-action-sub" id="admin-action-audit-sub">{auditEventsCount} entries</div>
             </div>
           </div>
-          <div className="admin-action-count" id="admin-action-audit-count">{stats.auditEvents}</div>
+          <div className="admin-action-count" id="admin-action-audit-count">{auditEventsCount}</div>
         </button>
 
         <button className="admin-action-card" data-testid="admin-action-reports-card" onClick={() => navigate('/admin/reports')}>
@@ -227,9 +194,9 @@ const AdminDashboard = () => {
           </div>
 
           <div className="admin-health-item">
-            <div className="admin-health-head"><span>Warned</span><span id="admin-health-warned-label">{stats.flaggedWarned} / {stats.totalUsers}</span></div>
+            <div className="admin-health-head"><span>Warned</span><span id="admin-health-warned-label">{stats.warnedUsers ?? 0} / {stats.totalUsers}</span></div>
             <div className="admin-health-track">
-              <div className="admin-health-fill warning" id="admin-health-warned-fill" style={{ width: `${getPercentage(stats.flaggedWarned)}%` }}></div>
+              <div className="admin-health-fill warning" id="admin-health-warned-fill" style={{ width: `${getPercentage(stats.warnedUsers ?? 0)}%` }}></div>
             </div>
           </div>
 
@@ -246,7 +213,7 @@ const AdminDashboard = () => {
           <div className="admin-events-list" id="admin-dash-recent-events">
             {recentEvents.length > 0 ? (
               recentEvents.map((entry, index) => (
-                <div className="admin-event-row" key={index}>
+                <div className="admin-event-row" key={entry.id || index}>
                   <span className={getAuditChipClass(entry.type || 'system')}>{String(entry.type || 'system').toUpperCase()}</span>
                   <div>
                     <div className="admin-event-text">{formatEventText(entry)}</div>
@@ -265,4 +232,5 @@ const AdminDashboard = () => {
   );
 };
 
+const AdminDashboard = AdminDashboardContent;
 export default AdminDashboard;

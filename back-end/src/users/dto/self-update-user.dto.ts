@@ -44,9 +44,6 @@ export const SELF_UPDATE_ALLOWED_TOP_FIELDS = new Set<string>([
   'portfolio',
   'website',
   'links',
-  'digestEnabled',
-  'digestHour',
-  'utcOffsetMinutes',
   'settings',
   'profile',
 ]);
@@ -215,25 +212,6 @@ export class SelfUpdateUserDto {
   @IsOptional()
   @IsObject()
   links?: Record<string, string>;
-
-  @ApiPropertyOptional({ example: true })
-  @IsOptional()
-  @IsBoolean()
-  digestEnabled?: boolean;
-
-  @ApiPropertyOptional({ example: 9 })
-  @IsOptional()
-  @IsInt()
-  @Min(0)
-  @Max(23)
-  digestHour?: number;
-
-  @ApiPropertyOptional({ example: 330 })
-  @IsOptional()
-  @IsInt()
-  @Min(-720)
-  @Max(840)
-  utcOffsetMinutes?: number;
 
   @ApiPropertyOptional({
     type: 'object',

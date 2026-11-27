@@ -15,7 +15,10 @@ import {
   Optional,
 } from '@nestjs/common';
 import * as crypto from 'crypto';
+import * as fs from 'fs';
+import * as path from 'path';
 import * as bcrypt from 'bcryptjs';
+import { getUploadsDir } from '../core/middleware/file-upload.middleware';
 import { UsersRepository, User } from './users.repository';
 import { GamificationRepository } from '../gamification/gamification.repository';
 import { InternalCreateUserInput, UserRole, UserStatus } from './dto/create-user.dto';
@@ -32,7 +35,6 @@ import { assertSafeHttpUrl } from '../common/utils/url.util';
 import { ClockService } from '../common/services/clock.service';
 import { ContentFilterService } from '../common/services/content-filter.service';
 import { DuplicateDetectionService } from './duplicate-detection.service';
-import { DigestService } from '../notifications/digest.service';
 import { ReputationService } from '../moderation/reputation.service';
 
 export interface OtpChallengeState {
@@ -984,14 +986,22 @@ export class UsersService implements OnModuleInit {
     const resolvedTitle = rawBody?.title !== undefined ? rawBody.title : rawProfile.title;
     const resolvedUni =
       rawBody?.university !== undefined ? rawBody.university : rawProfile.university;
-    const resolvedAvatar =
-      rawBody?.avatar !== undefined
-        ? rawBody.avatar
-        : rawBody?.avatarUrl !== undefined
+    const hasAvatarField =
+      rawBody?.avatarUrl !== undefined ||
+      rawBody?.avatar !== undefined ||
+      rawProfile.avatarUrl !== undefined ||
+      rawProfile.avatar !== undefined;
+    const rawResolvedAvatar =
+      rawBody?.avatarUrl !== undefined
         ? rawBody.avatarUrl
-        : rawProfile.avatar !== undefined
-        ? rawProfile.avatar
-        : rawProfile.avatarUrl;
+        : rawBody?.avatar !== undefined
+        ? rawBody.avatar
+        : rawProfile.avatarUrl !== undefined
+        ? rawProfile.avatarUrl
+        : rawProfile.avatar;
+    const resolvedAvatar = hasAvatarField
+      ? (typeof rawResolvedAvatar === 'string' && rawResolvedAvatar.trim() ? rawResolvedAvatar.trim() : null)
+      : undefined;
     const resolvedSkills = rawBody?.skills !== undefined ? rawBody.skills : rawProfile.skills;
     const resolvedLinkedIn =
       rawBody?.linkedIn !== undefined
@@ -1006,11 +1016,22 @@ export class UsersService implements OnModuleInit {
     const resolvedWebsite =
       rawBody?.website !== undefined ? rawBody.website : rawProfile.website;
 
+    const previousAvatar =
+      (existingUser as any).avatarUrl ||
+      existingUser.avatar ||
+      (existingUser.profile as any)?.avatarUrl ||
+      existingUser.profile?.avatar ||
+      null;
+
     const allowedUpdate: InternalUpdateUserInput = {};
     if (resolvedName !== undefined) allowedUpdate.name = resolvedName;
     if (normalizedNewEmail !== undefined) allowedUpdate.email = normalizedNewEmail;
     if (resolvedUni !== undefined) allowedUpdate.university = resolvedUni;
-    if (resolvedAvatar !== undefined) allowedUpdate.avatar = resolvedAvatar;
+    if (hasAvatarField) {
+      allowedUpdate.avatar = resolvedAvatar;
+      allowedUpdate.avatarUrl = resolvedAvatar;
+      allowedUpdate.updatedAt = new Date().toISOString();
+    }
     if (resolvedSkills !== undefined) allowedUpdate.skills = resolvedSkills;
     if (resolvedLinkedIn !== undefined) allowedUpdate.linkedIn = resolvedLinkedIn;
     if (body?.links !== undefined) allowedUpdate.links = body.links;
@@ -1029,7 +1050,10 @@ export class UsersService implements OnModuleInit {
       nextProfile.university = resolvedUni;
       nextProfile.uni = resolvedUni;
     }
-    if (resolvedAvatar !== undefined) nextProfile.avatar = resolvedAvatar;
+    if (hasAvatarField) {
+      nextProfile.avatar = resolvedAvatar;
+      nextProfile.avatarUrl = resolvedAvatar;
+    }
     if (resolvedSkills !== undefined) nextProfile.skills = resolvedSkills;
     if (resolvedLinkedIn !== undefined) {
       nextProfile.linkedin = resolvedLinkedIn;
@@ -1044,17 +1068,10 @@ export class UsersService implements OnModuleInit {
 
     this.update(String(id), allowedUpdate);
 
-    if (
-      body?.digestEnabled !== undefined ||
-      body?.digestHour !== undefined ||
-      body?.utcOffsetMinutes !== undefined
-    ) {
-      this.updateDigestSettings(String(id), {
-        digestEnabled: body.digestEnabled,
-        digestHour: body.digestHour,
-        utcOffsetMinutes: body.utcOffsetMinutes,
-      });
+    if (hasAvatarField && previousAvatar && previousAvatar !== resolvedAvatar) {
+      this.deleteLocalAvatarIfUnused(previousAvatar, String(id));
     }
+
 
     if (emailChanged) {
       const updatedRaw = this.usersRepository.findById(String(id));
@@ -1099,6 +1116,78 @@ export class UsersService implements OnModuleInit {
 
     const finalRaw = this.usersRepository.findById(String(id));
     return this.toSafeUser(finalRaw!);
+  }
+
+  private extractLocalUploadFilename(avatarPath?: string | null): string | null {
+    if (!avatarPath || typeof avatarPath !== 'string') return null;
+    const trimmed = avatarPath.trim();
+    if (!trimmed) return null;
+    const clean = trimmed.split('?')[0].split('#')[0];
+    if (!clean.startsWith('/uploads/') || clean.startsWith('/uploads/cv/')) {
+      return null;
+    }
+    const base = path.basename(clean);
+    if (!base || base === '.' || base === '..' || clean.includes('..')) {
+      return null;
+    }
+    return base;
+  }
+
+  private deleteLocalAvatarIfUnused(oldAvatarUrl: string | null | undefined, excludingUserId?: string): void {
+    const filename = this.extractLocalUploadFilename(oldAvatarUrl);
+    if (!filename) return;
+    try {
+      const stillReferenced = this.usersRepository.findAll(true).some((u) => {
+        if (excludingUserId && String(u.id) === String(excludingUserId)) return false;
+        const candidate = (u as any).avatarUrl || u.avatar || (u.profile as any)?.avatarUrl || u.profile?.avatar;
+        return this.extractLocalUploadFilename(candidate) === filename;
+      });
+      if (stillReferenced) return;
+      const uploadsDir = path.resolve(getUploadsDir());
+      const resolved = path.resolve(uploadsDir, filename);
+      if (resolved.startsWith(`${uploadsDir}${path.sep}`) && fs.existsSync(resolved)) {
+        fs.unlinkSync(resolved);
+      }
+    } catch (err: any) {
+      this.logger.warn(`Failed to clean up previous avatar "${filename}": ${err?.message || err}`);
+    }
+  }
+
+  updateAvatar(userId: string, newAvatarUrl: string | null): any {
+    const uid = String(userId || '').trim();
+    const existing = this.usersRepository.findById(uid);
+    if (!existing) {
+      throw new NotFoundException(`User with ID ${uid} not found.`);
+    }
+
+    const previousAvatar =
+      (existing as any).avatarUrl ||
+      existing.avatar ||
+      (existing.profile as any)?.avatarUrl ||
+      existing.profile?.avatar ||
+      null;
+
+    const cleanUrl =
+      typeof newAvatarUrl === 'string' && newAvatarUrl.trim() ? newAvatarUrl.trim() : null;
+    const nowIso = (this.clockService ? this.clockService.now() : new Date()).toISOString();
+
+    this.update(uid, {
+      avatar: cleanUrl,
+      avatarUrl: cleanUrl,
+      updatedAt: nowIso,
+      profile: {
+        ...(existing.profile || {}),
+        avatar: cleanUrl,
+        avatarUrl: cleanUrl,
+      },
+    } as any);
+
+    if (previousAvatar && previousAvatar !== cleanUrl) {
+      this.deleteLocalAvatarIfUnused(previousAvatar, uid);
+    }
+
+    const updated = this.usersRepository.findById(uid);
+    return this.toSafeUser(updated!);
   }
 
   switchRole(userId: string, requestedRole: string): { role: string } {
@@ -1340,12 +1429,16 @@ export class UsersService implements OnModuleInit {
     const userAny = user as any;
     const effectiveUni = user.university || profile.university || profile.uni || null;
     const effectiveJoined = user.createdAt || profile.joined || null;
+    const effectiveAvatar =
+      userAny.avatarUrl || userAny.avatar || profile.avatarUrl || profile.avatar || null;
 
     return {
       id: user.id,
       name: user.name || profile.fullName || profile.name || 'Anonymous User',
       username: user.username || profile.username || '',
-      avatar: userAny.avatar || profile.avatar || null,
+      avatarUrl: effectiveAvatar,
+      avatar: effectiveAvatar,
+      updatedAt: userAny.updatedAt || null,
       role: user.role,
       university: effectiveUni,
       bio: profile.bio || userAny.bio || '',
@@ -1787,93 +1880,19 @@ export class UsersService implements OnModuleInit {
     return this.toSafeUser(existingUser);
   }
 
-  getDigestSettings(userId: string): {
-    digestEnabled: boolean;
-    digestHour: number;
-    utcOffsetMinutes: number;
-  } {
+  getUserSettings(userId: string): Record<string, never> {
     const user: any = this.usersRepository.findById(String(userId));
     if (!user || user.isDeleted || user.deletedAt) {
       throw new NotFoundException(`User with ID ${userId} not found.`);
     }
-    return {
-      digestEnabled: user.digestEnabled !== false,
-      digestHour:
-        Number.isInteger(user.digestHour) && user.digestHour >= 0 && user.digestHour <= 23
-          ? user.digestHour
-          : 9,
-      utcOffsetMinutes: Number.isInteger(user.utcOffsetMinutes) ? user.utcOffsetMinutes : 0,
-    };
+    return {};
   }
 
-  updateDigestSettings(
-    userId: string,
-    dto: { digestEnabled?: any; digestHour?: any; utcOffsetMinutes?: any },
-  ): {
-    digestEnabled: boolean;
-    digestHour: number;
-    utcOffsetMinutes: number;
-  } {
+  updateUserSettings(userId: string): Record<string, never> {
     const user: any = this.usersRepository.findById(String(userId));
     if (!user || user.isDeleted || user.deletedAt) {
       throw new NotFoundException(`User with ID ${userId} not found.`);
     }
-
-    const prevEnabled = user.digestEnabled !== false;
-
-    if (dto.digestEnabled !== undefined) {
-      if (typeof dto.digestEnabled !== 'boolean') {
-        throw new BadRequestException({
-          statusCode: 400,
-          code: 'INVALID_DIGEST_SETTINGS',
-          message: 'digestEnabled must be a boolean.',
-        });
-      }
-      user.digestEnabled = dto.digestEnabled;
-    }
-
-    if (dto.digestHour !== undefined) {
-      const numHour = Number(dto.digestHour);
-      if (
-        typeof dto.digestHour !== 'number' ||
-        !Number.isInteger(numHour) ||
-        numHour < 0 ||
-        numHour > 23
-      ) {
-        throw new BadRequestException({
-          statusCode: 400,
-          code: 'INVALID_DIGEST_HOUR',
-          message: 'digestHour must be an integer between 0 and 23.',
-        });
-      }
-      user.digestHour = numHour;
-    }
-
-    if (dto.utcOffsetMinutes !== undefined) {
-      const numOff = Number(dto.utcOffsetMinutes);
-      if (
-        typeof dto.utcOffsetMinutes !== 'number' ||
-        !Number.isInteger(numOff) ||
-        numOff < -720 ||
-        numOff > 840
-      ) {
-        throw new BadRequestException({
-          statusCode: 400,
-          code: 'INVALID_UTC_OFFSET',
-          message: 'utcOffsetMinutes must be an integer between -720 and 840.',
-        });
-      }
-      user.utcOffsetMinutes = numOff;
-    }
-
-    const nextEnabled = user.digestEnabled !== false;
-    if (prevEnabled && !nextEnabled) {
-      try {
-        const digestService = this.moduleRef.get(DigestService, { strict: false });
-        digestService?.flushBufferAsImmediate?.(String(user.id));
-      } catch {}
-    }
-
-    return this.getDigestSettings(userId);
+    return {};
   }
 }

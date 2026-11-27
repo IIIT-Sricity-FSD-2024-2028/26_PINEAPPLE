@@ -474,8 +474,6 @@ export class JoinRequestsService extends BaseService<JoinRequestEntity, Promise<
         this.notificationsService.create({
           userId: ownerTarget,
           type: 'JOIN_REQUEST',
-          priority: 'immediate',
-          bypassDigest: true,
           title: 'New Join Request',
           message: `${created.userName || 'A collaborator'} applied to join "${project.title || project.name || 'your project'}".`,
           readStatus: false,
@@ -925,7 +923,8 @@ export class JoinRequestsService extends BaseService<JoinRequestEntity, Promise<
         },
         skills: userSkills,
         university: rawUser?.university || '',
-        avatar: rawUser?.avatar || (applicantName ? applicantName.charAt(0).toUpperCase() : 'A'),
+        avatarUrl: rawUser?.avatarUrl || rawUser?.avatar || rawUser?.profile?.avatarUrl || rawUser?.profile?.avatar || null,
+        avatar: rawUser?.avatarUrl || rawUser?.avatar || (applicantName ? applicantName.charAt(0).toUpperCase() : 'A'),
       };
     });
 
@@ -1001,7 +1000,8 @@ export class JoinRequestsService extends BaseService<JoinRequestEntity, Promise<
         },
         skills: userSkills,
         university: rawUser?.university || '',
-        avatar: rawUser?.avatar || (inviteeName ? inviteeName.charAt(0).toUpperCase() : 'A'),
+        avatarUrl: rawUser?.avatarUrl || rawUser?.avatar || rawUser?.profile?.avatarUrl || rawUser?.profile?.avatar || null,
+        avatar: rawUser?.avatarUrl || rawUser?.avatar || (inviteeName ? inviteeName.charAt(0).toUpperCase() : 'A'),
       };
     });
 

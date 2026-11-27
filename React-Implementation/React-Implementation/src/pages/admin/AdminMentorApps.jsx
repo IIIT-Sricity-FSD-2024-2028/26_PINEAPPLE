@@ -1,12 +1,31 @@
 import { useState, useEffect, useRef } from 'react';
-import mentorApplicationsApi from '../../services/mentorApplicationsApi';
-import uploadsApi from '../../services/uploadsApi';
-import adminApi from '../../services/adminApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  approveMentorApplication,
+  downloadMentorCv,
+  fetchMentorApplications,
+  rejectMentorApplication,
+} from '../../store/thunks/mentorApplicationsThunks';
+import { fetchPublicConfig } from '../../store/thunks/platformConfigThunks';
+import {
+  setAdminMentorAppFilter,
+  setAdminMentorSearch,
+  setAdminMentorVerificationFilter,
+  setOverrideModalAppId,
+  setOverrideModalError,
+  toggleMentorAppExpanded,
+} from '../../store/slices/mentorApplicationsSlice';
+import {
+  selectAdminMentorApplications,
+  selectMentorApplicationsListError,
+  selectMentorApplicationsListStatus,
+  selectMentorApplicationsWorking,
+} from '../../store/selectors/mentorApplicationsSelectors';
+import { selectPublicConfig } from '../../store/selectors/platformConfigSelectors';
 import Badge from '../../components/common/Badge';
 import SearchBar from '../../components/common/SearchBar';
 import FilterTabs from '../../components/common/FilterTabs';
 import ConfirmModal from '../../components/common/ConfirmModal';
-import Modal from '../../components/common/Modal';
 import UniversalReasonModal from '../../components/common/UniversalReasonModal';
 import SafeLink from '../../components/common/SafeLink';
 import Avatar from '../../components/common/Avatar';
@@ -15,7 +34,7 @@ import { CREDENTIAL_STATUS } from '../../constants/credentialStatus';
 import './AdminMentorApps.css';
 
 function formatBytes(bytes) {
-  if (!bytes || isNaN(bytes)) return '';
+  if (!bytes || Number.isNaN(bytes)) return '';
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
@@ -50,8 +69,8 @@ const ChevronUpIcon = () => (
 // ─── Normalization Helper ────────────────────────────────────────
 
 function normalizeMentorApp(source = {}, index = 0) {
-  const name = String(source.name || "Unknown Applicant");
-  const initials = String(source.initials || "")
+  const name = String(source.name || 'Unknown Applicant');
+  const initials = String(source.initials || '')
     .trim()
     .toUpperCase();
 
@@ -62,38 +81,38 @@ function normalizeMentorApp(source = {}, index = 0) {
   }
 
   let expertise = Array.isArray(source.expertise)
-    ? source.expertise.join(", ")
-    : (source.expertise || "");
+    ? source.expertise.join(', ')
+    : source.expertise || '';
   if (!expertise && Array.isArray(source.skills)) {
-    expertise = source.skills.join(", ");
+    expertise = source.skills.join(', ');
   }
-  if (!expertise) expertise = "General Mentorship";
+  if (!expertise) expertise = 'General Mentorship';
 
-  const motivation = source.motivation || source.bio || "No motivation provided.";
+  const motivation = source.motivation || source.bio || 'No motivation provided.';
 
-  let submittedAt = source.submittedAt || "";
+  let submittedAt = source.submittedAt || '';
   if (!submittedAt && source.applicationDate) {
     try {
-      submittedAt = new Date(source.applicationDate).toLocaleDateString("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
+      submittedAt = new Date(source.applicationDate).toLocaleDateString('en-US', {
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric',
       });
     } catch {
       submittedAt = source.applicationDate;
     }
   }
-  if (!submittedAt) submittedAt = "Recently";
+  if (!submittedAt) submittedAt = 'Recently';
 
   const specialization = String(
-    source.specialization || (expertise ? expertise.split(",")[0].trim() : "General")
+    source.specialization || (expertise ? expertise.split(',')[0].trim() : 'General'),
   );
 
   const certificates = Array.isArray(source.certificates) ? source.certificates : [];
   const excludedCertificates = Array.isArray(source.excludedCertificates) ? source.excludedCertificates : [];
 
   const verifiedCertificates = certificates.filter(
-    (c) => c.status === CREDENTIAL_STATUS.VERIFIED || c.verificationStatus === 'verified'
+    (c) => c.status === CREDENTIAL_STATUS.VERIFIED || c.verificationStatus === 'verified',
   );
   const unverifiedCertificates = [
     ...certificates.filter((c) => !(c.status === CREDENTIAL_STATUS.VERIFIED || c.verificationStatus === 'verified')),
@@ -119,21 +138,22 @@ function normalizeMentorApp(source = {}, index = 0) {
     initials:
       initials ||
       name
-        .split(" ")
+        .split(' ')
         .filter(Boolean)
         .map((part) => part[0])
-        .join("")
+        .join('')
         .slice(0, 2)
-        .toUpperCase() || "MA",
-    university: String(source.university || source.institution || ""),
+        .toUpperCase() ||
+      'MA',
+    university: String(source.university || source.institution || ''),
     submittedAt,
     expertise,
     specialization,
-    linkedin: String(source.linkedin || source.portfolio || "#"),
+    linkedin: String(source.linkedin || source.portfolio || '#'),
     years,
     experienceText: typeof source.experience === 'string' ? source.experience : '',
     motivation,
-    status: String(source.status || "pending").toLowerCase(),
+    status: String(source.status || 'pending').toLowerCase(),
     cvFileName: source.cvFileName,
     cvOriginalName: source.cvOriginalName,
     cvFileSize: source.cvFileSize,
@@ -156,28 +176,36 @@ function toTitleCase(str) {
 
 // ─── Main Component ──────────────────────────────────────────────
 
-const AdminMentorApps = () => {
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [filter, setFilter] = useState('pending');
-  const [verificationFilter, setVerificationFilter] = useState('all');
-  const [searchQuery, setSearchQuery] = useState('');
-  const [expandedIds, setExpandedIds] = useState({});
+const AdminMentorAppsContent = () => {
+  const dispatch = useDispatch();
+
+  const applications = useSelector(selectAdminMentorApplications);
+  const listStatus = useSelector(selectMentorApplicationsListStatus);
+  const listError = useSelector(selectMentorApplicationsListError);
+  const working = useSelector(selectMentorApplicationsWorking);
+  const publicConfig = useSelector(selectPublicConfig);
+
+  const loading = listStatus === 'idle' || (listStatus === 'loading' && applications.length === 0);
+  const error = listError?.serverMessage || listError?.message || null;
+  const filter = working.adminFilter || 'pending';
+  const verificationFilter = working.verificationFilter || 'all';
+  const searchQuery = working.adminSearch || '';
+  const expandedIds = working.expandedIds || {};
+  const minYearsRequired =
+    publicConfig?.mentorMinYearsExperience !== undefined
+      ? Number(publicConfig.mentorMinYearsExperience)
+      : 4;
+
   const [processingId, setProcessingId] = useState(null);
-  const [minYearsRequired, setMinYearsRequired] = useState(4);
-
-  // Reject Reason Modal State
   const [rejectModalApp, setRejectModalApp] = useState(null);
-
-  // Override Verification Modal State
-  const [overrideModalApp, setOverrideModalApp] = useState(null);
   const [overrideNoteInput, setOverrideNoteInput] = useState('');
-  const [overrideError, setOverrideError] = useState('');
-
-  const [refreshKey, setRefreshKey] = useState(0);
   const [toast, setToast] = useState({ visible: false, message: '', type: 'info' });
   const toastTimeoutRef = useRef(null);
+
+  const overrideModalApp = working.overrideModalAppId
+    ? applications.find((a) => String(a.id) === String(working.overrideModalAppId)) || null
+    : null;
+  const overrideError = working.overrideError || '';
 
   const showToast = (message, type = 'info') => {
     if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
@@ -188,51 +216,16 @@ const AdminMentorApps = () => {
   };
 
   useEffect(() => {
-    let isMounted = true;
-    const loadApplications = async () => {
-      try {
-        const data = await mentorApplicationsApi.list();
-        if (isMounted) {
-          setApplications(Array.isArray(data) ? data : []);
-          setError(null);
-        }
-      } catch (err) {
-        console.error('Failed to load mentor applications:', err);
-        if (isMounted) {
-          setError(err.message || 'Failed to load mentor applications.');
-        }
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    adminApi.getPublicConfig()
-      .then((cfg) => {
-        if (isMounted && cfg?.mentorMinYearsExperience !== undefined) {
-          setMinYearsRequired(cfg.mentorMinYearsExperience);
-        }
-      })
-      .catch(() => {});
-
-    loadApplications();
+    dispatch(fetchPublicConfig());
+    dispatch(fetchMentorApplications());
 
     return () => {
-      isMounted = false;
       if (toastTimeoutRef.current) clearTimeout(toastTimeoutRef.current);
     };
-  }, [refreshKey]);
+  }, [dispatch]);
 
   const handleToggleDetails = (id, currentStatus) => {
-    setExpandedIds((prev) => {
-      const isCurrentlyOpen =
-        prev[id] !== undefined ? prev[id] : currentStatus === 'pending';
-      return {
-        ...prev,
-        [id]: !isCurrentlyOpen,
-      };
-    });
+    dispatch(toggleMentorAppExpanded({ id, currentStatus }));
   };
 
   const handleApprove = async (app, override = false, overrideNote = '') => {
@@ -244,9 +237,8 @@ const AdminMentorApps = () => {
 
     // Require verified credentials unless explicitly overridden with a note
     if (normalized.verifiedCount === 0 && !override) {
-      setOverrideModalApp(app);
+      dispatch(setOverrideModalAppId(app.id));
       setOverrideNoteInput('');
-      setOverrideError('');
       return;
     }
 
@@ -255,26 +247,23 @@ const AdminMentorApps = () => {
       const payload = override
         ? { overrideVerification: true, overrideNote: overrideNote.trim() }
         : undefined;
-      await mentorApplicationsApi.approve(app.id, payload);
+      await dispatch(approveMentorApplication({ id: app.id, payload })).unwrap();
       showToast(
         override
           ? `Mentor application for ${normalized.name} approved with administrative verification override.`
           : `Mentor application for ${normalized.name} approved successfully.`,
-        'success'
+        'success',
       );
-      setOverrideModalApp(null);
-      setRefreshKey((k) => k + 1);
+      dispatch(setOverrideModalAppId(null));
+      dispatch(fetchMentorApplications());
     } catch (err) {
-      console.error('Failed to approve mentor application:', err);
-      if (
-        err.message &&
-        (err.message.includes('0 verified') || err.message.includes('override') || err.message.includes('409'))
-      ) {
-        setOverrideModalApp(app);
+      const msg = err?.serverMessage || err?.message || 'Failed to approve mentor application';
+      if (msg.includes('0 verified') || msg.includes('override') || msg.includes('409')) {
+        dispatch(setOverrideModalAppId(app.id));
         setOverrideNoteInput('');
-        setOverrideError(err.message);
+        dispatch(setOverrideModalError(msg));
       } else {
-        showToast(err.message || 'Failed to approve mentor application', 'error');
+        showToast(msg, 'error');
       }
     } finally {
       setProcessingId(null);
@@ -284,7 +273,11 @@ const AdminMentorApps = () => {
   const handleConfirmOverride = async () => {
     if (!overrideModalApp) return;
     if (!overrideNoteInput.trim()) {
-      setOverrideError('A justification note is required to approve an applicant without verified credentials.');
+      dispatch(
+        setOverrideModalError(
+          'A justification note is required to approve an applicant without verified credentials.',
+        ),
+      );
       return;
     }
     await handleApprove(overrideModalApp, true, overrideNoteInput.trim());
@@ -308,13 +301,13 @@ const AdminMentorApps = () => {
           explanation,
         },
       };
-      await mentorApplicationsApi.reject(rejectModalApp.id, payload);
+      await dispatch(rejectMentorApplication({ id: rejectModalApp.id, payload })).unwrap();
       showToast(`Mentor application for ${rejectModalApp.name} rejected.`, 'info');
       setRejectModalApp(null);
-      setRefreshKey((k) => k + 1);
+      dispatch(fetchMentorApplications());
     } catch (err) {
-      console.error('Failed to reject mentor application:', err);
-      showToast(err.message || 'Failed to reject mentor application', 'error');
+      const msg = err?.serverMessage || err?.message || 'Failed to reject mentor application';
+      showToast(msg, 'error');
       throw err;
     } finally {
       setProcessingId(null);
@@ -323,17 +316,9 @@ const AdminMentorApps = () => {
 
   const handleDownloadCv = async (filename, originalName) => {
     try {
-      const blob = await uploadsApi.downloadCv(filename);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = originalName || filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await dispatch(downloadMentorCv({ filename, originalName })).unwrap();
     } catch (err) {
-      showToast(err.message || 'Failed to download CV file.', 'error');
+      showToast(err?.serverMessage || err?.message || 'Failed to download CV file.', 'error');
     }
   };
 
@@ -410,8 +395,8 @@ const AdminMentorApps = () => {
           <div className="admin-mentor-toolbar mt-3" style={{ display: 'flex', gap: '12px', alignItems: 'center', flexWrap: 'wrap' }}>
             <SearchBar
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              onClear={() => setSearchQuery('')}
+              onChange={(e) => dispatch(setAdminMentorSearch(e.target.value))}
+              onClear={() => dispatch(setAdminMentorSearch(''))}
               placeholder="Search mentor applicants..."
             />
             <FilterTabs
@@ -419,10 +404,10 @@ const AdminMentorApps = () => {
                 { id: 'pending', label: 'Pending', count: pendingCount },
                 { id: 'approved', label: 'Approved', count: approvedCount },
                 { id: 'rejected', label: 'Rejected', count: rejectedCount },
-                { id: 'all', label: 'All', count: totalCount }
+                { id: 'all', label: 'All', count: totalCount },
               ]}
               activeTab={filter}
-              onChange={setFilter}
+              onChange={(val) => dispatch(setAdminMentorAppFilter(val))}
             />
           </div>
 
@@ -439,7 +424,7 @@ const AdminMentorApps = () => {
                 { id: 'no_verified', label: 'No verified', count: noVerifiedCount },
               ]}
               activeTab={verificationFilter}
-              onChange={setVerificationFilter}
+              onChange={(val) => dispatch(setAdminMentorVerificationFilter(val))}
             />
           </div>
 
@@ -454,7 +439,7 @@ const AdminMentorApps = () => {
             ) : filteredApps.length === 0 ? (
               <EmptyState
                 title="No mentor applications"
-                message={searchQuery ? `No applications found matching "${searchQuery}".` : "No applications in this category."}
+                message={searchQuery ? `No applications found matching "${searchQuery}".` : 'No applications in this category.'}
               />
             ) : (
               filteredApps.map((app) => {
@@ -477,7 +462,7 @@ const AdminMentorApps = () => {
                       onClick={() => handleToggleDetails(app.id, app.status)}
                     >
                       <div className="admin-mentor-left">
-                        <Avatar name={app.name} size="md" />
+                        <Avatar name={app.name} src={app.avatarUrl || app.avatar} version={app.updatedAt} size="md" />
                         <div>
                           <div className="admin-mentor-name">{app.name}</div>
                           <div className="admin-mentor-sub">
@@ -522,10 +507,7 @@ const AdminMentorApps = () => {
                         </div>
                         <div>
                           <div className="admin-mentor-label">LinkedIn</div>
-                          <SafeLink
-                            className="admin-mentor-link"
-                            href={app.linkedin}
-                          >
+                          <SafeLink className="admin-mentor-link" href={app.linkedin}>
                             View Profile ↗
                           </SafeLink>
                         </div>
@@ -537,7 +519,7 @@ const AdminMentorApps = () => {
 
                       <div className="admin-mentor-label mt-3">Motivation</div>
                       <blockquote className="admin-mentor-quote">
-                        "{app.motivation}"
+                        &quot;{app.motivation}&quot;
                       </blockquote>
 
                       {/* Rejection Reason Notice if rejected */}
@@ -646,9 +628,7 @@ const AdminMentorApps = () => {
                             <div className="admin-mentor-label" style={{ color: '#b91c1c' }}>
                               ⚠️ Excluded / Unverified Credentials ({app.excludedCertificates.length})
                             </div>
-                            <Badge variant="name-mismatch">
-                              Excluded
-                            </Badge>
+                            <Badge variant="name-mismatch">Excluded</Badge>
                           </div>
                           <div className="admin-doc-grid">
                             {app.excludedCertificates.map((cert, idx) => (
@@ -736,7 +716,9 @@ const AdminMentorApps = () => {
       {/* Universal Reason Modal for Rejecting Mentor Applications */}
       <UniversalReasonModal
         isOpen={Boolean(rejectModalApp)}
-        onClose={() => { if (processingId !== rejectModalApp?.id) setRejectModalApp(null); }}
+        onClose={() => {
+          if (processingId !== rejectModalApp?.id) setRejectModalApp(null);
+        }}
         onConfirm={handleConfirmReject}
         actionType="ADMIN_REJECT_MENTOR_APP"
         entityName={rejectModalApp ? `${rejectModalApp.name}'s Mentor Application` : 'Mentor Application'}
@@ -753,8 +735,7 @@ const AdminMentorApps = () => {
           loading={processingId === overrideModalApp.id}
           onConfirm={handleConfirmOverride}
           onCancel={() => {
-            setOverrideModalApp(null);
-            setOverrideError('');
+            dispatch(setOverrideModalAppId(null));
           }}
           message={
             <div style={{ textAlign: 'left' }}>
@@ -786,7 +767,7 @@ const AdminMentorApps = () => {
                 value={overrideNoteInput}
                 onChange={(e) => {
                   setOverrideNoteInput(e.target.value);
-                  if (e.target.value.trim()) setOverrideError('');
+                  if (e.target.value.trim()) dispatch(setOverrideModalError(''));
                 }}
               />
             </div>
@@ -797,4 +778,5 @@ const AdminMentorApps = () => {
   );
 };
 
+const AdminMentorApps = AdminMentorAppsContent;
 export default AdminMentorApps;

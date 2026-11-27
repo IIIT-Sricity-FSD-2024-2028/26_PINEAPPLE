@@ -1,15 +1,20 @@
-import { useState, useEffect, useContext } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { NotificationContext } from '../../context/NotificationContext';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { selectAllNotifications } from '../../store/selectors/notificationsSelectors';
+import { selectAllProjects } from '../../store/selectors/projectsSelectors';
+import { selectAllJoinRequests } from '../../store/selectors/joinRequestsSelectors';
+import { selectTasksMapByProject } from '../../store/selectors/tasksSelectors';
+import { fetchProjects } from '../../store/thunks/projectsThunks';
+import { fetchTasksForProjects } from '../../store/thunks/tasksThunks';
+import { fetchJoinRequests } from '../../store/thunks/joinRequestsThunks';
 import StatCard from '../../components/common/StatCard';
 import EmptyState from '../../components/common/EmptyState';
 import ProjectCard from '../../components/features/ProjectCard';
-import projectsApi, { isProjectActive } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import joinRequestsApi from '../../services/joinRequestsApi';
+import { isProjectActive } from '../../utils/projectStatus';
 import { calculateProjectProgress } from '../../utils/progress';
-import { formatRelativeTime } from '../../utils/dateUtils';
+import { formatRelativeTime } from '../../utils/dateFormatter';
 import './ownerDashboard.css';
 
 /* ── Extracted SVG Sub-components ── */
@@ -20,18 +25,17 @@ const PlusIcon = () => (
   </svg>
 );
 
-const OwnerDashboard = () => {
-  const { user } = useContext(AuthContext);
-  const { notifications } = useContext(NotificationContext) || {};
+const EMPTY_OWNER_NOTIFICATIONS = [];
+
+const OwnerDashboardContent = () => {
+  const user = useSelector(selectCurrentUser);
+  const dispatch = useDispatch();
+  const notifications = useSelector(selectAllNotifications) || EMPTY_OWNER_NOTIFICATIONS;
+  const allProjects = useSelector(selectAllProjects);
+  const allRequests = useSelector(selectAllJoinRequests);
+  const tasksByProject = useSelector(selectTasksMapByProject);
   const navigate = useNavigate();
 
-  const [ownedProjects, setOwnedProjects] = useState([]);
-  const [activeProjectsCount, setActiveProjectsCount] = useState(0);
-  const [tasksByProject, setTasksByProject] = useState({});
-  const [pendingRequestsCount, setPendingRequestsCount] = useState(0);
-  const [totalCollaborators, setTotalCollaborators] = useState(0);
-  const [totalTasksCount, setTotalTasksCount] = useState(0);
-  const [ownerActions, setOwnerActions] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -41,102 +45,33 @@ const OwnerDashboard = () => {
         const currentUserId = user?.id;
         const currentUserName = user?.name || '';
 
-        const [allProjects, allRequests] = await Promise.all([
-          projectsApi.list().catch(() => []),
-          joinRequestsApi.list().catch(() => []),
+        const [projectsPayload] = await Promise.all([
+          dispatch(fetchProjects({ force: true }))
+            .unwrap()
+            .catch(() => ({ items: [] })),
+          dispatch(fetchJoinRequests({ force: true }))
+            .unwrap()
+            .catch(() => ({ items: [] })),
         ]);
+        const fetchedProjects = Array.isArray(projectsPayload?.items)
+          ? projectsPayload.items
+          : Array.isArray(projectsPayload)
+            ? projectsPayload
+            : [];
 
-        const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
+        const owned = (Array.isArray(fetchedProjects) ? fetchedProjects : []).filter(
           (p) => p.ownerId === currentUserId || p.owner === currentUserName
         );
-
-        // Canonical Sync: Filter active projects to exclude completed projects from stat cards
-        const activeOwned = owned.filter(isProjectActive);
-        const activeOwnedIds = new Set(activeOwned.map((p) => String(p.id)));
-
-        // Calculate pending join requests strictly for active owned projects
-        const pendingReqs = (Array.isArray(allRequests) ? allRequests : []).filter(
-          (r) => activeOwnedIds.has(String(r.projectId)) && r.status === 'Pending'
-        );
-
-        // Calculate unique collaborators across active owned projects
-        const uniqueCollabIds = new Set();
-        activeOwned.forEach((p) => {
-          const members = Array.isArray(p.members) && p.members.length > 0
-            ? p.members.filter((m) => m.role !== 'Owner')
-            : (Array.isArray(p.collaborators) ? p.collaborators : []);
-          members.forEach((c) => {
-            const cid = typeof c === 'object' ? (c.id || c.userId || c.name) : c;
-            if (cid) uniqueCollabIds.add(String(cid));
-          });
-        });
-
-        let taskCount = 0;
-        let tasks = [];
-        const tasksMap = {};
-        const ownedIds = new Set(owned.map((p) => String(p.id)));
-        if (owned.length > 0) {
-          tasks = (await tasksApi.listForProjects(Array.from(ownedIds))) || [];
-          // Total Tasks stat card counts tasks on ACTIVE projects
-          taskCount = tasks.filter((t) => activeOwnedIds.has(String(t.projectId))).length;
-          tasks.forEach((t) => {
-            const pid = String(t.projectId);
-            if (!tasksMap[pid]) tasksMap[pid] = [];
-            tasksMap[pid].push(t);
-          });
-        }
-
-        // Build owner actions for Recent Activity
-        const actions = [];
-        owned.forEach((p) => {
-          if (p.createdAt) {
-            actions.push({
-              id: `proj-create-${p.id}`,
-              title: 'Project Created',
-              message: `You created project "${p.title || p.name}".`,
-              timestamp: p.createdAt,
-              type: 'info',
-            });
-          }
-        });
-
-        (Array.isArray(allRequests) ? allRequests : []).forEach((r) => {
-          if (ownedIds.has(r.projectId) && (r.status === 'Approved' || r.status === 'Rejected')) {
-            const p = owned.find((proj) => proj.id === r.projectId);
-            const pName = p ? (p.title || p.name) : `Project #${r.projectId}`;
-            actions.push({
-              id: `req-res-${r.id}`,
-              title: r.status === 'Approved' ? 'Join Request Approved' : 'Join Request Declined',
-              message: `You ${r.status === 'Approved' ? 'accepted' : 'declined'} ${r.userName || 'applicant'} for "${pName}".`,
-              timestamp: r.updatedAt || r.createdAt,
-              type: r.status === 'Approved' ? 'success' : 'info',
-            });
-          }
-        });
-
-        (tasks || []).forEach((t) => {
-          const rawStatus = (t.status || '').toLowerCase();
-          if (rawStatus === 'completed' || rawStatus === 'approved') {
-            const p = owned.find((proj) => proj.id === t.projectId);
-            const pName = p ? (p.title || p.name) : 'Project';
-            actions.push({
-              id: `task-app-${t.id}`,
-              title: 'Task Approved',
-              message: `You approved task "${t.title}" for ${t.assignee || 'collaborator'} in "${pName}".`,
-              timestamp: t.updatedAt || t.createdAt,
-              type: 'success',
-            });
-          }
-        });
-
-        if (isMounted) {
-          setOwnedProjects(owned);
-          setActiveProjectsCount(activeOwned.length);
-          setTasksByProject(tasksMap);
-          setPendingRequestsCount(pendingReqs.length);
-          setTotalCollaborators(uniqueCollabIds.size);
-          setTotalTasksCount(taskCount);
-          setOwnerActions(actions);
+        const ownedIds = owned.map((p) => String(p.id));
+        if (ownedIds.length > 0) {
+          await dispatch(
+            fetchTasksForProjects({
+              projectIds: ownedIds,
+              force: true,
+            }),
+          )
+            .unwrap()
+            .catch(() => ({ items: [] }));
         }
       } catch (err) {
         console.error('Failed to load owner dashboard metrics:', err);
@@ -152,7 +87,94 @@ const OwnerDashboard = () => {
     return () => {
       isMounted = false;
     };
-  }, [user?.id, user?.name]);
+  }, [dispatch, user?.id, user?.name]);
+
+  const {
+    ownedProjects,
+    activeProjectsCount,
+    pendingRequestsCount,
+    totalCollaborators,
+    totalTasksCount,
+    ownerActions,
+  } = useMemo(() => {
+    const currentUserId = user?.id;
+    const currentUserName = user?.name || '';
+    const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
+      (p) => p.ownerId === currentUserId || p.owner === currentUserName
+    );
+    const activeOwned = owned.filter(isProjectActive);
+    const activeOwnedIds = new Set(activeOwned.map((p) => String(p.id)));
+    const ownedIds = new Set(owned.map((p) => String(p.id)));
+
+    const pendingReqs = (Array.isArray(allRequests) ? allRequests : []).filter(
+      (r) => activeOwnedIds.has(String(r.projectId)) && r.status === 'Pending'
+    );
+
+    const uniqueCollabIds = new Set();
+    activeOwned.forEach((p) => {
+      const members = Array.isArray(p.members) && p.members.length > 0
+        ? p.members.filter((m) => m.role !== 'Owner')
+        : (Array.isArray(p.collaborators) ? p.collaborators : []);
+      members.forEach((c) => {
+        const cid = typeof c === 'object' ? (c.id || c.userId || c.name) : c;
+        if (cid) uniqueCollabIds.add(String(cid));
+      });
+    });
+
+    const ownedTasks = owned.flatMap((p) => tasksByProject[String(p.id)] || []);
+    const taskCount = ownedTasks.filter((t) => activeOwnedIds.has(String(t.projectId))).length;
+
+    const actions = [];
+    owned.forEach((p) => {
+      if (p.createdAt) {
+        actions.push({
+          id: `proj-create-${p.id}`,
+          title: 'Project Created',
+          message: `You created project "${p.title || p.name}".`,
+          timestamp: p.createdAt,
+          type: 'info',
+        });
+      }
+    });
+
+    (Array.isArray(allRequests) ? allRequests : []).forEach((r) => {
+      if (ownedIds.has(String(r.projectId)) && (r.status === 'Approved' || r.status === 'Rejected')) {
+        const p = owned.find((proj) => String(proj.id) === String(r.projectId));
+        const pName = p ? (p.title || p.name) : `Project #${r.projectId}`;
+        actions.push({
+          id: `req-res-${r.id}`,
+          title: r.status === 'Approved' ? 'Join Request Approved' : 'Join Request Declined',
+          message: `You ${r.status === 'Approved' ? 'accepted' : 'declined'} ${r.userName || 'applicant'} for "${pName}".`,
+          timestamp: r.updatedAt || r.createdAt,
+          type: r.status === 'Approved' ? 'success' : 'info',
+        });
+      }
+    });
+
+    ownedTasks.forEach((t) => {
+      const rawStatus = (t.status || '').toLowerCase();
+      if (rawStatus === 'completed' || rawStatus === 'approved') {
+        const p = owned.find((proj) => String(proj.id) === String(t.projectId));
+        const pName = p ? (p.title || p.name) : 'Project';
+        actions.push({
+          id: `task-app-${t.id}`,
+          title: 'Task Approved',
+          message: `You approved task "${t.title}" for ${t.assignee || 'collaborator'} in "${pName}".`,
+          timestamp: t.updatedAt || t.createdAt,
+          type: 'success',
+        });
+      }
+    });
+
+    return {
+      ownedProjects: owned,
+      activeProjectsCount: activeOwned.length,
+      pendingRequestsCount: pendingReqs.length,
+      totalCollaborators: uniqueCollabIds.size,
+      totalTasksCount: taskCount,
+      ownerActions: actions,
+    };
+  }, [allProjects, allRequests, tasksByProject, user?.id, user?.name]);
 
   const displayName = user?.name || 'Project Owner';
 
@@ -299,5 +321,7 @@ const OwnerDashboard = () => {
     </div>
   );
 };
+
+const OwnerDashboard = OwnerDashboardContent;
 
 export default OwnerDashboard;

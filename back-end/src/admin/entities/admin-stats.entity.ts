@@ -1,4 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
+import type { AdminUserCounts } from '../../common/utils/platform-user.util';
 
 export class AdminStatsEntity {
   @ApiProperty({ description: 'Total number of registered users' })
@@ -60,4 +61,13 @@ export class AdminStatsEntity {
 
   @ApiProperty({ description: 'Number of recorded audit log events', required: false })
   auditEvents?: number;
+
+  @ApiProperty({ description: 'Number of possible duplicate groups', required: false })
+  possibleDuplicates?: number;
+
+  @ApiProperty({ description: 'Number of pending second-approval moderation actions', required: false })
+  pendingApprovals?: number;
+
+  @ApiProperty({ description: 'Shared platform user counts object matching the Users page chips', required: false })
+  counts?: AdminUserCounts;
 }

@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
+import { renderWithStore } from './test-utils';
 import Leaderboard from '../pages/leaderboard';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import Profile from '../pages/profile';
@@ -93,32 +90,18 @@ function renderWithContexts(ui, { route = '/' } = {}) {
     emailVerified: true,
     profileComplete: true,
   };
-  return render(
-    <MemoryRouter initialEntries={[route]}>
-      <UIProvider>
-        <AuthContext.Provider
-          value={{
-            user,
-            token: 'fake-token',
-            isAuthenticated: true,
-            emailVerified: true,
-          }}
-        >
-          <RoleContext.Provider value={{ currentRole: 'project-owner' }}>
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                fetchNotifications: vi.fn(),
-              }}
-            >
-              {ui}
-            </NotificationContext.Provider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </UIProvider>
-    </MemoryRouter>,
-  );
+  return renderWithStore(ui, {
+    route,
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'project-owner',
+        allowedRoles: ['project-owner'],
+      },
+    },
+  });
 }
 
 describe('Phase 22: Single Reputation Ledger & Completion Reason UI', () => {

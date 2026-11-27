@@ -1,22 +1,35 @@
 import { useState } from 'react';
+import { useSelector } from 'react-redux';
 import Badge from '../common/Badge';
 import FeedbackHistory from './FeedbackHistory';
 import UserTrustCard from './UserTrustCard';
 import { formatDateTime } from '../../utils/dateFormatter';
+import { selectIsJoinRequestResponding } from '../../store/selectors/joinRequestsSelectors';
+import { selectIsInviteActing } from '../../store/selectors/invitesSelectors';
 import './JoinRequestCard.css';
 
 /**
  * Reusable JoinRequestCard for project owners reviewing collaborator join applications.
- * @param {Object} props
- * @param {Object} props.request
- * @param {Object} [props.trustSummary]
- * @param {boolean} [props.isLocked=false]
- * @param {(requestId: string) => void} [props.onAccept]
- * @param {(requestId: string) => void} [props.onReject]
- * @param {(userId: string, request: Object) => void} [props.onViewProfile]
  */
-const JoinRequestCard = ({ request, trustSummary, isLocked = false, onAccept, onReject, onViewProfile, onCancelInvite }) => {
-  const [isResponding, setIsResponding] = useState(false);
+const JoinRequestCardContent = ({
+  request,
+  trustSummary,
+  isLocked = false,
+  isResponding: externalResponding = false,
+  onAccept,
+  onReject,
+  onViewProfile,
+  onCancelInvite,
+}) => {
+  const [localResponding, setLocalResponding] = useState(false);
+  const storeResponding = useSelector((state) =>
+    selectIsJoinRequestResponding(state, request?.id),
+  );
+  const storeInviteActing = useSelector((state) =>
+    selectIsInviteActing(state, request?.id),
+  );
+  const isResponding =
+    localResponding || storeResponding || storeInviteActing || Boolean(externalResponding);
 
   const trustData = trustSummary || request.trustSummary || request.trust;
 
@@ -47,21 +60,21 @@ const JoinRequestCard = ({ request, trustSummary, isLocked = false, onAccept, on
 
   const handleAccept = async () => {
     if (isResponding || !onAccept) return;
-    setIsResponding(true);
+    setLocalResponding(true);
     try {
       await onAccept(request.id);
     } finally {
-      setIsResponding(false);
+      setLocalResponding(false);
     }
   };
 
   const handleReject = async () => {
     if (isResponding || !onReject) return;
-    setIsResponding(true);
+    setLocalResponding(true);
     try {
       await onReject(request.id, request);
     } finally {
-      setIsResponding(false);
+      setLocalResponding(false);
     }
   };
 
@@ -163,6 +176,7 @@ const JoinRequestCard = ({ request, trustSummary, isLocked = false, onAccept, on
                 type="button"
                 className="tf-join-req-btn tf-join-req-btn--reject"
                 data-testid={`cancel-invite-btn-${request.id}`}
+                disabled={isResponding}
                 onClick={() => onCancelInvite(request.id)}
               >
                 Cancel
@@ -209,5 +223,7 @@ const JoinRequestCard = ({ request, trustSummary, isLocked = false, onAccept, on
     </div>
   );
 };
+
+const JoinRequestCard = JoinRequestCardContent;
 
 export default JoinRequestCard;

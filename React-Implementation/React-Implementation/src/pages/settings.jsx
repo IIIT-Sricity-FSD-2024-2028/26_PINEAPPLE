@@ -1,17 +1,44 @@
-import { useState, useEffect, useContext, useRef, useId, useCallback } from 'react';
+import { useState, useEffect, useRef, useId, useCallback } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { UIContext } from '../context/UIContext';
-import usersApi from '../services/usersApi';
-import uploadsApi from '../services/uploadsApi';
-import { resolveApiBaseUrl } from '../services/apiClient';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  downloadDataExport,
+  fetchDataExports,
+  requestDataExport,
+} from '../store/thunks/dataExportsThunks';
+import {
+  selectDataExportsWorking,
+  selectLatestDataExport,
+} from '../store/selectors/dataExportsSelectors';
+import { fetchMyProfile } from '../store/thunks/profilesThunks';
+import { clearDeleteFeedback } from '../store/slices/settingsSlice';
+import {
+  checkAccountDeletionEligibility,
+  checkUsernameAvailability,
+  deleteMyAccount,
+  deleteUserPhone,
+  fetchPhoneOtpStatus,
+  recordFailedPhoneOtpAttempt,
+  saveProfileSettings,
+  uploadUserAvatar,
+  verifyUserPhone,
+} from '../store/thunks/settingsThunks';
+import {
+  selectDeletionBlockersSummary,
+  selectDeletionCheck,
+  selectSettingsWorking,
+} from '../store/selectors/settingsSelectors';
+import { selectCurrentUser } from '../store/selectors/sessionSelectors';
+import { logoutSessionUser, refreshSessionUser } from '../store/thunks/sessionThunks';
+import { userUpdated } from '../store/slices/sessionSlice';
+import { selectTheme } from '../store/selectors/uiSelectors';
+import { setTheme as setThemeAction } from '../store/slices/uiSlice';
 import FormInput from '../components/common/FormInput';
 import Avatar from '../components/common/Avatar';
 import Badge from '../components/common/Badge';
 import Modal from '../components/common/Modal';
 import { RecaptchaVerifier, signInWithPhoneNumber, updateProfile } from 'firebase/auth';
 import { phoneVerifyAuth, auth } from '../services/firebase';
-import storage from '../utils/storage';
 import './settings.css';
 
 const INDIAN_PHONE_RE = /^[6-9]\d{9}$/;
@@ -64,35 +91,32 @@ function getInitials(name) {
     .join('') || 'TF';
 }
 
-export const Settings = () => {
+const SettingsContent = () => {
+  const dispatch = useDispatch();
   const avatarInputId = useId();
   const navigate = useNavigate();
-  const { user, updateUser, refreshUser, logout } = useContext(AuthContext);
-  const { theme, setTheme } = useContext(UIContext);
+  const user = useSelector(selectCurrentUser);
+  const theme = useSelector(selectTheme);
   const [loading, setLoading] = useState(true);
   const [savingProfile, setSavingProfile] = useState(false);
 
-  // Notification digest state (Phase 18)
-  const [digestEnabled, setDigestEnabled] = useState(true);
-  const [digestHour, setDigestHour] = useState(9);
-  const [utcOffsetMinutes] = useState(() => -new Date().getTimezoneOffset());
-  const [savingDigest, setSavingDigest] = useState(false);
+  // Data export state (Phase 18 — backed by dataExportsSlice)
+  const exportState = useSelector(selectLatestDataExport);
+  const dataExportsWorking = useSelector(selectDataExportsWorking);
+  const requestingExport = Boolean(dataExportsWorking.requestingExport);
+  const downloadingExport = Boolean(dataExportsWorking.downloadingExport);
+  const exportError = dataExportsWorking.exportError || '';
 
-  // Data export state (Phase 18)
-  const [exportState, setExportState] = useState(null);
-  const [requestingExport, setRequestingExport] = useState(false);
-  const [downloadingExport, setDownloadingExport] = useState(false);
-  const [exportError, setExportError] = useState('');
-
-  // Account deletion state (Phase 18 / Part 2: Active tasks & obligations guards)
+  // Account deletion state (Phase 18 / Part 2: Active tasks & obligations guards via settingsSlice)
+  const deletionCheck = useSelector(selectDeletionCheck);
+  const deletionBlockers = useSelector(selectDeletionBlockersSummary);
+  const settingsWorking = useSelector(selectSettingsWorking);
   const [deleteUsernameConfirm, setDeleteUsernameConfirm] = useState('');
   const [isDeleteConfirmModalOpen, setIsDeleteConfirmModalOpen] = useState(false);
   const [deletingAccount, setDeletingAccount] = useState(false);
   const [deleteAccountError, setDeleteAccountError] = useState('');
   const [deleteObligations, setDeleteObligations] = useState([]);
   const [deleteTaskBlockers, setDeleteTaskBlockers] = useState([]);
-  const [deletionCheck, setDeletionCheck] = useState(null);
-  const [checkingDeletionEligibility, setCheckingDeletionEligibility] = useState(false);
 
   // Profile State
   const [fullName, setFullName] = useState('');
@@ -127,8 +151,7 @@ export const Settings = () => {
 
   // Avatar state
   const [avatarUrl, setAvatarUrl] = useState('');
-  const [avatarPreview, setAvatarPreview] = useState('');
-  const [avatarFile, setAvatarFile] = useState(null);
+  const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const fileInputRef = useRef(null);
 
   // Field validation errors
@@ -141,12 +164,11 @@ export const Settings = () => {
     phone: '',
     linkedin: '',
     skill: '',
+    avatar: '',
   });
 
   const handleSelectTheme = (newMode) => {
-    if (setTheme) {
-      setTheme(newMode);
-    }
+    dispatch(setThemeAction(newMode));
     showToast(`Switched to ${newMode === 'dark' ? 'Dark' : 'Light'} theme`);
   };
 
@@ -170,16 +192,12 @@ export const Settings = () => {
 
   const fetchDeletionEligibility = useCallback(async () => {
     if (!user) return;
-    setCheckingDeletionEligibility(true);
     try {
-      const res = await usersApi.checkDeletionEligibility();
-      setDeletionCheck(res);
+      await dispatch(checkAccountDeletionEligibility()).unwrap();
     } catch (err) {
       console.warn('[settings] Failed to check deletion eligibility:', err);
-    } finally {
-      setCheckingDeletionEligibility(false);
     }
-  }, [user]);
+  }, [dispatch, user]);
 
   useEffect(() => {
     fetchDeletionEligibility();
@@ -205,34 +223,28 @@ export const Settings = () => {
     }
   }, []);
 
-  // Initial load & hydration strictly from backend API / AuthContext
+  const userRef = useRef(user);
+  useEffect(() => {
+    userRef.current = user;
+  }, [user]);
+
+  // Initial load & hydration strictly from Redux thunks / session state
   useEffect(() => {
     let ignore = false;
     const hydrateSettings = async () => {
       try {
-        const userId = user?.id || storage.getBackendUserId() || '';
+        const initialUser = userRef.current;
+        const userId = initialUser?.id || initialUser?.uid || '';
         let backendUser = null;
 
         if (userId) {
           try {
-            backendUser = await usersApi.getMe();
+            backendUser = await dispatch(fetchMyProfile()).unwrap();
           } catch (apiErr) {
-            console.warn('Could not load backend user for settings, falling back to AuthContext:', apiErr);
+            console.warn('Could not load backend user for settings, falling back to Redux session:', apiErr);
           }
           try {
-            if (typeof usersApi.getSettings === 'function') {
-              const digestCfg = await usersApi.getSettings();
-              if (!ignore && digestCfg) {
-                setDigestEnabled(digestCfg.digestEnabled !== false);
-                if (Number.isInteger(digestCfg.digestHour)) setDigestHour(digestCfg.digestHour);
-              }
-            }
-            if (typeof usersApi.listExports === 'function') {
-              const expList = await usersApi.listExports();
-              if (!ignore && Array.isArray(expList) && expList.length > 0) {
-                setExportState(expList[0]);
-              }
-            }
+            dispatch(fetchDataExports());
           } catch (subErr) {
             console.warn('[settings] Non-critical settings hydration notice:', subErr);
           }
@@ -243,31 +255,31 @@ export const Settings = () => {
         const currentName =
           backendUser?.name ||
           backendUser?.profile?.fullName ||
-          user?.name ||
-          user?.profile?.fullName ||
+          initialUser?.name ||
+          initialUser?.profile?.fullName ||
           '';
         const currentUsername =
           backendUser?.username ||
           backendUser?.profile?.username ||
-          user?.username ||
-          user?.profile?.username ||
+          initialUser?.username ||
+          initialUser?.profile?.username ||
           (currentName ? currentName.toLowerCase().replace(/[^a-z0-9]+/g, '') : '');
         const currentBio =
           backendUser?.profile?.bio ||
           backendUser?.bio ||
-          user?.bio ||
+          initialUser?.bio ||
           '';
         const currentPhone =
           backendUser?.phone ||
           backendUser?.profile?.phone ||
-          user?.phone ||
-          user?.profile?.phone ||
+          initialUser?.phone ||
+          initialUser?.profile?.phone ||
           '';
         const isVerified = Boolean(
           backendUser?.phoneVerified ??
           backendUser?.profile?.phoneVerified ??
-          user?.phoneVerified ??
-          user?.profile?.phoneVerified
+          initialUser?.phoneVerified ??
+          initialUser?.profile?.phoneVerified
         );
         const phoneDigits = currentPhone.replace(/^\+91/, '').trim();
         setPhone(phoneDigits);
@@ -277,23 +289,27 @@ export const Settings = () => {
         const currentLinkedin =
           backendUser?.linkedIn ||
           backendUser?.profile?.linkedin ||
-          user?.linkedIn ||
+          initialUser?.linkedIn ||
           '';
         const currentSkills =
           backendUser?.profile?.skills ||
           backendUser?.skills ||
-          user?.skills ||
+          initialUser?.skills ||
           [];
         const currentAvatar =
-          backendUser?.profile?.avatarUrl ||
           backendUser?.avatarUrl ||
-          user?.avatarUrl ||
-          user?.profile?.avatarUrl ||
+          backendUser?.profile?.avatarUrl ||
+          backendUser?.avatar ||
+          backendUser?.profile?.avatar ||
+          initialUser?.avatarUrl ||
+          initialUser?.profile?.avatarUrl ||
+          initialUser?.avatar ||
+          initialUser?.profile?.avatar ||
           '';
 
         const currentEmail =
           backendUser?.email ||
-          user?.email ||
+          initialUser?.email ||
           '';
         setFullName(currentName);
         setUsername(currentUsername);
@@ -304,9 +320,9 @@ export const Settings = () => {
           backendUser?.university ||
           backendUser?.profile?.university ||
           backendUser?.profile?.uni ||
-          user?.university ||
-          user?.profile?.university ||
-          user?.profile?.uni ||
+          initialUser?.university ||
+          initialUser?.profile?.university ||
+          initialUser?.profile?.uni ||
           '';
         setUniversity(currentUni);
         setPhone(currentPhone);
@@ -324,8 +340,7 @@ export const Settings = () => {
     return () => {
       ignore = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [dispatch]);
 
   // Cleanup reCAPTCHA on unmount (Phase 3)
   useEffect(() => {
@@ -440,8 +455,8 @@ export const Settings = () => {
     setOtpLockSeconds(0);
     setIsOtpModalOpen(true);
 
-    usersApi
-      .getPhoneOtpStatus()
+    dispatch(fetchPhoneOtpStatus())
+      .unwrap()
       .then((status) => {
         if (!status) return;
         if (status.locked) {
@@ -569,34 +584,32 @@ export const Settings = () => {
       }
 
       // Send to our backend
-      const updatedUser = await usersApi.verifyPhone(idToken);
-
       const cleanDigits = phone.replace(/^\+91/, '').trim();
       const verifiedPhoneE164 = `+91${cleanDigits}`;
+      const updatedUser = await dispatch(
+        verifyUserPhone({ idToken, phoneE164: verifiedPhoneE164 }),
+      ).unwrap();
+
       setSavedPhone(verifiedPhoneE164);
       setSavedPhoneVerified(true);
       setIsPhoneVerified(true);
       setPhone(cleanDigits);
 
-      if (updateUser) {
-        updateUser({
-          ...user,
+      dispatch(userUpdated({
+        ...user,
+        phone: verifiedPhoneE164,
+        phoneVerified: true,
+        phoneVerifiedAt: updatedUser?.phoneVerifiedAt || new Date().toISOString(),
+        profile: {
+          ...(user?.profile || {}),
           phone: verifiedPhoneE164,
           phoneVerified: true,
           phoneVerifiedAt: updatedUser?.phoneVerifiedAt || new Date().toISOString(),
-          profile: {
-            ...(user?.profile || {}),
-            phone: verifiedPhoneE164,
-            phoneVerified: true,
-            phoneVerifiedAt: updatedUser?.phoneVerifiedAt || new Date().toISOString(),
-          },
-        });
-      }
+        },
+      }));
 
       showToast('Phone number verified successfully!', 'success');
-      if (typeof refreshUser === 'function') {
-        await refreshUser().catch(() => {});
-      }
+      await dispatch(refreshSessionUser()).catch(() => {});
       handleCloseOtpModal();
     } catch (err) {
       console.error('[Phone Verification Confirm Error]', err?.code || err?.message || err?.status);
@@ -611,7 +624,7 @@ export const Settings = () => {
 
       let nextWrong = wrongAttempts + 1;
       try {
-        await usersApi.recordFailedOtpAttempt();
+        await dispatch(recordFailedPhoneOtpAttempt()).unwrap();
       } catch (recErr) {
         const recCode = recErr?.code || recErr?.data?.code;
         if (recCode === 'OTP_LOCKED') {
@@ -640,7 +653,7 @@ export const Settings = () => {
   };
 
   // Handle Avatar selection
-  const handleAvatarChange = (e) => {
+  const handleAvatarChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
@@ -669,17 +682,69 @@ export const Settings = () => {
     }
 
     setErrors((prev) => ({ ...prev, avatar: '' }));
-    setAvatarFile(file);
-    const objectUrl = URL.createObjectURL(file);
-    setAvatarPreview(objectUrl);
+    setUploadingAvatar(true);
+
+    try {
+      const uploadRes = await dispatch(uploadUserAvatar(file)).unwrap();
+      const uploadedUrl =
+        uploadRes?.user?.avatarUrl ||
+        uploadRes?.avatarUrl ||
+        uploadRes?.url ||
+        uploadRes?.path ||
+        (uploadRes?.filename ? `/uploads/${uploadRes.filename}` : '') ||
+        '';
+
+      if (!uploadedUrl) {
+        throw new Error('Upload completed without a valid avatar URL');
+      }
+
+      setAvatarUrl(uploadedUrl);
+      showToast('Profile photo updated', 'success');
+    } catch (uploadErr) {
+      const msg =
+        uploadErr?.serverMessage ||
+        uploadErr?.message ||
+        'Failed to upload profile photo. Please try again.';
+      setErrors((prev) => ({ ...prev, avatar: msg }));
+      showToast(msg, 'error');
+    } finally {
+      setUploadingAvatar(false);
+      if (e.target) {
+        e.target.value = '';
+      }
+    }
   };
 
-  const handleRemoveAvatar = () => {
-    setAvatarFile(null);
-    setAvatarPreview('');
+  const handleRemoveAvatar = async () => {
     setAvatarUrl('');
+    setErrors((prev) => ({ ...prev, avatar: '' }));
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
+    }
+    const uid = user?.id || user?.uid;
+    if (uid) {
+      setUploadingAvatar(true);
+      try {
+        await dispatch(
+          saveProfileSettings({
+            userId: uid,
+            payload: { avatarUrl: null, profile: { avatarUrl: null } },
+            sessionPatch: {
+              avatarUrl: null,
+              avatar: null,
+              updatedAt: new Date().toISOString(),
+              profile: { ...(user?.profile || {}), avatarUrl: null, avatar: null },
+            },
+          }),
+        ).unwrap();
+        showToast('Profile photo removed', 'success');
+      } catch (err) {
+        const msg = err?.serverMessage || err?.message || 'Failed to remove profile photo';
+        setErrors((prev) => ({ ...prev, avatar: msg }));
+        showToast(msg, 'error');
+      } finally {
+        setUploadingAvatar(false);
+      }
     }
   };
 
@@ -817,10 +882,12 @@ export const Settings = () => {
     }
 
     // Check username availability with backend before proceeding (only if no existing username)
-    const userId = user?.id || storage.getBackendUserId() || '';
+    const userId = user?.id || user?.uid || '';
     if (!newErrors.username && cleanedUsername && !user?.username) {
       try {
-        const avail = await usersApi.checkUsernameAvailable(cleanedUsername, userId);
+        const avail = await dispatch(
+          checkUsernameAvailability({ username: cleanedUsername, excludeUserId: userId }),
+        ).unwrap();
         if (avail && avail.available === false) {
           newErrors.username = 'This username is already taken';
           hasError = true;
@@ -837,34 +904,13 @@ export const Settings = () => {
     }
 
     setSavingProfile(true);
-    let finalAvatarUrl = avatarUrl;
+    const finalAvatarUrl = avatarUrl || user?.avatarUrl || user?.profile?.avatarUrl || null;
 
     try {
-      // 1. Upload Avatar if new file chosen
-      if (avatarFile) {
-        try {
-          const uploadRes = await uploadsApi.uploadAvatar(avatarFile);
-          finalAvatarUrl = uploadRes?.url || uploadRes?.path || (uploadRes?.filename ? `/uploads/${uploadRes.filename}` : null) || avatarUrl;
-          setAvatarUrl(finalAvatarUrl);
-          setAvatarPreview('');
-          setAvatarFile(null);
-        } catch (uploadErr) {
-          if (uploadErr?.code === 'UNSUPPORTED_FILE_TYPE' || uploadErr?.statusCode === 400) {
-            const msg = uploadErr?.serverMessage || uploadErr?.message || 'Unsupported file type. Allowed formats: PNG, JPG, JPEG, WEBP.';
-            setErrors((prev) => ({ ...prev, avatar: msg }));
-            showToast(msg, 'error');
-            setSavingProfile(false);
-            return;
-          }
-          console.warn('Avatar upload failed, falling back to local preview:', uploadErr);
-          showToast('Avatar upload failed. Server unavailable.', 'error');
-        }
-      }
-
       // Remove phone if user cleared it
       if (!cleanPhoneDigits && cleanSavedDigits) {
         try {
-          await usersApi.deletePhone();
+          await dispatch(deleteUserPhone()).unwrap();
           setSavedPhone('');
           setSavedPhoneVerified(false);
           setIsPhoneVerified(false);
@@ -901,7 +947,7 @@ export const Settings = () => {
         apiUpdatePayload.email = cleanedEmail;
       }
 
-      const localStorageProfilePayload = {
+      const localProfilePayload = {
         ...safeProfilePayload,
         username: cleanedUsername,
         uni: cleanedUniversity,
@@ -910,12 +956,33 @@ export const Settings = () => {
         phoneVerified: isPhoneVerified,
       };
 
-      // 3. Update backend API
-      const userId = user?.id || storage.getBackendUserId() || '';
+      const baseSessionPatch = {
+        id: userId,
+        name: cleanedName,
+        email: cleanedEmail || user?.email || '',
+        ...(emailChanged ? { emailVerified: false } : {}),
+        university: cleanedUniversity,
+        phone: finalPhone,
+        linkedIn: cleanedLinkedin,
+        avatarUrl: finalAvatarUrl,
+        profile: {
+          ...(user?.profile || {}),
+          ...localProfilePayload,
+          fullName: cleanedName,
+        },
+      };
+
+      // 3. Update backend API via settingsSlice thunk (also updates sessionSlice via userUpdated)
       let backendUpdatedUser = null;
       if (userId) {
         try {
-          backendUpdatedUser = await usersApi.update(userId, apiUpdatePayload);
+          backendUpdatedUser = await dispatch(
+            saveProfileSettings({
+              userId,
+              payload: apiUpdatePayload,
+              sessionPatch: baseSessionPatch,
+            }),
+          ).unwrap();
         } catch (apiErr) {
           const code = apiErr?.code || apiErr?.data?.code;
           const errField = apiErr?.field || apiErr?.data?.field;
@@ -968,7 +1035,7 @@ export const Settings = () => {
         }
       }
 
-      // 4. Refresh AuthContext from backend (no full-user localStorage cache)
+      // 4. Keep sessionSlice synchronized cleanly via Redux state (no DOM events)
       const nextEmailVerified = emailChanged
         ? false
         : backendUpdatedUser?.emailVerified !== undefined
@@ -989,7 +1056,7 @@ export const Settings = () => {
         profile: {
           ...(user?.profile || {}),
           ...(backendUpdatedUser?.profile || {}),
-          ...localStorageProfilePayload,
+          ...localProfilePayload,
           fullName: cleanedName,
         },
       };
@@ -1002,16 +1069,8 @@ export const Settings = () => {
         }
       }
 
-      if (typeof refreshUser === 'function') {
-        await refreshUser().catch(() => {});
-      }
-      if (updateUser) {
-        updateUser(updatedUserObj);
-      }
-
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('teamforge:user_updated', { detail: updatedUserObj }));
-      }
+      await dispatch(refreshSessionUser()).catch(() => {});
+      dispatch(userUpdated(updatedUserObj));
 
       setFullName(cleanedName);
       setUsername(cleanedUsername);
@@ -1051,8 +1110,9 @@ export const Settings = () => {
 
   const displayName = fullName || user?.name || user?.profile?.fullName || 'User';
   const initials = getInitials(displayName);
-  const apiBase = resolveApiBaseUrl ? resolveApiBaseUrl() : 'http://localhost:3000';
-  const displayAvatar = avatarPreview || (avatarUrl ? (avatarUrl.startsWith('http') || avatarUrl.startsWith('data:') ? avatarUrl : `${apiBase}${avatarUrl}`) : null);
+  const effectiveAvatar =
+    avatarUrl || user?.avatarUrl || user?.profile?.avatarUrl || user?.avatar || user?.profile?.avatar || null;
+  const avatarVersion = user?.updatedAt || user?.profile?.updatedAt || null;
 
   if (loading) {
     return (
@@ -1123,7 +1183,8 @@ export const Settings = () => {
             <div className="settings-avatar-wrapper">
               <div className="settings-avatar-box">
                 <Avatar
-                  src={displayAvatar}
+                  src={effectiveAvatar}
+                  version={avatarVersion}
                   name={displayName}
                   initials={initials}
                   size="xl"
@@ -1133,7 +1194,7 @@ export const Settings = () => {
                 <div className="settings-avatar-btn-row">
                   <label htmlFor={avatarInputId} className="settings-file-label">
                     <UploadIcon />
-                    <span>Choose Image</span>
+                    <span>{uploadingAvatar ? 'Uploading...' : 'Choose Image'}</span>
                   </label>
                   <input
                     type="file"
@@ -1141,12 +1202,14 @@ export const Settings = () => {
                     ref={fileInputRef}
                     className="settings-file-input"
                     accept=".png,.jpg,.jpeg,.webp,image/png,image/jpeg,image/webp"
+                    disabled={uploadingAvatar}
                     onChange={handleAvatarChange}
                   />
-                  {(displayAvatar || avatarFile) && (
+                  {effectiveAvatar && (
                     <button
                       type="button"
                       onClick={handleRemoveAvatar}
+                      disabled={uploadingAvatar}
                       className="settings-avatar-remove-btn"
                     >
                       Remove
@@ -1154,7 +1217,9 @@ export const Settings = () => {
                   )}
                 </div>
                 <p className="settings-avatar-note">
-                  Select an image (max 2MB, JPG/PNG/WebP) to set as your profile avatar.
+                  {uploadingAvatar
+                    ? 'Uploading profile photo...'
+                    : 'Select an image (max 2MB, JPG/PNG/WebP) to set as your profile avatar.'}
                 </p>
                 {errors.avatar && (
                   <p data-testid="avatar-upload-error" role="alert" style={{ color: '#dc2626', fontSize: '0.84rem', marginTop: '4px' }}>
@@ -1462,83 +1527,7 @@ export const Settings = () => {
         </div>
       </div>
 
-      {/* ═══════════ CARD 3: NOTIFICATION DIGEST (Phase 18) ═══════════ */}
-      <div className="settings-card" id="settings-section-digest" data-testid="settings-digest-card">
-        <div className="settings-section-header">
-          <div>
-            <h2 className="settings-section-title">Notification digest</h2>
-            <p className="settings-section-desc">
-              Batch routine updates (likes, applicants, comments, badges) into one daily summary at your chosen hour. Warnings, payments, disputes, and urgent deadlines (&lt;24h) still arrive immediately.
-            </p>
-          </div>
-        </div>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', marginTop: '12px' }}>
-          <label style={{ display: 'flex', alignItems: 'center', gap: '10px', fontSize: '0.92rem', cursor: 'pointer' }}>
-            <input
-              type="checkbox"
-              data-testid="digest-enabled-toggle"
-              checked={digestEnabled}
-              onChange={(e) => setDigestEnabled(e.target.checked)}
-            />
-            <span>Enable daily notification digest</span>
-          </label>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <label htmlFor="digest-hour-select" style={{ fontSize: '0.88rem', fontWeight: 600 }}>
-              Delivery hour:
-            </label>
-            <select
-              id="digest-hour-select"
-              data-testid="digest-hour-select"
-              className="settings-input"
-              style={{ maxWidth: '160px' }}
-              value={digestHour}
-              disabled={!digestEnabled}
-              onChange={(e) => setDigestHour(Number(e.target.value))}
-            >
-              {Array.from({ length: 24 }, (_, h) => (
-                <option key={h} value={h}>
-                  {`${String(h).padStart(2, '0')}:00`}
-                </option>
-              ))}
-            </select>
-            <span style={{ fontSize: '0.82rem', color: '#64748b' }}>
-              Local offset: UTC{utcOffsetMinutes >= 0 ? `+${(utcOffsetMinutes / 60).toFixed(1).replace('.0', '')}` : (utcOffsetMinutes / 60).toFixed(1).replace('.0', '')}
-            </span>
-          </div>
-          <div>
-            <button
-              type="button"
-              data-testid="save-digest-btn"
-              className="settings-btn-primary"
-              disabled={savingDigest}
-              onClick={async () => {
-                if (savingDigest) return;
-                setSavingDigest(true);
-                try {
-                  const saved = await usersApi.updateSettings({
-                    digestEnabled,
-                    digestHour: Number(digestHour),
-                    utcOffsetMinutes,
-                  });
-                  if (saved) {
-                    setDigestEnabled(saved.digestEnabled !== false);
-                    setDigestHour(saved.digestHour ?? digestHour);
-                  }
-                  showToast('Notification digest settings saved.');
-                } catch (err) {
-                  showToast(err?.serverMessage || err?.message || 'Failed to save digest settings.', 'error');
-                } finally {
-                  setSavingDigest(false);
-                }
-              }}
-            >
-              {savingDigest ? 'Saving...' : 'Save Digest Settings'}
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* ═══════════ CARD 4: YOUR DATA (Phase 18) ═══════════ */}
+      {/* ═══════════ CARD 3: YOUR DATA (Phase 18) ═══════════ */}
       <div className="settings-card" id="settings-section-your-data" data-testid="settings-your-data-card">
         <div className="settings-section-header">
           <div>
@@ -1557,16 +1546,11 @@ export const Settings = () => {
               disabled={requestingExport}
               onClick={async () => {
                 if (requestingExport) return;
-                setRequestingExport(true);
-                setExportError('');
                 try {
-                  const res = await usersApi.requestExport();
-                  setExportState(res);
+                  await dispatch(requestDataExport()).unwrap();
                   showToast('Your data export JSON is ready for download.');
-                } catch (err) {
-                  setExportError(err?.serverMessage || err?.message || 'Failed to request data export.');
-                } finally {
-                  setRequestingExport(false);
+                } catch {
+                  // Friendly error stored in dataExportsSlice working.exportError
                 }
               }}
             >
@@ -1606,11 +1590,17 @@ export const Settings = () => {
                   disabled={downloadingExport}
                   onClick={async () => {
                     if (downloadingExport) return;
-                    setDownloadingExport(true);
-                    setExportError('');
                     try {
-                      const file = await usersApi.downloadExport(exportState.exportId || exportState.id);
-                      if (typeof document !== 'undefined' && typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function') {
+                      const out = await dispatch(
+                        downloadDataExport(exportState.exportId || exportState.id),
+                      ).unwrap();
+                      const file = out?.file;
+                      if (
+                        file &&
+                        typeof document !== 'undefined' &&
+                        typeof URL !== 'undefined' &&
+                        typeof URL.createObjectURL === 'function'
+                      ) {
                         const blob = new Blob([file.text], { type: 'application/json;charset=utf-8' });
                         const href = URL.createObjectURL(blob);
                         const a = document.createElement('a');
@@ -1622,10 +1612,8 @@ export const Settings = () => {
                         URL.revokeObjectURL(href);
                       }
                       showToast('JSON export downloaded.');
-                    } catch (err) {
-                      setExportError(err?.serverMessage || err?.message || 'Failed to download export.');
-                    } finally {
-                      setDownloadingExport(false);
+                    } catch {
+                      // Friendly error stored in dataExportsSlice working.exportError
                     }
                   }}
                 >
@@ -1642,11 +1630,16 @@ export const Settings = () => {
         const expectedUsername = String(username || user?.username || '').trim().toLowerCase();
         const typedUsername = String(deleteUsernameConfirm || '').trim().toLowerCase();
         const isUsernameMatched = Boolean(expectedUsername && typedUsername === expectedUsername);
-        const isBlockedFromDeletion = Boolean(
-          deletionCheck && !deletionCheck.canDelete &&
-          ((Array.isArray(deletionCheck.taskBlockers) && deletionCheck.taskBlockers.length > 0) ||
-           (Array.isArray(deletionCheck.obligations) && deletionCheck.obligations.length > 0))
-        );
+        const isBlockedFromDeletion = deletionBlockers.isBlocked;
+        const effectiveDeleteError = deleteAccountError || settingsWorking.deleteError || '';
+        const effectiveDeleteObligations =
+          deleteObligations.length > 0
+            ? deleteObligations
+            : settingsWorking.deleteObligations || [];
+        const effectiveDeleteTaskBlockers =
+          deleteTaskBlockers.length > 0
+            ? deleteTaskBlockers
+            : settingsWorking.deleteTaskBlockers || [];
 
         const handleConfirmDeleteAccount = async () => {
           if (deletingAccount) return;
@@ -1654,24 +1647,20 @@ export const Settings = () => {
           setDeleteAccountError('');
           setDeleteObligations([]);
           setDeleteTaskBlockers([]);
+          dispatch(clearDeleteFeedback());
           try {
-            await usersApi.deleteMyAccount({
-              username: deleteUsernameConfirm.trim(),
-            });
+            await dispatch(
+              deleteMyAccount({
+                username: deleteUsernameConfirm.trim(),
+              }),
+            ).unwrap();
             setIsDeleteConfirmModalOpen(false);
-            try {
-              storage.setAccountDeletedNotice('Your account was deleted.');
-            } catch (storageErr) {
-              console.warn('[settings] Could not persist account deleted notice:', storageErr);
-            }
             showToast('Your account was deleted.');
             navigate('/', {
               replace: true,
               state: { accountDeletedMessage: 'Your account was deleted.' },
             });
-            if (typeof logout === 'function') {
-              await logout();
-            }
+            await dispatch(logoutSessionUser());
           } catch (err) {
             setIsDeleteConfirmModalOpen(false);
             setDeleteAccountError(
@@ -1769,21 +1758,24 @@ export const Settings = () => {
                   value={deleteUsernameConfirm}
                   onChange={(e) => {
                     setDeleteUsernameConfirm(e.target.value);
-                    if (deleteAccountError) setDeleteAccountError('');
+                    if (deleteAccountError || settingsWorking.deleteError) {
+                      setDeleteAccountError('');
+                      dispatch(clearDeleteFeedback());
+                    }
                   }}
                 />
-                {deleteAccountError && (
+                {effectiveDeleteError && (
                   <div
                     role="alert"
                     data-testid="delete-account-error"
                     style={{ color: '#b91c1c', background: '#fef2f2', padding: '10px 12px', borderRadius: '6px', fontSize: '0.86rem' }}
                   >
-                    <div>⚠️ {deleteAccountError}</div>
-                    {deleteTaskBlockers.length > 0 && (
+                    <div>⚠️ {effectiveDeleteError}</div>
+                    {effectiveDeleteTaskBlockers.length > 0 && (
                       <div style={{ marginTop: '6px' }}>
                         <strong>Active Tasks Blocking Deletion:</strong>
                         <ul data-testid="delete-error-task-blockers-list" style={{ margin: '4px 0 0', paddingLeft: '18px' }}>
-                          {deleteTaskBlockers.map((b) => (
+                          {effectiveDeleteTaskBlockers.map((b) => (
                             <li key={b.taskId}>
                               <span>{b.taskTitle} ({b.status}) in project </span>
                               <Link
@@ -1797,9 +1789,9 @@ export const Settings = () => {
                         </ul>
                       </div>
                     )}
-                    {deleteObligations.length > 0 && (
+                    {effectiveDeleteObligations.length > 0 && (
                       <ul data-testid="delete-obligations-list" style={{ margin: '6px 0 0', paddingLeft: '18px' }}>
-                        {deleteObligations.map((ob, idx) => (
+                        {effectiveDeleteObligations.map((ob, idx) => (
                           <li key={ob.id || idx}>{ob.reason || `${ob.type}: ${ob.title || ob.id} (${ob.status})`}</li>
                         ))}
                       </ul>
@@ -2121,4 +2113,5 @@ export const Settings = () => {
   );
 };
 
+export const Settings = (props) => <SettingsContent {...props} />;
 export default Settings;

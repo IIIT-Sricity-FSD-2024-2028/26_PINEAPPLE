@@ -1,31 +1,53 @@
-import { useState, useCallback } from 'react';
-import adminApi from '../../services/adminApi';
+import { useCallback } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  fetchJobRuns,
+  triggerJobTick,
+} from '../../store/thunks/jobRunsThunks';
+import {
+  selectJobRun,
+  setJobConfirmModalOpen,
+} from '../../store/slices/jobRunsSlice';
+import {
+  selectAllJobRuns,
+  selectJobRunsStatus,
+  selectJobRunsWorking,
+  selectSelectedJobRun,
+} from '../../store/selectors/jobRunsSelectors';
+import {
+  canAccess,
+  selectIsSessionConfigured,
+  selectSession,
+} from '../../store/selectors/sessionSelectors';
 import { formatDateTime, formatDuration, getNextExpectedRun } from '../../utils/jobFormatter';
 import Modal from '../../components/common/Modal';
 import { useVisibilityPoll } from '../../hooks/useVisibilityPoll';
 import './ScheduledJobsPanel.css';
 
-const ScheduledJobsPanel = ({ isSuperUser = false }) => {
-  const [runs, setRuns] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [selectedRun, setSelectedRun] = useState(null);
-  const [showConfirmModal, setShowConfirmModal] = useState(false);
-  const [isTriggering, setIsTriggering] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [successMessage, setSuccessMessage] = useState('');
+const ScheduledJobsPanelContent = ({ isSuperUser = false }) => {
+  const dispatch = useDispatch();
 
-  const fetchRuns = useCallback(async () => {
-    try {
-      const data = await adminApi.getJobRuns(50);
-      if (Array.isArray(data)) {
-        setRuns(data);
-      }
-    } catch (err) {
-      console.warn('[ScheduledJobsPanel] Failed to fetch job runs:', err);
-    } finally {
-      setLoading(false);
-    }
-  }, []);
+  const runs = useSelector(selectAllJobRuns);
+  const runsStatus = useSelector(selectJobRunsStatus);
+  const working = useSelector(selectJobRunsWorking);
+  const selectedRun = useSelector(selectSelectedJobRun);
+  const session = useSelector(selectSession);
+  const isSessionConfigured = useSelector(selectIsSessionConfigured);
+
+  const canTriggerTick = isSessionConfigured
+    ? canAccess(session, 'jobs_tick')
+    : Boolean(isSuperUser);
+  const showRunNowButton = canTriggerTick || isSessionConfigured;
+
+  const loading = runsStatus === 'idle' || (runsStatus === 'loading' && runs.length === 0);
+  const showConfirmModal = Boolean(working.showConfirmModal);
+  const isTriggering = Boolean(working.isTriggering);
+  const errorMessage = working.errorMessage || '';
+  const successMessage = working.successMessage || '';
+
+  const fetchRuns = useCallback(() => {
+    return dispatch(fetchJobRuns(50));
+  }, [dispatch]);
 
   useVisibilityPoll(fetchRuns, 15000, {
     enabled: true,
@@ -33,27 +55,9 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
     triggerOnVisible: true,
   });
 
-  const handleTriggerTick = async () => {
-    setShowConfirmModal(false);
-    setIsTriggering(true);
-    setErrorMessage('');
-    setSuccessMessage('');
-
-    try {
-      const res = await adminApi.triggerJobTick();
-      setSuccessMessage(`Job tick accepted successfully (Run ID: ${res?.runId || 'initiated'}).`);
-      await fetchRuns();
-    } catch (err) {
-      const code = err?.code || (err?.response && err.response.code);
-      const msg =
-        err?.serverMessage ||
-        err?.message ||
-        (code === 'JOB_ALREADY_RUNNING' ? 'A job tick is already in progress.' : 'Failed to trigger job tick.');
-      setErrorMessage(msg);
-      fetchRuns();
-    } finally {
-      setIsTriggering(false);
-    }
+  const handleTriggerTick = () => {
+    if (!canTriggerTick) return;
+    dispatch(triggerJobTick());
   };
 
   const isAnyRunInProgress = runs.some((r) => r.status === 'running') || isTriggering;
@@ -72,13 +76,14 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
         </div>
 
         <div className="jobs-actions">
-          {isSuperUser && (
+          {showRunNowButton && (
             <button
               id="run-now-btn"
               data-testid="run-now-btn"
               className="btn btn-primary"
-              disabled={isAnyRunInProgress}
-              onClick={() => setShowConfirmModal(true)}
+              disabled={!canTriggerTick || isAnyRunInProgress}
+              title={!canTriggerTick ? 'Super User permission required' : undefined}
+              onClick={() => canTriggerTick && dispatch(setJobConfirmModalOpen(true))}
               style={{
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -179,7 +184,7 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
           <div className="jobs-empty-icon">⏱️</div>
           <div className="jobs-empty-title">No scheduled jobs have run yet</div>
           <div className="jobs-empty-desc">
-            The background scheduler executes time-dependent policies every hour. Super Users can also trigger an immediate execution using the "Run Now" action.
+            The background scheduler executes time-dependent policies every hour. Super Users can also trigger an immediate execution using the &quot;Run Now&quot; action.
           </div>
         </div>
       ) : (
@@ -218,7 +223,7 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
                       className="btn btn-secondary"
                       data-testid={`view-run-${run.id}`}
                       style={{ padding: '4px 10px', fontSize: '0.8rem', borderRadius: '6px' }}
-                      onClick={() => setSelectedRun(run)}
+                      onClick={() => dispatch(selectJobRun(run.id))}
                     >
                       View Details
                     </button>
@@ -234,13 +239,12 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
       <Modal
         isOpen={Boolean(selectedRun)}
         title={selectedRun ? `Run Details: ${selectedRun.id}` : 'Run Details'}
-        onClose={() => setSelectedRun(null)}
+        onClose={() => dispatch(selectJobRun(null))}
         size="lg"
         testId="run-detail-drawer"
       >
         {selectedRun && (
           <div>
-
             <div className="drawer-body">
               <div className="drawer-meta-grid">
                 <div className="drawer-meta-item">
@@ -384,7 +388,9 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
       <Modal
         isOpen={showConfirmModal}
         title="Confirm Manual Execution"
-        onClose={() => { if (!isTriggering) setShowConfirmModal(false); }}
+        onClose={() => {
+          if (!isTriggering) dispatch(setJobConfirmModalOpen(false));
+        }}
         closeDisabled={isTriggering}
         size="sm"
         testId="confirm-tick-modal"
@@ -393,7 +399,7 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
             <button
               type="button"
               className="btn btn-secondary"
-              onClick={() => setShowConfirmModal(false)}
+              onClick={() => dispatch(setJobConfirmModalOpen(false))}
               disabled={isTriggering}
               style={{ padding: '8px 16px', borderRadius: '8px' }}
             >
@@ -421,4 +427,5 @@ const ScheduledJobsPanel = ({ isSuperUser = false }) => {
   );
 };
 
+const ScheduledJobsPanel = ScheduledJobsPanelContent;
 export default ScheduledJobsPanel;

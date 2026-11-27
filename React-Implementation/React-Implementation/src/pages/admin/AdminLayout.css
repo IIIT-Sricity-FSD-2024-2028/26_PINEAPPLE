@@ -58,6 +58,9 @@
 .admin-content,
 .admin-main-content {
   flex: 1;
+  min-width: 0;
+  max-width: 100%;
+  box-sizing: border-box;
   overflow-y: auto;
   padding: 24px;
 }
@@ -123,4 +126,75 @@
   letter-spacing: 0.05em;
   margin: 16px 8px 8px;
   padding-left: 8px;
+}
+
+@media (max-width: 768px) {
+  .admin-layout {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
+  .admin-sidebar {
+    width: 100%;
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 4px 6px;
+    padding: 10px 12px;
+    border-right: none;
+    border-bottom: 1px solid var(--border);
+    box-sizing: border-box;
+  }
+
+  .admin-logo {
+    padding: 0 8px 0 0;
+    margin-bottom: 0;
+    border-bottom: none;
+  }
+
+  .admin-nav-item {
+    width: auto;
+    padding: 6px 10px;
+    font-size: 0.82rem;
+    border-radius: 8px;
+  }
+
+  .admin-nav-item.active {
+    border-left: none;
+    border-bottom: 2px solid var(--primary);
+  }
+
+  .su-only-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .su-nav-item {
+    border-left: none !important;
+  }
+
+  .admin-nav-divider,
+  .flex-spacer {
+    display: none;
+  }
+
+  .admin-exit-btn {
+    margin-left: auto;
+  }
+
+  .admin-content,
+  .admin-main-content {
+    padding: 16px;
+    overflow-y: visible;
+  }
+}
+
+@media (max-width: 480px) {
+  .admin-content,
+  .admin-main-content {
+    padding: 12px;
+  }
 }

@@ -1,10 +1,11 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate, Link, Navigate } from 'react-router-dom';
-import { sendPasswordResetEmail } from 'firebase/auth';
-import { auth } from '../services/firebase.js';
-import { AuthContext } from '../context/AuthContext';
-import { authApi } from '../services/authApi';
-import { getAuthMode } from '../services/apiClient';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectIsAuthenticated } from '../store/selectors/sessionSelectors';
+import {
+  getCurrentAuthMode,
+  requestPasswordReset,
+} from '../store/thunks/sessionThunks';
 import FormInput from '../components/common/FormInput';
 import SafeLink from '../components/common/SafeLink';
 import './Auth.css';
@@ -16,7 +17,8 @@ const HomeIcon = () => (
   </svg>
 );
 
-const ForgotPassword = () => {
+const ForgotPasswordContent = () => {
+  const dispatch = useDispatch();
   const [identifier, setIdentifier] = useState('');
   const [submittedIdentifier, setSubmittedIdentifier] = useState('');
   const [isSubmitted, setIsSubmitted] = useState(false);
@@ -30,9 +32,9 @@ const ForgotPassword = () => {
   const [error, setError] = useState('');
 
   const timerRef = useRef(null);
-  const { isAuthenticated } = useContext(AuthContext);
+  const isAuthenticated = useSelector(selectIsAuthenticated);
   const navigate = useNavigate();
-  const mode = getAuthMode();
+  const mode = getCurrentAuthMode();
   const isProduction = import.meta.env.PROD;
 
   // Resend countdown timer
@@ -70,34 +72,8 @@ const ForgotPassword = () => {
     const trimmed = targetIdent.trim();
 
     try {
-      if (mode === 'firebase') {
-        let targetEmail = trimmed;
-        if (!targetEmail.includes('@')) {
-          try {
-            const res = await authApi.resolveIdentifier(targetEmail);
-            if (res && res.email) {
-              targetEmail = res.email;
-            }
-          } catch (err) {
-            console.log('[ForgotPassword] Silent identifier lookup notice (anti-enumeration):', err);
-          }
-        }
-
-        try {
-          if (targetEmail.includes('@')) {
-            const actionCodeSettings = {
-              url: `${window.location.origin}/login`,
-              handleCodeInApp: false,
-            };
-            await sendPasswordResetEmail(auth, targetEmail, actionCodeSettings);
-          }
-        } catch (fbErr) {
-          // Suppress account enumeration, but log in dev
-          if (!isProduction) {
-            console.warn('[Firebase Reset Request]', fbErr?.code || fbErr?.message);
-          }
-        }
-
+      const response = await dispatch(requestPasswordReset(trimmed)).unwrap();
+      if (mode === 'firebase' || response?.mode === 'firebase') {
         setMessage(genericMsg);
         setIsSubmitted(true);
         setSubmittedIdentifier(trimmed);
@@ -116,8 +92,6 @@ const ForgotPassword = () => {
         return;
       }
 
-      // JWT or Legacy Mode: through our backend MailService
-      const response = await authApi.forgotPassword(trimmed);
       setMessage(response?.message || genericMsg);
       setIsSubmitted(true);
       setSubmittedIdentifier(trimmed);
@@ -145,7 +119,7 @@ const ForgotPassword = () => {
       if (err?.status === 429) {
         setError('Too many password reset requests. Please wait before trying again.');
       } else {
-        setError(err.message || 'Unable to process password reset request. Please try again.');
+        setError(err?.serverMessage || err?.message || 'Unable to process password reset request. Please try again.');
       }
     } finally {
       setLoading(false);
@@ -404,4 +378,5 @@ const ForgotPassword = () => {
   );
 };
 
+const ForgotPassword = ForgotPasswordContent;
 export default ForgotPassword;

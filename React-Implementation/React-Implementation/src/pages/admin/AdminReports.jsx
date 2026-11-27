@@ -1,56 +1,95 @@
-import { useState, useEffect, useCallback } from 'react';
-import { Link } from 'react-router-dom';
-import reportsApi from '../../services/reportsApi';
-import appealsApi from '../../services/appealsApi';
-import adminApi from '../../services/adminApi';
+import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useDispatch, useSelector } from 'react-redux';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import {
+  actionAdminReport,
+  fetchAdminReportDetails,
+  fetchAdminReports,
+  fetchOwnerPatterns,
+  updateAdminReportStatus,
+} from '../../store/thunks/reportsThunks';
+import {
+  closeReportDetail,
+  setReportFilter as setReportFilterAction,
+  setReportSearch as setReportSearchAction,
+} from '../../store/slices/reportsSlice';
+import {
+  selectAdminReports,
+  selectAdminReportsStatus,
+  selectOwnerPatterns,
+  selectOwnerPatternsStatus,
+  selectReportsWorking,
+} from '../../store/selectors/reportsSelectors';
+import {
+  decideAdminAppeal,
+  fetchAdminAppeals,
+} from '../../store/thunks/appealsThunks';
+import {
+  closeAppealDecisionModal,
+  openAppealDecisionModal,
+  setAppealFilter as setAppealFilterAction,
+  setAppealSearch as setAppealSearchAction,
+} from '../../store/slices/appealsSlice';
+import {
+  selectAdminAppeals,
+  selectAdminAppealsStatus,
+  selectAppealsWorking,
+} from '../../store/selectors/appealsSelectors';
+import {
+  canAccess,
+  selectSession,
+} from '../../store/selectors/sessionSelectors';
+import {
+  clearNeedsReviewSession,
+  decideSessionDispute,
+  fetchAdminDisputes,
+  fetchNeedsReviewSessions,
+} from '../../store/thunks/sessionDisputesThunks';
+import {
+  selectDisputeForDecision,
+  setDisputeFilter as setDisputeFilterAction,
+} from '../../store/slices/sessionDisputesSlice';
+import {
+  selectAllSessionDisputes,
+  selectSessionDisputesStatus,
+  selectSessionDisputesWorking,
+} from '../../store/selectors/sessionDisputesSelectors';
 import SearchBar from '../../components/common/SearchBar';
 import DataTable from '../../components/common/DataTable';
 import FilterTabs from '../../components/common/FilterTabs';
 import Modal from '../../components/common/Modal';
 import ModerationModal from '../../components/common/ModerationModal';
-import storage from '../../utils/storage';
 import './AdminReports.css';
 
-const AdminReports = () => {
-  // Permission verification
-  const adminSession = storage.getAdminSession();
-  const portalRole = adminSession.portalRole;
-  const role = adminSession.role || adminSession.portalRole;
-  const isSuperUser =
-    adminSession.isSuperUser ||
-    portalRole?.toLowerCase() === 'superuser' ||
-    portalRole?.toLowerCase() === 'super user' ||
-    role?.toLowerCase() === 'superuser' ||
-    role?.toLowerCase() === 'super user';
+const AdminReportsContent = () => {
+  const dispatch = useDispatch();
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const sessionState = useSelector(selectSession);
 
-  const permissions = Array.isArray(adminSession.permissions) ? adminSession.permissions : null;
-
-  const hasReportsPermission =
-    isSuperUser ||
-    !permissions ||
-    (Array.isArray(permissions) && permissions.includes('reports'));
-
-  const hasAuditPermission =
-    isSuperUser ||
-    !permissions ||
-    (Array.isArray(permissions) && permissions.includes('audit'));
+  const hasReportsPermission = canAccess(sessionState, 'reports');
+  const hasAuditPermission = canAccess(sessionState, 'audit');
 
   // Main UI state
   const [activeTab, setActiveTab] = useState('reports'); // 'reports' | 'appeals'
 
-  // Reports state
-  const [reports, setReports] = useState([]);
-  const [reportsLoading, setReportsLoading] = useState(true);
-  const [reportFilter, setReportFilter] = useState('all');
-  const [reportSearch, setReportSearch] = useState('');
-  const [selectedReportId, setSelectedReportId] = useState(null);
-  const [reportDetail, setReportDetail] = useState(null);
-  const [detailLoading, setDetailLoading] = useState(false);
-  const [detailError, setDetailError] = useState('');
+  // Reports state (backed by reportsSlice)
+  const reports = useSelector(selectAdminReports);
+  const adminReportsStatus = useSelector(selectAdminReportsStatus);
+  const reportsWorking = useSelector(selectReportsWorking);
+  const reportsLoading = adminReportsStatus === 'loading';
+  const reportFilter = reportsWorking.reportFilter || 'all';
+  const reportSearch = reportsWorking.reportSearch || '';
+  const selectedReportId = reportsWorking.selectedReportId;
+  const reportDetail = reportsWorking.selectedReportDetail;
+  const detailLoading = Boolean(reportsWorking.detailLoading);
+  const detailError = reportsWorking.detailError || '';
+  const updatingStatus = Boolean(reportsWorking.updatingStatus);
+  const setReportFilter = (val) => dispatch(setReportFilterAction(val));
+  const setReportSearch = (val) => dispatch(setReportSearchAction(val));
 
-  // Status update state
+  // Status update note (local keystrokes)
   const [statusUpdateNote, setStatusUpdateNote] = useState('');
-  const [updatingStatus, setUpdatingStatus] = useState(false);
 
   // Moderation action on report state (Warn / Suspend)
   const [modModalOpen, setModModalOpen] = useState(false);
@@ -59,138 +98,142 @@ const AdminReports = () => {
   // Dismiss modal state
   const [dismissModalOpen, setDismissModalOpen] = useState(false);
   const [dismissReason, setDismissReason] = useState('');
-  const [dismissSubmitting, setDismissSubmitting] = useState(false);
-  const [dismissError, setDismissError] = useState('');
+  const dismissSubmitting = Boolean(reportsWorking.actionSubmitting);
+  const dismissError = reportsWorking.actionError || '';
 
-  // Appeals state
-  const [appeals, setAppeals] = useState([]);
-  const [appealsLoading, setAppealsLoading] = useState(true);
-  const [appealFilter, setAppealFilter] = useState('all');
-  const [appealSearch, setAppealSearch] = useState('');
-  const [selectedAppeal, setSelectedAppeal] = useState(null);
+  // Appeals state (backed by appealsSlice)
+  const appeals = useSelector(selectAdminAppeals);
+  const adminAppealsStatus = useSelector(selectAdminAppealsStatus);
+  const appealsWorking = useSelector(selectAppealsWorking);
+  const appealsLoading = adminAppealsStatus === 'loading';
+  const appealFilter = appealsWorking.appealFilter || 'all';
+  const appealSearch = appealsWorking.appealSearch || '';
+  const selectedAppeal = useMemo(
+    () =>
+      appealsWorking.selectedAppealId
+        ? appeals.find(
+            (a) => String(a.id) === String(appealsWorking.selectedAppealId),
+          ) || null
+        : null,
+    [appeals, appealsWorking.selectedAppealId],
+  );
+  const setAppealFilter = (val) => dispatch(setAppealFilterAction(val));
+  const setAppealSearch = (val) => dispatch(setAppealSearchAction(val));
   const [appealDecision, setAppealDecision] = useState('accept');
   const [appealDecisionNote, setAppealDecisionNote] = useState('');
-  const [submittingDecision, setSubmittingDecision] = useState(false);
-  const [decisionError, setDecisionError] = useState('');
+  const submittingDecision = Boolean(appealsWorking.deciding);
+  const decisionError = appealsWorking.decisionError || '';
 
-  // Phase 17: Escrow disputes state
-  const [disputes, setDisputes] = useState([]);
-  const [disputesLoading, setDisputesLoading] = useState(false);
-  const [disputeFilter, setDisputeFilter] = useState('all');
-  const [selectedDispute, setSelectedDispute] = useState(null);
+  // Phase 17: Escrow disputes state (backed by sessionDisputesSlice)
+  const allDisputes = useSelector(selectAllSessionDisputes);
+  const disputesStatus = useSelector(selectSessionDisputesStatus);
+  const disputesWorking = useSelector(selectSessionDisputesWorking);
+  const disputesLoading = disputesStatus === 'loading';
+  const disputeFilter = disputesWorking.filter || 'all';
+  const disputes = useMemo(() => {
+    if (disputeFilter === 'all') return allDisputes;
+    return allDisputes.filter(
+      (d) => String(d.status || '').toLowerCase() === disputeFilter,
+    );
+  }, [allDisputes, disputeFilter]);
+  const selectedDispute = useMemo(
+    () =>
+      disputesWorking.selectedDisputeId
+        ? allDisputes.find(
+            (d) => String(d.id || d.disputeId) === String(disputesWorking.selectedDisputeId),
+          ) || null
+        : null,
+    [allDisputes, disputesWorking.selectedDisputeId],
+  );
+  const setDisputeFilter = (val) => dispatch(setDisputeFilterAction(val));
   const [disputeDecision, setDisputeDecision] = useState('release_to_mentor');
   const [splitPercent, setSplitPercent] = useState(50);
   const [disputeDecisionReason, setDisputeDecisionReason] = useState('');
-  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
-  const [disputeError, setDisputeError] = useState('');
+  const disputeSubmitting = Boolean(disputesWorking.decisionSubmitting);
+  const [localDisputeError, setLocalDisputeError] = useState('');
+  const disputeError = localDisputeError || disputesWorking.decisionError || '';
 
-  // Phase 23: Sessions flagged needs_review by snapshot integrity check
+  // Phase 23: Sessions flagged needs_review by snapshot integrity check (unwired BE calls, D8)
   const [needsReviewSessions, setNeedsReviewSessions] = useState([]);
   const [selectedReviewSession, setSelectedReviewSession] = useState(null);
   const [clearReviewReason, setClearReviewReason] = useState('');
   const [clearReviewSubmitting, setClearReviewSubmitting] = useState(false);
   const [clearReviewError, setClearReviewError] = useState('');
 
-  // Phase 17: Owner rejection patterns state
-  const [ownerPatterns, setOwnerPatterns] = useState([]);
-  const [patternsLoading, setPatternsLoading] = useState(false);
+  // Phase 17: Owner rejection patterns state (backed by reportsSlice)
+  const ownerPatterns = useSelector(selectOwnerPatterns);
+  const ownerPatternsStatus = useSelector(selectOwnerPatternsStatus);
+  const patternsLoading = ownerPatternsStatus === 'loading';
   const [expandedOwnerId, setExpandedOwnerId] = useState(null);
 
   // 1. Fetch reports
-  const fetchReports = useCallback(async () => {
-    setReportsLoading(true);
-    try {
-      const res = await reportsApi.getAdminReports({
+  const fetchReports = useCallback(() => {
+    return dispatch(
+      fetchAdminReports({
         status: reportFilter === 'all' ? undefined : reportFilter,
         q: reportSearch.trim() || undefined,
-      });
-      const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-      setReports(list);
-    } catch (err) {
-      console.warn('Could not load admin reports:', err);
-      setReports([]);
-    } finally {
-      setReportsLoading(false);
-    }
-  }, [reportFilter, reportSearch]);
+      }),
+    );
+  }, [dispatch, reportFilter, reportSearch]);
 
   useEffect(() => {
     if (activeTab === 'reports' && hasReportsPermission) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchReports();
     }
   }, [activeTab, fetchReports, hasReportsPermission]);
 
   // 2. Fetch appeals
-  const fetchAppeals = useCallback(async () => {
-    setAppealsLoading(true);
-    try {
-      const res = await appealsApi.getAdminAppeals(
-        appealFilter === 'all' ? undefined : appealFilter
-      );
-      const list = Array.isArray(res) ? res : res?.items || res?.data || [];
-      setAppeals(list);
-    } catch (err) {
-      console.warn('Could not load admin appeals:', err);
-      setAppeals([]);
-    } finally {
-      setAppealsLoading(false);
-    }
-  }, [appealFilter]);
+  const fetchAppeals = useCallback(() => {
+    return dispatch(
+      fetchAdminAppeals(appealFilter === 'all' ? undefined : appealFilter),
+    );
+  }, [dispatch, appealFilter]);
 
   useEffect(() => {
     if (activeTab === 'appeals' && hasReportsPermission) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchAppeals();
     }
   }, [activeTab, fetchAppeals, hasReportsPermission]);
 
   const reloadDisputes = useCallback(async () => {
-    if (typeof adminApi.getDisputes !== 'function') return;
-    try {
-      const [res, reviewRes] = await Promise.all([
-        adminApi.getDisputes(disputeFilter === 'all' ? '' : disputeFilter),
-        typeof adminApi.getNeedsReviewSessions === 'function'
-          ? adminApi.getNeedsReviewSessions().catch(() => [])
-          : Promise.resolve([]),
-      ]);
-      setDisputes(Array.isArray(res) ? res : res?.data || []);
-      setNeedsReviewSessions(Array.isArray(reviewRes) ? reviewRes : reviewRes?.data || []);
-    } catch {
-      setDisputes([]);
-    } finally {
-      setDisputesLoading(false);
-    }
-  }, [disputeFilter]);
+    await dispatch(
+      fetchAdminDisputes({
+        status: disputeFilter === 'all' ? '' : disputeFilter,
+        source: 'admin',
+      }),
+    );
+    const reviewRes = await dispatch(fetchNeedsReviewSessions())
+      .unwrap()
+      .catch(() => []);
+    setNeedsReviewSessions(Array.isArray(reviewRes) ? reviewRes : []);
+  }, [dispatch, disputeFilter]);
 
   useEffect(() => {
     if (activeTab !== 'disputes' || !hasReportsPermission) return;
     let active = true;
-    const run = async () => {
-      if (typeof adminApi.getDisputes !== 'function') return;
-      try {
-        const [res, reviewRes] = await Promise.all([
-          adminApi.getDisputes(disputeFilter === 'all' ? '' : disputeFilter),
-          typeof adminApi.getNeedsReviewSessions === 'function'
-            ? adminApi.getNeedsReviewSessions().catch(() => [])
-            : Promise.resolve([]),
-        ]);
+    dispatch(
+      fetchAdminDisputes({
+        status: disputeFilter === 'all' ? '' : disputeFilter,
+        source: 'admin',
+      }),
+    );
+    dispatch(fetchNeedsReviewSessions())
+      .unwrap()
+      .then((reviewRes) => {
         if (active) {
-          setDisputes(Array.isArray(res) ? res : res?.data || []);
-          setNeedsReviewSessions(Array.isArray(reviewRes) ? reviewRes : reviewRes?.data || []);
+          setNeedsReviewSessions(Array.isArray(reviewRes) ? reviewRes : []);
         }
-      } catch {
-        if (active) setDisputes([]);
-      } finally {
-        if (active) setDisputesLoading(false);
-      }
+      })
+      .catch(() => {
+        if (active) setNeedsReviewSessions([]);
+      });
+    return () => {
+      active = false;
     };
-    run();
-    return () => { active = false; };
-  }, [activeTab, disputeFilter, hasReportsPermission]);
+  }, [dispatch, activeTab, disputeFilter, hasReportsPermission]);
 
   const handleClearSessionReview = async () => {
-    if (!selectedReviewSession || typeof adminApi.clearSessionReview !== 'function') return;
+    if (!selectedReviewSession) return;
     const trimmed = clearReviewReason.trim();
     if (trimmed.length < 10 || trimmed.length > 500) {
       setClearReviewError('Clearance reason must be between 10 and 500 characters.');
@@ -199,12 +242,17 @@ const AdminReports = () => {
     setClearReviewSubmitting(true);
     setClearReviewError('');
     try {
-      await adminApi.clearSessionReview(selectedReviewSession.id, trimmed);
+      await dispatch(
+        clearNeedsReviewSession({
+          sessionId: selectedReviewSession.id,
+          reason: trimmed,
+        }),
+      ).unwrap();
       setSelectedReviewSession(null);
       setClearReviewReason('');
       await reloadDisputes();
     } catch (err) {
-      setClearReviewError(err?.message || 'Failed to clear review flag.');
+      setClearReviewError(err?.serverMessage || err?.message || 'Failed to clear review flag.');
     } finally {
       setClearReviewSubmitting(false);
     }
@@ -212,78 +260,54 @@ const AdminReports = () => {
 
   useEffect(() => {
     if (activeTab !== 'owner-patterns' || !hasReportsPermission) return;
-    let active = true;
-    const run = async () => {
-      const fetcher =
-        typeof reportsApi.getOwnerPatterns === 'function'
-          ? reportsApi.getOwnerPatterns
-          : typeof adminApi.getOwnerRejectionPatterns === 'function'
-            ? adminApi.getOwnerRejectionPatterns
-            : null;
-      if (!fetcher) return;
-      try {
-        const res = await fetcher(30);
-        if (active) setOwnerPatterns(Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : []);
-      } catch {
-        if (active) setOwnerPatterns([]);
-      } finally {
-        if (active) setPatternsLoading(false);
-      }
-    };
-    run();
-    return () => { active = false; };
-  }, [activeTab, hasReportsPermission]);
+    dispatch(fetchOwnerPatterns(30));
+  }, [activeTab, hasReportsPermission, dispatch]);
 
-  // 3. Open report detail
-  const handleOpenReportDetail = async (id) => {
-    setSelectedReportId(id);
-    setDetailLoading(true);
-    setDetailError('');
+  // 3. Open report detail (and reopen via ?open=<reportId> when returning from Audit Log)
+  const openReportParam = searchParams.get('open');
+  useEffect(() => {
+    if (!openReportParam || !hasReportsPermission) return;
+    dispatch(fetchAdminReportDetails(openReportParam));
+  }, [openReportParam, hasReportsPermission, dispatch]);
+
+  const handleOpenReportDetail = (id) => {
     setStatusUpdateNote('');
-    try {
-      const data = await reportsApi.getReportDetails(id);
-      setReportDetail(data);
-    } catch (err) {
-      setDetailError(err?.message || 'Failed to load report details');
-    } finally {
-      setDetailLoading(false);
-    }
+    dispatch(fetchAdminReportDetails(id));
   };
 
   const handleCloseReportDetail = () => {
-    setSelectedReportId(null);
-    setReportDetail(null);
-    setDetailError('');
+    dispatch(closeReportDetail());
+    if (searchParams.has('open')) {
+      const next = new URLSearchParams(searchParams);
+      next.delete('open');
+      setSearchParams(next, { replace: true });
+    }
   };
 
   // 4. Update report status
   const handleUpdateStatus = async (newStatus) => {
     if (!reportDetail) return;
-    setUpdatingStatus(true);
     try {
-      await reportsApi.updateReportStatus(reportDetail.id, {
-        status: newStatus,
-        note: statusUpdateNote.trim() || undefined,
-      });
+      await dispatch(
+        updateAdminReportStatus({
+          reportId: reportDetail.id,
+          status: newStatus,
+          note: statusUpdateNote.trim() || undefined,
+          filters: {
+            status: reportFilter === 'all' ? undefined : reportFilter,
+            q: reportSearch.trim() || undefined,
+          },
+        }),
+      ).unwrap();
       setStatusUpdateNote('');
-      const updated = await reportsApi.getReportDetails(reportDetail.id);
-      setReportDetail(updated);
-      fetchReports();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('teamforge:report_updated'));
-      }
-    } catch (err) {
-      const msg = err?.serverMessage || err?.message || 'Failed to update report status';
-      setDetailError(msg);
-    } finally {
-      setUpdatingStatus(false);
+    } catch {
+      // Friendly error stored in reportsSlice working.detailError
     }
   };
 
   // 5. Open Dismiss Modal
   const handleOpenDismissModal = () => {
     setDismissReason('');
-    setDismissError('');
     setDismissModalOpen(true);
   };
 
@@ -293,25 +317,21 @@ const AdminReports = () => {
       return;
     }
 
-    setDismissSubmitting(true);
-    setDismissError('');
     try {
-      await reportsApi.actionReport(reportDetail.id, {
-        action: 'dismiss',
-        reason: dismissReason.trim(),
-      });
+      await dispatch(
+        actionAdminReport({
+          reportId: reportDetail.id,
+          action: 'dismiss',
+          reason: dismissReason.trim(),
+          filters: {
+            status: reportFilter === 'all' ? undefined : reportFilter,
+            q: reportSearch.trim() || undefined,
+          },
+        }),
+      ).unwrap();
       setDismissModalOpen(false);
-      handleCloseReportDetail();
-      fetchReports();
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new CustomEvent('teamforge:report_updated'));
-      }
-    } catch (err) {
-      const msg = err?.serverMessage || err?.message || 'Failed to dismiss report';
-      setDismissError(msg);
-      setDetailError(msg);
-    } finally {
-      setDismissSubmitting(false);
+    } catch {
+      // Friendly error stored in reportsSlice working.actionError & detailError
     }
   };
 
@@ -322,60 +342,56 @@ const AdminReports = () => {
   };
 
   const handleModSubmit = async (reason) => {
-    if (!reportDetail) return;
-    try {
-      return await reportsApi.actionReport(reportDetail.id, {
+    if (!reportDetail) return null;
+    const out = await dispatch(
+      actionAdminReport({
+        reportId: reportDetail.id,
         action: modActionType,
         reason,
-      });
-    } catch (err) {
-      const msg = err?.serverMessage || err?.message || 'Failed to action report';
-      setDetailError(msg);
-      throw err;
-    }
+        filters: {
+          status: reportFilter === 'all' ? undefined : reportFilter,
+          q: reportSearch.trim() || undefined,
+        },
+      }),
+    ).unwrap();
+    return out?.result || out;
   };
 
   const handleModSuccess = () => {
     setModModalOpen(false);
     handleCloseReportDetail();
-    fetchReports();
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('teamforge:report_updated'));
-    }
   };
 
   // 7. Decide appeal
   const handleOpenAppealDecision = (appeal) => {
-    setSelectedAppeal(appeal);
+    dispatch(openAppealDecisionModal(appeal?.id));
     setAppealDecision('accept');
     setAppealDecisionNote('');
-    setDecisionError('');
   };
 
   const handleCloseAppealDecision = () => {
-    setSelectedAppeal(null);
+    dispatch(closeAppealDecisionModal());
     setAppealDecisionNote('');
-    setDecisionError('');
   };
 
   const handleSubmitAppealDecision = async (e) => {
     e.preventDefault();
     if (!selectedAppeal || appealDecisionNote.trim().length < 10) return;
 
-    setSubmittingDecision(true);
-    setDecisionError('');
     try {
-      await appealsApi.decideAppeal(selectedAppeal.id, {
-        decision: appealDecision,
-        note: appealDecisionNote.trim(),
-      });
-      handleCloseAppealDecision();
-      fetchAppeals();
-    } catch (err) {
-      const msg = err?.serverMessage || err?.message || 'Failed to decide appeal';
-      setDecisionError(msg);
-    } finally {
-      setSubmittingDecision(false);
+      await dispatch(
+        decideAdminAppeal({
+          appealId: selectedAppeal.id,
+          decision: appealDecision,
+          note: appealDecisionNote.trim(),
+          warningId: selectedAppeal.warningId,
+          userId: selectedAppeal.userId,
+          currentFilter: appealFilter === 'all' ? undefined : appealFilter,
+        }),
+      ).unwrap();
+      setAppealDecisionNote('');
+    } catch {
+      // Friendly error stored in appealsSlice working.decisionError
     }
   };
 
@@ -433,7 +449,6 @@ const AdminReports = () => {
         <button
           className={`admin-reports-tab-btn ${activeTab === 'disputes' ? 'active' : ''}`}
           onClick={() => {
-            setDisputesLoading(true);
             setActiveTab('disputes');
           }}
           data-testid="tab-disputes"
@@ -443,7 +458,6 @@ const AdminReports = () => {
         <button
           className={`admin-reports-tab-btn ${activeTab === 'owner-patterns' ? 'active' : ''}`}
           onClick={() => {
-            setPatternsLoading(true);
             setActiveTab('owner-patterns');
           }}
           data-testid="tab-owner-patterns"
@@ -814,11 +828,11 @@ const AdminReports = () => {
                       className="admin-reports-action-btn primary"
                       data-testid={`decide-dispute-btn-${d.id}`}
                       onClick={() => {
-                        setSelectedDispute(d);
+                        dispatch(selectDisputeForDecision(d.id || d.disputeId));
                         setDisputeDecision('release_to_mentor');
                         setSplitPercent(70);
                         setDisputeDecisionReason('');
-                        setDisputeError('');
+                        setLocalDisputeError('');
                       }}
                     >
                       {d.status === 'open' ? 'Decide' : 'View'}
@@ -995,11 +1009,19 @@ const AdminReports = () => {
                   </div>
                   <div>
                     {hasAuditPermission ? (
-                      <Link
-                        to={`/admin/audit-log?userId=${encodeURIComponent(reportDetail.reportedUserId || reportDetail.reportedUser?.id || '')}&reportId=${encodeURIComponent(reportDetail.id || '')}&from=report`}
-                        target="_blank"
-                        rel="noopener noreferrer"
+                      <button
+                        type="button"
                         data-testid="link-view-audit"
+                        onClick={() => {
+                          const targetUserId =
+                            reportDetail.reportedUserId || reportDetail.reportedUser?.id || '';
+                          const targetReportId = reportDetail.id || '';
+                          const targetUrl = `/admin/audit-log?userId=${encodeURIComponent(
+                            targetUserId,
+                          )}&reportId=${encodeURIComponent(targetReportId)}&from=report`;
+                          handleCloseReportDetail();
+                          navigate(targetUrl);
+                        }}
                         style={{
                           display: 'inline-flex',
                           alignItems: 'center',
@@ -1010,12 +1032,12 @@ const AdminReports = () => {
                           borderRadius: '6px',
                           fontWeight: 600,
                           fontSize: '0.85rem',
-                          textDecoration: 'none',
                           border: '1px solid #bfdbfe',
+                          cursor: 'pointer',
                         }}
                       >
                         🔍 View audit log
-                      </Link>
+                      </button>
                     ) : (
                       <button
                         type="button"
@@ -1524,7 +1546,7 @@ const AdminReports = () => {
         <Modal
           isOpen={true}
           title={`Escrow Dispute: ${selectedDispute.projectTitle || selectedDispute.projectId}`}
-          onClose={() => !disputeSubmitting && setSelectedDispute(null)}
+          onClose={() => !disputeSubmitting && dispatch(selectDisputeForDecision(null))}
           closeDisabled={disputeSubmitting}
           footer={
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
@@ -1532,7 +1554,7 @@ const AdminReports = () => {
                 type="button"
                 className="admin-reports-action-btn"
                 disabled={disputeSubmitting}
-                onClick={() => setSelectedDispute(null)}
+                onClick={() => dispatch(selectDisputeForDecision(null))}
               >
                 Close
               </button>
@@ -1543,20 +1565,23 @@ const AdminReports = () => {
                   className="admin-reports-action-btn primary"
                   disabled={disputeSubmitting || disputeDecisionReason.trim().length < 10}
                   onClick={async () => {
-                    setDisputeSubmitting(true);
-                    setDisputeError('');
+                    setLocalDisputeError('');
                     try {
-                      await adminApi.decideDispute(selectedDispute.id, {
-                        decision: disputeDecision,
-                        ...(disputeDecision === 'split' ? { mentorPercent: Number(splitPercent) } : {}),
-                        reason: disputeDecisionReason.trim(),
-                      });
-                      setSelectedDispute(null);
+                      await dispatch(
+                        decideSessionDispute({
+                          disputeId: selectedDispute.id,
+                          payload: {
+                            decision: disputeDecision,
+                            ...(disputeDecision === 'split' ? { mentorPercent: Number(splitPercent) } : {}),
+                            reason: disputeDecisionReason.trim(),
+                          },
+                          source: 'admin',
+                        }),
+                      ).unwrap();
+                      dispatch(selectDisputeForDecision(null));
                       await reloadDisputes();
                     } catch (err) {
-                      setDisputeError(err?.serverMessage || err?.message || 'Failed to decide dispute.');
-                    } finally {
-                      setDisputeSubmitting(false);
+                      setLocalDisputeError(err?.serverMessage || err?.message || 'Failed to decide dispute.');
                     }
                   }}
                 >
@@ -1720,4 +1745,5 @@ const AdminReports = () => {
   );
 };
 
+const AdminReports = AdminReportsContent;
 export default AdminReports;

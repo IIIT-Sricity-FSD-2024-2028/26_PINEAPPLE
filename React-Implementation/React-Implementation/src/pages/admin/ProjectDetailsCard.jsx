@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import Badge from '../../components/common/Badge';
 import { formatMemberSince, formatProjectDueDate } from '../../utils/dateFormatter';
-import { isProjectLocked } from '../../services/projectsApi';
+import { isProjectLocked } from '../../utils/projectStatus';
 
 const ProjectDetailsCard = ({
   project,

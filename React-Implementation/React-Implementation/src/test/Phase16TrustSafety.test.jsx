@@ -1,9 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { renderWithStore } from './test-utils';
 import ChatBox from '../components/features/ChatBox';
 import AdminUsers from '../pages/admin/AdminUsers';
 import AdminReports from '../pages/admin/AdminReports';
@@ -97,6 +94,7 @@ vi.mock('../services/projectsApi', () => ({
 
 vi.mock('../services/authApi', () => ({
   default: {
+    signup: vi.fn(),
     verifyEmail: vi.fn(),
     resendVerification: vi.fn(),
   },
@@ -109,8 +107,6 @@ vi.mock('../services/usersApi', () => ({
     getMe: vi.fn(),
     update: vi.fn(),
     getPhoneOtpStatus: vi.fn(),
-    requestPhoneOtp: vi.fn(),
-    verifyPhoneOtp: vi.fn(),
     recordFailedOtpAttempt: vi.fn(),
     deletePhone: vi.fn(),
   },
@@ -120,37 +116,25 @@ vi.mock('../services/usersApi', () => ({
     getMe: vi.fn(),
     update: vi.fn(),
     getPhoneOtpStatus: vi.fn(),
-    requestPhoneOtp: vi.fn(),
-    verifyPhoneOtp: vi.fn(),
     recordFailedOtpAttempt: vi.fn(),
     deletePhone: vi.fn(),
   },
 }));
 
-const renderWithAuth = (ui, { user = null, updateUser = vi.fn(), signup = vi.fn(), route = '/' } = {}) =>
-  render(
-    <MemoryRouter initialEntries={[route]}>
-      <UIProvider>
-        <AuthContext.Provider
-          value={{
-            user,
-            isAuthenticated: Boolean(user),
-            loading: false,
-            login: vi.fn(),
-            signup,
-            logout: vi.fn(),
-            updateUser,
-            refreshToken: vi.fn(),
-            authMode: 'jwt',
-          }}
-        >
-          <RoleContext.Provider value={{ activeRole: user?.role || 'Collaborator' }}>
-            {ui}
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </UIProvider>
-    </MemoryRouter>,
-  );
+const renderWithAuth = (ui, { user = null, route = '/' } = {}) =>
+  renderWithStore(ui, {
+    route,
+    preloadedState: {
+      session: {
+        user,
+        isAuthenticated: Boolean(user),
+        loading: false,
+        status: user ? 'authenticated' : 'signed_out',
+        activeRole: user?.role || 'Collaborator',
+        allowedRoles: [user?.role || 'Collaborator'],
+      },
+    },
+  });
 
 describe('Phase 16: Trust & Safety Frontend Workflows', () => {
   beforeEach(() => {
@@ -167,7 +151,7 @@ describe('Phase 16: Trust & Safety Frontend Workflows', () => {
       { id: 'm-other-2', senderId: 'u2', senderName: 'Other User', content: 'Second offending message', timestamp: '2026-12-01T10:02:00Z' },
     ];
 
-    render(
+    renderWithStore(
       <ChatBox
         messages={messages}
         currentUserId="u1"
@@ -368,32 +352,30 @@ describe('Phase 16: Trust & Safety Frontend Workflows', () => {
     });
 
     // VerifyEmail route page marks email verified on valid token
-    const updateUser = vi.fn();
     authApi.verifyEmail.mockResolvedValueOnce({
       verified: true,
       message: 'Email address verified successfully.',
       user: { emailVerifiedAt: '2026-12-01T12:00:00Z' },
     });
 
-    renderWithAuth(<VerifyEmail />, {
+    const { store: verifyStore } = renderWithAuth(<VerifyEmail />, {
       user: { id: 'u-9', email: 'new@edu.org', emailVerified: false },
-      updateUser,
       route: '/verify-email?token=abc-token-123',
     });
 
     await waitFor(() => {
       expect(authApi.verifyEmail).toHaveBeenCalledWith('abc-token-123');
       expect(screen.getByTestId('verify-email-result-msg').textContent).toContain('verified successfully');
-      expect(updateUser).toHaveBeenCalledWith(expect.objectContaining({ emailVerified: true }));
+      expect(verifyStore.getState().session.user.emailVerified).toBe(true);
     });
   });
 
   it('6. Signup submits email + password without username and surfaces backend errors', async () => {
-    const signupMock = vi.fn().mockRejectedValueOnce({
+    authApi.signup.mockRejectedValueOnce({
       message: 'An account with this email already exists',
     });
 
-    renderWithAuth(<Signup />, { signup: signupMock });
+    renderWithAuth(<Signup />);
     expect(screen.queryByPlaceholderText(/johndoe/i)).toBeNull();
     fireEvent.change(screen.getByPlaceholderText(/name@example\.com/i), { target: { value: 'user@university.edu' } });
     const pwInputs = document.querySelectorAll('input[type="password"]');
@@ -402,7 +384,7 @@ describe('Phase 16: Trust & Safety Frontend Workflows', () => {
     fireEvent.click(screen.getByRole('button', { name: /^Sign Up$/i }));
 
     await waitFor(() => {
-      expect(signupMock).toHaveBeenCalledWith({
+      expect(authApi.signup).toHaveBeenCalledWith({
         email: 'user@university.edu',
         password: 'Password123!',
         role: 'Collaborator',

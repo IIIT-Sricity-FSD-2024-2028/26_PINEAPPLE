@@ -1,10 +1,42 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { RoleContext } from '../../context/RoleContext';
-import mentorApplicationsApi from '../../services/mentorApplicationsApi';
-import uploadsApi from '../../services/uploadsApi';
-import adminApi from '../../services/adminApi';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  selectCurrentUser,
+  selectIsMentorApproved,
+  selectMentorAppStatus,
+} from '../../store/selectors/sessionSelectors';
+import {
+  evaluateMentorStatus,
+  switchUserRole,
+} from '../../store/thunks/sessionThunks';
+import {
+  downloadMentorCv,
+  fetchDigiLockerStatus,
+  fetchMentorMinYearsConfig,
+  fetchMyMentorApplicationStatus,
+  pullDigiLockerDocuments,
+  submitMentorApplication,
+  uploadMentorCv,
+} from '../../store/thunks/mentorApplicationsThunks';
+import {
+  clearMentorAppMessages,
+  removeDigiLockerDocAt,
+  setMentorAppCvError,
+  setMentorAppDigiLockerError,
+  setMentorAppSubmitError,
+  setShowMentorForm,
+} from '../../store/slices/mentorApplicationsSlice';
+import {
+  selectDigiLockerState,
+  selectMentorApplicationsWorking,
+  selectMentorCvState,
+  selectMinYearsRequired,
+  selectMyApplicationLoadStatus,
+  selectMyMentorApplication,
+  selectMyMentorCooldownInfo,
+  selectMyMentorStatusData,
+} from '../../store/selectors/mentorApplicationsSelectors';
 import FormInput from '../../components/common/FormInput';
 import VerifyEmailBanner from '../../components/common/VerifyEmailBanner';
 import { CREDENTIAL_STATUS } from '../../constants/credentialStatus';
@@ -18,19 +50,58 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
 }
 
-const MentorApplication = () => {
-  const { user } = useContext(AuthContext);
-  const { isMentorApproved, mentorAppStatus, switchRole, refreshMentorStatus } = useContext(RoleContext);
+const MentorApplicationContent = () => {
+  const user = useSelector(selectCurrentUser);
+  const isMentorApproved = useSelector(selectIsMentorApproved);
+  const mentorAppStatus = useSelector(selectMentorAppStatus);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
+  const refreshMentorStatus = useCallback(
+    () => dispatch(evaluateMentorStatus()).unwrap(),
+    [dispatch],
+  );
+  const switchRole = useCallback(
+    (role) => dispatch(switchUserRole(role)),
+    [dispatch],
+  );
 
-  const [loading, setLoading] = useState(true);
-  const [existingApp, setExistingApp] = useState(null);
-  const [showForm, setShowForm] = useState(false);
-  const [minYearsRequired, setMinYearsRequired] = useState(5);
-  const [cooldownInfo, setCooldownInfo] = useState(null);
+  const myStatusData = useSelector(selectMyMentorStatusData);
+  const existingApp = useSelector(selectMyMentorApplication);
+  const loadStatus = useSelector(selectMyApplicationLoadStatus);
+  const minYearsRequired = useSelector(selectMinYearsRequired);
+  const cooldownInfo = useSelector(selectMyMentorCooldownInfo);
+  const { cvData, cvUploading } = useSelector(selectMentorCvState);
+  const {
+    docs: digiLockerDocs,
+    connected: digiLockerConnected,
+    loading: digiLockerLoading,
+  } = useSelector(selectDigiLockerState);
+  const working = useSelector(selectMentorApplicationsWorking);
+  const myLastFetchedAt = useSelector((state) => state?.mentorApplications?.myLastFetchedAt || null);
+  const submitting = useSelector((state) =>
+    Boolean(state?.mentorApplications?.submitting),
+  );
+
+  // Only show the initial blocking spinner before the first status fetch completes;
+  // background focus refreshes must never unmount the form or wipe file/typed inputs.
+  const loading =
+    Boolean(user?.id) &&
+    !myLastFetchedAt &&
+    (loadStatus === 'idle' || loadStatus === 'loading');
+  const showForm =
+    working.showFormOverride !== null
+      ? working.showFormOverride
+      : !existingApp;
+  const cvError = working.cvError || '';
+  const digiLockerError = working.digiLockerError || '';
+  const error = working.submitError || '';
+  const success = working.submitSuccess || '';
+  const emailNotVerifiedError = Boolean(working.emailNotVerifiedError);
   const [nowTs] = useState(() => Date.now());
+  const cvInputRef = useRef(null);
+  const [selectedCvFile, setSelectedCvFile] = useState(null);
 
-  // Form fields
+  // Controlled Form keystroke state (local per Decision D6)
   const [name, setName] = useState(() => user?.name || user?.username || '');
   const [email, setEmail] = useState(() => user?.email || '');
   const [bio, setBio] = useState('');
@@ -38,130 +109,61 @@ const MentorApplication = () => {
   const [portfolio, setPortfolio] = useState('');
   const [yearsOfExperience, setYearsOfExperience] = useState('');
 
-  // CV Upload state
-  const [cvUploading, setCvUploading] = useState(false);
-  const [cvData, setCvData] = useState(null);
-  const [cvError, setCvError] = useState('');
-
-  // DigiLocker verification state
-  const [digiLockerLoading, setDigiLockerLoading] = useState(false);
-  const [digiLockerDocs, setDigiLockerDocs] = useState([]);
-  const [digiLockerConnected, setDigiLockerConnected] = useState(false);
-  const [digiLockerError, setDigiLockerError] = useState('');
-
-  const [submitting, setSubmitting] = useState(false);
-  const [error, setError] = useState('');
-  const [success, setSuccess] = useState('');
-  const [emailNotVerifiedError, setEmailNotVerifiedError] = useState(false);
+  const skipFocusRefreshRef = useRef(false);
+  useEffect(() => {
+    skipFocusRefreshRef.current = Boolean(
+      cvUploading || submitting || selectedCvFile || cvData?.filename || showForm,
+    );
+  }, [cvUploading, submitting, selectedCvFile, cvData, showForm]);
 
   const loadApplication = useCallback(async () => {
-    if (!user?.id) {
-      setLoading(false);
-      return;
+    if (!user?.id) return;
+    const action = await dispatch(
+      fetchMyMentorApplicationStatus({ userId: user.id, force: true }),
+    );
+    const data = action?.payload;
+    if (
+      (data?.mentorUnlocked || data?.status === 'approved') &&
+      typeof refreshMentorStatus === 'function'
+    ) {
+      await refreshMentorStatus();
     }
-    try {
-      let statusData = null;
-      try {
-        statusData = await mentorApplicationsApi.getMyStatus({ userId: user.id });
-      } catch (err) {
-        console.warn('[MentorApplication] Fallback fetching mentor application status:', err);
-      }
-
-      if (statusData && statusData.status !== undefined) {
-        if (statusData.mentorUnlocked || statusData.status === 'approved') {
-          setExistingApp(statusData.application || { status: 'approved' });
-          setShowForm(false);
-          if (typeof refreshMentorStatus === 'function') {
-            await refreshMentorStatus();
-          }
-        } else if (statusData.status === 'pending') {
-          setExistingApp(statusData.application);
-          setShowForm(false);
-        } else if (statusData.status === 'rejected') {
-          setExistingApp(statusData.application);
-          if (statusData.inCooldown || statusData.cooldownAvailableAt) {
-            setCooldownInfo({
-              inCooldown: Boolean(statusData.inCooldown),
-              availableAt: statusData.cooldownAvailableAt || null,
-              cooldownDays: statusData.cooldownDays || 14,
-            });
-          } else {
-            setCooldownInfo(null);
-          }
-        } else {
-          // none
-          setExistingApp(null);
-          setShowForm(true);
-        }
-      } else {
-        const apps = await mentorApplicationsApi.list({ userId: user.id });
-        const list = Array.isArray(apps) ? apps : [];
-        list.sort((a, b) => {
-          const timeA = new Date(a.createdAt || a.applicationDate || 0).getTime();
-          const timeB = new Date(b.createdAt || b.applicationDate || 0).getTime();
-          return timeB - timeA;
-        });
-        const activeList = list.filter((a) => a.status !== 'superseded');
-        const myApp = activeList[0] || list[0];
-
-        if (myApp) {
-          setExistingApp(myApp);
-          if (myApp.status === 'approved') {
-            setShowForm(false);
-            if (typeof refreshMentorStatus === 'function') {
-              await refreshMentorStatus();
-            }
-          }
-        } else {
-          setExistingApp(null);
-          setShowForm(true);
-        }
-      }
-    } catch (err) {
-      console.error('Error fetching mentor application:', err);
-      setShowForm(true);
-    } finally {
-      setLoading(false);
-    }
-  }, [user, refreshMentorStatus]);
+  }, [dispatch, user, refreshMentorStatus]);
 
   useEffect(() => {
-    // eslint-disable-next-line react-hooks/set-state-in-effect
     loadApplication();
 
-    const handleFocus = () => loadApplication();
-    const handleStatusUpdate = () => loadApplication();
-
+    // Returning from OS file picker fires window.focus; never refetch while the applicant form is active
+    const handleFocus = () => {
+      if (!skipFocusRefreshRef.current) {
+        loadApplication();
+      }
+    };
     window.addEventListener('focus', handleFocus);
-    window.addEventListener('teamforge:mentor_status_updated', handleStatusUpdate);
 
     return () => {
       window.removeEventListener('focus', handleFocus);
-      window.removeEventListener('teamforge:mentor_status_updated', handleStatusUpdate);
     };
   }, [loadApplication]);
 
   useEffect(() => {
-    adminApi.getPublicConfig()
-      .then((cfg) => {
-        const tenure = cfg?.minimumTenure ?? cfg?.mentorMinYearsExperience;
-        if (tenure !== undefined) {
-          setMinYearsRequired(Math.max(5, Number(tenure)));
-        }
-      })
-      .catch(() => {});
-  }, []);
+    dispatch(fetchMentorMinYearsConfig());
+    dispatch(fetchDigiLockerStatus());
+  }, [dispatch]);
 
   // CV File Selection & Upload
   const handleCvChange = async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    setCvError('');
+    setSelectedCvFile(file);
+    dispatch(setMentorAppCvError(''));
 
     // Phase 8: Validate file extension
     if (!file.name.toLowerCase().endsWith('.pdf')) {
-      setCvError('Invalid file type. Only PDF documents (.pdf) are allowed.');
+      dispatch(
+        setMentorAppCvError('Invalid file type. Only PDF documents (.pdf) are allowed.'),
+      );
       e.target.value = '';
       return;
     }
@@ -169,86 +171,67 @@ const MentorApplication = () => {
     // Phase 8: Validate max file size (5MB)
     const MAX_SIZE = 5 * 1024 * 1024;
     if (file.size > MAX_SIZE) {
-      setCvError(`File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of 5 MB.`);
+      dispatch(
+        setMentorAppCvError(
+          `File size (${formatBytes(file.size)}) exceeds the maximum allowed limit of 5 MB.`,
+        ),
+      );
       e.target.value = '';
       return;
     }
 
-    setCvUploading(true);
     try {
-      const res = await uploadsApi.uploadCv(file);
-      setCvData({
-        filename: res.filename,
-        originalName: res.originalName || file.name,
-        size: res.size || file.size,
-        url: res.url,
-      });
-    } catch (err) {
-      if (err?.code === 'UNSUPPORTED_FILE_TYPE' || err?.statusCode === 400) {
-        setCvError(err?.serverMessage || err?.message || 'Unsupported file type. Allowed format: PDF (.pdf) with a valid %PDF- signature.');
-      } else {
-        setCvError(err?.serverMessage || err.message || 'Failed to upload CV file. Please try again.');
-      }
+      await dispatch(uploadMentorCv(file)).unwrap();
+    } catch {
+      // Friendly error stored in working.cvError by mentorApplicationsSlice
     } finally {
-      setCvUploading(false);
       e.target.value = '';
     }
   };
 
   // DigiLocker Connection & Verification
   const handleConnectDigiLocker = async () => {
-    setDigiLockerError('');
+    dispatch(setMentorAppDigiLockerError(''));
     const applicantName = (name || user?.name || user?.username || '').trim();
     if (!applicantName) {
-      setDigiLockerError('Please enter your Full Name above before connecting DigiLocker to ensure credential matching.');
+      dispatch(
+        setMentorAppDigiLockerError(
+          'Please enter your Full Name above before connecting DigiLocker to ensure credential matching.',
+        ),
+      );
       return;
     }
 
-    setDigiLockerLoading(true);
     try {
-      const res = await mentorApplicationsApi.pullDigiLockerDocuments(applicantName);
-      const docs = Array.isArray(res.documents) ? res.documents : [];
-      setDigiLockerDocs(docs);
-      setDigiLockerConnected(true);
-    } catch (err) {
-      setDigiLockerError(err.message || 'Failed to connect to DigiLocker sandbox.');
-    } finally {
-      setDigiLockerLoading(false);
+      await dispatch(pullDigiLockerDocuments({ applicantName })).unwrap();
+    } catch {
+      // Error stored in working.digiLockerError
     }
   };
 
   const handleRemoveDoc = (indexToRemove) => {
-    setDigiLockerDocs((prev) => prev.filter((_, idx) => idx !== indexToRemove));
+    dispatch(removeDigiLockerDocAt(indexToRemove));
   };
 
   // Download CV for existing application
   const handleDownloadCv = async (filename, originalName) => {
     try {
-      const blob = await uploadsApi.downloadCv(filename);
-      const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = originalName || filename;
-      document.body.appendChild(a);
-      a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      await dispatch(downloadMentorCv({ filename, originalName })).unwrap();
     } catch (err) {
-      alert(err.message || 'Failed to download CV file.');
+      alert(err?.message || 'Failed to download CV file.');
     }
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-    setSuccess('');
+    dispatch(clearMentorAppMessages());
 
     if (!name.trim()) {
-      setError('Please provide your full name.');
+      dispatch(setMentorAppSubmitError('Please provide your full name.'));
       return;
     }
     if (!email.trim()) {
-      setError('Please provide your email address.');
+      dispatch(setMentorAppSubmitError('Please provide your email address.'));
       return;
     }
     const numYears = Number(yearsOfExperience);
@@ -261,42 +244,74 @@ const MentorApplication = () => {
       numYears > 40
     ) {
       if (!Number.isInteger(numYears) && !isNaN(numYears)) {
-        setError('Years of experience must be a whole number between 5 and 40.');
+        dispatch(
+          setMentorAppSubmitError(
+            'Years of experience must be a whole number between 5 and 40.',
+          ),
+        );
       } else if (numYears > 40) {
-        setError('Maximum 40 years of professional experience allowed.');
+        dispatch(
+          setMentorAppSubmitError(
+            'Maximum 40 years of professional experience allowed.',
+          ),
+        );
       } else {
-        setError(`Minimum ${minRequired} years of professional experience required for mentor eligibility (up to 40).`);
+        dispatch(
+          setMentorAppSubmitError(
+            `Minimum ${minRequired} years of professional experience required for mentor eligibility (up to 40).`,
+          ),
+        );
       }
       return;
     }
     if (!skills.trim()) {
-      setError('Please specify at least one skill or area of expertise.');
+      dispatch(
+        setMentorAppSubmitError(
+          'Please specify at least one skill or area of expertise.',
+        ),
+      );
       return;
     }
     if (!bio.trim() || bio.trim().length < 10) {
-      setError('Please provide a motivation statement of at least 10 characters describing your mentoring focus.');
+      dispatch(
+        setMentorAppSubmitError(
+          'Please provide a motivation statement of at least 10 characters describing your mentoring focus.',
+        ),
+      );
       return;
     }
 
     // Phase 8 Enforcement: CV is mandatory
     if (!cvData?.filename) {
-      setError('A CV upload (.pdf, max 5MB) is required for mentor application.');
+      dispatch(
+        setMentorAppSubmitError(
+          'A CV upload (.pdf, max 5MB) is required for mentor application.',
+        ),
+      );
       return;
     }
 
     // Credential enforcement: At least one verified credential required
     const verifiedDocs = digiLockerDocs.filter(
-      (d) => d.status === CREDENTIAL_STATUS.VERIFIED || d.verificationStatus === 'verified'
+      (d) => d.status === CREDENTIAL_STATUS.VERIFIED || d.verificationStatus === 'verified',
     );
     const unverifiedDocs = digiLockerDocs.filter(
-      (d) => !(d.status === CREDENTIAL_STATUS.VERIFIED || d.verificationStatus === 'verified')
+      (d) => !(d.status === CREDENTIAL_STATUS.VERIFIED || d.verificationStatus === 'verified'),
     );
 
     if (verifiedDocs.length === 0) {
       if (unverifiedDocs.length > 0) {
-        setError('Your connected credentials could not be verified (e.g. name mismatch). At least one verified credential is required.');
+        dispatch(
+          setMentorAppSubmitError(
+            'Your connected credentials could not be verified (e.g. name mismatch). At least one verified credential is required.',
+          ),
+        );
       } else {
-        setError('At least one verified credential from DigiLocker is required. Please click "Connect DigiLocker (Demo)" below.');
+        dispatch(
+          setMentorAppSubmitError(
+            'At least one verified credential from DigiLocker is required. Please click "Connect DigiLocker (Demo)" below.',
+          ),
+        );
       }
       return;
     }
@@ -306,56 +321,51 @@ const MentorApplication = () => {
       .map((s) => s.trim())
       .filter(Boolean);
 
-    setSubmitting(true);
-    try {
-      // Submit only verified credentials; unverified ones are excluded
-      const payload = {
-        userId: String(user?.id || '1'),
-        name: name.trim(),
-        email: email.trim(),
-        university: (user?.university || user?.profile?.university || user?.profile?.uni || '').trim() || undefined,
-        bio: bio.trim(),
-        motivation: bio.trim(),
-        years: numYears,
-        yearsOfExperience: numYears,
-        experience: `${numYears} years`,
-        skills: parsedSkills.length > 0 ? parsedSkills : undefined,
-        expertise: parsedSkills.join(', '),
-        linkedin: portfolio.trim() || undefined,
-        portfolio: portfolio.trim() || undefined,
-        cvFileName: cvData.filename,
-        cvOriginalName: cvData.originalName,
-        cvFileSize: cvData.size,
-        cvUrl: cvData.url,
-        certificates: verifiedDocs,
-        excludedCertificates: unverifiedDocs,
-      };
+    const payload = {
+      userId: String(user?.id || '1'),
+      name: name.trim(),
+      email: email.trim(),
+      university:
+        (
+          user?.university ||
+          user?.profile?.university ||
+          user?.profile?.uni ||
+          ''
+        ).trim() || undefined,
+      bio: bio.trim(),
+      motivation: bio.trim(),
+      years: numYears,
+      yearsOfExperience: numYears,
+      experience: `${numYears} years`,
+      skills: parsedSkills.length > 0 ? parsedSkills : undefined,
+      expertise: parsedSkills.join(', '),
+      linkedin: portfolio.trim() || undefined,
+      portfolio: portfolio.trim() || undefined,
+      cvFileName: cvData.filename,
+      cvOriginalName: cvData.originalName,
+      cvFileSize: cvData.size,
+      cvUrl: cvData.url,
+      certificates: verifiedDocs,
+      excludedCertificates: unverifiedDocs,
+    };
 
-      const created = await mentorApplicationsApi.create(payload);
-      setEmailNotVerifiedError(false);
-      const excludedMsg = unverifiedDocs.length > 0 ? ` (Note: ${unverifiedDocs.length} unverified credential(s) were excluded)` : '';
-      setSuccess(`Your mentor application with ${verifiedDocs.length} verified credential(s) has been submitted successfully for admin review!${excludedMsg}`);
-      setExistingApp(created);
-      setShowForm(false);
+    try {
+      await dispatch(
+        submitMentorApplication({
+          payload,
+          excludedCount: unverifiedDocs.length,
+          verifiedCount: verifiedDocs.length,
+        }),
+      ).unwrap();
       if (typeof refreshMentorStatus === 'function') {
         await refreshMentorStatus();
       }
-    } catch (err) {
-      if (err?.code === 'EMAIL_NOT_VERIFIED' || /verify your email/i.test(err?.serverMessage || err?.message || '')) {
-        setEmailNotVerifiedError(true);
-      }
-      if (err?.code === 'REAPPLY_COOLDOWN' || err?.availableAt) {
-        setCooldownInfo({
-          inCooldown: true,
-          availableAt: err.availableAt || null,
-          cooldownDays: err.cooldownDays || 14,
-        });
-      }
-      setError(err?.serverMessage || err?.message || 'Failed to submit mentor application. Please try again.');
-    } finally {
-      setSubmitting(false);
+    } catch {
+      // Friendly error, cooldown, and verification notice handled in mentorApplicationsSlice
     }
   };
+
+  void myStatusData;
 
   const handleGoToMentoredProjects = () => {
     switchRole('Mentor');
@@ -634,7 +644,7 @@ const MentorApplication = () => {
                           type="button"
                           className="tf-mentor-app-btn-primary"
                           disabled={inCooldown}
-                          onClick={() => setShowForm(true)}
+                          onClick={() => dispatch(setShowMentorForm(true))}
                         >
                           {inCooldown ? 'Re-application in Cooldown' : 'Submit New Application'}
                         </button>
@@ -728,26 +738,33 @@ const MentorApplication = () => {
                   Curriculum Vitae (CV) - PDF Only (Max 5MB) <span style={{ color: '#dc2626' }}>*</span>
                 </label>
                 <div className="tf-mentor-upload-section">
+                  <input
+                    type="file"
+                    id="mentor-cv-file"
+                    ref={cvInputRef}
+                    accept=".pdf,application/pdf"
+                    style={{ display: 'none' }}
+                    onChange={handleCvChange}
+                    disabled={cvUploading}
+                  />
                   {cvData ? (
                     <div className="tf-mentor-file-pill">
                       <div className="tf-mentor-file-info">
                         <span style={{ fontSize: '1.25rem' }}>📄</span>
                         <div>
-                          <div className="tf-mentor-file-name">{cvData.originalName}</div>
-                          <div className="tf-mentor-file-size">{formatBytes(cvData.size)} · Verified PDF</div>
+                          <div className="tf-mentor-file-name">
+                            {cvUploading && selectedCvFile ? selectedCvFile.name : cvData.originalName}
+                          </div>
+                          <div className="tf-mentor-file-size">
+                            {cvUploading && selectedCvFile
+                              ? `${formatBytes(selectedCvFile.size)} · Uploading...`
+                              : `${formatBytes(cvData.size)} · Verified PDF`}
+                          </div>
                         </div>
                       </div>
                       <div>
-                        <input
-                          type="file"
-                          id="mentor-cv-replace-file"
-                          accept=".pdf,application/pdf"
-                          style={{ display: 'none' }}
-                          onChange={handleCvChange}
-                          disabled={cvUploading}
-                        />
                         <label
-                          htmlFor="mentor-cv-replace-file"
+                          htmlFor="mentor-cv-file"
                           className="tf-mentor-app-btn-outline"
                           style={{ padding: '0.35rem 0.75rem', fontSize: '0.8rem', cursor: 'pointer', margin: 0 }}
                         >
@@ -757,24 +774,30 @@ const MentorApplication = () => {
                     </div>
                   ) : (
                     <div>
-                      <input
-                        type="file"
-                        id="mentor-cv-file"
-                        accept=".pdf,application/pdf"
-                        style={{ display: 'none' }}
-                        onChange={handleCvChange}
-                        disabled={cvUploading}
-                      />
                       <label htmlFor="mentor-cv-file" className="tf-mentor-upload-btn-label">
                         <span>{cvUploading ? '⏳ Uploading CV...' : '📎 Choose PDF File'}</span>
                       </label>
                       <span className="tf-mentor-app-hint" style={{ marginLeft: '12px' }}>
                         Accepted format: .pdf up to 5 MB
                       </span>
+                      {selectedCvFile && (
+                        <div className="tf-mentor-file-pill" style={{ marginTop: '8px' }}>
+                          <div className="tf-mentor-file-info">
+                            <span style={{ fontSize: '1.1rem' }}>📄</span>
+                            <div>
+                              <div className="tf-mentor-file-name">{selectedCvFile.name}</div>
+                              <div className="tf-mentor-file-size">
+                                {formatBytes(selectedCvFile.size)}
+                                {cvUploading ? ' · Uploading...' : cvError ? ' · Upload failed' : ''}
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      )}
                     </div>
                   )}
                   {cvError && (
-                    <div style={{ color: '#dc2626', fontSize: '0.85rem' }}>{cvError}</div>
+                    <div role="alert" style={{ color: '#dc2626', fontSize: '0.85rem' }}>{cvError}</div>
                   )}
                 </div>
               </div>
@@ -886,7 +909,7 @@ const MentorApplication = () => {
                   <button
                     type="button"
                     className="tf-mentor-app-btn-outline"
-                    onClick={() => setShowForm(false)}
+                    onClick={() => dispatch(setShowMentorForm(false))}
                   >
                     Cancel
                   </button>
@@ -907,4 +930,5 @@ const MentorApplication = () => {
   );
 };
 
+const MentorApplication = MentorApplicationContent;
 export default MentorApplication;

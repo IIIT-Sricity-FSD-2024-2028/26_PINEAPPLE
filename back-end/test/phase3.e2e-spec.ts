@@ -14,9 +14,6 @@ describe('Phase 3 Joining and Leaving - E2E API Tests', () => {
 
   beforeEach(() => {
     ctx.resetStores();
-    for (const u of ctx.usersRepository.findAll(true)) {
-      u.digestEnabled = false;
-    }
   });
 
   describe('Join Request Limits & Requests Used', () => {

@@ -296,8 +296,6 @@ describe('Phase 20: Resource Authorization & Input Checks (E2E)', () => {
         title: 'Private Alert',
         message: 'Private notification specifically for user one.',
         readStatus: false,
-        priority: 'immediate',
-        bypassDigest: true,
       });
 
       // User B tries GET /notifications/:id, PUT /notifications/:id, PUT /read, DELETE /notifications/:id

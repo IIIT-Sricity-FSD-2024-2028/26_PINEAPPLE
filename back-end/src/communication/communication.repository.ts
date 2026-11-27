@@ -275,10 +275,16 @@ export class CommunicationRepository {
         const projectRole = project ? getProjectRole(project, msg.senderId) : null;
         const roleLabel = projectRole || (project && Array.isArray(project.removedUsers) && project.removedUsers.some((r: any) => String(r.userId || r.id) === String(msg.senderId)) ? 'Former member' : null);
 
+        const senderAvatarUrl = isDeletedUser
+          ? null
+          : ((user as any)?.avatarUrl || (user as any)?.avatar || (user?.profile as any)?.avatarUrl || (user?.profile as any)?.avatar || null);
+
         return {
           ...msg,
           senderName,
           sender: senderName,
+          senderAvatarUrl,
+          senderUpdatedAt: isDeletedUser ? null : ((user as any)?.updatedAt || null),
           ...(isDeletedUser ? { senderIsDeleted: true } : {}),
           role: roleLabel || undefined,
           senderRole: roleLabel || undefined,

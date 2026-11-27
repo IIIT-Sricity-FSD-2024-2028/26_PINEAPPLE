@@ -1,17 +1,12 @@
-import React from 'react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter, Routes, Route } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Routes, Route } from 'react-router-dom';
 import fs from 'fs';
 import path from 'path';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
 import MyProjects from '../pages/owner/MyProjects';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import projectsApi from '../services/projectsApi';
-import tasksApi from '../services/tasksApi';
-import mentorMarketplaceApi from '../services/mentorMarketplaceApi';
+import { renderWithStore } from './test-utils';
 
 const mockedNavigate = vi.fn();
 vi.mock('react-router-dom', async () => {
@@ -56,17 +51,19 @@ const ownerUser = {
 };
 
 const renderWithProviders = (ui) => {
-  return render(
-    <MemoryRouter initialEntries={['/my-projects']}>
-      <AuthContext.Provider value={{ user: ownerUser, loading: false, isAuthenticated: true }}>
-        <RoleContext.Provider value={{ currentRole: 'Project Owner', switchRole: vi.fn(), availableRoles: ['Project Owner'] }}>
-          <UIProvider>
-            {ui}
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>
-  );
+  return renderWithStore(ui, {
+    route: '/my-projects',
+    preloadedState: {
+      session: {
+        user: ownerUser,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: 'Project Owner',
+        allowedRoles: ['Project Owner'],
+      },
+    },
+  });
 };
 
 describe('REMOVAL: "Delete" Button on Every Project Card in My Projects List', () => {
@@ -186,23 +183,23 @@ describe('REMOVAL: "Delete" Button on Every Project Card in My Projects List', (
       mode: 'instant',
     });
 
-    render(
-      <MemoryRouter initialEntries={['/owner/workspace/proj-workspace-4']}>
-        <Routes>
-          <Route
-            path="/owner/workspace/:projectId"
-            element={
-              <AuthContext.Provider value={{ user: ownerUser, loading: false, isAuthenticated: true }}>
-                <RoleContext.Provider value={{ currentRole: 'Project Owner', switchRole: vi.fn(), availableRoles: ['Project Owner'] }}>
-                  <UIProvider>
-                    <OwnedWorkspace />
-                  </UIProvider>
-                </RoleContext.Provider>
-              </AuthContext.Provider>
-            }
-          />
-        </Routes>
-      </MemoryRouter>
+    renderWithStore(
+      <Routes>
+        <Route path="/owner/workspace/:projectId" element={<OwnedWorkspace />} />
+      </Routes>,
+      {
+        route: '/owner/workspace/proj-workspace-4',
+        preloadedState: {
+          session: {
+            user: ownerUser,
+            loading: false,
+            isAuthenticated: true,
+            status: 'authenticated',
+            activeRole: 'Project Owner',
+            allowedRoles: ['Project Owner'],
+          },
+        },
+      },
     );
 
     // Verify delete option button inside workspace exists

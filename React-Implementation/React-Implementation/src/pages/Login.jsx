@@ -1,12 +1,16 @@
-import { useState, useContext } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
-import { signInWithEmailAndPassword, signInWithPopup } from 'firebase/auth';
-import { auth, googleProvider, githubProvider } from '../services/firebase.js';
-import { AuthContext } from '../context/AuthContext';
-import { authApi } from '../services/authApi';
-import { getAuthMode, setAccessToken } from '../services/apiClient';
-import { recordPortalAuditEntry } from '../services/adminApi';
-import storage from '../utils/storage';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  selectSessionNotices,
+  selectSuspendedInfo,
+} from '../store/selectors/sessionSelectors';
+import { clearSuspendedInfo, consumeNotice } from '../store/slices/sessionSlice';
+import {
+  getCurrentAuthMode,
+  loginSessionUser,
+  signInWithOAuthProvider,
+} from '../store/thunks/sessionThunks';
 import SuspendedAccountPanel from '../components/common/SuspendedAccountPanel';
 import './Auth.css';
 
@@ -39,22 +43,21 @@ const GithubIcon = () => (
   </svg>
 );
 
-const Login = () => {
+const LoginContent = () => {
+  const dispatch = useDispatch();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const location = useLocation();
-  const [suspendedInfo, setSuspendedInfo] = useState(() => {
-    if (location.state?.suspendedInfo) return location.state.suspendedInfo;
-    try {
-      if (typeof window !== 'undefined') {
-        const stored = sessionStorage.getItem('teamforge_suspended_info');
-        if (stored) return JSON.parse(stored);
-      }
-    } catch {
-      // ignore
-    }
-    return null;
-  });
+  const navigate = useNavigate();
+  const mode = getCurrentAuthMode();
+
+  const storeSuspendedInfo = useSelector(selectSuspendedInfo);
+  const sessionNotices = useSelector(selectSessionNotices);
+
+  const [localSuspendedInfo, setLocalSuspendedInfo] = useState(
+    () => location.state?.suspendedInfo || null,
+  );
+  const suspendedInfo = localSuspendedInfo || storeSuspendedInfo || null;
   const [error, setError] = useState(() => {
     try {
       if (typeof window !== 'undefined') {
@@ -68,49 +71,42 @@ const Login = () => {
     }
     return '';
   });
-  const [notice, setNotice] = useState(() => {
-    if (location.state?.serverRestartMessage) return location.state.serverRestartMessage;
-    if (location.state?.demoResetMessage) return location.state.demoResetMessage;
-    return (
-      storage.consumeSessionEndedNotice() ||
-      storage.consumeServerRestartNotice() ||
-      storage.consumeDemoResetNotice() ||
-      ''
-    );
-  });
+  const [notice, setNotice] = useState(
+    () =>
+      location.state?.serverRestartMessage ||
+      sessionNotices.sessionEnded ||
+      sessionNotices.serverRestart ||
+      '',
+  );
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const { login } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const mode = getAuthMode();
 
-  const handleGoogleSignIn = async () => {
+  useEffect(() => {
+    if (sessionNotices.sessionEnded) dispatch(consumeNotice('sessionEnded'));
+    if (sessionNotices.serverRestart) dispatch(consumeNotice('serverRestart'));
+  }, [
+    dispatch,
+    sessionNotices.serverRestart,
+    sessionNotices.sessionEnded,
+  ]);
+
+  const handleOAuthSignIn = async (providerName) => {
     if (loading) return;
     setError('');
     setLoading(true);
     try {
       if (mode === 'legacy') {
-        setError('Google Sign-In is only supported under Firebase mode.');
-        setLoading(false);
+        setError(
+          `${providerName === 'github' ? 'GitHub' : 'Google'} Sign-In is only supported under Firebase mode.`,
+        );
         return;
       }
-      const result = await signInWithPopup(auth, googleProvider);
-      const fbUser = result.user;
-      const token = await fbUser.getIdToken();
-      setAccessToken(token);
-
-      const me = await authApi.getMe().catch(() => null);
-      if (me) {
-        await login(me);
-      }
-      if (me && me.profileComplete !== false) {
+      const res = await dispatch(signInWithOAuthProvider(providerName)).unwrap();
+      if (res?.me && res.me.profileComplete !== false) {
         navigate('/dashboard');
       } else {
         navigate('/complete-profile', {
-          state: {
-            name: fbUser.displayName || '',
-            email: fbUser.email || '',
-          },
+          state: res?.fallbackState || {},
         });
       }
     } catch (err) {
@@ -122,76 +118,32 @@ const Login = () => {
           appealAvailable: err.appealAvailable,
           supportContact: err.supportContact,
         };
-        setSuspendedInfo(info);
+        setLocalSuspendedInfo(info);
         setError('');
         return;
       }
-      if (err.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
+      if (err?.code === 'auth/popup-closed-by-user') {
         return;
       }
-      setError(err.message || 'Google sign-in failed. Please try again.');
+      setError(
+        err?.serverMessage ||
+          err?.message ||
+          `${providerName === 'github' ? 'GitHub' : 'Google'} sign-in failed. Please try again.`,
+      );
     } finally {
       setLoading(false);
     }
   };
 
-  const handleGithubSignIn = async () => {
-    if (loading) return;
-    setError('');
-    setLoading(true);
-    try {
-      if (mode === 'legacy') {
-        setError('GitHub Sign-In is only supported under Firebase mode.');
-        setLoading(false);
-        return;
-      }
-      const result = await signInWithPopup(auth, githubProvider);
-      const fbUser = result.user;
-      const token = await fbUser.getIdToken();
-      setAccessToken(token);
-
-      const me = await authApi.getMe().catch(() => null);
-      if (me) {
-        await login(me);
-      }
-      if (me && me.profileComplete !== false) {
-        navigate('/dashboard');
-      } else {
-        navigate('/complete-profile', {
-          state: {
-            name: fbUser.displayName || '',
-            email: fbUser.email || '',
-          },
-        });
-      }
-    } catch (err) {
-      if (err?.code === 'ACCOUNT_SUSPENDED' || err?.data?.code === 'ACCOUNT_SUSPENDED') {
-        const info = err.data || {
-          reason: err.reason,
-          suspendedAt: err.suspendedAt,
-          suspensionType: err.suspensionType,
-          appealAvailable: err.appealAvailable,
-          supportContact: err.supportContact,
-        };
-        setSuspendedInfo(info);
-        setError('');
-        return;
-      }
-      if (err.code === 'auth/popup-closed-by-user') {
-        setLoading(false);
-        return;
-      }
-      setError(err.message || 'GitHub sign-in failed. Please try again.');
-    } finally {
-      setLoading(false);
-    }
-  };
+  const handleGoogleSignIn = () => handleOAuthSignIn('google');
+  const handleGithubSignIn = () => handleOAuthSignIn('github');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (loading) return;
     setError('');
+    setLocalSuspendedInfo(null);
+    dispatch(clearSuspendedInfo());
 
     if (!email || !password) {
       setError('Please enter both email and password.');
@@ -216,109 +168,14 @@ const Login = () => {
     };
 
     try {
-      if (mode === 'jwt') {
-        try {
-          const loggedUser = await login({ identifier: email.trim(), password });
-          if (loggedUser?.profileComplete === false) {
-            navigate('/complete-profile');
-          } else {
-            navigate('/dashboard');
-          }
-          return;
-        } catch (err) {
-          setPassword('');
-          if (err?.code === 'ACCOUNT_SUSPENDED' || err?.data?.code === 'ACCOUNT_SUSPENDED') {
-            const info = err.data || {
-              reason: err.reason,
-              suspendedAt: err.suspendedAt,
-              suspensionType: err.suspensionType,
-              appealAvailable: err.appealAvailable,
-              supportContact: err.supportContact,
-            };
-            setSuspendedInfo(info);
-            setError('');
-            return;
-          }
-          const msg = String(err.message || '');
-          const code = err?.code || err?.data?.code || '';
-          if (
-            code === 'TOO_MANY_ATTEMPTS' ||
-            err?.statusCode === 429 ||
-            msg.toLowerCase().includes('too many') ||
-            msg.toLowerCase().includes('rate limit')
-          ) {
-            setError(formatThrottleMessage(err));
-          } else if (code === 'PASSWORD_REQUIRED') {
-            setError('Password is required.');
-          } else {
-            setError('Invalid credentials. Please check your username/email and password.');
-          }
-          return;
-        }
+      const loggedUser = await dispatch(
+        loginSessionUser({ identifier: email.trim(), password }),
+      ).unwrap();
+      if (loggedUser?.profileComplete === false) {
+        navigate('/complete-profile');
+      } else {
+        navigate('/dashboard');
       }
-
-      if (mode === 'firebase') {
-        let signinEmail = email.trim();
-        // Support sign in with username by resolving to email first
-        if (!signinEmail.includes('@')) {
-          try {
-            const res = await authApi.resolveIdentifier(signinEmail);
-            if (res && res.email) {
-              signinEmail = res.email;
-            } else {
-              setError('Invalid credentials. Please check your username/email and password.');
-              return;
-            }
-          } catch {
-            setError('Invalid credentials. Please check your username/email and password.');
-            return;
-          }
-        }
-
-        try {
-          await signInWithEmailAndPassword(auth, signinEmail, password);
-          navigate('/dashboard');
-          return;
-        } catch (fbErr) {
-          const code = fbErr.code || '';
-          if (code === 'auth/user-disabled') {
-            setError('This account is suspended. Contact support.');
-          } else if (code === 'auth/too-many-requests') {
-            setError('Too many failed login attempts. Please try again later.');
-          } else if (
-            code === 'auth/user-not-found' ||
-            code === 'auth/wrong-password' ||
-            code === 'auth/invalid-credential'
-          ) {
-            setError('Invalid credentials. Please check your username/email and password.');
-          } else {
-            setError('Invalid credentials. Please check your username/email and password.');
-          }
-          return;
-        }
-      }
-
-      // Unified backend auth login (replaces removed /users list & passwordless fallback)
-      const res = await authApi.login({ identifier: email.trim(), password });
-      if (res?.accessToken) {
-        setAccessToken(res.accessToken);
-      }
-      const matchedUser = res?.user;
-      if (!matchedUser) {
-        setError('Invalid credentials. Please check your username/email and password.');
-        return;
-      }
-
-      recordPortalAuditEntry({
-        action: 'login',
-        actor: matchedUser.name || matchedUser.username || email,
-        target: 'User Login',
-        event: `User "${matchedUser.name || matchedUser.username || email}" logged in`,
-        details: { email: matchedUser.email, role: matchedUser.role },
-      });
-
-      login(matchedUser);
-      navigate('/dashboard');
     } catch (err) {
       setPassword('');
       if (err?.code === 'ACCOUNT_SUSPENDED' || err?.data?.code === 'ACCOUNT_SUSPENDED') {
@@ -329,17 +186,23 @@ const Login = () => {
           appealAvailable: err.appealAvailable,
           supportContact: err.supportContact,
         };
-        setSuspendedInfo(info);
+        setLocalSuspendedInfo(info);
         setPassword('');
         setError('');
         return;
       }
-      const msg = String(err.message || '');
+      const msg = String(err?.serverMessage || err?.message || '');
       const code = err?.code || err?.data?.code || '';
-      if (
+      if (code === 'auth/user-disabled') {
+        setError('This account is suspended. Contact support.');
+      } else if (code === 'auth/too-many-requests') {
+        setError('Too many failed login attempts. Please try again later.');
+      } else if (
         code === 'TOO_MANY_ATTEMPTS' ||
         err?.statusCode === 429 ||
-        msg.toLowerCase().includes('too many')
+        err?.status === 429 ||
+        msg.toLowerCase().includes('too many') ||
+        msg.toLowerCase().includes('rate limit')
       ) {
         setError(formatThrottleMessage(err));
       } else if (code === 'PASSWORD_REQUIRED') {
@@ -376,14 +239,17 @@ const Login = () => {
             {suspendedInfo && (
               <SuspendedAccountPanel
                 info={suspendedInfo}
-                onDismiss={() => setSuspendedInfo(null)}
+                onDismiss={() => {
+                  setLocalSuspendedInfo(null);
+                  if (storeSuspendedInfo) dispatch(clearSuspendedInfo());
+                }}
               />
             )}
 
             {notice && (
               <div
                 role="status"
-                data-testid="demo-reset-login-notice"
+                data-testid="login-notice"
                 style={{
                   background: '#ecfdf5',
                   border: '1px solid #10b981',
@@ -477,4 +343,5 @@ const Login = () => {
   );
 };
 
+const Login = LoginContent;
 export default Login;

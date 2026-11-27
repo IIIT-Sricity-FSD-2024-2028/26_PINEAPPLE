@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import DeleteProjectDialog from '../components/features/DeleteProjectDialog';
 import ProjectTombstone from '../pages/ProjectTombstone';
-import projectsApi, { isProjectLocked } from '../services/projectsApi';
+import projectsApi from '../services/projectsApi';
+import { isProjectLocked } from '../utils/projectStatus';
+import { renderWithStore } from './test-utils';
 
 const mockNavigate = vi.fn();
 
@@ -72,7 +73,7 @@ describe('Enhanced Project Deletion Frontend Tests', () => {
       const onReviewTasks = vi.fn();
       const onCloseProject = vi.fn();
 
-      render(
+      renderWithStore(
         <DeleteProjectDialog
           isOpen={true}
           projectId="proj-100"
@@ -128,7 +129,7 @@ describe('Enhanced Project Deletion Frontend Tests', () => {
       const onSuccess = vi.fn();
       const onClose = vi.fn();
 
-      render(
+      renderWithStore(
         <DeleteProjectDialog
           isOpen={true}
           projectId="proj-200"
@@ -206,7 +207,7 @@ describe('Enhanced Project Deletion Frontend Tests', () => {
         message: 'Rate limit exceeded.',
       });
 
-      render(
+      renderWithStore(
         <DeleteProjectDialog
           isOpen={true}
           projectId="proj-limit"
@@ -248,7 +249,7 @@ describe('Enhanced Project Deletion Frontend Tests', () => {
         deletedAt: '2026-11-14T12:00:00.000Z',
       });
 
-      render(
+      renderWithStore(
         <DeleteProjectDialog
           isOpen={true}
           projectId="proj-admin-override"
@@ -315,10 +316,8 @@ describe('Enhanced Project Deletion Frontend Tests', () => {
 
       const onNavigate = vi.fn();
 
-      render(
-        <MemoryRouter>
-          <ProjectTombstone project={tombstoneProject} onNavigate={onNavigate} />
-        </MemoryRouter>,
+      renderWithStore(
+        <ProjectTombstone project={tombstoneProject} onNavigate={onNavigate} />,
       );
 
       expect(screen.getByTestId('project-tombstone')).toBeDefined();

@@ -6,7 +6,6 @@ import {
   NotificationsService,
   formatGroupedItemList,
 } from './notifications.service';
-import { DigestService } from './digest.service';
 import { ProjectsService } from '../projects/projects.service';
 import { ProjectsRepository } from '../projects/projects.repository';
 import { ProjectStatus } from '../projects/dto/create-project.dto';
@@ -23,7 +22,6 @@ import { UserRole, UserStatus } from '../users/dto/create-user.dto';
 
 describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
   let notificationsService: NotificationsService;
-  let digestService: DigestService;
   let clockService: ClockService;
   let projectsService: ProjectsService;
   let projectsRepo: ProjectsRepository;
@@ -61,7 +59,6 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
     appRef = app;
 
     notificationsService = app.get(NotificationsService);
-    digestService = app.get(DigestService);
     clockService = app.get(ClockService);
     projectsService = app.get(ProjectsService);
     projectsRepo = app.get(ProjectsRepository);
@@ -77,13 +74,9 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
 
   beforeEach(() => {
     usersRepo.reset();
-    for (const u of usersRepo.findAll(true)) {
-      u.digestEnabled = false;
-    }
     projectsRepo.reset();
     tasksRepo.reset();
     notificationsService.reset();
-    digestService.reset();
     joinRequestsService.reset();
     moderationService.reset();
     invitesService.reset();
@@ -115,7 +108,6 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
 
     const sent = notificationsService.sendGrouped('1', 'bulk-tasks-1', twelveItems, (items, count) => ({
       type: 'TASK_RELEASED',
-      priority: 'immediate',
       title: `${count} tasks released in Project Atlas`,
       message: `${count} tasks released: ${formatGroupedItemList(items, 10)}`,
       referenceId: 'proj-1',
@@ -127,47 +119,6 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
     expect(sent?.count).toBe(12);
     expect(sent?.items).toHaveLength(12);
     expect(sent?.items?.[0]).toEqual({ label: 'Task #1', link: '/owner/workspace/proj-1' });
-  });
-
-  it('2. DigestService merges grouped notifications cleanly using item.count instead of counting 1 per batch', () => {
-    const owner = usersRepo.findById('1')!;
-    owner.digestEnabled = true;
-
-    notificationsService.sendGrouped(
-      '1',
-      'batch-1',
-      Array.from({ length: 5 }, (_, i) => ({ label: `Item ${i + 1}`, link: '/projects/p1' })),
-      (_items, count) => ({
-        type: 'TASK_RELEASED',
-        title: `${count} tasks released`,
-        message: `${count} tasks released`,
-        referenceId: 'proj-1',
-        metadata: { projectTitle: 'Atlas' },
-      }),
-    );
-
-    notificationsService.sendGrouped(
-      '1',
-      'batch-2',
-      Array.from({ length: 3 }, (_, i) => ({ label: `Item ${i + 6}`, link: '/projects/p1' })),
-      (_items, count) => ({
-        type: 'TASK_RELEASED',
-        title: `${count} tasks released`,
-        message: `${count} tasks released`,
-        referenceId: 'proj-1',
-        metadata: { projectTitle: 'Atlas' },
-      }),
-    );
-
-    const buffered = digestService.getBufferForUser('1');
-    expect(buffered).toHaveLength(2);
-    const flushRes = digestService.flushDueDigests();
-    expect(flushRes.digestsCreated).toBeGreaterThanOrEqual(1);
-    const digest = notificationsService
-      .findByUser('1')
-      .find((n) => n.type === 'DAILY_DIGEST');
-    expect(digest).toBeDefined();
-    expect(digest?.message).toContain('8 tasks released from Atlas');
   });
 
   it('3. Releasing 8 tasks when a member leaves gives owner ONE notification with count 8 (even with 12 tasks capped in text)', () => {
@@ -218,8 +169,6 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
     projectsService.addCollaborator(project2.id, { id: '3', name: 'Kiran Bose', role: 'Collaborator' });
     const kiran = usersRepo.findById('3');
     if (kiran) kiran.role = UserRole.Collaborator;
-    const owner = usersRepo.findById('1')!;
-    owner.digestEnabled = true;
 
     for (let i = 1; i <= 12; i++) {
       tasksService.create({
@@ -269,7 +218,6 @@ describe('Phase 26 Unit Tests: Notification Aggregation & Bulk Loops', () => {
         emailVerified: true,
         status: UserStatus.Active,
       } as any);
-      applicant.digestEnabled = false;
       applicantIds.push(applicant.id);
 
       joinRequestsService.create(

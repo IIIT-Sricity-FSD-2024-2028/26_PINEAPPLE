@@ -1,10 +1,32 @@
-import { useState, useEffect, useRef, useContext, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
+import { useDispatch, useSelector } from "react-redux";
 import { useLocation } from "react-router-dom";
 import SearchBar from "../components/common/SearchBar";
-import usersApi from "../services/usersApi";
-import reportsApi from "../services/reportsApi";
-import supportApi from "../services/supportApi";
-import { AuthContext } from "../context/AuthContext";
+import { selectCurrentUser } from "../store/selectors/sessionSelectors";
+import { searchUsers as searchUsersThunk } from "../store/thunks/profilesThunks";
+import {
+  createUserReport,
+  fetchMyReports as fetchMyReportsThunk,
+} from "../store/thunks/reportsThunks";
+import { clearReportSubmitFeedback } from "../store/slices/reportsSlice";
+import {
+  selectMyReports,
+  selectMyReportsStatus,
+  selectReportsWorking,
+} from "../store/selectors/reportsSelectors";
+import {
+  createSupportTicket,
+  fetchMySupportTicketById,
+  fetchMySupportTickets,
+  replyToMySupportTicket,
+} from "../store/thunks/supportTicketsThunks";
+import { selectMyTicket } from "../store/slices/supportTicketsSlice";
+import {
+  selectMySupportTickets,
+  selectMyTicketsStatus,
+  selectSelectedMyTicket,
+  selectSupportTicketsWorking,
+} from "../store/selectors/supportTicketsSelectors";
 import { highlightMatch } from "../utils/highlightMatch";
 import VerifyEmailBanner from "../components/common/VerifyEmailBanner";
 import { formatDateTime } from "../utils/dateFormatter";
@@ -186,41 +208,59 @@ const FaqCategory = ({ category }) => {
 };
 
 // --- Main Help Component ---
-const Help = () => {
-  const { user: currentUser } = useContext(AuthContext) || {};
+const HelpContent = () => {
+  const dispatch = useDispatch();
+  const currentUser = useSelector(selectCurrentUser);
   const location = useLocation();
-  const [activeTab, setActiveTab] = useState(() => {
-    const params = new URLSearchParams(location?.search || "");
+  const searchKey = location?.search || "";
+  const tabFromSearch = useMemo(() => {
+    const params = new URLSearchParams(searchKey);
     const tabParam = params.get("tab");
     const ticketParam = params.get("ticket");
-    if (tabParam === "tickets" || ticketParam) return "tickets";
     if (tabParam === "my-reports" || tabParam === "reports" || tabParam === "myreports") return "my-reports";
     if (tabParam === "report") return "report";
-    return "support";
-  }); // "support" | "tickets" | "report" | "my-reports"
+    if (tabParam === "tickets" || ticketParam) return "tickets";
+    return null;
+  }, [searchKey]);
+  const [tabOverride, setTabOverride] = useState({ search: searchKey, tab: null });
+  const activeTab =
+    tabOverride.search === searchKey && tabOverride.tab
+      ? tabOverride.tab
+      : tabFromSearch || "support"; // "support" | "tickets" | "report" | "my-reports"
+  const setActiveTab = useCallback(
+    (tab) => setTabOverride({ search: searchKey, tab }),
+    [searchKey],
+  );
   const [faqSearch, setFaqSearch] = useState("");
 
-  // My Tickets & New Ticket state (Phase 27)
-  const [myTickets, setMyTickets] = useState([]);
-  const [ticketsLoading, setTicketsLoading] = useState(false);
-  const [ticketsError, setTicketsError] = useState("");
-  const [selectedTicket, setSelectedTicket] = useState(null);
-  const [ticketDetailLoading, setTicketDetailLoading] = useState(false);
+  // My Tickets & New Ticket state (backed by supportTicketsSlice)
+  const myTickets = useSelector(selectMySupportTickets);
+  const myTicketsStatus = useSelector(selectMyTicketsStatus);
+  const ticketsLoading = myTicketsStatus === "loading";
+  const ticketsError = useSelector((s) => s?.supportTickets?.myTicketsError || "");
+  const selectedTicket = useSelector(selectSelectedMyTicket);
+  const supportWorking = useSelector(selectSupportTicketsWorking);
+  const ticketDetailLoading = Boolean(supportWorking.myTicketDetailLoading);
 
   const [ticketCategory, setTicketCategory] = useState("Help Inquiry");
   const [ticketPriority, setTicketPriority] = useState("normal");
   const [ticketSubject, setTicketSubject] = useState("");
   const [ticketMessage, setTicketMessage] = useState("");
   const [parentTicket, setParentTicket] = useState(null);
-  const [ticketSubmitting, setTicketSubmitting] = useState(false);
-  const [ticketSubmitError, setTicketSubmitError] = useState("");
-  const [ticketSubmitSuccess, setTicketSubmitSuccess] = useState("");
+  const ticketSubmitting = Boolean(supportWorking.ticketSubmitting);
+  const ticketSubmitError = supportWorking.ticketSubmitError || "";
+  const ticketSubmitSuccess = supportWorking.ticketSubmitSuccess || "";
 
   const [myReplyBody, setMyReplyBody] = useState("");
-  const [sendingMyReply, setSendingMyReply] = useState(false);
-  const [myReplyError, setMyReplyError] = useState("");
+  const sendingMyReply = Boolean(supportWorking.sendingMyReply);
+  const myReplyError = supportWorking.myReplyError || "";
 
-  // Report form state
+  // Report form & My Reports state (backed by reportsSlice + local keystrokes)
+  const reportsWorking = useSelector(selectReportsWorking);
+  const myReports = useSelector(selectMyReports);
+  const myReportsStatus = useSelector(selectMyReportsStatus);
+  const loadingReports = myReportsStatus === "loading";
+
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState([]);
   const [isSearching, setIsSearching] = useState(false);
@@ -228,14 +268,11 @@ const Help = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [reason, setReason] = useState("");
   const [details, setDetails] = useState("");
-  const [submitting, setSubmitting] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
-  const [successMessage, setSuccessMessage] = useState("");
-  const [emailNotVerifiedError, setEmailNotVerifiedError] = useState(false);
-
-  // My Reports list state
-  const [myReports, setMyReports] = useState([]);
-  const [loadingReports, setLoadingReports] = useState(false);
+  const [localReportError, setLocalReportError] = useState("");
+  const submitting = Boolean(reportsWorking.submitSubmitting);
+  const errorMessage = localReportError || reportsWorking.submitError || "";
+  const successMessage = reportsWorking.submitSuccess || "";
+  const emailNotVerifiedError = Boolean(reportsWorking.emailNotVerified);
 
   const searchDebounceRef = useRef(null);
   const comboboxRef = useRef(null);
@@ -252,104 +289,40 @@ const Help = () => {
   }, []);
 
   // Fetch my reports when switching to report tab
-  const fetchMyReports = async () => {
-    setLoadingReports(true);
-    try {
-      const res = await reportsApi.getMyReports();
-      const list = Array.isArray(res) ? res : res?.data || [];
-      setMyReports(list);
-    } catch (err) {
-      console.warn("Could not load user reports:", err);
-    } finally {
-      setLoadingReports(false);
-    }
-  };
+  const fetchMyReports = useCallback(() => {
+    return dispatch(fetchMyReportsThunk());
+  }, [dispatch]);
 
   useEffect(() => {
     if (activeTab === "report" || activeTab === "my-reports") {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
       fetchMyReports();
     }
-  }, [activeTab]);
+  }, [activeTab, fetchMyReports]);
 
-  const fetchMyTickets = useCallback(async () => {
-    setTicketsLoading(true);
-    setTicketsError("");
-    try {
-      const res = await supportApi.listMyTickets();
-      const list = Array.isArray(res) ? res : res?.data || [];
-      setMyTickets(list);
-    } catch (err) {
-      setTicketsError(err?.serverMessage || err?.message || "Failed to load your support tickets.");
-    } finally {
-      setTicketsLoading(false);
-    }
-  }, []);
+  const fetchMyTickets = useCallback(() => {
+    return dispatch(fetchMySupportTickets());
+  }, [dispatch]);
 
-  const openMyTicketDetail = useCallback(async (ticketId) => {
-    setTicketDetailLoading(true);
-    setMyReplyError("");
-    try {
-      const detail = await supportApi.getMyTicket(ticketId);
-      setSelectedTicket(detail);
-    } catch (err) {
-      setTicketsError(err?.serverMessage || err?.message || "Could not load support ticket.");
-    } finally {
-      setTicketDetailLoading(false);
-    }
-  }, []);
+  const openMyTicketDetail = useCallback(
+    (ticketId) => {
+      return dispatch(fetchMySupportTicketById(ticketId));
+    },
+    [dispatch],
+  );
 
   useEffect(() => {
-    if (activeTab !== "tickets") return undefined;
-    let active = true;
-    supportApi.listMyTickets()
-      .then((res) => {
-        if (!active) return;
-        setTicketsError("");
-        const list = Array.isArray(res) ? res : res?.data || [];
-        setMyTickets(list);
-      })
-      .catch((err) => {
-        if (active) {
-          setTicketsError(err?.serverMessage || err?.message || "Failed to load your support tickets.");
-        }
-      })
-      .finally(() => {
-        if (active) setTicketsLoading(false);
-      });
-    return () => {
-      active = false;
-    };
-  }, [activeTab]);
+    if (activeTab === "tickets") {
+      dispatch(fetchMySupportTickets());
+    }
+  }, [activeTab, dispatch]);
 
   useEffect(() => {
-    const params = new URLSearchParams(location?.search || "");
-    const tabParam = params.get("tab");
+    const params = new URLSearchParams(searchKey);
     const ticketParam = params.get("ticket");
-    if (tabParam === "my-reports" || tabParam === "reports" || tabParam === "myreports") {
-      setActiveTab("my-reports");
-    } else if (tabParam === "report") {
-      setActiveTab("report");
-    } else if (tabParam === "tickets" || ticketParam) {
-      setActiveTab("tickets");
+    if (ticketParam) {
+      dispatch(fetchMySupportTicketById(ticketParam));
     }
-    if (!ticketParam) return undefined;
-    let active = true;
-    supportApi.getMyTicket(ticketParam)
-      .then((detail) => {
-        if (!active) return;
-        setMyReplyError("");
-        setSelectedTicket(detail);
-      })
-      .catch((err) => {
-        if (active) {
-          setTicketsError(err?.serverMessage || err?.message || "Could not load support ticket.");
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [location?.search]);
+  }, [searchKey, dispatch]);
 
   const handleSubmitNewTicket = async (e) => {
     e.preventDefault();
@@ -357,56 +330,38 @@ const Help = () => {
     const m = ticketMessage.trim();
     if (s.length < 5 || s.length > 120 || m.length < 10 || m.length > 2000) return;
 
-    setTicketSubmitting(true);
-    setTicketSubmitError("");
-    setTicketSubmitSuccess("");
     try {
-      const created = await supportApi.createTicket({
-        type: "help",
-        category: ticketCategory,
-        priority: ticketPriority,
-        subject: s,
-        message: m,
-        ...(parentTicket?.id ? { parentTicketId: parentTicket.id } : {}),
-      });
-      setTicketSubmitSuccess("Support ticket submitted successfully.");
+      await dispatch(
+        createSupportTicket({
+          type: "help",
+          category: ticketCategory,
+          priority: ticketPriority,
+          subject: s,
+          message: m,
+          ...(parentTicket?.id ? { parentTicketId: parentTicket.id } : {}),
+        }),
+      ).unwrap();
       setTicketSubject("");
       setTicketMessage("");
       setParentTicket(null);
-      await fetchMyTickets();
-      if (created?.id) {
-        setSelectedTicket(created);
-      }
-    } catch (err) {
-      setTicketSubmitError(err?.serverMessage || err?.message || "Failed to submit ticket.");
-    } finally {
-      setTicketSubmitting(false);
+    } catch {
+      // Error stored in supportTicketsSlice working.ticketSubmitError
     }
   };
 
   const handleSendMyReply = async (e) => {
     e.preventDefault();
     if (!selectedTicket || !myReplyBody.trim()) return;
-    setSendingMyReply(true);
-    setMyReplyError("");
     try {
-      const updated = await supportApi.replyToMyTicket(selectedTicket.id, myReplyBody.trim());
-      setSelectedTicket(updated);
+      await dispatch(
+        replyToMySupportTicket({
+          ticketId: selectedTicket.id,
+          body: myReplyBody.trim(),
+        }),
+      ).unwrap();
       setMyReplyBody("");
-      fetchMyTickets();
-    } catch (err) {
-      if (err?.code === 'TICKET_CLOSED' || /read-only|ticket_closed/i.test(err?.serverMessage || err?.message || '')) {
-        try {
-          const fresh = await supportApi.getMyTicket(selectedTicket.id);
-          setSelectedTicket(fresh);
-        } catch {}
-        setMyReplyError('This ticket is closed and can no longer receive replies. Please open a follow-up ticket.');
-        fetchMyTickets();
-      } else {
-        setMyReplyError(err?.serverMessage || err?.message || "Failed to send reply.");
-      }
-    } finally {
-      setSendingMyReply(false);
+    } catch {
+      // Friendly TICKET_CLOSED or error stored in supportTicketsSlice working.myReplyError
     }
   };
 
@@ -414,7 +369,8 @@ const Help = () => {
   const handleSearchChange = (e) => {
     const val = e.target.value;
     setSearchQuery(val);
-    setErrorMessage("");
+    setLocalReportError("");
+    dispatch(clearReportSubmitFeedback());
 
     if (searchDebounceRef.current) {
       clearTimeout(searchDebounceRef.current);
@@ -430,8 +386,8 @@ const Help = () => {
     setIsSearching(true);
     searchDebounceRef.current = setTimeout(async () => {
       try {
-        const users = await usersApi.searchUsers(val.trim());
-        const rawList = Array.isArray(users) ? users : users?.data || [];
+        const res = await dispatch(searchUsersThunk(val.trim())).unwrap();
+        const rawList = Array.isArray(res?.items) ? res.items : Array.isArray(res) ? res : [];
         // Filter out current user from search results (cannot report self)
         const list = rawList.filter((u) => {
           if (!currentUser?.id && !currentUser?.email) return true;
@@ -458,7 +414,8 @@ const Help = () => {
     setSearchQuery("");
     setSearchResults([]);
     setDropdownOpen(false);
-    setErrorMessage("");
+    setLocalReportError("");
+    dispatch(clearReportSubmitFeedback());
   };
 
   const handleClearSelectedUser = () => {
@@ -479,37 +436,25 @@ const Help = () => {
     }
 
     if (isSelf) {
-      setErrorMessage("You cannot report yourself.");
+      setLocalReportError("You cannot report yourself.");
       return;
     }
 
-    setSubmitting(true);
-    setErrorMessage("");
-    setSuccessMessage("");
-    setEmailNotVerifiedError(false);
-
+    setLocalReportError("");
     try {
-      await reportsApi.createReport({
-        reportedUserId: selectedUser.id,
-        reason,
-        details: details.trim(),
-      });
-      setSuccessMessage(
-        "Your report has been submitted. Platform moderators will review it promptly. Thank you for helping keep TeamForge safe."
-      );
+      await dispatch(
+        createUserReport({
+          reportedUserId: selectedUser.id,
+          reason,
+          details: details.trim(),
+        }),
+      ).unwrap();
       setSelectedUser(null);
       setReason("");
       setDetails("");
       setSearchQuery("");
-      fetchMyReports();
-    } catch (err) {
-      if (err?.code === 'EMAIL_NOT_VERIFIED' || /verify your email/i.test(err?.serverMessage || err?.message || '')) {
-        setEmailNotVerifiedError(true);
-      }
-      const msg = err?.serverMessage || err?.message || err?.error || "Failed to submit report.";
-      setErrorMessage(msg);
-    } finally {
-      setSubmitting(false);
+    } catch {
+      // Friendly error & emailNotVerified stored in reportsSlice working state
     }
   };
 
@@ -842,7 +787,7 @@ const Help = () => {
                   <button
                     type="button"
                     className="btn btn-outline"
-                    onClick={() => setSelectedTicket(null)}
+                    onClick={() => dispatch(selectMyTicket(null))}
                   >
                     Close Detail
                   </button>
@@ -1294,4 +1239,5 @@ const Help = () => {
   );
 };
 
+const Help = HelpContent;
 export default Help;

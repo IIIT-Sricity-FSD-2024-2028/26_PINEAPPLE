@@ -111,7 +111,7 @@ describe('FIX 2 E2E: Permanent Username & Email Verification Source of Truth', (
     const settingsPatch = await request(server)
       .patch('/users/me/settings')
       .set('Authorization', collabToken)
-      .send({ digestEnabled: true, username: 'settings_edited' });
+      .send({ username: 'settings_edited' });
     expect(settingsPatch.status).toBe(400);
     expect(settingsPatch.body.code).toBe('USERNAME_IMMUTABLE');
     expect(ctx.usersService.findRawUserById('2')?.username).toBe(origCollab);

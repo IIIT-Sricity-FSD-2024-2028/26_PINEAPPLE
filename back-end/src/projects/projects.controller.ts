@@ -594,7 +594,7 @@ export class ProjectsController {
   @ApiResponse({ status: 201, description: 'Invite created and notification sent.' })
   @ApiResponse({ status: 400, description: 'CANNOT_INVITE_SELF.' })
   @ApiResponse({ status: 404, description: 'USER_NOT_FOUND.' })
-  @ApiResponse({ status: 409, description: 'ALREADY_MEMBER, INVITE_ALREADY_PENDING, INVITE_LIMIT, USER_SUSPENDED, REINVITE_COOLDOWN.' })
+  @ApiResponse({ status: 409, description: 'ALREADY_MEMBER, INVITE_ALREADY_PENDING, PROJECT_FULL, INVITE_LIMIT, USER_SUSPENDED, REINVITE_COOLDOWN.' })
   sendInvite(
     @Param('id') id: string,
     @Body() body: { username?: string; message?: string },

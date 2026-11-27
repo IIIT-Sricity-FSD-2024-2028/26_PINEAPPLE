@@ -1,10 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { screen, fireEvent, waitFor, render } from '@testing-library/react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
+import { Route, Routes } from 'react-router-dom';
+import { renderWithStore } from './test-utils';
 
 import MentorsDirectory from '../pages/owner/MentorsDirectory';
 import AdminReports from '../pages/admin/AdminReports';
@@ -51,7 +48,6 @@ vi.mock('../services/mentorMarketplaceApi', () => {
   return {
     default: api,
     mentorMarketplaceApi: api,
-    mentorMarketApi: api,
     calculateEscrowBreakdown: (p) => {
       const price = Math.round(Number(p) || 0);
       const platformFee = Math.round(price * 0.15);
@@ -75,7 +71,6 @@ vi.mock('../services/adminApi', () => ({
     getProjectEscrow: vi.fn(),
     getAuditLog: vi.fn(),
     exportAuditLog: vi.fn(),
-    getOwnerRejectionPatterns: vi.fn(),
     getMyWarnings: vi.fn(),
     getUserReputation: vi.fn(() => Promise.resolve({ items: [], total: 0 })),
     getPublicConfig: vi.fn(() => Promise.resolve({})),
@@ -130,32 +125,33 @@ vi.mock('../services/notificationsApi', () => ({
 }));
 
 function renderWithProviders(ui, { role = 'admin', userId = 'u-admin-1', initialEntries = ['/'] } = {}) {
-  return render(
-    <MemoryRouter initialEntries={initialEntries}>
-      <AuthContext.Provider value={{ user: { id: userId, role }, isAuthenticated: true }}>
-        <RoleContext.Provider value={{ currentRole: role, switchRole: vi.fn() }}>
-          <UIProvider>
-            <NotificationContext.Provider
-              value={{
-                notifications: [],
-                unreadCount: 0,
-                markAsRead: vi.fn(),
-                markAllAsRead: vi.fn(),
-              }}
-            >
-              {ui}
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>,
-  );
+  const roleLower = String(role || '').toLowerCase();
+  const isAdmin = roleLower === 'admin' || roleLower === 'superuser';
+  return renderWithStore(ui, {
+    route: initialEntries[0] || '/',
+    preloadedState: {
+      session: {
+        user: { id: userId, role },
+        isAuthenticated: true,
+        status: 'authenticated',
+        activeRole: role,
+        allowedRoles: [role],
+        ...(isAdmin
+          ? {
+              adminUid: userId,
+              portalRole: roleLower,
+              isSuperUser: roleLower === 'superuser',
+              permissions: ['*'],
+            }
+          : {}),
+      },
+    },
+  });
 }
 
 describe('Phase 17 Disputes & Admin Accountability UI', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    sessionStorage.clear();
   });
 
   it('allows owner to open an escrow dispute and displays payout frozen badge', async () => {
@@ -351,7 +347,6 @@ describe('Phase 17 Disputes & Admin Accountability UI', () => {
   });
 
   it('AdminUsers shows Approvals queue with Waiting for another admin on own request vs Approve for peers, and AdminUserDetails/Notifications render Expired warning status', async () => {
-    sessionStorage.setItem('teamforge.uid', 'u-admin-1');
     adminApi.listUsers.mockResolvedValue([
       { id: '2', name: 'Arjun Sharma', role: 'collaborator', status: 'Active', pendingModerationAction: { id: 'pma-self' } },
     ]);

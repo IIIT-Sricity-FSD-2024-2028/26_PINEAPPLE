@@ -1,63 +1,36 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
-import { signOut as fbSignOut } from 'firebase/auth';
-import { auth } from '../../services/firebase.js';
-import { getAuthMode, setAccessToken } from '../../services/apiClient.js';
-import reportsApi from '../../services/reportsApi';
-import storage from '../../utils/storage';
+import { useDispatch, useSelector } from 'react-redux';
+import { logoutAdminPortal } from '../../store/thunks/sessionThunks.js';
+import { fetchOpenReportsCount } from '../../store/thunks/reportsThunks.js';
+import { selectOpenReportsCount } from '../../store/selectors/reportsSelectors.js';
+import {
+  canAccess,
+  selectIsSuperUser,
+  selectSession,
+} from '../../store/selectors/sessionSelectors.js';
 import './AdminLayout.css';
 
-const AdminLayout = () => {
+const AdminLayoutContent = () => {
+  const dispatch = useDispatch();
   const navigate = useNavigate();
-  const [openReportsCount, setOpenReportsCount] = useState(0);
+  const openReportsCount = useSelector(selectOpenReportsCount);
+  const sessionState = useSelector(selectSession);
+  const isSuperUser = useSelector(selectIsSuperUser);
 
   const handleExit = async () => {
-    storage.clearAdminSession();
-    setAccessToken(null);
-    if (getAuthMode() === 'firebase') {
-      try {
-        await fbSignOut(auth);
-      } catch (err) {
-        console.warn("[AdminLayout] Firebase sign-out failed:", err);
-      }
-    }
+    await dispatch(logoutAdminPortal());
     navigate('/', { replace: true });
   };
 
-  const { isSuperUser, permissions } = storage.getAdminSession();
+  const hasPermission = (key) => canAccess(sessionState, key);
 
-  const hasPermission = (key) => {
-    if (isSuperUser) return true;
-    if (!permissions || !Array.isArray(permissions)) return true;
-    return permissions.includes(key);
-  };
+  const canAccessReports = hasPermission('reports');
 
   useEffect(() => {
-    let isMounted = true;
-    const fetchOpenReports = async () => {
-      if (!hasPermission('reports')) return;
-      try {
-        const res = await reportsApi.getOpenCount();
-        if (isMounted) {
-          const count = typeof res?.count === 'number' ? res.count : typeof res?.openCount === 'number' ? res.openCount : 0;
-          setOpenReportsCount(count);
-        }
-      } catch {
-        // Non-critical fallback
-      }
-    };
-
-    fetchOpenReports();
-
-    const handleUpdate = () => {
-      fetchOpenReports();
-    };
-    window.addEventListener('teamforge:report_updated', handleUpdate);
-    return () => {
-      isMounted = false;
-      window.removeEventListener('teamforge:report_updated', handleUpdate);
-    };
-  }, [hasPermission('reports')]);
+    if (!canAccessReports) return;
+    dispatch(fetchOpenReportsCount());
+  }, [canAccessReports, dispatch]);
 
   return (
     <div id="admin-dashboard-screen" className="admin-layout">
@@ -152,11 +125,12 @@ const AdminLayout = () => {
         </button>
       </aside>
       
-      <main className="admin-main-content" style={{ flex: 1, overflowY: 'auto' }}>
+      <main className="admin-main-content">
         <Outlet />
       </main>
     </div>
   );
 };
 
+const AdminLayout = AdminLayoutContent;
 export default AdminLayout;

@@ -20,10 +20,6 @@ export const usersApi = {
     apiRequest('/users/me/phone/verify', 'POST', { idToken }, { role: role || getCurrentUserRole() }),
   getPhoneOtpStatus: (role) =>
     apiRequest('/users/me/phone/otp-status', 'GET', null, { role: role || getCurrentUserRole() }),
-  requestPhoneOtp: (phone, role) =>
-    apiRequest('/users/me/phone/request-otp', 'POST', { phone }, { role: role || getCurrentUserRole() }),
-  verifyPhoneOtp: (code, phone, role) =>
-    apiRequest('/users/me/phone/verify-otp', 'POST', { code, phone }, { role: role || getCurrentUserRole() }),
   recordFailedOtpAttempt: (role) =>
     apiRequest('/users/me/phone/failed-attempt', 'POST', {}, { role: role || getCurrentUserRole() }),
   deletePhone: (role) =>
@@ -57,10 +53,6 @@ export const usersApi = {
     apiRequest('/users/me/delete', 'POST', payload),
   checkDeletionEligibility: () =>
     apiRequest('/users/me/deletion-check', 'GET', null, { skipCache: true }),
-  getSettings: () =>
-    apiRequest('/users/me/settings', 'GET', null, { skipCache: true }),
-  updateSettings: (payload) =>
-    apiRequest('/users/me/settings', 'PATCH', payload),
 };
 
 export default usersApi;

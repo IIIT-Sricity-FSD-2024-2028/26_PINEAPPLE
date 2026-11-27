@@ -7,7 +7,7 @@ export function getApprovedCollaboratorsCount(project: any): number {
   if (!project) return 0;
   const collabs = Array.isArray(project.collaborators) ? project.collaborators : [];
   const ownerId = String(project.ownerId || (typeof project.owner === 'object' && project.owner ? project.owner.id || project.owner.userId : '') || '').trim();
-  const mentorId = String(project.mentorId || (typeof project.mentor === 'object' && project.mentor ? project.mentor.id || project.mentor.userId : '') || '').trim();
+  const mentorId = String(project.mentorId || project.mentorUserId || (typeof project.mentor === 'object' && project.mentor ? project.mentor.id || project.mentor.userId : '') || '').trim();
   const seen = new Set<string>();
 
   return collabs.filter((c: any) => {
@@ -34,7 +34,12 @@ export function getApprovedCollaboratorsCount(project: any): number {
 
 export function getEffectiveMaxCollaborators(project: any, platformCap?: number): number {
   const maxCapLimit = platformCap && Number(platformCap) > 0 ? Number(platformCap) : 20;
-  const projectMax = project && Number(project.maxCollaborators) > 0 ? Number(project.maxCollaborators) : 5;
+  const projectMax =
+    project && Number(project.maxCollaborators) > 0
+      ? Number(project.maxCollaborators)
+      : project && Number(project.teamSize) > 0
+        ? Number(project.teamSize)
+        : 5;
   return Math.min(projectMax, maxCapLimit);
 }
 

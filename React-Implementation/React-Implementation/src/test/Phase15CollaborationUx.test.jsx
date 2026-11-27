@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { screen, fireEvent, waitFor, render, act } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationContext } from '../context/NotificationContext';
+import { screen, fireEvent, waitFor, act } from '@testing-library/react';
+import { createAppStore } from '../store';
+import { setSession } from '../store/slices/sessionSlice';
+import { renderWithStore } from './test-utils';
+import { fetchChatUnread } from '../store/thunks/communicationThunks';
+import { resetChatPollingForTests } from '../hooks/useChatPolling';
 import ProjectsMarketplace from '../pages/collaborator/ProjectsMarketplace';
 import AppliedProjects from '../pages/collaborator/AppliedProjects';
 import Notifications from '../pages/notifications';
@@ -138,25 +138,22 @@ vi.mock('../services/reportsApi', () => ({
   default: { submitReport: vi.fn(), getMyReports: vi.fn(() => Promise.resolve([])) },
 }));
 
-function renderWithAuth(ui, { user = { id: '2', name: 'Arjun Sharma', username: 'arjunsharma', role: 'Collaborator' }, role = 'Collaborator', route = '/' } = {}) {
-  return render(
-    <MemoryRouter initialEntries={[route]}>
-      <AuthContext.Provider value={{ user, logout: vi.fn(), setUser: vi.fn() }}>
-        <RoleContext.Provider value={{ currentRole: role, switchRole: vi.fn(), isMentorApproved: false, mentorAppStatus: 'none' }}>
-          <UIProvider>
-            <NotificationContext.Provider value={{ notifications: [], unreadCount: 0, markAsRead: vi.fn(), markAllAsRead: vi.fn() }}>
-              {ui}
-            </NotificationContext.Provider>
-          </UIProvider>
-        </RoleContext.Provider>
-      </AuthContext.Provider>
-    </MemoryRouter>,
+function renderWithAuth(ui, { user = { id: '2', name: 'Arjun Sharma', username: 'arjunsharma', role: 'Collaborator' }, role = 'Collaborator', route = '/', store = createAppStore() } = {}) {
+  store.dispatch(
+    setSession({
+      user,
+      isAuthenticated: true,
+      activeRole: role,
+      allowedRoles: [role],
+    }),
   );
+  return renderWithStore(ui, { store, route });
 }
 
 describe('Phase 15: Collaboration UX Frontend Suite', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    resetChatPollingForTests();
     mockNavigate.mockReset();
     projectsApi.list.mockResolvedValue([]);
     projectsApi.getMyInvites.mockResolvedValue([]);
@@ -171,6 +168,7 @@ describe('Phase 15: Collaboration UX Frontend Suite', () => {
   });
 
   afterEach(() => {
+    resetChatPollingForTests();
     vi.useRealTimers();
   });
 
@@ -304,14 +302,14 @@ describe('Phase 15: Collaboration UX Frontend Suite', () => {
         byProject: [{ projectId: 'proj-1', projectTitle: 'AI Planner', unreadCount: 125 }],
       });
 
-    renderWithAuth(<Navbar onMenuClick={vi.fn()} />);
+    const { store } = renderWithAuth(<Navbar onMenuClick={vi.fn()} />);
 
     const badge = await screen.findByTestId('navbar-chat-badge');
     expect(badge.textContent).toBe('3');
 
-    // Trigger refresh event -> shows 99+ cap
-    act(() => {
-      window.dispatchEvent(new CustomEvent('teamforge:chat_read'));
+    // Trigger store unread refresh -> shows 99+ cap
+    await act(async () => {
+      await store.dispatch(fetchChatUnread({ force: true }));
     });
 
     await waitFor(() => {

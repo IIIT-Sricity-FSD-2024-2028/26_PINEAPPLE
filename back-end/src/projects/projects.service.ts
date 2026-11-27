@@ -57,6 +57,8 @@ export interface ProjectMemberRow {
   username?: string;
   role: 'Owner' | 'Collaborator' | 'Mentor';
   initials?: string;
+  avatarUrl?: string | null;
+  updatedAt?: string | null;
   joinedAt?: string;
   lastActiveAt?: string;
   lastActivityAt?: string;
@@ -700,11 +702,14 @@ export class ProjectsService implements OnApplicationBootstrap {
         const del = Boolean(u?.isDeleted || u?.deletedAt);
         const displayName = del ? 'Deleted user' : (u?.name || c);
         const meta = resolveCollabMeta(c);
+        const cAvatar = del ? null : (u?.avatarUrl || u?.avatar || null);
         return {
           id: c,
           name: displayName,
           role: 'Collaborator' as any,
           initials: del ? 'DU' : this.getInitials(displayName),
+          avatarUrl: cAvatar,
+          updatedAt: del ? null : (u?.updatedAt || null),
           ...(del ? { isDeleted: true } : {}),
           ...meta,
         };
@@ -714,12 +719,15 @@ export class ProjectsService implements OnApplicationBootstrap {
       const del = Boolean(c.isDeleted || u?.isDeleted || u?.deletedAt);
       const displayName = del ? 'Deleted user' : (c.name || u?.name || 'Collaborator');
       const meta = resolveCollabMeta(cid, c);
+      const cAvatar = del ? null : (u?.avatarUrl || u?.avatar || c.avatarUrl || c.avatar || null);
       return {
         id: cid,
         userId: cid,
         name: displayName,
         role: c.role || ('Collaborator' as any),
         initials: del ? 'DU' : this.getInitials(displayName),
+        avatarUrl: cAvatar,
+        updatedAt: del ? null : (u?.updatedAt || null),
         joinedAt: c.joinedAt || meta.lastActivityAt,
         ...(del ? { isDeleted: true } : {}),
         ...meta,
@@ -796,6 +804,8 @@ export class ProjectsService implements OnApplicationBootstrap {
       username: ownerRecord?.username || '',
       role: 'Owner',
       initials: isOwnerDeleted ? 'DU' : this.getInitials(ownerDisplayName),
+      avatarUrl: isOwnerDeleted ? null : (ownerRecord?.avatarUrl || ownerRecord?.avatar || null),
+      updatedAt: isOwnerDeleted ? null : (ownerRecord?.updatedAt || null),
       joinedAt: project.createdAt || (project as any).created_at,
       lastActiveAt: ownerRecord?.lastActiveAt || ownerRecord?.lastLoginAt || project.createdAt,
       lastActivityAt: ownerRecord?.lastActiveAt || ownerRecord?.lastLoginAt || project.createdAt,
@@ -845,6 +855,8 @@ export class ProjectsService implements OnApplicationBootstrap {
         username: mentorRecord?.username || '',
         role: 'Mentor',
         initials: isMentorDeleted ? 'DU' : this.getInitials(mentorDisplayName),
+        avatarUrl: isMentorDeleted ? null : (mentorRecord?.avatarUrl || mentorRecord?.avatar || null),
+        updatedAt: isMentorDeleted ? null : (mentorRecord?.updatedAt || null),
         joinedAt: project.createdAt,
         lastActiveAt: mentorRecord?.lastActiveAt || mentorRecord?.lastLoginAt,
         lastActivityAt: mentorRecord?.lastActiveAt || mentorRecord?.lastLoginAt,
@@ -945,6 +957,8 @@ export class ProjectsService implements OnApplicationBootstrap {
         username: uRecord?.username || (typeof c === 'object' ? c.username : '') || '',
         role: 'Collaborator',
         initials: isDel ? 'DU' : this.getInitials(cName),
+        avatarUrl: isDel ? null : (uRecord?.avatarUrl || uRecord?.avatar || (typeof c === 'object' ? (c.avatarUrl || c.avatar) : null) || null),
+        updatedAt: isDel ? null : (uRecord?.updatedAt || null),
         joinedAt: (typeof c === 'object' && c.joinedAt) || meta.lastActivityAt,
         ...(isDel ? { isDeleted: true } : {}),
         ...meta,
@@ -1396,12 +1410,18 @@ export class ProjectsService implements OnApplicationBootstrap {
     const config = this.platformConfigService.getConfig();
 
     const platformCap = (config as any).maxCollaboratorCapacity || config.maxCollaboratorsPerProject || 20;
-    if (createProjectDto.maxCollaborators !== undefined) {
-      const desired = Number(createProjectDto.maxCollaborators) || 5;
-      createProjectDto.maxCollaborators = Math.min(Math.max(desired, 1), platformCap);
-    } else {
-      createProjectDto.maxCollaborators = 5;
-    }
+    const rawRequestedCap =
+      createProjectDto.maxCollaborators !== undefined
+        ? Number(createProjectDto.maxCollaborators)
+        : createProjectDto.teamSize !== undefined
+          ? Number(createProjectDto.teamSize)
+          : undefined;
+    const effectiveCap =
+      rawRequestedCap !== undefined && !Number.isNaN(rawRequestedCap) && rawRequestedCap > 0
+        ? Math.min(Math.max(rawRequestedCap, 1), platformCap)
+        : Math.min(5, platformCap);
+    createProjectDto.maxCollaborators = effectiveCap;
+    (createProjectDto as any).teamSize = effectiveCap;
 
     // Phase 3 Rule: Due date is required, must not be in past, must be at least tomorrow
     if (!createProjectDto.dueDate) {
@@ -1693,7 +1713,6 @@ export class ProjectsService implements OnApplicationBootstrap {
           message: `🎉 Project "${project.title || project.name}" has been completed! All tasks approved and deliverables published.`,
           readStatus: false,
           referenceId: project.id,
-          bypassDigest: true,
         });
       }
     } catch (err) {
@@ -2969,8 +2988,6 @@ export class ProjectsService implements OnApplicationBootstrap {
             message: `The deadline for "${project.title || project.name}" was changed from ${oldDueDate || 'initial date'} to ${project.dueDate}. Reason: ${trimmedReason}`,
             readStatus: false,
             referenceId: id,
-            priority: 'immediate' as any,
-            bypassDigest: true as any,
           });
         } catch (err: any) {
           console.warn('[projects.service] Suppressed non-critical error:', err?.message || err);
@@ -2988,8 +3005,6 @@ export class ProjectsService implements OnApplicationBootstrap {
           message: `The deadline for "${project.title || project.name}" was changed from ${oldDueDate || 'initial date'} to ${project.dueDate}. Reason: ${trimmedReason}`,
           readStatus: false,
           referenceId: id,
-          priority: 'immediate' as any,
-          bypassDigest: true as any,
         });
       } catch (err: any) {
         console.warn('[projects.service] Suppressed non-critical error:', err?.message || err);

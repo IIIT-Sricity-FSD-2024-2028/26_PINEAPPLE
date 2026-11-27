@@ -1,7 +1,8 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import UniversalReasonModal from '../components/common/UniversalReasonModal';
 import feedbackApi from '../services/feedbackApi';
+import { renderWithStore } from './test-utils';
 
 describe('UniversalReasonModal (Fix 4)', () => {
   const mockOnClose = vi.fn();
@@ -59,7 +60,7 @@ describe('UniversalReasonModal (Fix 4)', () => {
   });
 
   it('renders reason chips, enforces minReasons = 1, and submits valid selection', async () => {
-    render(
+    renderWithStore(
       <UniversalReasonModal
         isOpen={true}
         onClose={mockOnClose}
@@ -100,7 +101,7 @@ describe('UniversalReasonModal (Fix 4)', () => {
   });
 
   it('requires explanation when OTHER is selected', async () => {
-    render(
+    renderWithStore(
       <UniversalReasonModal
         isOpen={true}
         onClose={mockOnClose}
@@ -133,7 +134,7 @@ describe('UniversalReasonModal (Fix 4)', () => {
   });
 
   it('enforces 10 to 500 characters explanation for work rejection (REJECT_WORK / REQUEST_CHANGES)', async () => {
-    render(
+    renderWithStore(
       <UniversalReasonModal
         isOpen={true}
         onClose={mockOnClose}
@@ -176,7 +177,7 @@ describe('UniversalReasonModal (Fix 4)', () => {
   it('preserves user input and displays error banner when submission fails', async () => {
     mockOnConfirm.mockRejectedValueOnce(new Error('Network connection timeout.'));
 
-    render(
+    renderWithStore(
       <UniversalReasonModal
         isOpen={true}
         onClose={mockOnClose}

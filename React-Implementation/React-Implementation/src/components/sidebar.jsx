@@ -1,6 +1,7 @@
 import './sidebar.css';
 import { useNavigate } from "react-router-dom";
-import { useActiveRole } from "../utils/roleStore";
+import { useSelector } from "react-redux";
+import { selectActiveRole } from "../store/selectors/sessionSelectors";
 
 
 const pages = [
@@ -70,9 +71,9 @@ const pages = [
   },
 ];
 
-const Sidebar = ({ isOpen }) => {
+const SidebarContent = ({ isOpen }) => {
   const navigate = useNavigate();
-  const { activeRole } = useActiveRole();
+  const activeRole = useSelector(selectActiveRole);
 
   const isOwner = activeRole === 'Project Owner';
   const isMentor = activeRole === 'Mentor';
@@ -242,5 +243,7 @@ const Sidebar = ({ isOpen }) => {
     </aside>
   );
 };
+
+const Sidebar = SidebarContent;
 
 export default Sidebar;

@@ -1,10 +1,61 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { useActiveRole } from '../../utils/roleStore';
-import mentorMarketplaceApi, { calculateEscrowBreakdown } from '../../services/mentorMarketplaceApi';
-import projectsApi from '../../services/projectsApi';
-import { normalizeRole } from '../../services/apiClient';
+import { useDispatch, useSelector } from 'react-redux';
+import {
+  selectAllowedRoles,
+  selectCurrentUser,
+} from '../../store/selectors/sessionSelectors';
+import { fetchMentors } from '../../store/thunks/mentorProfilesThunks';
+import { setMentorSearchQuery } from '../../store/slices/mentorProfilesSlice';
+import {
+  selectAllDirectoryMentors,
+  selectMentorProfilesWorking,
+  selectMentorsListStatus,
+} from '../../store/selectors/mentorProfilesSelectors';
+import { fetchProjects } from '../../store/thunks/projectsThunks';
+import { selectAllProjects } from '../../store/selectors/projectsSelectors';
+import {
+  bookMentorSession,
+  fetchMySessions,
+} from '../../store/thunks/mentorSessionsThunks';
+import { setDirectoryTab } from '../../store/slices/mentorSessionsSlice';
+import {
+  selectMentorSessionsWorking,
+  selectMySessions,
+  selectMySessionsStatus,
+} from '../../store/selectors/mentorSessionsSelectors';
+import { submitSessionFeedback } from '../../store/thunks/sessionFeedbackThunks';
+import {
+  closeSessionFeedbackModal,
+  openSessionFeedbackModal,
+} from '../../store/slices/sessionFeedbackSlice';
+import {
+  selectSessionFeedbackSubmitting,
+  selectSessionFeedbackWorking,
+} from '../../store/selectors/sessionFeedbackSelectors';
+import {
+  cancelSessionPayment,
+  confirmSessionPayment,
+  formatPaymentError,
+} from '../../store/thunks/paymentsThunks';
+import {
+  closePaymentCheckout,
+  openPaymentCheckout,
+  resetCheckoutToDetails,
+  setCheckoutError,
+  setCopiedUpi,
+} from '../../store/slices/paymentsSlice';
+import {
+  selectCheckoutDisplayTotals,
+  selectPaymentCheckout,
+  selectPaymentsWorking,
+} from '../../store/selectors/paymentsSelectors';
+import { openSessionDispute } from '../../store/thunks/sessionDisputesThunks';
+import {
+  closeDisputeModal,
+  openDisputeModal,
+} from '../../store/slices/sessionDisputesSlice';
+import { selectSessionDisputesWorking } from '../../store/selectors/sessionDisputesSelectors';
 import Modal from '../../components/common/Modal';
 import FormInput from '../../components/common/FormInput';
 import SearchBar from '../../components/common/SearchBar';
@@ -13,7 +64,8 @@ import FilterTabs from '../../components/common/FilterTabs';
 import DataTable from '../../components/common/DataTable';
 import Badge from '../../components/common/Badge';
 import MentorCard from '../../components/features/MentorCard';
-import trustApi from '../../services/trustApi';
+import { fetchTrustSummaries } from '../../store/thunks/profilesThunks';
+import { selectTrustSummariesMap } from '../../store/selectors/profilesSelectors';
 import { formatDateTime } from '../../utils/dateFormatter';
 import QRCodeSvg from '../../components/common/QRCodeSvg';
 import './mentorsDirectory.css';
@@ -73,91 +125,107 @@ const getProjectBookingStatus = (project, sessions) => {
   return { disabled: false, reason: null };
 };
 
-export const formatBookingError = (err) => {
-  if (!err) return 'An unexpected error occurred. Please try again.';
+const formatBookingError = formatPaymentError;
 
-  if (err.isNetworkError || (err instanceof TypeError && !err.statusCode && !err.serverMessage)) {
-    return 'Network error. Please check your connection and try again.';
-  }
-
-  const code = err?.code || err?.data?.code;
-
-  switch (code) {
-    case 'EMAIL_NOT_VERIFIED':
-      return 'Verify your email to book a mentor';
-    case 'SESSION_INVALID':
-      return 'Your session expired. Please sign in again';
-    case 'ALREADY_PAID':
-      if (err?.serverMessage && err.serverMessage.toLowerCase().includes('already paid for')) {
-        return err.serverMessage;
-      }
-      if (err?.message && err.message.toLowerCase().includes('already paid for')) {
-        return err.message;
-      }
-      return 'This booking has already been paid';
-    case 'PAYMENT_EXPIRED':
-    case 'HOLD_EXPIRED':
-      return 'This payment hold has expired. Please book again.';
-    case 'CANNOT_BOOK_SELF':
-      return err?.serverMessage || err?.message || 'You cannot book yourself as a mentor for your own project.';
-    case 'CANNOT_BOOK_OWN_PROJECT_MENTOR':
-    case 'MENTOR_IS_PROJECT_MEMBER':
-      return err?.serverMessage || err?.message || 'A project owner or active collaborator cannot be booked as mentor on the same project.';
-    case 'PROJECT_NOT_BOOKABLE':
-      return err?.serverMessage || err?.message || 'This project is not in a live, bookable state.';
-    case 'MENTOR_SUSPENDED':
-      return err?.serverMessage || err?.message || 'This mentor account is suspended and cannot be booked.';
-    case 'MENTOR_UNAVAILABLE':
-      return err?.serverMessage || err?.message || 'This mentor is currently unavailable.';
-    case 'MENTOR_AT_CAPACITY':
-      return err?.serverMessage || err?.message || 'This mentor is currently at full active mentee capacity.';
-    default:
-      return err?.serverMessage || err?.message || 'Failed to complete payment. Please try again.';
-  }
-};
-
-const MentorsDirectory = () => {
-  const { user } = useContext(AuthContext);
-  const { activeRole, allowedRoles } = useActiveRole();
+const MentorsDirectoryContent = () => {
+  const user = useSelector(selectCurrentUser);
+  const allowedRoles = useSelector(selectAllowedRoles);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [mentors, setMentors] = useState([]);
-  const [trustSummaries, setTrustSummaries] = useState({});
-  const [searchQuery, setSearchQuery] = useState('');
-  const [ownedProjects, setOwnedProjects] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('browse');
-  const [mySessions, setMySessions] = useState([]);
+  const mentors = useSelector(selectAllDirectoryMentors);
+  const mentorsListStatus = useSelector(selectMentorsListStatus);
+  const mentorsWorking = useSelector(selectMentorProfilesWorking);
+  const allProjects = useSelector(selectAllProjects);
+  const mySessions = useSelector(selectMySessions);
+  const mySessionsStatus = useSelector(selectMySessionsStatus);
+  const sessionsWorking = useSelector(selectMentorSessionsWorking);
+  const feedbackSubmitting = useSelector(selectSessionFeedbackSubmitting);
+  const feedbackWorking = useSelector(selectSessionFeedbackWorking);
+  const checkout = useSelector(selectPaymentCheckout);
+  const checkoutTotals = useSelector(selectCheckoutDisplayTotals);
+  const paymentsWorking = useSelector(selectPaymentsWorking);
+  const disputesWorking = useSelector(selectSessionDisputesWorking);
 
-  // Escrow Booking Modal state
-  const [selectedMentor, setSelectedMentor] = useState(null);
+  const searchQuery = mentorsWorking.searchQuery || '';
+  const activeTab = sessionsWorking.directoryTab || 'browse';
+  const setSearchQuery = (val) => dispatch(setMentorSearchQuery(val));
+  const setActiveTab = (val) => dispatch(setDirectoryTab(val));
+
+  const ownedProjects = useMemo(
+    () =>
+      allProjects.filter(
+        (p) => p && (p.ownerId === user?.id || p.owner === user?.name),
+      ),
+    [allProjects, user?.id, user?.name],
+  );
+
+  const trustSummaries = useSelector(selectTrustSummariesMap);
+  const loading =
+    mentorsListStatus === 'idle' ||
+    mentorsListStatus === 'loading' ||
+    mySessionsStatus === 'idle';
+
+  // Escrow Booking Modal state (checkout + Idempotency-Key live in Redux paymentsSlice)
+  const selectedMentor = useMemo(() => {
+    if (!checkout.isOpen || !checkout.selectedMentorId) return null;
+    return (
+      mentors.find((m) => String(m.id) === String(checkout.selectedMentorId)) || {
+        id: checkout.selectedMentorId,
+        name: checkout.selectedMentorName || 'Mentor',
+        sessionPrice: checkout.selectedMentorPrice || 0,
+      }
+    );
+  }, [checkout.isOpen, checkout.selectedMentorId, checkout.selectedMentorName, checkout.selectedMentorPrice, mentors]);
+
   const [selectedProjectId, setSelectedProjectId] = useState('');
   const [requestMsg, setRequestMsg] = useState('');
   const [submitting, setSubmitting] = useState(false);
-  const [feedback, setFeedback] = useState(null);
+  const [localFeedback, setLocalFeedback] = useState(null);
 
-  // Phase 9: Demo Payment Flow state (30-min window & idempotency key)
-  const [bookingStep, setBookingStep] = useState('details'); // 'details' | 'payment'
-  const [activePaymentSession, setActivePaymentSession] = useState(null);
-  const [activePaymentIntent, setActivePaymentIntent] = useState(null);
-  const [paymentTimeLeft, setPaymentTimeLeft] = useState(1800);
-  const [confirmingPayment, setConfirmingPayment] = useState(false);
-  const [copiedUpi, setCopiedUpi] = useState(false);
-  const [idempotencyKey, setIdempotencyKey] = useState('');
+  // Demo Payment Flow state backed by paymentsSlice (Idempotency-Key survives routeChanged)
+  const bookingStep = checkout.bookingStep || 'details';
+  const activePaymentSession = checkout.session;
+  const activePaymentIntent = checkout.paymentIntent;
+  const confirmingPayment = checkout.confirmStatus === 'loading';
+  const copiedUpi = Boolean(paymentsWorking.copiedUpi);
+  const feedback = useMemo(() => {
+    if (localFeedback) return localFeedback;
+    if (checkout.successMessage) return { type: 'success', message: checkout.successMessage };
+    if (checkout.error) return { type: 'error', message: checkout.error };
+    return null;
+  }, [localFeedback, checkout.successMessage, checkout.error]);
+
+  const [nowMs, setNowMs] = useState(() => Date.now());
+  const paymentTimeLeft =
+    bookingStep === 'payment' && checkout.paymentOpenedAtMs
+      ? Math.max(0, 1800 - Math.floor((nowMs - checkout.paymentOpenedAtMs) / 1000))
+      : 1800;
   const successTimerRef = useRef(null);
 
-  // Phase 14: Post-session feedback modal state (1-5 stars + optional 500-char comment)
-  const [feedbackTargetSession, setFeedbackTargetSession] = useState(null);
+  // Post-session feedback modal state (backed by sessionFeedbackSlice + local keystrokes)
+  const feedbackTargetSession = useMemo(
+    () =>
+      mySessions.find(
+        (s) => String(s.id) === String(feedbackWorking.targetSessionId),
+      ) || null,
+    [mySessions, feedbackWorking.targetSessionId],
+  );
   const [feedbackRating, setFeedbackRating] = useState(5);
   const [feedbackComment, setFeedbackComment] = useState('');
-  const [feedbackSubmitting, setFeedbackSubmitting] = useState(false);
-  const [feedbackModalError, setFeedbackModalError] = useState('');
+  const feedbackModalError = feedbackWorking.modalError || '';
 
-  // Phase 17: Escrow dispute modal state
-  const [disputeTargetSession, setDisputeTargetSession] = useState(null);
+  // Escrow dispute modal state (backed by sessionDisputesSlice + local keystrokes)
+  const disputeTargetSession = useMemo(
+    () =>
+      mySessions.find(
+        (s) => String(s.id) === String(disputesWorking.targetSessionId),
+      ) || null,
+    [mySessions, disputesWorking.targetSessionId],
+  );
   const [disputeReason, setDisputeReason] = useState('');
-  const [disputeSubmitting, setDisputeSubmitting] = useState(false);
-  const [disputeModalError, setDisputeModalError] = useState('');
+  const disputeSubmitting = Boolean(disputesWorking.submitting);
+  const disputeModalError = disputesWorking.modalError || '';
 
   useEffect(() => {
     return () => {
@@ -180,46 +248,41 @@ const MentorsDirectory = () => {
     let isMounted = true;
     const loadDirectoryData = async () => {
       try {
-        const [marketMentors, allProjects, bookedSessions] = await Promise.all([
-          mentorMarketplaceApi.listMentors().catch(() => []),
-          projectsApi.list().catch(() => []),
-          mentorMarketplaceApi.mySessions().catch(() => []),
+        const [marketMentors, allProjs, bookedSessions] = await Promise.all([
+          dispatch(fetchMentors({ force: true }))
+            .unwrap()
+            .catch(() => []),
+          dispatch(fetchProjects({ force: true }))
+            .unwrap()
+            .then((r) => r?.items || [])
+            .catch(() => []),
+          dispatch(fetchMySessions({ force: true }))
+            .unwrap()
+            .catch(() => []),
         ]);
 
         const validMentors = Array.isArray(marketMentors) ? marketMentors : [];
-
         if (isMounted) {
-          setMentors(validMentors);
-          setMySessions(Array.isArray(bookedSessions) ? bookedSessions : []);
-
-          const owned = (Array.isArray(allProjects) ? allProjects : []).filter(
-            (p) => p && (p.ownerId === user?.id || p.owner === user?.name)
+          const owned = (Array.isArray(allProjs) ? allProjs : []).filter(
+            (p) => p && (p.ownerId === user?.id || p.owner === user?.name),
           );
-          setOwnedProjects(owned);
-          const firstEligible = owned.find((p) => !getProjectBookingStatus(p, bookedSessions).disabled);
+          const firstEligible = owned.find(
+            (p) => !getProjectBookingStatus(p, bookedSessions).disabled,
+          );
           if (firstEligible) setSelectedProjectId(firstEligible.id);
           else if (owned.length > 0) setSelectedProjectId(owned[0].id);
+
           if (validMentors.length > 0) {
-            const mentorIds = validMentors.map((m) => String(m.userId || m.id || '')).filter(Boolean);
+            const mentorIds = validMentors
+              .map((m) => String(m.userId || m.id || ''))
+              .filter(Boolean);
             if (mentorIds.length > 0) {
-              trustApi.getTrustSummaries(mentorIds.slice(0, 50)).then((summaries) => {
-                if (isMounted && Array.isArray(summaries)) {
-                  const map = {};
-                  summaries.forEach((s) => {
-                    if (s?.userId) map[s.userId] = s;
-                  });
-                  setTrustSummaries(map);
-                }
-              }).catch(() => {});
+              dispatch(fetchTrustSummaries(mentorIds.slice(0, 50)));
             }
           }
         }
       } catch (err) {
         console.error('Failed to load mentors directory:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
       }
     };
 
@@ -231,20 +294,18 @@ const MentorsDirectory = () => {
         clearTimeout(successTimerRef.current);
       }
     };
-  }, [user?.id, user?.name]);
+  }, [dispatch, user?.id, user?.name]);
 
-  // Phase 7: 10-minute countdown timer for Demo Payment
+  // Sync 30-minute hold countdown from server paymentOpenedAtMs timestamp
   useEffect(() => {
-    let timer = null;
-    if (bookingStep === 'payment' && paymentTimeLeft > 0) {
-      timer = setInterval(() => {
-        setPaymentTimeLeft((prev) => Math.max(0, prev - 1));
-      }, 1000);
+    if (bookingStep !== 'payment') {
+      return undefined;
     }
-    return () => {
-      if (timer) clearInterval(timer);
-    };
-  }, [bookingStep, paymentTimeLeft]);
+    const timer = setInterval(() => {
+      setNowMs(Date.now());
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [bookingStep]);
 
   const formatTimer = (seconds) => {
     const m = Math.floor(seconds / 60);
@@ -257,16 +318,9 @@ const MentorsDirectory = () => {
     if (viewerId && mentor?.userId && String(mentor.userId) === String(viewerId)) {
       return;
     }
-    setSelectedMentor(mentor);
-    setFeedback(null);
+    dispatch(openPaymentCheckout({ mentor }));
+    setLocalFeedback(null);
     setRequestMsg('');
-    setIdempotencyKey('');
-    setBookingStep('details');
-    setActivePaymentSession(null);
-    setActivePaymentIntent(null);
-    setPaymentTimeLeft(1800);
-    setConfirmingPayment(false);
-    setCopiedUpi(false);
     const hasCurrentSelected = selectedProjectId && ownedProjects.some((p) => String(p.id) === String(selectedProjectId));
     if (!hasCurrentSelected) {
       const firstEligible = ownedProjects.find((p) => !getProjectBookingStatus(p, mySessions).disabled);
@@ -276,78 +330,68 @@ const MentorsDirectory = () => {
   };
 
   const handleBookAgain = () => {
-    setBookingStep('details');
-    setActivePaymentSession(null);
-    setActivePaymentIntent(null);
-    setFeedback(null);
-    setPaymentTimeLeft(1800);
-    setConfirmingPayment(false);
-    setIdempotencyKey('');
+    dispatch(resetCheckoutToDetails());
+    setLocalFeedback(null);
   };
 
-  // Canonical fee calculation for modal
-  const breakdown = calculateEscrowBreakdown(selectedMentor?.sessionPrice || 0);
-  const basePrice = breakdown.price;
-  const platformFee = breakdown.platformFee;
-  const gatewayFee = breakdown.gatewayFee;
-  const totalAmount = breakdown.totalAmount;
-  const mentorPayout = breakdown.mentorPayout;
+  // Server-sourced fee values from Redux paymentsSlice (zero client arithmetic)
+  const {
+    basePrice,
+    platformFee,
+    gatewayFee,
+    totalAmount,
+    mentorPayout,
+  } = checkoutTotals;
 
   const handleProceedToPayment = async (e) => {
     e.preventDefault();
     if (!selectedProjectId) {
-      setFeedback({ type: 'error', message: 'Please select one of your projects to book mentorship for.' });
+      setLocalFeedback({ type: 'error', message: 'Please select one of your projects to book mentorship for.' });
       return;
     }
 
     const targetProj = ownedProjects.find((p) => String(p.id) === String(selectedProjectId));
     if (!targetProj) {
-      setFeedback({ type: 'error', message: 'You can only book mentors for projects that you own.' });
+      setLocalFeedback({ type: 'error', message: 'You can only book mentors for projects that you own.' });
       return;
     }
 
     const viewerId = user?.id || user?.uid;
     if (viewerId && selectedMentor?.userId && String(selectedMentor.userId) === String(viewerId)) {
-      setFeedback({ type: 'error', message: 'You cannot book yourself as a mentor for your own project.' });
+      setLocalFeedback({ type: 'error', message: 'You cannot book yourself as a mentor for your own project.' });
       return;
     }
 
     if (isMentorCollaboratorOnProject(targetProj, selectedMentor?.userId)) {
-      setFeedback({ type: 'error', message: 'Cannot book a collaborator or member of this project as its mentor.' });
+      setLocalFeedback({ type: 'error', message: 'Cannot book a collaborator or member of this project as its mentor.' });
       return;
     }
 
     const bookingStatus = getProjectBookingStatus(targetProj, mySessions);
     if (bookingStatus.disabled) {
-      setFeedback({ type: 'error', message: `Cannot book mentorship: ${bookingStatus.reason}` });
+      setLocalFeedback({ type: 'error', message: `Cannot book mentorship: ${bookingStatus.reason}` });
       return;
     }
 
     setSubmitting(true);
-    setFeedback(null);
+    setLocalFeedback(null);
+    dispatch(setCheckoutError(null));
 
     try {
-      const res = await mentorMarketplaceApi.bookSession({
-        mentorId: selectedMentor.id,
-        projectId: selectedProjectId,
-        projectDescription: requestMsg.trim() || 'Mentorship booking for project deliverables and architecture review.',
-      });
-
-      const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
-      setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
-
-      // Phase 9: Generate UUID idempotency key once per pay screen open
-      const key = typeof crypto !== 'undefined' && crypto.randomUUID
-        ? crypto.randomUUID()
-        : 'idemp-' + Date.now() + '-' + Math.random().toString(36).substring(2, 9);
-      setIdempotencyKey(key);
-
-      setActivePaymentSession(res.session);
-      setActivePaymentIntent(res.paymentIntent);
-      setBookingStep('payment');
-      setPaymentTimeLeft(1800);
+      await dispatch(
+        bookMentorSession({
+          payload: {
+            mentorId: selectedMentor.id,
+            projectId: selectedProjectId,
+            projectDescription:
+              requestMsg.trim() ||
+              'Mentorship booking for project deliverables and architecture review.',
+          },
+        }),
+      ).unwrap();
+      setNowMs(Date.now());
     } catch (err) {
-      setFeedback({
+      setLocalFeedback({
         type: 'error',
         message: formatBookingError(err),
       });
@@ -357,61 +401,37 @@ const MentorsDirectory = () => {
   };
 
   const handleCloseModal = () => {
-    setSelectedMentor(null);
-    setBookingStep('details');
-    setActivePaymentSession(null);
-    setActivePaymentIntent(null);
-    setFeedback(null);
-    setIdempotencyKey('');
-    setConfirmingPayment(false);
+    dispatch(closePaymentCheckout());
+    setLocalFeedback(null);
   };
 
   const handleConfirmPayment = async () => {
     if (!activePaymentSession || confirmingPayment || paymentTimeLeft <= 0) return;
 
-    setConfirmingPayment(true);
-    setFeedback(null);
-
+    setLocalFeedback(null);
     try {
-      await mentorMarketplaceApi.confirmPayment(activePaymentSession.id, null, {
-        'Idempotency-Key': idempotencyKey,
-      });
-
-      const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
-      setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
-
-      setFeedback({
-        type: 'success',
-        message: `Demo payment confirmed! ₹${totalAmount} is secured in escrow. The mentor has been notified.`,
-      });
+      await dispatch(
+        confirmSessionPayment({
+          sessionId: activePaymentSession.id,
+        }),
+      ).unwrap();
 
       if (successTimerRef.current) clearTimeout(successTimerRef.current);
       successTimerRef.current = setTimeout(() => {
-        handleCloseModal();
+        dispatch(closePaymentCheckout());
+        setLocalFeedback(null);
       }, 1600);
-    } catch (err) {
-      if (err.code === 'ALREADY_PAID' || err.status === 409 || (err.message && err.message.toLowerCase().includes('already paid'))) {
-        setFeedback({
-          type: 'error',
-          message: err.serverMessage || err.message || 'This session has already been paid for.',
-        });
-      } else {
-        setFeedback({
-          type: 'error',
-          message: formatBookingError(err) || 'Payment confirmation failed. Please try again.',
-        });
-      }
-    } finally {
-      setConfirmingPayment(false);
+    } catch {
+      // Friendly formatted error stored in paymentsSlice checkout.error
     }
   };
 
   const handleCancelPayment = async () => {
     if (activePaymentSession && bookingStep === 'payment') {
       try {
-        await mentorMarketplaceApi.cancelPayment(activePaymentSession.id).catch(() => {});
-        const updatedSessions = await mentorMarketplaceApi.mySessions().catch(() => []);
-        setMySessions(Array.isArray(updatedSessions) ? updatedSessions : []);
+        await dispatch(
+          cancelSessionPayment({ sessionId: activePaymentSession.id }),
+        ).unwrap();
       } catch (err) {
         console.warn('[MentorsDirectory] Error cancelling payment session:', err);
       }
@@ -422,9 +442,9 @@ const MentorsDirectory = () => {
   const handleCopyUpi = () => {
     const vpa = activePaymentIntent?.payeeVpa || 'teamforge@demo';
     navigator.clipboard.writeText(vpa);
-    setCopiedUpi(true);
+    dispatch(setCopiedUpi(true));
     if (successTimerRef.current) clearTimeout(successTimerRef.current);
-    successTimerRef.current = setTimeout(() => setCopiedUpi(false), 2000);
+    successTimerRef.current = setTimeout(() => dispatch(setCopiedUpi(false)), 2000);
   };
 
   const viewerId = user?.id || user?.uid;
@@ -582,10 +602,9 @@ const MentorsDirectory = () => {
                   className="tf-mentors-btn-secondary"
                   style={{ padding: '4px 10px', fontSize: '0.78rem' }}
                   onClick={() => {
-                    setFeedbackTargetSession(s);
+                    dispatch(openSessionFeedbackModal(s.id));
                     setFeedbackRating(5);
                     setFeedbackComment('');
-                    setFeedbackModalError('');
                   }}
                 >
                   Rate Session
@@ -599,9 +618,8 @@ const MentorsDirectory = () => {
                 className="tf-mentors-btn-secondary"
                 style={{ padding: '4px 10px', fontSize: '0.78rem', color: '#b91c1c', borderColor: '#fecaca' }}
                 onClick={() => {
-                  setDisputeTargetSession(s);
+                  dispatch(openDisputeModal(s.id));
                   setDisputeReason('');
-                  setDisputeModalError('');
                 }}
               >
                 Dispute
@@ -831,7 +849,11 @@ const MentorsDirectory = () => {
                 disabled={submitting || ownedProjects.length === 0 || ownedProjects.every((p) => getProjectBookingStatus(p, mySessions).disabled) || !selectedProjectId}
                 onClick={handleProceedToPayment}
               >
-                {submitting ? 'Creating Payment Hold...' : `Proceed to Payment (₹${totalAmount})`}
+                {submitting
+                  ? 'Creating Payment Hold...'
+                  : platformFee !== null
+                  ? `Proceed to Payment (₹${totalAmount})`
+                  : `Proceed to Payment (₹${basePrice} + fees)`}
               </button>
             </>
           )
@@ -1016,11 +1038,11 @@ const MentorsDirectory = () => {
                 </div>
                 <div className="tf-escrow-breakdown-row">
                   <span>Platform Fee (15%)</span>
-                  <span>₹{platformFee}</span>
+                  <span>{platformFee !== null ? `₹${platformFee}` : 'Calculated on server'}</span>
                 </div>
                 <div className="tf-escrow-breakdown-row">
                   <span>Payment Gateway Fee (2%)</span>
-                  <span>₹{gatewayFee}</span>
+                  <span>{gatewayFee !== null ? `₹${gatewayFee}` : 'Calculated on server'}</span>
                 </div>
                 <div className="tf-escrow-breakdown-row" style={{ color: '#16a34a', fontWeight: 500 }}>
                   <span>Mentor Payout (on completion)</span>
@@ -1028,7 +1050,7 @@ const MentorsDirectory = () => {
                 </div>
                 <div className="tf-escrow-breakdown-total">
                   <span>Total Amount</span>
-                  <span>₹{totalAmount}</span>
+                  <span>{platformFee !== null ? `₹${totalAmount}` : `₹${basePrice} + server fees`}</span>
                 </div>
                 <span className="tf-escrow-badge">
                   🔒 Escrow Protection: Funds will be held securely in escrow upon payment confirmation. Payout is released to the mentor only after you complete and publish the project.
@@ -1056,7 +1078,7 @@ const MentorsDirectory = () => {
       <Modal
         isOpen={Boolean(feedbackTargetSession)}
         title="Rate Completed Mentor Session"
-        onClose={() => !feedbackSubmitting && setFeedbackTargetSession(null)}
+        onClose={() => !feedbackSubmitting && dispatch(closeSessionFeedbackModal())}
         footer={
           <>
             <button
@@ -1064,7 +1086,7 @@ const MentorsDirectory = () => {
               className="tf-myproj-btn-primary"
               style={{ background: '#9ca3af' }}
               disabled={feedbackSubmitting}
-              onClick={() => setFeedbackTargetSession(null)}
+              onClick={() => dispatch(closeSessionFeedbackModal())}
             >
               Cancel
             </button>
@@ -1076,26 +1098,18 @@ const MentorsDirectory = () => {
               disabled={feedbackSubmitting}
               onClick={async () => {
                 if (!feedbackTargetSession || feedbackSubmitting) return;
-                setFeedbackSubmitting(true);
-                setFeedbackModalError('');
                 try {
-                  await mentorMarketplaceApi.submitSessionFeedback(
-                    feedbackTargetSession.id,
-                    {
-                      rating: feedbackRating,
-                      comment: feedbackComment.trim() || undefined,
-                    },
-                  );
-                  setMySessions((prev) =>
-                    prev.map((sess) =>
-                      sess.id === feedbackTargetSession.id ? { ...sess, hasFeedback: true } : sess
-                    )
-                  );
-                  setFeedbackTargetSession(null);
-                } catch (err) {
-                  setFeedbackModalError(err.serverMessage || err.message || 'Failed to submit session feedback.');
-                } finally {
-                  setFeedbackSubmitting(false);
+                  await dispatch(
+                    submitSessionFeedback({
+                      sessionId: feedbackTargetSession.id,
+                      payload: {
+                        rating: feedbackRating,
+                        comment: feedbackComment.trim() || undefined,
+                      },
+                    }),
+                  ).unwrap();
+                } catch {
+                  // Friendly error stored in sessionFeedback.working.modalError
                 }
               }}
             >
@@ -1174,14 +1188,14 @@ const MentorsDirectory = () => {
       <Modal
         isOpen={Boolean(disputeTargetSession)}
         title="Open Escrow Dispute"
-        onClose={() => !disputeSubmitting && setDisputeTargetSession(null)}
+        onClose={() => !disputeSubmitting && dispatch(closeDisputeModal())}
         footer={
           <>
             <button
               type="button"
               className="tf-mentors-btn-secondary"
               disabled={disputeSubmitting}
-              onClick={() => setDisputeTargetSession(null)}
+              onClick={() => dispatch(closeDisputeModal())}
             >
               Cancel
             </button>
@@ -1192,26 +1206,16 @@ const MentorsDirectory = () => {
               style={{ background: '#dc2626' }}
               disabled={disputeSubmitting || disputeReason.trim().length < 10}
               onClick={async () => {
-                if (!disputeTargetSession) return;
-                setDisputeSubmitting(true);
-                setDisputeModalError('');
+                if (!disputeTargetSession || disputeSubmitting) return;
                 try {
-                  const dispute = await mentorMarketplaceApi.openDispute(
-                    disputeTargetSession.id,
-                    disputeReason.trim(),
-                  );
-                  setMySessions((prev) =>
-                    prev.map((sess) =>
-                      sess.id === disputeTargetSession.id
-                        ? { ...sess, status: 'disputed', disputed: true, dispute }
-                        : sess
-                    )
-                  );
-                  setDisputeTargetSession(null);
-                } catch (err) {
-                  setDisputeModalError(err.serverMessage || err.message || 'Failed to open dispute.');
-                } finally {
-                  setDisputeSubmitting(false);
+                  await dispatch(
+                    openSessionDispute({
+                      sessionId: disputeTargetSession.id,
+                      reason: disputeReason.trim(),
+                    }),
+                  ).unwrap();
+                } catch {
+                  // Error stored in sessionDisputes.working.modalError
                 }
               }}
             >
@@ -1263,4 +1267,5 @@ const MentorsDirectory = () => {
   );
 };
 
+const MentorsDirectory = MentorsDirectoryContent;
 export default MentorsDirectory;

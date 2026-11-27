@@ -1,12 +1,52 @@
 import Badge from '../../components/common/Badge';
-import { useState, useEffect, useContext, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { useVisibilityPoll } from '../../hooks/useVisibilityPoll';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import communicationApi from '../../services/communicationApi';
-import feedbackApi from '../../services/feedbackApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { useChatMessagesPolling } from '../../hooks/useChatPolling';
+import { isProjectLocked } from '../../utils/projectStatus';
+import {
+  fetchProjectById,
+  requestCloseProject,
+} from '../../store/thunks/projectsThunks';
+import {
+  createLeaveRequest,
+  fetchMyLeaveRequest,
+  withdrawLeaveRequest,
+} from '../../store/thunks/leaveRequestsThunks';
+import { setLeaveCooldownMessage } from '../../store/slices/leaveRequestsSlice';
+import {
+  selectLeaveCooldownForProject,
+  selectMyLeaveRequestForProject,
+} from '../../store/selectors/leaveRequestsSelectors';
+import { setSelectedProjectId } from '../../store/slices/projectsSlice';
+import {
+  selectProjectById,
+  selectProjectDetailStatus,
+  selectProjectTombstoneById,
+} from '../../store/selectors/projectsSelectors';
+import {
+  fetchTasksByProject,
+  unassignTask,
+  updateTaskStatus,
+} from '../../store/thunks/tasksThunks';
+import { fetchFeedbackReasons } from '../../store/thunks/feedbackThunks';
+import {
+  selectTasksByProjectId,
+  selectTasksForbiddenForProject,
+} from '../../store/selectors/tasksSelectors';
+import { selectReasonsForAction } from '../../store/selectors/feedbackSelectors';
+import {
+  fetchProjectMessages,
+  markProjectChatRead,
+  sendProjectMessage,
+} from '../../store/thunks/communicationThunks';
+import {
+  selectChatForbiddenMessage,
+  selectIsChatForbidden,
+  selectIsSendingMessage,
+  selectMessagesByProjectId,
+} from '../../store/selectors/communicationSelectors';
 import TaskCard from '../../components/features/TaskCard';
 import ChatBox from '../../components/features/ChatBox';
 import Modal from '../../components/common/Modal';
@@ -29,15 +69,45 @@ const BackArrowIcon = () => (
   </svg>
 );
 
-const CollaboratorWorkspace = () => {
+const CollaboratorWorkspaceContent = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
 
-  const [project, setProject] = useState(null);
-  const [tombstoneData, setTombstoneData] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [messages, setMessages] = useState([]);
+  const project = useSelector((state) => selectProjectById(state, projectId));
+  const tombstoneData = useSelector((state) =>
+    selectProjectTombstoneById(state, projectId),
+  );
+  const leaveRequest = useSelector((state) =>
+    selectMyLeaveRequestForProject(state, projectId),
+  );
+  const leaveCooldownMsg = useSelector((state) =>
+    selectLeaveCooldownForProject(state, projectId),
+  );
+  const detailStatus = useSelector(selectProjectDetailStatus);
+
+  const tasks = useSelector((state) =>
+    selectTasksByProjectId(state, projectId),
+  );
+  const storeTasksForbidden = useSelector((state) =>
+    selectTasksForbiddenForProject(state, projectId),
+  );
+  const dropReasons = useSelector((state) =>
+    selectReasonsForAction(state, 'DROP_TASK'),
+  );
+  const messages = useSelector((state) =>
+    selectMessagesByProjectId(state, projectId),
+  );
+  const sendingMsg = useSelector((state) =>
+    selectIsSendingMessage(state, projectId),
+  );
+  const chatForbidden = useSelector((state) =>
+    selectIsChatForbidden(state, projectId),
+  );
+  const chatForbiddenMessage = useSelector((state) =>
+    selectChatForbiddenMessage(state, projectId),
+  );
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const tab = new URLSearchParams(window.location.search).get('tab');
@@ -45,7 +115,9 @@ const CollaboratorWorkspace = () => {
     }
     return 'overview';
   });
-  const [loading, setLoading] = useState(true);
+  const [secondaryLoading, setSecondaryLoading] = useState(true);
+  const loading =
+    (detailStatus === 'loading' && !project && !tombstoneData) || secondaryLoading;
 
   // Proof submission modal state
   const [proofTask, setProofTask] = useState(null);
@@ -53,16 +125,12 @@ const CollaboratorWorkspace = () => {
   const [proofNotes, setProofNotes] = useState('');
   const [submittingProof, setSubmittingProof] = useState(false);
   const [feedback, setFeedback] = useState(null);
-  const [sendingMsg, setSendingMsg] = useState(false);
-  const [tasksForbidden, setTasksForbidden] = useState(false);
-  const [chatForbidden, setChatForbidden] = useState(false);
+  const [mutationTasksForbidden, setMutationTasksForbidden] = useState(false);
+  const tasksForbidden = storeTasksForbidden || mutationTasksForbidden;
 
   // Leave project request state (Part 1: Collaborator leaves with owner approval)
   const [leaveModalOpen, setLeaveModalOpen] = useState(false);
-  const [leaveRequest, setLeaveRequest] = useState(null);
   const [withdrawingLeave, setWithdrawingLeave] = useState(false);
-  const [leaveCooldownMsg, setLeaveCooldownMsg] = useState('');
-  const [leaveError, setLeaveError] = useState('');
 
   // Abandoned owner / closure request state
   const [requestingClose, setRequestingClose] = useState(false);
@@ -74,7 +142,6 @@ const CollaboratorWorkspace = () => {
   const [unassignOpenedAt, setUnassignOpenedAt] = useState(0);
   const [unassignReason, setUnassignReason] = useState('');
   const [unassignReasons, setUnassignReasons] = useState([]);
-  const [dropReasons, setDropReasons] = useState([]);
   const [unassigning, setUnassigning] = useState(false);
   const [unassignError, setUnassignError] = useState('');
 
@@ -82,106 +149,53 @@ const CollaboratorWorkspace = () => {
   const [deadlineHistoryModalOpen, setDeadlineHistoryModalOpen] = useState(false);
 
   useEffect(() => {
-    feedbackApi.getFeedbackReasons().then((cfg) => {
-      const list = cfg?.DROP_TASK?.reasons || cfg?.actions?.DROP_TASK?.reasons || [];
-      if (Array.isArray(list) && list.length > 0) {
-        setDropReasons(list);
-      }
-    }).catch(() => {});
-  }, []);
+    dispatch(fetchFeedbackReasons());
+  }, [dispatch]);
 
   useEffect(() => {
     let isMounted = true;
     if (!projectId) return;
 
-    const fetchWorkspace = async () => {
+    dispatch(setSelectedProjectId(projectId));
+    dispatch(fetchProjectById({ id: projectId, force: true }));
+    dispatch(fetchMyLeaveRequest({ projectId }));
+
+    const fetchSecondaryWorkspace = async () => {
       try {
-        const [projData, tasksData, msgsData, leaveReqData] = await Promise.all([
-          projectsApi.get(projectId).catch((err) => {
-            if (err?.statusCode === 410 || err?.code === 'PROJECT_DELETED') {
-              if (isMounted) {
-                setTombstoneData(err.project || err.data?.project || { id: projectId });
-              }
-            }
-            return null;
-          }),
-          tasksApi.list({ projectId }).catch((err) => {
-            if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER' || err?.response?.status === 403) {
-              if (isMounted) setTasksForbidden(true);
-            }
-            return [];
-          }),
-          communicationApi.getMessages(projectId).catch((err) => {
-            if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-              if (isMounted) setChatForbidden(true);
-            }
-            return [];
-          }),
-          typeof projectsApi.getMyLeaveRequest === 'function'
-            ? projectsApi.getMyLeaveRequest(projectId).catch(() => null)
-            : Promise.resolve(null),
+        await Promise.all([
+          dispatch(fetchTasksByProject({ projectId, force: true }))
+            .unwrap()
+            .catch(() => []),
+          dispatch(fetchProjectMessages({ projectId, force: true })).catch(() => null),
         ]);
-        if (isMounted) {
-          setProject(projData);
-          setTasks(Array.isArray(tasksData) ? tasksData : []);
-          setMessages(Array.isArray(msgsData) ? msgsData : []);
-          if (leaveReqData && leaveReqData.status === 'pending') {
-            setLeaveRequest(leaveReqData);
-          } else {
-            setLeaveRequest(null);
-          }
-        }
       } catch (err) {
         console.error('Failed to load project workspace:', err);
       } finally {
         if (isMounted) {
-          setLoading(false);
+          setSecondaryLoading(false);
         }
       }
     };
 
-    fetchWorkspace();
+    fetchSecondaryWorkspace();
 
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [dispatch, projectId]);
 
-  // Real-time chat polling (polls every 6s while active tab, pauses when hidden or forbidden)
-  const pollCollabChat = useCallback(async () => {
-    if (!projectId || activeTab !== 'chat' || chatForbidden) return;
-    try {
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
-    } catch (err) {
-      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-        setChatForbidden(true);
-      }
-      console.warn('[CollaboratorWorkspace] Background chat polling error:', err);
-    }
-  }, [projectId, activeTab, chatForbidden]);
-
-  useVisibilityPoll(pollCollabChat, 6000, {
+  useChatMessagesPolling(dispatch, {
+    projectId,
     enabled: Boolean(projectId && activeTab === 'chat' && !chatForbidden),
+    intervalMs: 6000,
     immediate: false,
-    triggerOnVisible: true,
   });
 
   useEffect(() => {
     if (!projectId || activeTab !== 'chat') return undefined;
-    if (typeof communicationApi.markProjectRead === 'function') {
-      communicationApi.markProjectRead(projectId)
-        .then(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('teamforge:chat_read'));
-          }
-        })
-        .catch(() => {});
-    }
+    dispatch(markProjectChatRead({ projectId }));
     return undefined;
-  }, [projectId, activeTab]);
+  }, [dispatch, projectId, activeTab]);
 
   const proofResetTimerRef = useRef(null);
   useEffect(() => {
@@ -195,13 +209,16 @@ const CollaboratorWorkspace = () => {
   const handleStartTask = async (taskId) => {
     if (isLocked) return;
     try {
-      const updated = await tasksApi.updateStatus(taskId, { status: 'In Progress' });
-      setTasks((prev) =>
-        prev.map((t) => (t.id === taskId ? { ...t, ...(updated || {}), status: 'In Progress' } : t))
-      );
+      await dispatch(
+        updateTaskStatus({
+          id: taskId,
+          payload: { status: 'In Progress' },
+          optimistic: true,
+        }),
+      ).unwrap();
     } catch (err) {
       if (err?.statusCode === 403 || err?.code === 'NOT_A_PROJECT_MEMBER') {
-        setTasksForbidden(true);
+        setMutationTasksForbidden(true);
         setFeedback({ type: 'error', message: 'You are not a member of this project.' });
       }
       console.error('Failed to update task status:', err);
@@ -240,30 +257,18 @@ const CollaboratorWorkspace = () => {
         return;
       }
 
-      const updated = await tasksApi.updateStatus(proofTask.id, {
-        status: 'In Review',
-        proofUrl: finalUrl,
-        proofLink: finalUrl,
-        notes: proofNotes,
-      });
-
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === proofTask.id
-            ? {
-                ...t,
-                ...(updated || {}),
-                status: 'In Review',
-                proofUrl: finalUrl,
-                proofLink: finalUrl,
-                notes: proofNotes,
-                rejectionReason: undefined,
-                rejectedAt: undefined,
-                rejectedBy: undefined,
-              }
-            : t
-        )
-      );
+      await dispatch(
+        updateTaskStatus({
+          id: proofTask.id,
+          payload: {
+            status: 'In Review',
+            proofUrl: finalUrl,
+            proofLink: finalUrl,
+            notes: proofNotes,
+          },
+          clearRejection: true,
+        }),
+      ).unwrap();
 
       setFeedback({ type: 'success', message: 'Proof submitted! Task is now In Review.' });
       if (proofResetTimerRef.current) clearTimeout(proofResetTimerRef.current);
@@ -281,51 +286,38 @@ const CollaboratorWorkspace = () => {
   };
 
   const handleSendMessage = async (text) => {
-    if (!text.trim() || chatForbidden) return;
-    setSendingMsg(true);
+    const trimmed = String(text || '').trim();
+    if (!trimmed || chatForbidden) return;
     try {
-      const newMsg = await communicationApi.sendMessage({
-        projectId,
-        text,
-        senderName: user?.name || 'Collaborator',
-      }, 'Collaborator', user?.id);
-
-      if (newMsg) {
-        setMessages((prev) => [...prev, newMsg]);
-      }
-
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
+      await dispatch(
+        sendProjectMessage({
+          projectId,
+          text: trimmed,
+          senderId: user?.id,
+          senderName: user?.name || 'Collaborator',
+          senderRole: 'Collaborator',
+          role: 'Collaborator',
+          userId: user?.id,
+        }),
+      ).unwrap();
     } catch (err) {
-      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-        setChatForbidden(true);
-      }
       console.error('Failed to send message:', err);
-    } finally {
-      setSendingMsg(false);
     }
   };
 
   const handleLeaveRequestSubmit = async ({ reasons, explanation }) => {
     if (isLocked || isOwner) return;
-    setLeaveError('');
-    setLeaveCooldownMsg('');
+    dispatch(setLeaveCooldownMessage({ projectId, message: '' }));
     try {
-      const res = await projectsApi.submitLeaveRequest(projectId, {
-        reasons,
-        explanation,
-      });
-      setLeaveRequest(res);
+      await dispatch(
+        createLeaveRequest({
+          projectId,
+          payload: { reasons, explanation },
+        }),
+      ).unwrap();
       setLeaveModalOpen(false);
     } catch (err) {
       console.error('Failed to submit leave request:', err);
-      const msg = err.serverMessage || err.message || 'Failed to submit leave request.';
-      if (err?.status === 409 && (msg.toLowerCase().includes('cooldown') || err?.code === 'LEAVE_REQUEST_COOLDOWN')) {
-        setLeaveCooldownMsg(msg);
-      }
-      setLeaveError(msg);
       throw err;
     }
   };
@@ -333,30 +325,22 @@ const CollaboratorWorkspace = () => {
   const handleWithdrawLeaveRequest = async () => {
     if (withdrawingLeave) return;
     setWithdrawingLeave(true);
-    setLeaveError('');
     try {
-      await projectsApi.withdrawLeaveRequest(projectId);
-      setLeaveRequest(null);
+      await dispatch(withdrawLeaveRequest({ projectId })).unwrap();
     } catch (err) {
       console.error('Failed to withdraw leave request:', err);
-      setLeaveError(err.serverMessage || err.message || 'Failed to withdraw leave request.');
     } finally {
       setWithdrawingLeave(false);
     }
   };
 
   const handleAskAdminToClose = async () => {
-    if (isLocked || isOwner || requestingClose || typeof projectsApi.requestClose !== 'function') return;
+    if (isLocked || isOwner || requestingClose) return;
     setRequestingClose(true);
     setCloseRequestError('');
     try {
-      const res = await projectsApi.requestClose(projectId, {});
+      await dispatch(requestCloseProject({ projectId, payload: {} })).unwrap();
       setCloseRequestMsg('Close request sent to admins for review.');
-      if (res?.project) {
-        setProject((prev) => ({ ...(prev || {}), ...res.project }));
-      } else {
-        setProject((prev) => (prev ? { ...prev, closeRequestedAt: new Date().toISOString() } : prev));
-      }
     } catch (err) {
       setCloseRequestError(err?.serverMessage || err?.message || 'Failed to submit closure request.');
     } finally {
@@ -402,29 +386,12 @@ const CollaboratorWorkspace = () => {
         explanation: trimmed,
         reason: trimmed,
       };
-      const updated =
-        typeof tasksApi.unassign === 'function'
-          ? await tasksApi.unassign(unassignTaskTarget.id, payload)
-          : await tasksApi.update(unassignTaskTarget.id, {
-              assigneeId: '',
-              assigneeName: 'Unassigned',
-              assignee: 'Unassigned',
-              ...payload,
-            });
-      setTasks((prev) =>
-        prev.map((t) =>
-          t.id === unassignTaskTarget.id
-            ? {
-                ...t,
-                ...(updated || {}),
-                assigneeId: '',
-                assigneeName: 'Unassigned',
-                assignee: 'Unassigned',
-                status: 'To Do',
-              }
-            : t
-        )
-      );
+      await dispatch(
+        unassignTask({
+          id: unassignTaskTarget.id,
+          payload,
+        }),
+      ).unwrap();
       setUnassignTaskTarget(null);
       setUnassignReason('');
     } catch (err) {
@@ -566,7 +533,6 @@ const CollaboratorWorkspace = () => {
               style={{ marginBottom: 0, color: '#e11d48', borderColor: '#fecdd3' }}
               onClick={() => {
                 setLeaveModalOpen(true);
-                setLeaveError('');
               }}
               data-testid="leave-project-btn"
             >
@@ -886,7 +852,7 @@ const CollaboratorWorkspace = () => {
                 return (
                   <div key={`${memberId}-${role}`} className="tf-collab-ws-member-card" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-                      <Avatar name={name} size="md" />
+                      <Avatar name={name} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="md" />
                       <div className="tf-collab-ws-member-info">
                         <h4>{name}</h4>
                         <p>{isOwner ? 'Project Lead' : isMentor ? 'Project Mentor' : 'Collaborator'}</p>
@@ -905,14 +871,16 @@ const CollaboratorWorkspace = () => {
         {/* Tab 4: Chat (Rendered via reusable ChatBox) */}
         {activeTab === 'chat' && (
           <ChatBox
+            projectId={projectId}
             messages={messages}
             currentUserId={user?.id}
             currentUserName={user?.name}
             currentUserRole="Collaborator"
             onSendMessage={handleSendMessage}
-            onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
+            onRefresh={() => dispatch(fetchProjectMessages({ projectId, force: true }))}
             sending={sendingMsg}
             isForbidden={chatForbidden}
+            forbiddenMessage={chatForbiddenMessage}
           />
         )}
       </div>
@@ -1194,4 +1162,5 @@ const CollaboratorWorkspace = () => {
   );
 };
 
+const CollaboratorWorkspace = CollaboratorWorkspaceContent;
 export default CollaboratorWorkspace;

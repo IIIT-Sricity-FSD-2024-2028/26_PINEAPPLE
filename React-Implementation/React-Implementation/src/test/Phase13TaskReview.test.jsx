@@ -1,7 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { screen, fireEvent, waitFor } from '@testing-library/react';
-import { AuthContext } from '../context/AuthContext';
-import { renderWithProviders } from './test-utils';
+import { renderWithStore } from './test-utils';
 import OwnedWorkspace from '../pages/owner/OwnedWorkspace';
 import CollaboratorWorkspace from '../pages/collaborator/CollaboratorWorkspace';
 import AdminProjectDetails from '../pages/admin/AdminProjectDetails';
@@ -54,11 +53,16 @@ vi.mock('../services/communicationApi', () => ({
 }));
 
 const renderWithUser = (ui, user) =>
-  renderWithProviders(
-    <AuthContext.Provider value={{ user, loading: false, isAuthenticated: true }}>
-      {ui}
-    </AuthContext.Provider>,
-  );
+  renderWithStore(ui, {
+    preloadedState: {
+      session: {
+        user,
+        loading: false,
+        isAuthenticated: true,
+        status: 'authenticated',
+      },
+    },
+  });
 
 describe('Phase 13 - Task Review, Feedback, Waiting Badges & Drop Task Frontend UI', () => {
   beforeEach(() => {

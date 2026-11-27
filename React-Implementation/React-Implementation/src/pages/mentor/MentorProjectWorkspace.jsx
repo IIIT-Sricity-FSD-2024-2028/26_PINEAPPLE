@@ -1,11 +1,32 @@
-import { useState, useEffect, useContext, useCallback } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import { useVisibilityPoll } from '../../hooks/useVisibilityPoll';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
-import tasksApi from '../../services/tasksApi';
-import communicationApi from '../../services/communicationApi';
-import mentorshipApi from '../../services/mentorshipApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { useChatMessagesPolling } from '../../hooks/useChatPolling';
+import { isProjectLocked } from '../../utils/projectStatus';
+import { fetchProjectById } from '../../store/thunks/projectsThunks';
+import {
+  selectProjectById,
+  selectProjectTombstoneById,
+} from '../../store/selectors/projectsSelectors';
+import { fetchTasksByProject } from '../../store/thunks/tasksThunks';
+import { selectTasksByProjectId } from '../../store/selectors/tasksSelectors';
+import {
+  fetchProjectMessages,
+  markProjectChatRead,
+  sendProjectMessage,
+} from '../../store/thunks/communicationThunks';
+import {
+  selectChatForbiddenMessage,
+  selectIsChatForbidden,
+  selectIsSendingMessage,
+  selectMessagesByProjectId,
+} from '../../store/selectors/communicationSelectors';
+import {
+  fetchBadgesByProject,
+  issueMentorBadge,
+} from '../../store/thunks/gamificationThunks';
+import { selectProjectBadges } from '../../store/selectors/gamificationSelectors';
 import TaskCard from '../../components/features/TaskCard';
 import ChatBox from '../../components/features/ChatBox';
 import EmptyState from '../../components/common/EmptyState';
@@ -33,15 +54,45 @@ const AwardIcon = () => (
   </svg>
 );
 
-const MentorProjectWorkspace = () => {
+const MentorProjectWorkspaceContent = () => {
   const { projectId } = useParams();
   const navigate = useNavigate();
-  const { user } = useContext(AuthContext);
+  const dispatch = useDispatch();
+  const user = useSelector(selectCurrentUser);
 
-  const [project, setProject] = useState(null);
-  const [tombstoneData, setTombstoneData] = useState(null);
-  const [tasks, setTasks] = useState([]);
-  const [messages, setMessages] = useState([]);
+  const project = useSelector((state) => selectProjectById(state, projectId));
+  const tombstoneData = useSelector((state) =>
+    selectProjectTombstoneById(state, projectId),
+  );
+  const projectBadges = useSelector((state) =>
+    selectProjectBadges(state, projectId),
+  );
+  const awardedMembers = useMemo(() => {
+    const existingAwarded = new Set();
+    if (Array.isArray(projectBadges)) {
+      projectBadges.forEach((b) => {
+        if (b.recipientId) existingAwarded.add(String(b.recipientId).toLowerCase());
+        if (b.recipientName) existingAwarded.add(String(b.recipientName).toLowerCase());
+        if (b.collaboratorId) existingAwarded.add(String(b.collaboratorId).toLowerCase());
+      });
+    }
+    return existingAwarded;
+  }, [projectBadges]);
+  const tasks = useSelector((state) =>
+    selectTasksByProjectId(state, projectId),
+  );
+  const messages = useSelector((state) =>
+    selectMessagesByProjectId(state, projectId),
+  );
+  const sendingMsg = useSelector((state) =>
+    selectIsSendingMessage(state, projectId),
+  );
+  const chatForbidden = useSelector((state) =>
+    selectIsChatForbidden(state, projectId),
+  );
+  const chatForbiddenMessage = useSelector((state) =>
+    selectChatForbiddenMessage(state, projectId),
+  );
   const [activeTab, setActiveTab] = useState(() => {
     if (typeof window !== 'undefined') {
       const tab = new URLSearchParams(window.location.search).get('tab');
@@ -57,9 +108,6 @@ const MentorProjectWorkspace = () => {
   const [badgeType, setBadgeType] = useState('Technical Excellence');
   const [badgeComment, setBadgeComment] = useState('');
   const [submittingBadge, setSubmittingBadge] = useState(false);
-  const [awardedMembers, setAwardedMembers] = useState(new Set());
-  const [sendingMsg, setSendingMsg] = useState(false);
-  const [chatForbidden, setChatForbidden] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -67,39 +115,18 @@ const MentorProjectWorkspace = () => {
 
     const fetchWorkspace = async () => {
       try {
-        const [projData, tasksData, msgsData, badgesData] = await Promise.all([
-          projectsApi.get(projectId).catch((err) => {
-            if (err?.statusCode === 410 || err?.code === 'PROJECT_DELETED') {
-              if (isMounted) {
-                setTombstoneData(err.project || err.data?.project || { id: projectId });
-              }
-            }
-            return null;
-          }),
-          tasksApi.list({ projectId }).catch(() => []),
-          communicationApi.getMessages(projectId).catch((err) => {
-            if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-              if (isMounted) setChatForbidden(true);
-            }
-            return [];
-          }),
-          mentorshipApi.getBadgesByProject(projectId).catch(() => []),
+        await Promise.all([
+          dispatch(fetchProjectById({ id: projectId, force: true }))
+            .unwrap()
+            .catch(() => null),
+          dispatch(fetchTasksByProject({ projectId, force: true }))
+            .unwrap()
+            .catch(() => []),
+          dispatch(fetchProjectMessages({ projectId, force: true })).catch(() => null),
+          dispatch(fetchBadgesByProject({ projectId }))
+            .unwrap()
+            .catch(() => ({ badges: [] })),
         ]);
-
-        if (isMounted) {
-          setProject(projData);
-          setTasks(Array.isArray(tasksData) ? tasksData : []);
-          setMessages(Array.isArray(msgsData) ? msgsData : []);
-          const existingAwarded = new Set();
-          if (Array.isArray(badgesData)) {
-            badgesData.forEach((b) => {
-              if (b.recipientId) existingAwarded.add(String(b.recipientId).toLowerCase());
-              if (b.recipientName) existingAwarded.add(String(b.recipientName).toLowerCase());
-              if (b.collaboratorId) existingAwarded.add(String(b.collaboratorId).toLowerCase());
-            });
-          }
-          setAwardedMembers(existingAwarded);
-        }
       } catch (err) {
         console.error('Failed to load mentor workspace:', err);
         if (isMounted) {
@@ -117,43 +144,20 @@ const MentorProjectWorkspace = () => {
     return () => {
       isMounted = false;
     };
-  }, [projectId]);
+  }, [dispatch, projectId]);
 
-  // Real-time chat polling (polls every 6s while active tab, pauses when hidden or forbidden)
-  const pollMentorChat = useCallback(async () => {
-    if (!projectId || activeTab !== 'chat' || chatForbidden) return;
-    try {
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
-    } catch (err) {
-      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-        setChatForbidden(true);
-      }
-      console.warn('[MentorProjectWorkspace] Background chat polling error:', err);
-    }
-  }, [projectId, activeTab, chatForbidden]);
-
-  useVisibilityPoll(pollMentorChat, 6000, {
+  useChatMessagesPolling(dispatch, {
+    projectId,
     enabled: Boolean(projectId && activeTab === 'chat' && !chatForbidden),
+    intervalMs: 6000,
     immediate: false,
-    triggerOnVisible: true,
   });
 
   useEffect(() => {
     if (!projectId || activeTab !== 'chat') return undefined;
-    if (typeof communicationApi.markProjectRead === 'function') {
-      communicationApi.markProjectRead(projectId)
-        .then(() => {
-          if (typeof window !== 'undefined') {
-            window.dispatchEvent(new CustomEvent('teamforge:chat_read'));
-          }
-        })
-        .catch(() => {});
-    }
+    dispatch(markProjectChatRead({ projectId }));
     return undefined;
-  }, [projectId, activeTab]);
+  }, [dispatch, projectId, activeTab]);
 
 
 
@@ -170,20 +174,20 @@ const MentorProjectWorkspace = () => {
     setSubmittingBadge(true);
     try {
       const targetId = badgeModalMember.id || badgeModalMember.userId || badgeModalMember.name;
-      await mentorshipApi.issueBadge({
-        projectId,
-        recipientId: targetId,
-        collaboratorId: targetId,
-        badgeName: badgeType,
-        badgeType: badgeType,
-        comment: badgeComment || 'Exceptional mentorship recommendation.',
-        note: badgeComment || 'Exceptional mentorship recommendation.',
-      });
+      await dispatch(
+        issueMentorBadge({
+          payload: {
+            projectId,
+            recipientId: targetId,
+            collaboratorId: targetId,
+            badgeName: badgeType,
+            badgeType: badgeType,
+            comment: badgeComment || 'Exceptional mentorship recommendation.',
+            note: badgeComment || 'Exceptional mentorship recommendation.',
+          },
+        }),
+      ).unwrap();
 
-      const memberNameKey = String(badgeModalMember.name || '').toLowerCase();
-      const memberIdKey = String(targetId).toLowerCase();
-
-      setAwardedMembers((prev) => new Set([...prev, memberNameKey, memberIdKey]));
       setFeedback({
         type: 'success',
         message: `Recommendation badge "${badgeType}" awarded to ${badgeModalMember.name}!`,
@@ -206,31 +210,22 @@ const MentorProjectWorkspace = () => {
   const handleSendMessage = async (text) => {
     if (!text || !text.trim() || chatForbidden) return;
     const messageText = text.trim();
-    setSendingMsg(true);
 
     try {
-      const res = await communicationApi.sendMessage({
-        projectId,
-        content: messageText,
-        text: messageText,
-        senderName: user?.name || user?.username || 'Mentor',
-      }, 'Mentor', user?.id);
-
-      if (res) {
-        setMessages((prev) => [...prev, res]);
-      }
-
-      const fresh = await communicationApi.getMessages(projectId);
-      if (Array.isArray(fresh)) {
-        setMessages(fresh);
-      }
+      await dispatch(
+        sendProjectMessage({
+          projectId,
+          content: messageText,
+          text: messageText,
+          senderId: user?.id,
+          senderName: user?.name || user?.username || 'Mentor',
+          senderRole: 'Mentor',
+          role: 'Mentor',
+          userId: user?.id,
+        }),
+      ).unwrap();
     } catch (err) {
-      if (err?.statusCode === 403 || err?.code === 'CHAT_MEMBERSHIP_REQUIRED' || err?.response?.status === 403) {
-        setChatForbidden(true);
-      }
       console.error('Failed to send chat message:', err);
-    } finally {
-      setSendingMsg(false);
     }
   };
 
@@ -515,7 +510,7 @@ const MentorProjectWorkspace = () => {
               return (
                 <div key={mIdx} className="tf-mentor-ws-member-row">
                   <div className="tf-mentor-ws-member-info">
-                    <Avatar name={member.name} size="md" />
+                    <Avatar name={member.name} src={member.avatarUrl || member.avatar} version={member.updatedAt} size="md" />
                     <div>
                       <div className="tf-mentor-ws-member-name" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <span>{member.name}</span>
@@ -562,14 +557,16 @@ const MentorProjectWorkspace = () => {
       {activeTab === 'chat' && (
         <div className="tf-mentor-ws-card" style={{ padding: '1.25rem' }}>
           <ChatBox
+            projectId={projectId}
             messages={messages}
             currentUserId={user?.id}
             currentUserName={user?.name || user?.username || 'Mentor'}
             currentUserRole="Mentor"
             onSendMessage={handleSendMessage}
-            onRefresh={() => communicationApi.getMessages(projectId).then((m) => Array.isArray(m) && setMessages(m)).catch(() => {})}
+            onRefresh={() => dispatch(fetchProjectMessages({ projectId, force: true }))}
             sending={sendingMsg}
             isForbidden={chatForbidden}
+            forbiddenMessage={chatForbiddenMessage}
           />
         </div>
       )}
@@ -665,6 +662,8 @@ const MentorProjectWorkspace = () => {
     </div>
   );
 };
+
+const MentorProjectWorkspace = MentorProjectWorkspaceContent;
 
 export default MentorProjectWorkspace;
 

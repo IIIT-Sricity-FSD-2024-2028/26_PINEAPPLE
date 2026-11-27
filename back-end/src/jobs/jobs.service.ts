@@ -22,7 +22,6 @@ import { JobRunsService, JobRun } from './job-runs.service';
 import { ProjectInvitesService } from '../projects/invites.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { DataExportService } from '../users/data-export.service';
-import { DigestService } from '../notifications/digest.service';
 import { StorageHygieneService } from './storage-hygiene.service';
 import { SupportService } from '../support/support.service';
 import { LeaveRequestsService } from '../projects/leave-requests.service';
@@ -65,9 +64,6 @@ export class JobsService {
     @Optional()
     @Inject(forwardRef(() => DataExportService))
     private readonly dataExportService?: DataExportService,
-    @Optional()
-    @Inject(forwardRef(() => DigestService))
-    private readonly digestService?: DigestService,
     @Optional()
     private readonly storageHygieneService?: StorageHygieneService,
     @Optional()
@@ -923,26 +919,7 @@ export class JobsService {
       });
     }
 
-    // Job 18: Flush due notification digests based on user's chosen local hour & timezone (Phase 18)
-    try {
-      const digestResult = this.digestService?.flushDueDigests
-        ? this.digestService.flushDueDigests()
-        : { flushedUsers: [], digestsCreated: 0, errors: [] };
-      this.jobRunsService.finishJob(run.id, {
-        name: 'flushNotificationDigests',
-        itemsProcessed: digestResult.digestsCreated || 0,
-        errors: digestResult.errors || [],
-      });
-    } catch (err: any) {
-      this.logger.error(`Job flushNotificationDigests failed: ${err?.message || err}`);
-      this.jobRunsService.finishJob(run.id, {
-        name: 'flushNotificationDigests',
-        itemsProcessed: 0,
-        errors: [err?.message || String(err)],
-      });
-    }
-
-    // Job 19: Storage hygiene cleanup (orphan uploads >24h, expired/orphan exports, deleted CVs, >30d deleted project tombstones) (Phase 23)
+    // Job 18: Storage hygiene cleanup (orphan uploads >24h, expired/orphan exports, deleted CVs, >30d deleted project tombstones) (Phase 23)
     try {
       const hygieneResult = this.storageHygieneService?.runHygiene
         ? this.storageHygieneService.runHygiene()

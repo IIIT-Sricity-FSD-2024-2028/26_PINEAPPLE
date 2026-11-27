@@ -31,12 +31,49 @@ import { randomUUID } from 'crypto';
 // Storage Configuration
 // ──────────────────────────────────────────────────────────────
 
-export const UPLOADS_DIR = path.join(process.cwd(), 'uploads');
-
-// Ensure uploads directory exists
-if (!fs.existsSync(UPLOADS_DIR)) {
-  fs.mkdirSync(UPLOADS_DIR, { recursive: true });
+/**
+ * Resolves the root upload directory from UPLOAD_DIR (default: back-end/.runtime/uploads,
+ * outside watched source folders so dev watchers never restart on uploads).
+ */
+export function getUploadRootDir(): string {
+  const configured = String(process.env.UPLOAD_DIR || '').trim();
+  if (configured) {
+    return path.resolve(configured);
+  }
+  return path.resolve(process.cwd(), '.runtime', 'uploads');
 }
+
+export function getUploadsDir(): string {
+  const legacyOverride = String(process.env.UPLOADS_DIR || '').trim();
+  if (legacyOverride) {
+    return path.resolve(legacyOverride);
+  }
+  return getUploadRootDir();
+}
+
+export function getSecureCvsDir(): string {
+  const legacyOverride = String(process.env.SECURE_CVS_DIR || '').trim();
+  if (legacyOverride) {
+    return path.resolve(legacyOverride);
+  }
+  return path.join(getUploadRootDir(), 'secure-cvs');
+}
+
+export function ensureUploadDirectories(): { uploadsDir: string; secureCvsDir: string } {
+  const uploadsDir = getUploadsDir();
+  const secureCvsDir = getSecureCvsDir();
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+  if (!fs.existsSync(secureCvsDir)) {
+    fs.mkdirSync(secureCvsDir, { recursive: true });
+  }
+  return { uploadsDir, secureCvsDir };
+}
+
+export const UPLOADS_DIR = getUploadsDir();
+
+ensureUploadDirectories();
 
 /**
  * Sanitizes a filename by removing special characters and adding a timestamp.
@@ -55,10 +92,29 @@ function sanitizeFilename(originalName: string): string {
  */
 const storage = multerRuntime.diskStorage({
   destination: (_req: Request, _file: Express.Multer.File, cb: Function) => {
-    cb(null, UPLOADS_DIR);
+    const { uploadsDir } = ensureUploadDirectories();
+    cb(null, uploadsDir);
   },
   filename: (_req: Request, file: Express.Multer.File, cb: Function) => {
     cb(null, sanitizeFilename(file.originalname));
+  },
+});
+
+function sanitizeAvatarExt(originalName: string): string {
+  const ext = path.extname(String(originalName || '')).toLowerCase();
+  if (ext === '.png' || ext === '.jpg' || ext === '.jpeg' || ext === '.webp') {
+    return ext;
+  }
+  return '.png';
+}
+
+const avatarStorage = multerRuntime.diskStorage({
+  destination: (_req: Request, _file: Express.Multer.File, cb: Function) => {
+    const { uploadsDir } = ensureUploadDirectories();
+    cb(null, uploadsDir);
+  },
+  filename: (_req: Request, file: Express.Multer.File, cb: Function) => {
+    cb(null, `avatar-${randomUUID()}${sanitizeAvatarExt(file.originalname)}`);
   },
 });
 
@@ -108,10 +164,10 @@ function createFileFilter(allowedMimes: string[], allowedExts: string[]) {
 // ──────────────────────────────────────────────────────────────
 
 /**
- * Avatar upload — PNG, JPG, JPEG, WEBP only, max 2 MB.
+ * Avatar upload — PNG, JPG, JPEG, WEBP only, max 2 MB, unguessable UUID filenames.
  */
 export const avatarUploadOptions = {
-  storage,
+  storage: avatarStorage,
   limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
   fileFilter: createFileFilter(IMAGE_MIMES, IMAGE_EXTS),
 };
@@ -141,14 +197,12 @@ export const resourceUpload = multerRuntime(resourceUploadOptions);
 // Secure CV Upload Configuration (Stored outside public web root)
 // ──────────────────────────────────────────────────────────────
 
-export const SECURE_CVS_DIR = path.join(process.cwd(), 'secure-cvs');
-if (!fs.existsSync(SECURE_CVS_DIR)) {
-  fs.mkdirSync(SECURE_CVS_DIR, { recursive: true });
-}
+export const SECURE_CVS_DIR = getSecureCvsDir();
 
 const cvStorage = multerRuntime.diskStorage({
   destination: (_req: Request, _file: Express.Multer.File, cb: Function) => {
-    cb(null, SECURE_CVS_DIR);
+    const { secureCvsDir } = ensureUploadDirectories();
+    cb(null, secureCvsDir);
   },
   filename: (_req: Request, file: Express.Multer.File, cb: Function) => {
     const ext = path.extname(file.originalname).toLowerCase();

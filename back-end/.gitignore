@@ -7,7 +7,9 @@ pnpm-debug.log*
 .env
 .env.local
 logs/
-uploads/
+/uploads/
+/secure-cvs/
+/.runtime/
 backend-requests.log
 serviceAccountKey.json
 *firebase-adminsdk*.json

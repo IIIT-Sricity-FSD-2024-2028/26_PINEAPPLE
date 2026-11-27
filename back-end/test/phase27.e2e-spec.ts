@@ -34,10 +34,10 @@ describe('Phase 27 E2E API Tests: Admin Support Inbox & Project Closure Actions'
   beforeEach(() => {
     ctx.resetStores();
     ctx.clockService.setTime('2026-11-12T10:00:00.000Z');
-    ctx.usersRepository.update('1', { emailVerified: true, digestEnabled: false } as any);
-    ctx.usersRepository.update('2', { emailVerified: true, digestEnabled: false } as any);
-    ctx.usersRepository.update('3', { emailVerified: true, digestEnabled: false } as any);
-    ctx.usersRepository.update('7', { emailVerified: true, digestEnabled: false } as any);
+    ctx.usersRepository.update('1', { emailVerified: true } as any);
+    ctx.usersRepository.update('2', { emailVerified: true } as any);
+    ctx.usersRepository.update('3', { emailVerified: true } as any);
+    ctx.usersRepository.update('7', { emailVerified: true } as any);
   });
 
   afterAll(async () => {

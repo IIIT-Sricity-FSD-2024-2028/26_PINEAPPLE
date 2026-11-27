@@ -1,6 +1,7 @@
 import { Injectable, Optional } from '@nestjs/common';
 import { UsersRepository, User } from './users.repository';
 import { AuditService } from '../audit/audit.service';
+import { isPlatformUser } from '../common/utils/platform-user.util';
 
 export interface DuplicateGroupUserSummary {
   id: string;
@@ -83,7 +84,7 @@ export class DuplicateDetectionService {
   }
 
   private isEligibleUser(u: User): boolean {
-    return !u.isDeleted && !u.deletedAt && !u.isHidden && !u.isDuplicate;
+    return isPlatformUser(u);
   }
 
   private toSummary(u: User): DuplicateGroupUserSummary {

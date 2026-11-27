@@ -1,12 +1,10 @@
-import { Inject, Injectable, NotFoundException, Optional, forwardRef } from '@nestjs/common';
+import { Inject, Injectable, NotFoundException, Optional } from '@nestjs/common';
 import { ModuleRef } from '@nestjs/core';
 import { Notification } from './notification.entity';
 import { CreateNotificationDto } from './dto/create-notification.dto';
 import { UpdateNotificationDto } from './dto/update-notification.dto';
 import { ClockService } from '../common/services/clock.service';
-import { DigestService } from './digest.service';
 import { AuditService } from '../audit/audit.service';
-import { resolveNotificationPriority } from './notification-priority.config';
 
 export interface NotificationGroupedItem {
   label: string;
@@ -74,14 +72,10 @@ export class NotificationsService {
   constructor(
     @Optional() private readonly clockService?: ClockService,
     @Optional()
-    @Inject(forwardRef(() => DigestService))
-    private readonly digestService?: DigestService,
-    @Optional()
     @Inject(AuditService)
     private readonly auditService?: AuditService,
     @Optional() private readonly moduleRef?: ModuleRef,
   ) {
-    this.digestService?.registerNotificationsService?.(this);
     this.initSeeds();
   }
 
@@ -197,14 +191,6 @@ export class NotificationsService {
       rawType.replace(/_/g, ' ');
 
     const nowDate = this.clockService ? this.clockService.now() : new Date();
-    const resolvedPriority = resolveNotificationPriority(
-      {
-        type: rawType,
-        priority: createNotificationDto.priority,
-        metadata: createNotificationDto.metadata,
-      },
-      nowDate.getTime(),
-    );
 
     const resolvedGroupKey =
       createNotificationDto.groupKey || createNotificationDto.metadata?.groupKey;
@@ -229,21 +215,11 @@ export class NotificationsService {
       referenceId: createNotificationDto.referenceId,
       link: createNotificationDto.link || (createNotificationDto.referenceId ? `/projects/${createNotificationDto.referenceId}` : undefined),
       metadata: createNotificationDto.metadata,
-      priority: resolvedPriority,
       ...(resolvedGroupKey ? { groupKey: resolvedGroupKey } : {}),
       ...(resolvedCount !== undefined ? { count: resolvedCount } : {}),
       ...(resolvedItems ? { items: resolvedItems } : {}),
       ...(createNotificationDto.suggestedProjects ? { suggestedProjects: createNotificationDto.suggestedProjects } : {}),
     };
-
-    if (
-      this.digestService &&
-      !createNotificationDto.bypassDigest &&
-      this.digestService.shouldBuffer(notification)
-    ) {
-      this.digestService.enqueue(notification);
-      return { ...notification, bufferedForDigest: true } as any;
-    }
 
     this.notifications.push(notification);
     if (this.notifications.length > NotificationsService.MAX_NOTIFICATIONS) {

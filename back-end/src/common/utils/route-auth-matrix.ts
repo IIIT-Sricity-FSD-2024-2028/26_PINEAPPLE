@@ -34,6 +34,9 @@ export interface RouteAuthMatrixDocument {
 
 export const PUBLIC_ROUTE_ALLOWLIST: string[] = [
   'GET /admin/config/public',
+  // Cookie-authenticated admin session lifecycle endpoints (opaque httpOnly cookie + sameSite strict + Origin validation)
+  'POST /admin/auth/logout',
+  'POST /admin/auth/refresh',
   'POST /admin/login',
   'POST /auth/forgot-password',
   'POST /auth/login',
@@ -45,6 +48,7 @@ export const PUBLIC_ROUTE_ALLOWLIST: string[] = [
   'POST /support/tickets',
   'GET /health',
   'GET /mail/health',
+  // Public image/asset delivery from UPLOAD_DIR (avatars and non-CV files; CV routes remain guarded)
   'GET /uploads/:filename',
   'GET /users/:id/response-time',
   'GET /users/username-available',

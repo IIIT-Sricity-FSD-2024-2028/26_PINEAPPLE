@@ -1,27 +1,40 @@
-import { useState, useEffect, useContext, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { AuthContext } from '../../context/AuthContext';
-import joinRequestsApi from '../../services/joinRequestsApi';
-import projectsApi, { isProjectLocked } from '../../services/projectsApi';
+import { useDispatch, useSelector } from 'react-redux';
+import { selectCurrentUser } from '../../store/selectors/sessionSelectors';
+import { isProjectLocked } from '../../utils/projectStatus';
+import { fetchProjects } from '../../store/thunks/projectsThunks';
+import {
+  deleteJoinRequest,
+  fetchMyJoinRequests,
+} from '../../store/thunks/joinRequestsThunks';
+import { selectAllProjects } from '../../store/selectors/projectsSelectors';
+import {
+  selectMyJoinRequests,
+  selectMyJoinRequestsStatus,
+} from '../../store/selectors/joinRequestsSelectors';
 import Badge from '../../components/common/Badge';
 import EmptyState from '../../components/common/EmptyState';
 import DataTable from '../../components/common/DataTable';
 import Modal from '../../components/common/Modal';
 import { formatMemberSince } from '../../utils/dateFormatter';
-import storage from '../../utils/storage';
 import './appliedProjects.css';
 
-const AppliedProjects = () => {
-  const { user } = useContext(AuthContext);
+const AppliedProjectsContent = () => {
+  const user = useSelector(selectCurrentUser);
   const navigate = useNavigate();
+  const dispatch = useDispatch();
 
-  const [applications, setApplications] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const myRequests = useSelector(selectMyJoinRequests);
+  const myRequestsStatus = useSelector(selectMyJoinRequestsStatus);
+  const allProjects = useSelector(selectAllProjects);
+
+  const [initialLoaded, setInitialLoaded] = useState(false);
+  const loading = myRequestsStatus === 'loading' && !initialLoaded && myRequests.length === 0;
   const [feedback, setFeedback] = useState(null);
   const [deletingId, setDeletingId] = useState(null);
   const [withdrawTarget, setWithdrawTarget] = useState(null);
   const [withdrawOpenedAt, setWithdrawOpenedAt] = useState(0);
-  const [refreshKey, setRefreshKey] = useState(0);
   const feedbackTimerRef = useRef(null);
 
   useEffect(() => {
@@ -30,101 +43,102 @@ const AppliedProjects = () => {
     };
   }, []);
 
-  const effectiveUserId = user?.id || storage.getBackendUserId() || '';
+  const effectiveUserId = user?.id || '';
+  const effectiveUserName = user?.name || '';
 
   useEffect(() => {
     let isMounted = true;
-    const loadApplications = async () => {
-      try {
-        const [requests, allProjects] = await Promise.all([
-          joinRequestsApi.getMyRequests().catch(() => joinRequestsApi.list({ userId: effectiveUserId }).catch(() => [])),
-          projectsApi.list().catch(() => []),
-        ]);
-
-        const projectsMap = new Map();
-        if (Array.isArray(allProjects)) {
-          allProjects.forEach((p) => projectsMap.set(p.id, p));
-        }
-
-        storage.clearLegacyInviteKeys();
-
-        const enriched = (Array.isArray(requests) ? requests : [])
-          .filter((req) => req.status !== 'Invited' && req.status !== 'Declined')
-          .map((req) => {
-            const matchedProject = projectsMap.get(req.projectId) || {};
-            const removedRec = Array.isArray(matchedProject.removedUsers)
-              ? matchedProject.removedUsers.find(
-                  (r) =>
-                    String(r.userId) === String(effectiveUserId) ||
-                    (user?.name && r.userName && r.userName.toLowerCase() === user.name.toLowerCase())
-                )
-              : null;
-            const status = req.status || (removedRec ? 'Removed' : 'Pending');
-            const removalReason = req.removalReason || removedRec?.reason;
-            const rejectionReason = req.rejectionReason || (status?.toLowerCase() === 'rejected' ? req.reason : '');
-            return {
-              id: req.id,
-              projectId: req.projectId,
-              project: matchedProject.title || matchedProject.name || req.projectName || req.projectTitle || 'Project',
-              owner: matchedProject.owner || req.owner || 'Project Owner',
-              applied: req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'Recent',
-              dueDate: matchedProject.dueDate || req.projectDueDate,
-              status,
-              removalReason,
-              rejectionReason,
-              closureReason: req.closureReason,
-              sentAt: req.sentAt || req.createdAt,
-              viewedAt: req.viewedAt || null,
-              earlyWithdrawEligible: req.earlyWithdrawEligible,
-              requestsUsed: req.requestsUsed,
-              requestsLeft: req.requestsLeft,
-              suggestedProjects: Array.isArray(req.suggestedProjects) ? req.suggestedProjects : [],
-              isLocked: isProjectLocked(matchedProject),
-            };
-          });
-
-        if (Array.isArray(allProjects)) {
-          allProjects.forEach((p) => {
-            if (Array.isArray(p.removedUsers)) {
-              const rec = p.removedUsers.find(
-                (r) =>
-                  String(r.userId) === String(effectiveUserId) ||
-                  (user?.name && r.userName && r.userName.toLowerCase() === user.name.toLowerCase())
-              );
-              if (rec && !enriched.some((item) => item.projectId === p.id)) {
-                enriched.push({
-                  id: `removed-${p.id}`,
-                  projectId: p.id,
-                  project: p.title || p.name || 'Project',
-                  owner: p.owner || 'Project Owner',
-                  applied: rec.removedAt ? new Date(rec.removedAt).toLocaleDateString() : 'Recent',
-                  status: 'Removed',
-                  removalReason: rec.reason,
-                  isLocked: isProjectLocked(p),
-                });
-              }
-            }
-          });
-        }
-
-        if (isMounted) {
-          setApplications(enriched);
-        }
-      } catch (err) {
-        console.error('Failed to load applied projects:', err);
-      } finally {
-        if (isMounted) {
-          setLoading(false);
-        }
-      }
-    };
-
-    loadApplications();
+    Promise.all([
+      dispatch(fetchMyJoinRequests({ userId: effectiveUserId, force: true }))
+        .unwrap()
+        .catch(() => []),
+      dispatch(fetchProjects({ view: 'marketplace', force: true }))
+        .unwrap()
+        .catch(() => null),
+    ]).finally(() => {
+      if (isMounted) setInitialLoaded(true);
+    });
 
     return () => {
       isMounted = false;
     };
-  }, [effectiveUserId, refreshKey, user?.name]);
+  }, [dispatch, effectiveUserId]);
+
+  const applications = useMemo(() => {
+    const projectsMap = new Map();
+    if (Array.isArray(allProjects)) {
+      allProjects.forEach((p) => {
+        if (p?.id) projectsMap.set(p.id, p);
+      });
+    }
+
+    const enriched = (Array.isArray(myRequests) ? myRequests : [])
+      .filter((req) => req.status !== 'Invited' && req.status !== 'Declined')
+      .map((req) => {
+        const matchedProject = projectsMap.get(req.projectId) || {};
+        const removedRec = Array.isArray(matchedProject.removedUsers)
+          ? matchedProject.removedUsers.find(
+              (r) =>
+                String(r.userId) === String(effectiveUserId) ||
+                (effectiveUserName && r.userName && r.userName.toLowerCase() === effectiveUserName.toLowerCase()),
+            )
+          : null;
+        const status = req.status || (removedRec ? 'Removed' : 'Pending');
+        const removalReason = req.removalReason || removedRec?.reason;
+        const rejectionReason =
+          req.rejectionReason || (status?.toLowerCase() === 'rejected' ? req.reason : '');
+        return {
+          id: req.id,
+          projectId: req.projectId,
+          project:
+            matchedProject.title ||
+            matchedProject.name ||
+            req.projectName ||
+            req.projectTitle ||
+            'Project',
+          owner: matchedProject.owner || req.owner || 'Project Owner',
+          applied: req.createdAt ? new Date(req.createdAt).toLocaleDateString() : 'Recent',
+          dueDate: matchedProject.dueDate || req.projectDueDate,
+          status,
+          removalReason,
+          rejectionReason,
+          closureReason: req.closureReason,
+          sentAt: req.sentAt || req.createdAt,
+          viewedAt: req.viewedAt || null,
+          earlyWithdrawEligible: req.earlyWithdrawEligible,
+          requestsUsed: req.requestsUsed,
+          requestsLeft: req.requestsLeft,
+          suggestedProjects: Array.isArray(req.suggestedProjects) ? req.suggestedProjects : [],
+          isLocked: isProjectLocked(matchedProject),
+        };
+      });
+
+    if (Array.isArray(allProjects)) {
+      allProjects.forEach((p) => {
+        if (Array.isArray(p.removedUsers)) {
+          const rec = p.removedUsers.find(
+            (r) =>
+              String(r.userId) === String(effectiveUserId) ||
+              (effectiveUserName && r.userName && r.userName.toLowerCase() === effectiveUserName.toLowerCase()),
+          );
+          if (rec && !enriched.some((item) => item.projectId === p.id)) {
+            enriched.push({
+              id: `removed-${p.id}`,
+              projectId: p.id,
+              project: p.title || p.name || 'Project',
+              owner: p.owner || 'Project Owner',
+              applied: rec.removedAt ? new Date(rec.removedAt).toLocaleDateString() : 'Recent',
+              status: 'Removed',
+              removalReason: rec.reason,
+              isLocked: isProjectLocked(p),
+            });
+          }
+        }
+      });
+    }
+
+    return enriched;
+  }, [myRequests, allProjects, effectiveUserId, effectiveUserName]);
 
   const handleOpenWithdrawDialog = (item) => {
     setWithdrawTarget(item);
@@ -141,8 +155,10 @@ const AppliedProjects = () => {
     setDeletingId(requestId);
     setFeedback(null);
     try {
-      const res = await joinRequestsApi.remove(requestId);
-      setApplications((prev) => prev.filter((item) => item.id !== requestId));
+      const actionRes = await dispatch(
+        deleteJoinRequest({ id: requestId, projectId: target?.projectId }),
+      ).unwrap();
+      const res = actionRes?.res;
       setWithdrawTarget(null);
       const slotMsg = res?.slotRestored
         ? ' Your request slot has been restored.'
@@ -150,17 +166,16 @@ const AppliedProjects = () => {
       setFeedback({ type: 'success', message: `Application request withdrawn successfully.${slotMsg}` });
       if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
       feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3500);
-      setRefreshKey((k) => k + 1);
+      dispatch(fetchMyJoinRequests({ userId: effectiveUserId, force: true })).catch(() => {});
     } catch (err) {
-      if (err.message && (err.message.toLowerCase().includes('not found') || err.message.includes('404'))) {
-        setApplications((prev) => prev.filter((item) => item.id !== requestId));
+      if (err?.message && (err.message.toLowerCase().includes('not found') || err.message.includes('404'))) {
         setWithdrawTarget(null);
         setFeedback({ type: 'success', message: 'Application request was already removed.' });
         if (feedbackTimerRef.current) clearTimeout(feedbackTimerRef.current);
         feedbackTimerRef.current = setTimeout(() => setFeedback(null), 3500);
       } else {
         console.error('Failed to cancel application request:', err);
-        setFeedback({ type: 'error', message: err.message || 'Failed to cancel application request.' });
+        setFeedback({ type: 'error', message: err?.message || 'Failed to cancel application request.' });
       }
     } finally {
       setDeletingId(null);
@@ -445,5 +460,7 @@ const AppliedProjects = () => {
     </div>
   );
 };
+
+const AppliedProjects = AppliedProjectsContent;
 
 export default AppliedProjects;

@@ -1,13 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { render, screen, waitFor, fireEvent } from '@testing-library/react';
-import { MemoryRouter } from 'react-router-dom';
+import { screen, waitFor, fireEvent } from '@testing-library/react';
 import MentorsDirectory from '../pages/owner/MentorsDirectory';
 import MentorRevenue from '../pages/admin/MentorRevenue';
 import MentorEarnings from '../pages/mentor/MentorEarnings';
-import { AuthContext } from '../context/AuthContext';
-import { RoleContext } from '../context/RoleContext';
-import { UIProvider } from '../context/UIContext';
-import { NotificationProvider } from '../context/NotificationContext';
+import { renderWithStore } from './test-utils';
 
 const { mockMentorApi, mockProjectsApi } = vi.hoisted(() => ({
   mockMentorApi: {
@@ -32,7 +28,6 @@ vi.mock('../services/mentorMarketplaceApi', async (importOriginal) => {
   return {
     ...actual,
     default: mockMentorApi,
-    mentorMarketApi: mockMentorApi,
   };
 });
 
@@ -70,42 +65,28 @@ describe('Phase 9 Frontend Tests: Escrow & Payment Safety', () => {
   };
 
   const renderWithCustomAuth = (ui, { auth = {}, role = 'Project Owner', route = '/' } = {}) => {
-    const authValue = {
-      user: mockUser,
-      isAuthenticated: true,
-      loading: false,
-      updateUser: vi.fn(),
-      login: vi.fn(),
-      logout: vi.fn(),
-      ...auth,
-    };
-    const roleValue = {
-      currentRole: role,
-      setRole: vi.fn(),
-      availableRoles: ['Project Owner', 'Collaborator', 'Mentor', 'Admin'],
-    };
-
-    return render(
-      <MemoryRouter initialEntries={[route]}>
-        <AuthContext.Provider value={authValue}>
-          <RoleContext.Provider value={roleValue}>
-            <UIProvider>
-              <NotificationProvider>
-                {ui}
-              </NotificationProvider>
-            </UIProvider>
-          </RoleContext.Provider>
-        </AuthContext.Provider>
-      </MemoryRouter>
-    );
+    const isAdmin = role === 'Admin';
+    return renderWithStore(ui, {
+      route,
+      preloadedState: {
+        session: {
+          user: { ...mockUser, ...auth.user },
+          isAuthenticated: auth.isAuthenticated !== undefined ? auth.isAuthenticated : true,
+          status: 'authenticated',
+          activeRole: isAdmin ? 'Project Owner' : role,
+          portalRole: isAdmin ? 'admin' : null,
+          permissions: isAdmin ? ['*'] : [],
+          allowedRoles: ['Project Owner', 'Collaborator', 'Mentor'],
+          initialized: true,
+        },
+      },
+    });
   };
 
   beforeEach(() => {
     vi.clearAllMocks();
     sessionStorage.clear();
     localStorage.clear();
-    sessionStorage.setItem('teamforge.portalRole', 'Project Owner');
-    localStorage.setItem('teamforge.currentUser', JSON.stringify(mockUser));
   });
 
   describe('Demo Payment Flow, Idempotency & 30-min Timer', () => {
@@ -289,8 +270,6 @@ describe('Phase 9 Frontend Tests: Escrow & Payment Safety', () => {
         mismatches: [],
       });
 
-      sessionStorage.setItem('teamforge.portalRole', 'Admin');
-
       renderWithCustomAuth(<MentorRevenue />, { role: 'Admin' });
 
       await waitFor(() => {
@@ -322,7 +301,6 @@ describe('Phase 9 Frontend Tests: Escrow & Payment Safety', () => {
       };
 
       mockMentorApi.mentorSessions.mockResolvedValue([mentorCancelledSession]);
-      sessionStorage.setItem('teamforge.portalRole', 'Mentor');
 
       renderWithCustomAuth(<MentorEarnings />, { role: 'Mentor' });
 

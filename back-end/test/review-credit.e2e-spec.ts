@@ -16,9 +16,6 @@ describe('Review Time Credit (With Mandatory Project Deadline Cascade) E2E Tests
 
   beforeEach(() => {
     ctx.resetStores();
-    for (const u of ctx.usersRepository.findAll(true)) {
-      u.digestEnabled = false;
-    }
     ctx.clockService.setTime('2026-11-01T12:00:00.000Z');
   });
 

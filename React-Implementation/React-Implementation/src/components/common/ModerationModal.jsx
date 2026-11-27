@@ -1,7 +1,12 @@
 import { useState, useEffect, useRef } from 'react';
+import { useDispatch } from 'react-redux';
 import Modal from './Modal.jsx';
 import FormInput from './FormInput.jsx';
-import { adminApi } from '../../services/adminApi.js';
+import { issueUserWarning } from '../../store/thunks/warningsThunks.js';
+import {
+  reactivateUserModeration,
+  suspendUserModeration,
+} from '../../store/thunks/pendingModerationActionsThunks.js';
 
 /**
  * Inner content component with fresh state per user/action session.
@@ -13,6 +18,7 @@ const ModerationModalContent = ({
   onSuccess,
   onSubmit,
 }) => {
+  const dispatch = useDispatch();
   const [reason, setReason] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
@@ -63,11 +69,21 @@ const ModerationModalContent = ({
       } else {
         const userId = targetUser?.id;
         if (normalizedAction === 'warn') {
-          res = await adminApi.warnUser(userId, { reason: trimmed });
+          res = await dispatch(issueUserWarning({ userId, reason: trimmed })).unwrap();
         } else if (normalizedAction === 'suspend') {
-          res = await adminApi.suspendUser(userId, { reason: trimmed });
+          const out = await dispatch(
+            suspendUserModeration({
+              userId,
+              targetUserName: targetUser?.name,
+              reason: trimmed,
+            }),
+          ).unwrap();
+          res = out?.result || out;
         } else if (normalizedAction === 'reactivate') {
-          res = await adminApi.reactivateUser(userId, { reason: trimmed });
+          const out = await dispatch(
+            reactivateUserModeration({ userId, reason: trimmed }),
+          ).unwrap();
+          res = out?.result || out;
         }
       }
 

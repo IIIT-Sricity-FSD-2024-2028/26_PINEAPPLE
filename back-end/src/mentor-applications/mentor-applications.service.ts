@@ -18,7 +18,7 @@ import { assertSafeHttpUrl } from '../common/utils/url.util';
 import { ClockService } from '../common/services/clock.service';
 import { ContentFilterService } from '../common/services/content-filter.service';
 import { FileCleanupService } from '../common/services/file-cleanup.service';
-import { SECURE_CVS_DIR } from '../core/middleware/file-upload.middleware';
+import { getSecureCvsDir } from '../core/middleware/file-upload.middleware';
 import { FeedbackService } from '../feedback/feedback.service';
 
 export interface ApproveOptions {
@@ -853,7 +853,7 @@ export class MentorApplicationsService extends BaseService<MentorApplicationEnti
   cleanupApplicationCvFile(application: MentorApplicationEntity): void {
     if (application?.cvFileName) {
       const cleanup = this.fileCleanupService || new FileCleanupService();
-      cleanup.removeNamedFileInDir(SECURE_CVS_DIR, application.cvFileName, false);
+      cleanup.removeNamedFileInDir(getSecureCvsDir(), application.cvFileName, false);
       application.cvFileName = undefined;
       application.cvUrl = undefined;
       super.update(application.id, { cvFileName: undefined, cvUrl: undefined } as any);

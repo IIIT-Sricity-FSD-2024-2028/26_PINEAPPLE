@@ -1,13 +1,13 @@
-import { render, screen, fireEvent, waitFor } from '@testing-library/react';
+import { screen, fireEvent, waitFor } from '@testing-library/react';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { useReasonAction } from '../hooks/useReasonAction';
 import FeedbackHistory from '../components/features/FeedbackHistory';
 import feedbackApi from '../services/feedbackApi';
+import { renderWithStore } from './test-utils';
 
 // Test component integrating useReasonAction and FeedbackHistory
 const TestHarness = ({ onActionSubmit, initialHistory = [] }) => {
   const { requestReason, renderModal } = useReasonAction();
-  const [history, setHistory] = vi.importActual ? [initialHistory, () => {}] : [initialHistory, () => {}];
 
   const handleTriggerAction = async (actionType) => {
     try {
@@ -20,7 +20,9 @@ const TestHarness = ({ onActionSubmit, initialHistory = [] }) => {
         },
       });
       return result;
-    } catch {}
+    } catch {
+      return null;
+    }
   };
 
   return (
@@ -84,7 +86,7 @@ describe('FIX 4: Universal Action Reason and Feedback Integration', () => {
   it('triggers action reason flow through hook, enforces rules, and submits structured feedback', async () => {
     mockSubmit.mockResolvedValueOnce({ success: true });
 
-    render(<TestHarness onActionSubmit={mockSubmit} />);
+    renderWithStore(<TestHarness onActionSubmit={mockSubmit} />);
 
     // Click trigger button
     fireEvent.click(screen.getByTestId('trigger-decline-btn'));
@@ -116,7 +118,7 @@ describe('FIX 4: Universal Action Reason and Feedback Integration', () => {
   it('requires 10 to 500 characters explanation for REJECT_WORK action', async () => {
     mockSubmit.mockResolvedValueOnce({ success: true });
 
-    render(<TestHarness onActionSubmit={mockSubmit} />);
+    renderWithStore(<TestHarness onActionSubmit={mockSubmit} />);
 
     fireEvent.click(screen.getByTestId('trigger-reject-btn'));
 
