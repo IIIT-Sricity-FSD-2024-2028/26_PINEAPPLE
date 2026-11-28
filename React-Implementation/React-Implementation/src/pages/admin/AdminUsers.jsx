@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { toText } from '../../utils/toText';
 import { useNavigate, useSearchParams, Link } from 'react-router-dom';
 import {
   fetchAdminUsers,
@@ -381,22 +382,22 @@ const AdminUsersContent = () => {
                   >
                     <div style={{ flex: 1, minWidth: '240px' }}>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                        <strong>Suspend: {act.targetUserName || `User #${act.targetUserId}`}</strong>
-                        <Badge variant={act.status === 'pending' ? 'warning' : act.status === 'approved' ? 'success' : 'secondary'}>
-                          {act.status === 'pending' && isSelf ? 'Waiting for another admin' : act.status}
+                        <strong>Suspend: {toText(act.targetUserName, `User #${act.targetUserId}`)}</strong>
+                        <Badge variant={toText(act.status) === 'pending' ? 'warning' : toText(act.status) === 'approved' ? 'success' : 'secondary'}>
+                          {toText(act.status) === 'pending' && isSelf ? 'Waiting for another admin' : toText(act.status)}
                         </Badge>
                       </div>
                       <div style={{ fontSize: '0.84rem', color: '#475569', marginTop: '4px' }}>
-                        Requested by: <strong>{act.requestedByName || act.requestedBy}</strong> · Triggers:{' '}
-                        {(act.thresholdReasons || []).join(', ') || 'Threshold met'} · Expires:{' '}
+                        Requested by: <strong>{toText(act.requestedByName ?? act.requestedBy, 'Administrator')}</strong> · Triggers:{' '}
+                        {(act.thresholdReasons || []).map((r) => toText(r)).join(', ') || 'Threshold met'} · Expires:{' '}
                         {act.expiresAt ? new Date(act.expiresAt).toLocaleString() : '—'}
                       </div>
                       <div style={{ fontSize: '0.86rem', marginTop: '4px' }}>
-                        <strong>Reason:</strong> {act.reason}
+                        <strong>Reason:</strong> {toText(act.reason)}
                       </div>
                       {act.decisionReason && (
                         <div style={{ fontSize: '0.82rem', color: '#334155', marginTop: '4px' }}>
-                          <strong>Decision Note ({act.decidedByName || act.decidedBy}):</strong> {act.decisionReason}
+                          <strong>Decision Note ({toText(act.decidedByName ?? act.decidedBy, 'Admin')}):</strong> {toText(act.decisionReason)}
                         </div>
                       )}
                     </div>
@@ -607,12 +608,12 @@ const AdminUsersContent = () => {
                     </div>
                   )}
 
-                  <Badge variant={user.status} className={getStatusBadgeClass(user.status)}>
+                  <Badge variant={toText(user.status, 'Active')} className={getStatusBadgeClass(toText(user.status, 'Active'))}>
                     {user.pendingModerationAction
                       ? 'Pending 2nd Approval'
                       : activeWarnings > 0 && !isSuspended
                       ? `Warned (${activeWarnings}/4)`
-                      : toTitleCase(user.status || 'active')}
+                      : toTitleCase(toText(user.status, 'active'))}
                   </Badge>
                   
                   <div className="admin-user-actions dropdown">

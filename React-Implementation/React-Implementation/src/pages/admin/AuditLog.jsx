@@ -27,6 +27,7 @@ import SearchBar from '../../components/common/SearchBar';
 import DataTable from '../../components/common/DataTable';
 import FilterTabs from '../../components/common/FilterTabs';
 import Modal from '../../components/common/Modal';
+import { toText } from '../../utils/toText';
 import './AuditLog.css';
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}/;
@@ -120,8 +121,8 @@ const AuditLogContent = () => {
       sortable: true,
       width: '100px',
       render: (entry) => (
-        <span className={`admin-audit-type ${entry.type}`}>
-          {entry.type}
+        <span className={`admin-audit-type ${toText(entry.type, 'info')}`}>
+          {toText(entry.type, 'info')}
         </span>
       ),
     },
@@ -131,8 +132,10 @@ const AuditLogContent = () => {
       sortable: true,
       render: (entry) => (
         <div>
-          <div className="admin-audit-event">{entry.event}</div>
-          <div className="admin-audit-time">{entry.timestampFormatted || entry.timestamp}</div>
+          <div className="admin-audit-event">
+            {toText(entry.event ?? entry.details ?? entry.action, 'Audit event')}
+          </div>
+          <div className="admin-audit-time">{toText(entry.timestampFormatted || entry.timestamp, '—')}</div>
         </div>
       ),
     },
@@ -140,11 +143,13 @@ const AuditLogContent = () => {
       header: 'Actor',
       accessor: 'actor',
       sortable: true,
+      render: (entry) => toText(entry.actor ?? entry.performedBy, 'System'),
     },
     {
       header: 'Target',
       accessor: 'target',
       sortable: true,
+      render: (entry) => toText(entry.target, '—'),
     },
     {
       header: 'Details',

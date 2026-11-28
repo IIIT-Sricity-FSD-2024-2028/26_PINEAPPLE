@@ -1,4 +1,3 @@
-import { formatMemberSince, formatDateTime } from '../../utils/dateFormatter';
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
@@ -13,17 +12,14 @@ import {
   setRepTypeFilter as setRepTypeFilterAction,
 } from '../../store/slices/adminUsersSlice';
 import {
-  selectAdminUserDetailsById,
-  selectAdminUserReputationById,
   selectAdminUsersWorking,
+  selectUserDetailsView,
 } from '../../store/selectors/adminUsersSelectors';
 import { fetchAdminMentorFeedback } from '../../store/thunks/sessionFeedbackThunks';
-import { selectAdminMentorFeedbackById } from '../../store/selectors/sessionFeedbackSelectors';
 import {
   fetchUserWarningsAdmin,
   issueUserWarning,
 } from '../../store/thunks/warningsThunks';
-import { selectUserActiveWarningsCount } from '../../store/selectors/warningsSelectors';
 import {
   reactivateUserModeration,
   suspendUserModeration,
@@ -41,30 +37,26 @@ const AdminUserDetailsContent = () => {
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
-  const user = useSelector(selectAdminUserDetailsById(id));
+  const view = useSelector(selectUserDetailsView(id));
   const usersWorking = useSelector(selectAdminUsersWorking);
-  const reputationState = useSelector(selectAdminUserReputationById(id));
 
-  const loading = Boolean(usersWorking.detailLoading && !user);
-  const error = !user ? usersWorking.detailError : null;
+  const loading = Boolean(usersWorking.detailLoading && !view);
+  const error = !view ? usersWorking.detailError : null;
   const [toast, setToast] = useState({ visible: false, message: '', type: 'success' });
   const [isProcessing, setIsProcessing] = useState(false);
   const toastTimeoutRef = useRef(null);
 
   // Reputation history pagination state (backed by adminUsersSlice)
-  const repTypeFilter = usersWorking.repTypeFilter || 'all';
-  const repPage = usersWorking.repPage || 1;
+  const repTypeFilter = view?.reputation?.typeFilter || usersWorking.repTypeFilter || 'all';
+  const repPage = view?.reputation?.page || usersWorking.repPage || 1;
   const setRepTypeFilter = (val) => dispatch(setRepTypeFilterAction(val));
   const setRepPage = (valOrFn) =>
     dispatch(
       setRepPageAction(typeof valOrFn === 'function' ? valOrFn(repPage) : valOrFn),
     );
-  const repTotal = reputationState.total || 0;
-  const reputationEntries = reputationState.items || [];
-  const mentorFeedbackData = useSelector((state) =>
-    selectAdminMentorFeedbackById(state, id),
-  );
-  const storeActiveWarningsCount = useSelector(selectUserActiveWarningsCount(id));
+  const repTotal = view?.reputation?.total || 0;
+  const reputationEntries = view?.reputation?.items || [];
+  const mentorFeedbackData = view?.mentorFeedback || null;
 
   // Moderation action modal state
   const [modalAction, setModalAction] = useState(null); // 'warn' | 'suspend' | 'activate' | null
@@ -107,7 +99,7 @@ const AdminUserDetailsContent = () => {
         const out = await dispatch(
           suspendUserModeration({
             userId: id,
-            targetUserName: user?.name,
+            targetUserName: view?.name,
             reason: trimmed,
           }),
         ).unwrap();
@@ -175,19 +167,14 @@ const AdminUserDetailsContent = () => {
     );
   }, [dispatch, id, repPage, repTypeFilter]);
 
+  const isMentorRole = Boolean(view?.isMentorRole);
   useEffect(() => {
-    const isMentorUser = Boolean(
-      user &&
-      (String(user.role || '').toLowerCase() === 'mentor' ||
-        user.mentorUnlocked ||
-        user.profile?.mentorUnlocked)
-    );
-    if (!id || !isMentorUser) {
+    if (!id || !isMentorRole) {
       return undefined;
     }
     dispatch(fetchAdminMentorFeedback({ mentorId: id }));
     return undefined;
-  }, [dispatch, id, user]);
+  }, [dispatch, id, isMentorRole]);
 
 
 
@@ -201,7 +188,7 @@ const AdminUserDetailsContent = () => {
     );
   }
 
-  if (error || !user) {
+  if (error || !view) {
     return (
       <div className="admin-page">
         <button className="btn btn-outline mb-4" onClick={() => navigate('/admin/users')}>
@@ -217,16 +204,18 @@ const AdminUserDetailsContent = () => {
     );
   }
 
-  const isSuspended = (user.status || '').toLowerCase() === 'suspended';
-  const isFlagged = user.flags === true || user.flagged === true || (user.status || '').toLowerCase() === 'flagged';
-  const isWarned = (user.status || '').toLowerCase() === 'warned' || (user.warnings && (Array.isArray(user.warnings) ? user.warnings.length > 0 : user.warnings > 0));
-  const activeWarnings = storeActiveWarningsCount ?? user.activeWarningsCount ?? user.warningsCount ?? (
-    Array.isArray(user.warnings)
-      ? user.warnings.filter((w) => typeof w === 'object' ? w.active !== false : true).length
-      : (typeof user.warnings === 'number' ? user.warnings : 0)
-  );
-
-  const formattedJoinedDate = formatMemberSince(user.createdAt || user.joinedDate || user.profile?.createdAt || user.profile?.joined);
+  const {
+    isSuspended,
+    isFlagged,
+    isDeleted,
+    hasDuplicateFlag,
+    hasPendingSecondApproval,
+    pendingModerationActions,
+    suspension,
+    reactivation,
+    activeWarningsCount: activeWarnings,
+    actions,
+  } = view;
 
   const projectColumns = [
     {
@@ -242,21 +231,21 @@ const AdminUserDetailsContent = () => {
     {
       header: 'Difficulty',
       accessor: 'difficulty',
-      render: (p) => p.difficulty || '—',
+      render: (p) => p.difficulty,
     },
     {
       header: 'Status',
       accessor: 'status',
       render: (p) => (
-        <Badge variant={p.isCompleted ? 'completed' : (p.status?.toLowerCase() || 'open')}>
-          {p.isCompleted ? 'Completed' : (p.status || 'Active')}
+        <Badge variant={p.badgeVariant}>
+          {p.status}
         </Badge>
       ),
     },
     {
       header: 'Progress',
       accessor: 'progress',
-      render: (p) => `${p.progress ?? 0}%`,
+      render: (p) => `${p.progress}%`,
     },
   ];
 
@@ -269,19 +258,19 @@ const AdminUserDetailsContent = () => {
     {
       header: 'Project',
       accessor: 'projectName',
-      render: (t) => t.projectName || '—',
+      render: (t) => t.projectName,
     },
     {
       header: 'Priority',
       accessor: 'priority',
-      render: (t) => <Badge variant={t.priority || 'medium'}>{t.priority || 'Medium'}</Badge>,
+      render: (t) => <Badge variant={t.priority}>{t.priority}</Badge>,
     },
     {
       header: 'Status',
       accessor: 'status',
       render: (t) => (
-        <Badge variant={(t.status || '').toLowerCase() === 'approved' ? 'completed' : 'info'}>
-          {t.status || 'Open'}
+        <Badge variant={t.badgeVariant}>
+          {t.status}
         </Badge>
       ),
     },
@@ -291,7 +280,7 @@ const AdminUserDetailsContent = () => {
       align: 'right',
       render: (t) => (
         <span style={{ fontWeight: 600, color: 'var(--primary, #6366f1)' }}>
-          +{t.awardedXp || 50} XP
+          +{t.awardedXp} XP
         </span>
       ),
     },
@@ -305,14 +294,16 @@ const AdminUserDetailsContent = () => {
         </button>
 
         <div className="admin-user-actions-toolbar" role="toolbar" aria-label="User moderation actions">
-          <button
-            className="admin-user-action-btn admin-action-warn"
-            onClick={() => openModerationModal('warn')}
-            disabled={isProcessing}
-          >
-            Issue Warning
-          </button>
-          {!isSuspended ? (
+          {actions.canWarn && (
+            <button
+              className="admin-user-action-btn admin-action-warn"
+              onClick={() => openModerationModal('warn')}
+              disabled={isProcessing}
+            >
+              Issue Warning
+            </button>
+          )}
+          {actions.canSuspend && (
             <button
               className="admin-user-action-btn admin-action-suspend"
               onClick={() => openModerationModal('suspend')}
@@ -320,7 +311,24 @@ const AdminUserDetailsContent = () => {
             >
               Suspend User
             </button>
-          ) : (
+          )}
+          {hasPendingSecondApproval && !isSuspended && !isDeleted && (
+            <span
+              data-testid="toolbar-pending-second-approval"
+              style={{
+                padding: '6px 12px',
+                borderRadius: '6px',
+                background: '#fef3c7',
+                border: '1px solid #fde68a',
+                color: '#92400e',
+                fontSize: '0.84rem',
+                fontWeight: 600,
+              }}
+            >
+              Pending Second Approval
+            </span>
+          )}
+          {actions.canReactivate && (
             <button
               className="admin-user-action-btn admin-action-activate"
               onClick={() => openModerationModal('activate')}
@@ -329,22 +337,24 @@ const AdminUserDetailsContent = () => {
               Reactivate User
             </button>
           )}
-          {isFlagged ? (
-            <button
-              className="admin-user-action-btn admin-action-unflag"
-              onClick={() => handleFlagAction('unflag')}
-              disabled={isProcessing}
-            >
-              Remove Flag
-            </button>
-          ) : (
-            <button
-              className="admin-user-action-btn admin-action-flag"
-              onClick={() => handleFlagAction('flag')}
-              disabled={isProcessing}
-            >
-              Flag Account
-            </button>
+          {actions.canToggleFlag && (
+            isFlagged ? (
+              <button
+                className="admin-user-action-btn admin-action-unflag"
+                onClick={() => handleFlagAction('unflag')}
+                disabled={isProcessing}
+              >
+                Remove Flag
+              </button>
+            ) : (
+              <button
+                className="admin-user-action-btn admin-action-flag"
+                onClick={() => handleFlagAction('flag')}
+                disabled={isProcessing}
+              >
+                Flag Account
+              </button>
+            )
           )}
         </div>
       </div>
@@ -365,15 +375,15 @@ const AdminUserDetailsContent = () => {
 
       {/* User Hero Banner */}
       <div className="admin-user-hero">
-        <Avatar name={user.name} src={user.avatarUrl || user.avatar || user.profile?.avatarUrl} version={user.updatedAt} size="lg" />
+        <Avatar name={view.name} src={view.avatarUrl} version={view.updatedAt} size="lg" />
         <div className="admin-user-hero-info">
           <div className="admin-user-hero-title">
-            <h2>{user.name}</h2>
+            <h2>{view.name}</h2>
             {isFlagged && <span style={{ fontSize: '1.25rem' }} title="Flagged account">🏳</span>}
           </div>
           <div className="admin-user-hero-meta">
             <span
-              title={user.email}
+              title={view.email}
               style={{
                 maxWidth: '280px',
                 overflow: 'hidden',
@@ -383,45 +393,117 @@ const AdminUserDetailsContent = () => {
                 verticalAlign: 'bottom',
               }}
             >
-              {user.email}
-            </span> &bull; <span>@{user.username}</span> &bull; <span>{user.university || user.uni || 'Not specified'}</span>
-            {user.phone ? (
+              {view.email}
+            </span> &bull; <span>@{view.username}</span> &bull; <span>{view.university}</span>
+            {view.phone ? (
               <>
                 {' '}&bull;{' '}
                 <span>
-                  📞 {user.phone}{' '}
-                  <Badge variant={user.phoneVerified ? 'success' : 'secondary'} size="sm">
-                    {user.phoneVerified ? 'Verified' : 'Not verified'}
+                  📞 {view.phone}{' '}
+                  <Badge variant={view.phoneVerified ? 'success' : 'secondary'} size="sm">
+                    {view.phoneVerified ? 'Verified' : 'Not verified'}
                   </Badge>
                 </span>
               </>
             ) : null}
           </div>
           <div className="admin-user-hero-tags">
-            <Badge variant={user.role === 'Mentor' ? 'warning' : 'info'}>
-              {user.role}
+            <Badge variant={view.role === 'Mentor' ? 'warning' : 'info'}>
+              {view.role}
             </Badge>
-            <Badge variant={isSuspended ? 'danger' : isWarned ? 'warning' : 'success'}>
-              {user.status}
+            <Badge variant={view.statusBadgeVariant}>
+              {view.status}
             </Badge>
             {activeWarnings > 0 && (
               <Badge variant="warning">{activeWarnings}/4 Warnings</Badge>
             )}
+            {hasDuplicateFlag && (
+              <Badge variant="warning">Possible Duplicate</Badge>
+            )}
             <span style={{ fontSize: '0.8rem', color: 'var(--muted-fg, #6b7280)', marginLeft: '4px' }}>
-              Member since {formattedJoinedDate}
+              Member since {view.joinedDateFormatted}
             </span>
           </div>
         </div>
       </div>
 
+      {/* Suspension Panel (shown for suspended accounts) */}
+      {isSuspended && suspension && (
+        <div
+          className="admin-user-section-card"
+          data-testid="user-suspension-panel"
+          style={{
+            marginBottom: '20px',
+            borderColor: '#fecaca',
+            backgroundColor: '#fef2f2',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px', marginBottom: '12px' }}>
+            <h3 className="admin-user-section-title" style={{ margin: 0, color: '#991b1b' }}>
+              <span>⛔</span> Account Suspension Details
+            </h3>
+            <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
+              <Badge variant="danger">{suspension.typeLabel}</Badge>
+              {suspension.appealStatusLabel && (
+                <Badge variant="warning" data-testid="suspension-appeal-status">
+                  Appeal: {suspension.appealStatusLabel}
+                </Badge>
+              )}
+            </div>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '12px', fontSize: '0.88rem', color: '#1e293b' }}>
+            <div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>Reason</div>
+              <div data-testid="suspension-reason" style={{ marginTop: '2px', fontWeight: 500 }}>{suspension.reason}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>Suspension Type</div>
+              <div data-testid="suspension-type" style={{ marginTop: '2px', fontWeight: 500 }}>{suspension.typeLabel}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>Suspended At</div>
+              <div data-testid="suspension-date" style={{ marginTop: '2px', fontWeight: 500 }}>{suspension.suspendedAtFormatted}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>Suspended By</div>
+              <div data-testid="suspension-by" style={{ marginTop: '2px', fontWeight: 500 }}>{suspension.suspendedByName}</div>
+            </div>
+            {suspension.appealStatusLabel && (
+              <div>
+                <div style={{ fontSize: '0.76rem', color: '#64748b', fontWeight: 600 }}>Appeal Status</div>
+                <div style={{ marginTop: '2px', fontWeight: 500 }}>{suspension.appealStatusLabel}</div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {!isSuspended && reactivation && (
+        <div
+          className="admin-user-section-card"
+          data-testid="user-reactivation-banner"
+          style={{
+            marginBottom: '20px',
+            borderColor: '#bbf7d0',
+            backgroundColor: '#f0fdf4',
+            fontSize: '0.88rem',
+            color: '#166534',
+          }}
+        >
+          <strong>Account Reactivated</strong>
+          {reactivation.reactivatedAtFormatted ? ` on ${reactivation.reactivatedAtFormatted}` : ''}
+          {reactivation.reason ? ` — Reason: ${reactivation.reason}` : ''}
+        </div>
+      )}
+
       {/* KPI StatCards */}
       <div className="admin-user-stats-grid">
-        <StatCard label="Total Experience" value={`${Number(user.xp || 0).toLocaleString()} XP`} />
-        <StatCard label="Reputation Score" value={`${Number(user.rep || 0).toLocaleString()} Rep`} />
-        <StatCard label="Associated Projects" value={user.projectsCount || 0} />
-        <StatCard label="Tasks Completed" value={user.completedTasksCount || 0} />
+        <StatCard label="Total Experience" value={view.xpFormatted} />
+        <StatCard label="Reputation Score" value={view.repFormatted} />
+        <StatCard label="Associated Projects" value={view.projectsCount} />
+        <StatCard label="Tasks Completed" value={view.completedTasksCount} />
         <StatCard label="Active Warnings" value={`${activeWarnings}/4`} />
-        <StatCard label="Mentor Authorization" value={user.mentorStatus || 'None'} />
+        <StatCard label="Mentor Authorization" value={view.mentorStatus} />
       </div>
 
       <div className="admin-user-details-grid">
@@ -429,12 +511,12 @@ const AdminUserDetailsContent = () => {
         <div className="admin-user-left-col">
           <div className="admin-user-section-card">
             <h3 className="admin-user-section-title">
-              <span>📁</span> Associated Projects ({user.projects?.length || 0})
+              <span>📁</span> Associated Projects ({view.projects.length})
             </h3>
-            {user.projects && user.projects.length > 0 ? (
+            {view.projects.length > 0 ? (
               <DataTable
                 columns={projectColumns}
-                data={user.projects}
+                data={view.projects}
                 keyField="id"
               />
             ) : (
@@ -447,12 +529,12 @@ const AdminUserDetailsContent = () => {
 
           <div className="admin-user-section-card">
             <h3 className="admin-user-section-title">
-              <span>📋</span> Task Contribution History ({user.contributions?.length || 0})
+              <span>📋</span> Task Contribution History ({view.contributions.length})
             </h3>
-            {user.contributions && user.contributions.length > 0 ? (
+            {view.contributions.length > 0 ? (
               <DataTable
                 columns={taskColumns}
-                data={user.contributions}
+                data={view.contributions}
                 keyField="id"
               />
             ) : (
@@ -470,9 +552,9 @@ const AdminUserDetailsContent = () => {
             <h3 className="admin-user-section-title">
               <span>🛠️</span> Technical Skills
             </h3>
-            {Array.isArray(user.skills) && user.skills.length > 0 ? (
+            {view.skills.length > 0 ? (
               <div className="admin-user-skills-wrap">
-                {user.skills.map((s, idx) => (
+                {view.skills.map((s, idx) => (
                   <span key={idx} className="admin-user-skill-chip">{s}</span>
                 ))}
               </div>
@@ -486,13 +568,13 @@ const AdminUserDetailsContent = () => {
           {/* Mentor Recommendations Card */}
           <div className="admin-user-section-card">
             <h3 className="admin-user-section-title">
-              <span>🏅</span> Mentor Recommendations ({Array.isArray(user.mentorRecommendations) ? user.mentorRecommendations.length : 0})
+              <span>🏅</span> Mentor Recommendations ({view.mentorRecommendations.length})
             </h3>
-            {Array.isArray(user.mentorRecommendations) && user.mentorRecommendations.length > 0 ? (
+            {view.mentorRecommendations.length > 0 ? (
               <div className="admin-user-recommendations-list" style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-                {user.mentorRecommendations.map((rec, idx) => (
+                {view.mentorRecommendations.map((rec) => (
                   <div
-                    key={rec.id || idx}
+                    key={rec.id}
                     style={{
                       padding: '12px 16px',
                       borderRadius: '8px',
@@ -502,23 +584,19 @@ const AdminUserDetailsContent = () => {
                   >
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '6px' }}>
                       <Badge variant="warning">
-                        {rec.badgeName || rec.badgeType || 'Recommendation'}
+                        {rec.badgeName}
                       </Badge>
-                      {rec.awardedAt && (
+                      {rec.awardedAtFormatted && (
                         <span style={{ fontSize: '0.8rem', color: 'var(--muted-fg, #6b7280)' }}>
-                          {new Date(rec.awardedAt).toLocaleDateString(undefined, {
-                            year: 'numeric',
-                            month: 'short',
-                            day: 'numeric',
-                          })}
+                          {rec.awardedAtFormatted}
                         </span>
                       )}
                     </div>
                     <div style={{ fontSize: '0.88rem', color: 'var(--fg, #1e293b)' }}>
-                      Given by <strong>{rec.mentorName || rec.mentor}</strong> on{' '}
-                      <em>{rec.projectTitle || rec.project}</em>
+                      Given by <strong>{rec.mentorName}</strong> on{' '}
+                      <em>{rec.projectTitle}</em>
                     </div>
-                    {(rec.comment || rec.note) && (
+                    {rec.comment && (
                       <div
                         style={{
                           marginTop: '6px',
@@ -529,7 +607,7 @@ const AdminUserDetailsContent = () => {
                           paddingLeft: '8px',
                         }}
                       >
-                        &ldquo;{rec.comment || rec.note}&rdquo;
+                        &ldquo;{rec.comment}&rdquo;
                       </div>
                     )}
                   </div>
@@ -545,9 +623,9 @@ const AdminUserDetailsContent = () => {
           {/* Warning History Section Card */}
           <div className="admin-user-section-card" data-testid="warning-history-card">
             <h3 className="admin-user-section-title">
-              <span>⚠️</span> Warning History ({Array.isArray(user.warningHistory) ? user.warningHistory.length : (Array.isArray(user.warnings) ? user.warnings.length : 0)})
+              <span>⚠️</span> Warning History ({view.warnings.length})
             </h3>
-            {Array.isArray(user.pendingModerationActions) && user.pendingModerationActions.some((a) => a.status === 'pending') && (
+            {hasPendingSecondApproval && (
               <div
                 data-testid="user-pending-second-approval-banner"
                 style={{
@@ -560,83 +638,73 @@ const AdminUserDetailsContent = () => {
                   fontSize: '0.86rem',
                 }}
               >
-                Pending Second Approval — Waiting for another admin or Super User to approve or reject suspension request.
+                <div>
+                  <strong>Pending Second Approval</strong> — Waiting for another admin or Super User to approve or reject suspension request.
+                </div>
+                {pendingModerationActions
+                  .filter((a) => a.status === 'pending')
+                  .map((act) => (
+                    <div key={act.id} style={{ fontSize: '0.8rem', marginTop: '4px' }}>
+                      Requested by {act.requestedByName}: &ldquo;{act.reason}&rdquo; (Expires {act.expiresAtFormatted})
+                    </div>
+                  ))}
               </div>
             )}
-            {(() => {
-              const items = Array.isArray(user.warningHistory) && user.warningHistory.length > 0
-                ? user.warningHistory
-                : (Array.isArray(user.warnings) ? user.warnings : []);
-              if (items.length === 0) {
-                return (
-                  <p style={{ color: 'var(--muted-fg, #6b7280)', fontSize: '0.88rem', margin: 0, fontStyle: 'italic' }}>
-                    No warnings recorded for this user.
-                  </p>
-                );
-              }
-              return (
-                <div className="admin-user-warnings-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                  {items.map((w, idx) => {
-                    const reason = typeof w === 'object' ? w.reason : String(w);
-                    const rawDate = typeof w === 'object' ? (w.createdAt || w.issuedAt) : null;
-                    const issuedAt = rawDate ? new Date(rawDate).toLocaleDateString() : '—';
-                    const issuedBy = typeof w === 'object' ? (w.moderatorName || w.issuedBy || 'Administrator') : 'Administrator';
-                    const wStatus = typeof w === 'object' ? (w.status || (w.active === false ? 'removed' : 'active')).toLowerCase() : 'active';
-                    const isActive = wStatus === 'active';
-                    const isExpired = wStatus === 'expired';
-                    const badgeLabel = isActive ? 'Active' : isExpired ? 'Expired' : wStatus === 'cleared' ? 'Cleared' : 'Removed / Appealed';
-                    const badgeVariant = isActive ? 'warning' : 'secondary';
-                    return (
-                      <div
-                        key={w.id || idx}
-                        className="admin-user-warning-item"
-                        style={{
-                          padding: '12px 16px',
-                          borderRadius: '8px',
-                          backgroundColor: isActive ? '#fffbeb' : 'var(--surface-alt, #f8fafc)',
-                          border: `1px solid ${isActive ? '#fde68a' : 'var(--border, #e2e8f0)'}`,
-                        }}
-                      >
-                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
-                          <span style={{ fontWeight: 600, fontSize: '0.9rem', color: isActive ? '#92400e' : '#64748b' }}>
-                            Warning #{idx + 1}
-                          </span>
-                          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-                            <Badge variant={badgeVariant} data-testid={`warning-status-${w.id || idx}`}>
-                              {badgeLabel}
-                            </Badge>
-                            <span style={{ fontSize: '0.8rem', color: 'var(--muted-fg, #6b7280)' }}>
-                              {issuedAt}
-                            </span>
-                          </div>
-                        </div>
-                        <div style={{ fontSize: '0.88rem', color: 'var(--fg, #1e293b)' }}>
-                          <strong>Reason:</strong> {reason}
-                        </div>
-                        <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg, #64748b)', marginTop: '4px' }}>
-                          Issued by: {issuedBy}
-                          {isExpired && w.expiredAt ? ` · Expired: ${new Date(w.expiredAt).toLocaleDateString()}` : ''}
-                        </div>
+            {view.warnings.length === 0 ? (
+              <p style={{ color: 'var(--muted-fg, #6b7280)', fontSize: '0.88rem', margin: 0, fontStyle: 'italic' }}>
+                No warnings recorded for this user.
+              </p>
+            ) : (
+              <div className="admin-user-warnings-list" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                {view.warnings.map((w) => (
+                  <div
+                    key={w.id}
+                    className="admin-user-warning-item"
+                    style={{
+                      padding: '12px 16px',
+                      borderRadius: '8px',
+                      backgroundColor: w.isActive ? '#fffbeb' : 'var(--surface-alt, #f8fafc)',
+                      border: `1px solid ${w.isActive ? '#fde68a' : 'var(--border, #e2e8f0)'}`,
+                    }}
+                  >
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '4px' }}>
+                      <span style={{ fontWeight: 600, fontSize: '0.9rem', color: w.isActive ? '#92400e' : '#64748b' }}>
+                        {w.indexLabel}
+                      </span>
+                      <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                        <Badge variant={w.badgeVariant} data-testid={`warning-status-${w.id}`}>
+                          {w.badgeLabel}
+                        </Badge>
+                        <span style={{ fontSize: '0.8rem', color: 'var(--muted-fg, #6b7280)' }}>
+                          {w.issuedAtFormatted}
+                        </span>
                       </div>
-                    );
-                  })}
-                </div>
-              );
-            })()}
+                    </div>
+                    <div style={{ fontSize: '0.88rem', color: 'var(--fg, #1e293b)' }}>
+                      <strong>Reason:</strong> {w.reason}
+                    </div>
+                    <div style={{ fontSize: '0.78rem', color: 'var(--muted-fg, #64748b)', marginTop: '4px' }}>
+                      Issued by: {w.issuedByName}
+                      {w.isExpired && w.expiredAtFormatted ? ` · Expired: ${w.expiredAtFormatted}` : ''}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
 
           <div className="admin-user-section-card">
             <h3 className="admin-user-section-title">
               <span>📜</span> Recent Activity
             </h3>
-            {Array.isArray(user.recentActivity) && user.recentActivity.length > 0 ? (
+            {view.recentActivity.length > 0 ? (
               <div className="admin-user-activity-list">
-                {user.recentActivity.map((item, idx) => (
-                  <div key={item.id || idx} className="admin-user-activity-item">
-                    <div className="admin-user-activity-event">{item.event || item.action}</div>
+                {view.recentActivity.map((item) => (
+                  <div key={item.id} className="admin-user-activity-item">
+                    <div className="admin-user-activity-event">{item.eventText}</div>
                     <div className="admin-user-activity-meta">
-                      <span>{item.action}</span>
-                      <span>{item.timestamp ? new Date(item.timestamp).toLocaleDateString() : '—'}</span>
+                      <span>{item.actionText}</span>
+                      <span>{item.timestampFormatted}</span>
                     </div>
                   </div>
                 ))}
@@ -681,65 +749,50 @@ const AdminUserDetailsContent = () => {
             {reputationEntries.length > 0 ? (
               <>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                  {reputationEntries.map((entry) => {
-                    const deltaVal = Number(entry.delta || 0);
-                    const label =
-                      entry.type === 'seed'
-                        ? 'Starting reputation'
-                        : entry.reason || (
-                          entry.type === 'task_approved' ? `Task approved: ${entry.refId || ''}` :
-                          entry.type === 'project_completed' ? `Project completed: ${entry.refId || ''}` :
-                          entry.type === 'warning' ? `Warning penalty: ${entry.refId || ''}` :
-                          entry.type === 'warning_removed' ? `Warning appeal accepted: ${entry.refId || ''}` :
-                          entry.type === 'deadline_missed' ? `Missed deadline penalty: ${entry.refId || ''}` :
-                          entry.type === 'initial' ? 'Initial signup reputation' :
-                          entry.type || 'Reputation adjustment'
-                        );
-                    return (
-                      <div
-                        key={entry.id}
+                  {reputationEntries.map((entry) => (
+                    <div
+                      key={entry.id}
+                      style={{
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        padding: '8px 12px',
+                        borderRadius: '6px',
+                        border: '1px solid var(--border, #e2e8f0)',
+                        backgroundColor: 'var(--surface-alt, #f8fafc)',
+                        fontSize: '0.84rem',
+                      }}
+                    >
+                      <div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                          <span style={{ fontWeight: 500, color: 'var(--fg, #1e293b)' }}>{entry.label}</span>
+                          {entry.type && (
+                            <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '1px 7px', borderRadius: '999px', backgroundColor: '#e2e8f0', color: '#334155' }}>
+                              {entry.type}
+                            </span>
+                          )}
+                        </div>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--muted-fg, #64748b)', marginTop: '2px' }}>
+                          {entry.createdAtFormatted}
+                        </div>
+                      </div>
+                      <span
                         style={{
-                          display: 'flex',
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                          padding: '8px 12px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border, #e2e8f0)',
-                          backgroundColor: 'var(--surface-alt, #f8fafc)',
-                          fontSize: '0.84rem',
+                          fontWeight: 700,
+                          fontSize: '0.88rem',
+                          color: entry.deltaVal > 0 ? '#16a34a' : entry.deltaVal < 0 ? '#dc2626' : '#64748b',
                         }}
                       >
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                            <span style={{ fontWeight: 500, color: 'var(--fg, #1e293b)' }}>{label}</span>
-                            {entry.type && (
-                              <span style={{ fontSize: '0.72rem', fontWeight: 600, padding: '1px 7px', borderRadius: '999px', backgroundColor: '#e2e8f0', color: '#334155' }}>
-                                {entry.type}
-                              </span>
-                            )}
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--muted-fg, #64748b)', marginTop: '2px' }}>
-                            {formatDateTime(entry.createdAt)}
-                          </div>
-                        </div>
-                        <span
-                          style={{
-                            fontWeight: 700,
-                            fontSize: '0.88rem',
-                            color: deltaVal > 0 ? '#16a34a' : deltaVal < 0 ? '#dc2626' : '#64748b',
-                          }}
-                        >
-                          {deltaVal > 0 ? `+${deltaVal}` : deltaVal} Rep
-                        </span>
-                      </div>
-                    );
-                  })}
+                        {entry.deltaText} Rep
+                      </span>
+                    </div>
+                  ))}
                 </div>
 
                 {repTotal > 20 && (
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '12px', fontSize: '0.82rem' }}>
                     <span style={{ color: 'var(--muted-fg, #6b7280)' }}>
-                      Page {repPage} of {Math.ceil(repTotal / 20) || 1} ({repTotal} total)
+                      Page {repPage} of {view.reputation.totalPages} ({repTotal} total)
                     </span>
                     <div style={{ display: 'flex', gap: '6px' }}>
                       <button
@@ -753,7 +806,7 @@ const AdminUserDetailsContent = () => {
                       <button
                         type="button"
                         className="btn btn-secondary btn-sm"
-                        disabled={repPage >= Math.ceil(repTotal / 20)}
+                        disabled={repPage >= view.reputation.totalPages}
                         onClick={() => setRepPage((p) => p + 1)}
                       >
                         Next
@@ -777,15 +830,15 @@ const AdminUserDetailsContent = () => {
                 </h3>
                 <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                   <Badge variant="info">
-                    Avg Rating: {mentorFeedbackData.averageRating ?? 'N/A'} ({mentorFeedbackData.totalFeedbackCount || 0})
+                    Avg Rating: {mentorFeedbackData.averageRating} ({mentorFeedbackData.totalFeedbackCount})
                   </Badge>
-                  <Badge variant={(mentorFeedbackData.abandonmentHistory?.length || 0) > 0 ? 'warning' : 'secondary'}>
-                    Abandonment Incidents: {mentorFeedbackData.abandonmentHistory?.length || 0}
+                  <Badge variant={mentorFeedbackData.abandonmentCount > 0 ? 'warning' : 'secondary'}>
+                    Abandonment Incidents: {mentorFeedbackData.abandonmentCount}
                   </Badge>
                 </div>
               </div>
 
-              {Array.isArray(mentorFeedbackData.feedback) && mentorFeedbackData.feedback.length > 0 ? (
+              {mentorFeedbackData.feedback.length > 0 ? (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '12px' }}>
                   {mentorFeedbackData.feedback.map((fb) => (
                     <div
@@ -798,8 +851,8 @@ const AdminUserDetailsContent = () => {
                       }}
                     >
                       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.85rem', marginBottom: '4px' }}>
-                        <strong>{fb.ownerName || `Owner #${fb.studentId}`}</strong>
-                        <span>★ {fb.rating} / 5 · {fb.createdAt ? formatMemberSince(fb.createdAt) : ''}</span>
+                        <strong>{fb.ownerName}</strong>
+                        <span>★ {fb.rating} / 5{fb.createdAtFormatted ? ` · ${fb.createdAtFormatted}` : ''}</span>
                       </div>
                       {fb.comment && (
                         <div style={{ fontSize: '0.86rem', color: 'var(--fg, #1e293b)' }}>
@@ -815,13 +868,13 @@ const AdminUserDetailsContent = () => {
                 </p>
               )}
 
-              {Array.isArray(mentorFeedbackData.abandonmentHistory) && mentorFeedbackData.abandonmentHistory.length > 0 && (
+              {mentorFeedbackData.abandonmentHistory.length > 0 && (
                 <div>
                   <h4 style={{ fontSize: '0.88rem', margin: '0 0 8px 0', color: '#b45309' }}>Abandonment Releases</h4>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    {mentorFeedbackData.abandonmentHistory.map((inc, idx) => (
-                      <div key={inc.reviewId || idx} style={{ fontSize: '0.84rem', padding: '8px 10px', borderRadius: '6px', background: '#fffbeb', border: '1px solid #fde68a' }}>
-                        <strong>{inc.projectTitle || inc.projectId}</strong> — Released {inc.releasedAt ? formatMemberSince(inc.releasedAt) : ''}
+                    {mentorFeedbackData.abandonmentHistory.map((inc) => (
+                      <div key={inc.id} style={{ fontSize: '0.84rem', padding: '8px 10px', borderRadius: '6px', background: '#fffbeb', border: '1px solid #fde68a' }}>
+                        <strong>{inc.projectTitle}</strong> — Released {inc.releasedAtFormatted}
                         {inc.reason ? ` (${inc.reason})` : ''}
                       </div>
                     ))}

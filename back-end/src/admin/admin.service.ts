@@ -35,6 +35,7 @@ import { ClockService } from '../common/services/clock.service';
 import { normalizeRole } from '../common/utils/role.util';
 import { AdminUserCounts, isPlatformUser } from '../common/utils/platform-user.util';
 import { DuplicateDetectionService } from '../users/duplicate-detection.service';
+import { AppealsService } from '../moderation/appeals.service';
 import { ModerationService } from '../moderation/moderation.service';
 import { ReputationService } from '../moderation/reputation.service';
 import { LeaderboardService } from '../leaderboard/leaderboard.service';
@@ -88,7 +89,31 @@ export class AdminService {
     private readonly bootService?: BootService,
     @Optional()
     private readonly adminRefreshService?: AdminRefreshService,
+    @Optional()
+    @Inject(forwardRef(() => AppealsService))
+    private readonly appealsService?: AppealsService,
   ) {}
+
+  private resolveModeratorDisplayName(actorId?: string): string {
+    const id = String(actorId || '').trim();
+    if (!id) return 'Administrator';
+    if (id.toLowerCase() === 'system') return 'System';
+    if (id.toLowerCase() === 'admin') return 'Administrator';
+    try {
+      const user = this.usersService.findById(id);
+      if (user?.name) return user.name;
+      if (user?.email) return user.email;
+    } catch {
+      // Actor ID may not exist in UsersRepository (e.g., portal admin or system label)
+    }
+    try {
+      const portalAdmin = (this.portalAdminsService as any)?.findById?.(id);
+      if (portalAdmin?.name) return portalAdmin.name;
+    } catch {
+      // Ignore missing portal admin lookup
+    }
+    return id;
+  }
 
   getDuplicateUsers() {
     if (!this.duplicateDetectionService) {
@@ -296,17 +321,26 @@ export class AdminService {
       }
     }
 
-    // Recent Activity from Audit Log
+    // Recent Activity from Audit Log (guarantee plain string event)
     const allAudit = this.auditService.findAll();
-    const userAudit = allAudit.filter((entry: any) => {
-      return (
-        String(entry.entityId) === String(id) ||
-        entry.actor === safeUser.name ||
-        entry.performedBy === safeUser.email ||
-        entry.performedBy === safeUser.name ||
-        (entry.target && typeof entry.target === 'string' && entry.target.includes(safeUser.name))
-      );
-    }).slice(0, 10);
+    const userAudit = allAudit
+      .filter((entry: any) => {
+        return (
+          String(entry.entityId) === String(id) ||
+          entry.actor === safeUser.name ||
+          entry.performedBy === safeUser.email ||
+          entry.performedBy === safeUser.name ||
+          (entry.target && typeof entry.target === 'string' && entry.target.includes(safeUser.name))
+        );
+      })
+      .slice(0, 10)
+      .map((entry: any) => ({
+        ...entry,
+        event:
+          typeof entry.event === 'string'
+            ? entry.event
+            : entry.details?.message || entry.details?.reason || entry.action || 'Activity recorded',
+      }));
 
     const liveWarnings =
       this.moderationService && typeof this.moderationService.getAdminUserWarnings === 'function'
@@ -317,7 +351,19 @@ export class AdminService {
       : Array.isArray(safeUser.data?.warnings)
       ? safeUser.data.warnings
       : [];
-    const warningHistory = liveWarnings.length > 0 ? liveWarnings : fallbackWarnings;
+    const rawWarningHistory = liveWarnings.length > 0 ? liveWarnings : fallbackWarnings;
+    const warningHistory = rawWarningHistory.map((w: any) => {
+      if (!w || typeof w !== 'object') return w;
+      const resolvedIssuer =
+        w.issuedByName ||
+        w.moderatorName ||
+        this.resolveModeratorDisplayName(typeof w.issuedBy === 'string' ? w.issuedBy : w.issuedBy?.id || w.moderatorId);
+      return {
+        ...w,
+        moderatorName: resolvedIssuer,
+        issuedByName: resolvedIssuer,
+      };
+    });
     const activeWarningsCount =
       this.moderationService && typeof this.moderationService.getActiveWarningsCount === 'function' && liveWarnings.length > 0
         ? this.moderationService.getActiveWarningsCount(id)
@@ -330,6 +376,47 @@ export class AdminService {
         ? this.moderationService.getPendingModerationActionsForUser(id)
         : [];
 
+    const userAppeals =
+      this.appealsService && typeof this.appealsService.getUserAppeals === 'function'
+        ? this.appealsService.getUserAppeals(String(id))
+        : [];
+    const latestAppealStatus =
+      safeUser.appealStatus ||
+      (Array.isArray(userAppeals) && userAppeals.length > 0 ? userAppeals[0]?.status || null : null);
+
+    const statusStr =
+      safeUser.isDeleted || safeUser.deletedAt
+        ? 'Deleted'
+        : typeof safeUser.status === 'string' && safeUser.status.trim()
+        ? safeUser.status
+        : typeof safeUser.status?.status === 'string'
+        ? safeUser.status.status
+        : 'Active';
+    const isSuspended = statusStr.toLowerCase() === 'suspended';
+    const rawSuspensionReason = safeUser.suspensionReason || safeUser.suspendedReason || null;
+    const rawSuspensionType =
+      safeUser.suspensionType === 'automatic' ||
+      rawSuspensionReason === 'Automatic suspension after 4 warnings' ||
+      String(safeUser.suspendedBy || '').toLowerCase() === 'system'
+        ? 'automatic'
+        : 'manual';
+    const suspendedByName =
+      rawSuspensionType === 'automatic'
+        ? 'System'
+        : safeUser.suspendedByName ||
+          (safeUser.suspendedBy ? this.resolveModeratorDisplayName(safeUser.suspendedBy) : 'Administrator');
+    const suspension = isSuspended
+      ? {
+          reason: rawSuspensionReason || 'Account suspended',
+          type: rawSuspensionType,
+          typeLabel: rawSuspensionType === 'automatic' ? 'Automatic after 4 warnings' : 'Manual',
+          suspendedAt: safeUser.suspendedAt || null,
+          suspendedBy: safeUser.suspendedBy || (rawSuspensionType === 'automatic' ? 'system' : null),
+          suspendedByName,
+          appealStatus: latestAppealStatus,
+        }
+      : null;
+
     return stripUserSecrets({
       id: safeUser.id,
       name: safeUser.name,
@@ -340,7 +427,8 @@ export class AdminService {
       phone: safeUser.phone || safeUser.profile?.phone || null,
       phoneVerified: Boolean(safeUser.phoneVerified || safeUser.profile?.phoneVerified),
       phoneVerifiedAt: safeUser.phoneVerifiedAt || safeUser.profile?.phoneVerifiedAt || null,
-      status: safeUser.status || 'Active',
+      status: statusStr,
+      isDeleted: Boolean(safeUser.isDeleted || safeUser.deletedAt),
       flags: Boolean(safeUser.flags || safeUser.flagged),
       flagged: Boolean(safeUser.flags || safeUser.flagged),
       warnings: typeof safeUser.warnings === 'number'
@@ -349,8 +437,13 @@ export class AdminService {
       activeWarningsCount,
       warningHistory,
       pendingModerationActions,
-      suspensionReason: safeUser.suspensionReason || null,
-      suspendedAt: safeUser.suspendedAt || null,
+      suspensionReason: isSuspended ? rawSuspensionReason : null,
+      suspendedAt: isSuspended ? safeUser.suspendedAt || null : null,
+      suspendedBy: isSuspended ? suspension?.suspendedBy || null : null,
+      suspendedByName: isSuspended ? suspendedByName : null,
+      suspensionType: isSuspended ? rawSuspensionType : null,
+      appealStatus: latestAppealStatus,
+      suspension,
       reactivationReason: safeUser.reactivationReason || null,
       reactivatedAt: safeUser.reactivatedAt || null,
       joinedDate: safeUser.createdAt || safeUser.profile?.createdAt || safeUser.profile?.joined || safeUser.joinedDate || 'Unknown',
@@ -737,11 +830,16 @@ export class AdminService {
     }
 
     const nowIso = this.clockService ? this.clockService.nowIso() : new Date().toISOString();
+    const suspendedByName = this.resolveModeratorDisplayName(performedBy);
 
     const updatedUser = this.usersService.update(id, {
       status: UserStatus.Suspended,
+      suspendedReason: reason,
       suspensionReason: reason,
       suspendedAt: nowIso,
+      suspendedBy: String(performedBy),
+      suspendedByName,
+      suspensionType: 'manual',
     } as any);
 
     const targetName = user ? user.name : `User #${id}`;
@@ -831,6 +929,12 @@ export class AdminService {
     const updatedUser = this.usersService.update(id, {
       status: UserStatus.Active,
       activeWarningsCount: 0,
+      suspendedReason: undefined,
+      suspensionReason: undefined,
+      suspendedAt: undefined,
+      suspendedBy: undefined,
+      suspendedByName: undefined,
+      suspensionType: undefined,
       reactivationReason: reason,
       reactivatedAt: nowIso,
       flags: false,

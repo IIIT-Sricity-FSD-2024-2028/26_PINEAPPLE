@@ -209,6 +209,7 @@ export class ModerationService {
     }
 
     // Audit log
+    const actorName = this.resolveActorDisplayName(actorId);
     try {
       this.auditService.create({
         actor: actorId,
@@ -217,10 +218,12 @@ export class ModerationService {
         entityType: 'user',
         entityId: targetUserId,
         action: 'user-warned',
+        event: `Issued warning ${nextCount}/${WARNING_LIMIT} to ${targetUser.name || targetUserId} by ${actorName}. Reason: ${reason}`,
         details: {
           userId: targetUserId,
           targetUserId,
           actorId,
+          actorName,
           reportId: reportId || undefined,
           message: `Issued warning ${nextCount}/${WARNING_LIMIT} to user ${targetUserId}. Reason: ${reason}`,
         },
@@ -235,12 +238,18 @@ export class ModerationService {
     // Automatic suspension on 4th active warning
     if (nextCount >= WARNING_LIMIT) {
       autoSuspended = true;
+      const autoNowIso = this.getNowIso();
 
       await this.suspensionConsequencesService.handleSuspension(targetUserId, autoReason);
 
       this.usersRepository.update(targetUserId, {
         status: 'Suspended' as any,
         suspendedReason: autoReason,
+        suspensionReason: autoReason,
+        suspendedAt: autoNowIso,
+        suspendedBy: 'system',
+        suspendedByName: 'System',
+        suspensionType: 'automatic',
         tokenVersion: ((targetUser as any).tokenVersion || 0) + 1,
         refreshTokens: [],
       } as any);
@@ -265,6 +274,7 @@ export class ModerationService {
           entityType: 'user',
           entityId: targetUserId,
           action: 'user-auto-suspended',
+          event: `User ${targetUser.name || targetUserId} suspended automatically after reaching ${WARNING_LIMIT} warnings.`,
           details: {
             userId: targetUserId,
             targetUserId,
@@ -285,6 +295,15 @@ export class ModerationService {
       status: autoSuspended ? ('Suspended' as any) : ('Active' as any),
       suspensionReason: autoSuspended ? autoReason : undefined,
     };
+  }
+
+  private resolveActorDisplayName(actorId: string): string {
+    const id = String(actorId || '').trim();
+    if (!id || id === 'system') return 'System';
+    const actorUser = this.usersRepository.findById(id);
+    if (actorUser?.name) return actorUser.name;
+    if (actorUser?.email) return actorUser.email;
+    return id === 'admin' ? 'Administrator' : id;
   }
 
   private getNowDate(): Date {
@@ -360,6 +379,7 @@ export class ModerationService {
     reportId?: string,
   ): Promise<{ status: string; suspensionReason: string }> {
     const nowIso = this.getNowIso();
+    const suspendedByName = this.resolveActorDisplayName(actorId);
     await this.suspensionConsequencesService.handleSuspension(targetUserId, reason);
 
     this.usersRepository.update(targetUserId, {
@@ -367,6 +387,9 @@ export class ModerationService {
       suspendedReason: reason,
       suspensionReason: reason,
       suspendedAt: nowIso,
+      suspendedBy: String(actorId),
+      suspendedByName,
+      suspensionType: 'manual',
       tokenVersion: ((targetUser as any).tokenVersion || 0) + 1,
       refreshTokens: [],
     } as any);
@@ -391,12 +414,14 @@ export class ModerationService {
         entityType: 'user',
         entityId: targetUserId,
         action: 'user-suspended',
+        event: `Admin ${suspendedByName} suspended user ${targetUser.name || targetUserId}. Reason: ${reason}`,
         details: {
           userId: targetUserId,
           targetUserId,
           actorId,
+          actorName: suspendedByName,
           reportId: reportId || undefined,
-          message: `Admin ${actorId} suspended user ${targetUserId}. Reason: ${reason}`,
+          message: `Admin ${suspendedByName} suspended user ${targetUserId}. Reason: ${reason}`,
         },
       });
     } catch (err: any) {
@@ -489,6 +514,7 @@ export class ModerationService {
         entityType: 'user',
         entityId: targetUserId,
         action: 'pending-moderation-requested',
+        event: `${pendingAction.requestedByName} requested suspension approval for ${pendingAction.targetUserName}. Reason: ${reason}`,
         details: {
           actionId: pendingAction.id,
           type: 'suspend',
@@ -600,6 +626,7 @@ export class ModerationService {
         entityType: 'user',
         entityId: action.targetUserId,
         action: 'pending-moderation-approved',
+        event: `${action.decidedByName} approved suspension for ${action.targetUserName}.`,
         details: {
           actionId: action.id,
           requestedBy: action.requestedBy,
@@ -683,6 +710,7 @@ export class ModerationService {
         entityType: 'user',
         entityId: action.targetUserId,
         action: 'pending-moderation-rejected',
+        event: `${action.decidedByName} rejected suspension request for ${action.targetUserName}.`,
         details: {
           actionId: action.id,
           requestedBy: action.requestedBy,
@@ -801,6 +829,13 @@ export class ModerationService {
     this.usersRepository.update(targetUserId, {
       status: 'Active' as any,
       suspendedReason: undefined,
+      suspensionReason: undefined,
+      suspendedAt: undefined,
+      suspendedBy: undefined,
+      suspendedByName: undefined,
+      suspensionType: undefined,
+      reactivationReason: reason,
+      reactivatedAt: nowIso,
       activeWarningsCount: 0,
     } as any);
 
@@ -817,11 +852,18 @@ export class ModerationService {
       this.logger.warn(`Reactivation notification failed: ${err?.message}`);
     }
 
+    const actorName = this.resolveActorDisplayName(actorId);
     try {
       this.auditService.create({
         userId: actorId,
+        actor: actorId,
+        performedBy: actorId,
+        target: targetUserId,
+        entityType: 'user',
+        entityId: targetUserId,
         action: 'user-reactivated',
-        details: `Admin ${actorId} reactivated user ${targetUserId}. Cleared ${clearedCount} warnings. Reason: ${reason}`,
+        event: `Admin ${actorName} reactivated ${targetUser.name || targetUserId}. Cleared ${clearedCount} warnings. Reason: ${reason}`,
+        details: `Admin ${actorName} reactivated user ${targetUserId}. Cleared ${clearedCount} warnings. Reason: ${reason}`,
       });
     } catch (err: any) {
       this.logger.warn(`Audit log failed: ${err?.message}`);
@@ -847,6 +889,7 @@ export class ModerationService {
       return {
         ...w,
         moderatorName,
+        issuedByName: moderatorName,
       };
     });
   }

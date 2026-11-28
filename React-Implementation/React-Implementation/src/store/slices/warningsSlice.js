@@ -138,9 +138,15 @@ const warningsSlice = createSlice({
         warningsAdapter.upsertMany(state, list);
         if (userId) {
           state.byUserId[userId] = list.map(deriveWarningId);
-          state.activeWarningsCountByUserId[userId] = list.filter(
-            (w) => w.active !== false && w.status !== 'removed',
-          ).length;
+          state.activeWarningsCountByUserId[userId] = list.filter((w) => {
+            const st = String(w?.status || '').toLowerCase();
+            return (
+              w.active !== false &&
+              st !== 'removed' &&
+              st !== 'cleared' &&
+              st !== 'expired'
+            );
+          }).length;
         }
       })
 

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { toText } from '../../utils/toText';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   actionAdminReport,
@@ -567,10 +568,11 @@ const AdminReportsContent = () => {
                 {
                   header: 'Status',
                   render: (r) => {
-                    const s = (r.status || '').toLowerCase().replace(/\s+/g, '-');
+                    const statusText = toText(r.status, 'Open');
+                    const s = statusText.toLowerCase().replace(/\s+/g, '-');
                     return (
                       <span className={`admin-reports-badge badge-${s}`}>
-                        {r.status}
+                        {statusText}
                       </span>
                     );
                   },
@@ -996,14 +998,14 @@ const AdminReportsContent = () => {
                       )}
                     </div>
                     <div className="admin-reports-detail-value">
-                      <strong>{reportDetail.reportedUserName || reportDetail.reportedUser?.name || 'User'}</strong>
+                      <strong>{toText(reportDetail.reportedUserName ?? reportDetail.reportedUser?.name, 'User')}</strong>
                       {(reportDetail.reportedUserUsername || reportDetail.reportedUser?.username) && (
-                        <> (@{reportDetail.reportedUserUsername || reportDetail.reportedUser?.username})</>
+                        <> (@{toText(reportDetail.reportedUserUsername ?? reportDetail.reportedUser?.username, '')})</>
                       )}
                     </div>
                     {(reportDetail.reportedUserUniversity || reportDetail.reportedUser?.university) && (
                       <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
-                        University: {reportDetail.reportedUserUniversity || reportDetail.reportedUser?.university}
+                        University: {toText(reportDetail.reportedUserUniversity ?? reportDetail.reportedUser?.university)}
                       </div>
                     )}
                   </div>
@@ -1074,7 +1076,7 @@ const AdminReportsContent = () => {
                     Prior Reports Received: <strong>{(reportDetail.priorReports || reportDetail.earlierReports || []).length}</strong>
                   </div>
                   <div>
-                    Status: <strong style={{ textTransform: 'capitalize' }}>{reportDetail.status}</strong>
+                    Status: <strong style={{ textTransform: 'capitalize' }}>{toText(reportDetail.status)}</strong>
                   </div>
                 </div>
               </div>
@@ -1165,7 +1167,7 @@ const AdminReportsContent = () => {
               <div className="admin-reports-detail-section">
                 <div className="admin-reports-detail-label">Reason</div>
                 <div className="admin-reports-detail-value" style={{ fontWeight: 600, marginBottom: '0.5rem' }}>
-                  {reportDetail.reason}
+                  {toText(reportDetail.reason)}
                 </div>
                 <div className="admin-reports-detail-label">Details / Description</div>
                 <div
@@ -1179,7 +1181,7 @@ const AdminReportsContent = () => {
                     lineHeight: 1.5,
                   }}
                 >
-                  {reportDetail.details}
+                  {toText(reportDetail.details)}
                 </div>
               </div>
 

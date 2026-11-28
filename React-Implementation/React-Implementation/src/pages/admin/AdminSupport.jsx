@@ -38,6 +38,7 @@ import SearchBar from '../../components/common/SearchBar';
 import Modal from '../../components/common/Modal';
 import EmptyState from '../../components/common/EmptyState';
 import { formatDateTime } from '../../utils/dateFormatter';
+import { toText } from '../../utils/toText';
 import './AdminSupport.css';
 
 function formatRelativeAge(iso) {
@@ -465,11 +466,11 @@ const AdminSupportContent = () => {
                       </span>
                     </td>
                     <td>
-                      <span className={`support-pill support-status-${t.status}`}>
-                        {formatStatusLabel(t.status)}
+                      <span className={`support-pill support-status-${toText(t.status, 'open')}`}>
+                        {formatStatusLabel(toText(t.status, 'open'))}
                       </span>
                     </td>
-                    <td>{t.assigneeName || <span style={{ color: '#94a3b8' }}>Unassigned</span>}</td>
+                    <td>{t.assigneeName ? toText(t.assigneeName) : <span style={{ color: '#94a3b8' }}>Unassigned</span>}</td>
                     <td style={{ color: '#64748b' }}>{formatRelativeAge(t.createdAt)}</td>
                     <td>
                       <button
@@ -589,7 +590,7 @@ const AdminSupportContent = () => {
                 }}
               >
                 <div style={{ fontWeight: 600, fontSize: '0.92rem', marginBottom: '6px' }}>
-                  This ticket is {selectedTicket.status}. It can no longer be changed. If the user needs more help they can open a new ticket.
+                  This ticket is {toText(selectedTicket.status)}. It can no longer be changed. If the user needs more help they can open a new ticket.
                 </div>
                 {selectedTicket.resolutionNote && (
                   <div data-testid="ticket-resolution-note" style={{ fontSize: '0.88rem', marginTop: '4px' }}>
@@ -610,8 +611,8 @@ const AdminSupportContent = () => {
                 <div className="admin-support-control-box" data-testid="read-only-status">
                   <label>Status</label>
                   <div style={{ fontWeight: 600, padding: '8px 0', color: '#0f172a' }}>
-                    <span className={`support-pill support-status-${selectedTicket.status}`}>
-                      {formatStatusLabel(selectedTicket.status)}
+                    <span className={`support-pill support-status-${toText(selectedTicket.status, 'open')}`}>
+                      {formatStatusLabel(toText(selectedTicket.status, 'open'))}
                     </span>
                   </div>
                 </div>

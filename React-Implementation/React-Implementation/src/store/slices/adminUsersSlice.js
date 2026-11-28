@@ -1,6 +1,7 @@
 import { createEntityAdapter, createSlice } from '@reduxjs/toolkit';
 import { addRouteReset } from '../utils/routeReset';
 import { sessionReset } from '../actions/appActions';
+import { toText } from '../../utils/toText';
 import {
   fetchAdminUserDetails,
   fetchAdminUserReputation,
@@ -17,6 +18,21 @@ import {
 
 function deriveUserId(u) {
   return String(u?.id || u?.userId || '');
+}
+
+function sanitizeUserRecord(user) {
+  if (!user || typeof user !== 'object') return user;
+  const rawStatus =
+    user.status && typeof user.status === 'object' && user.status.status !== undefined
+      ? user.status.status
+      : user.status;
+  const normalizedStatus = user.isDeleted || user.deletedAt
+    ? 'Deleted'
+    : toText(rawStatus, 'Active');
+  return {
+    ...user,
+    status: normalizedStatus,
+  };
 }
 
 /**
@@ -181,7 +197,7 @@ const adminUsersSlice = createSlice({
           userCounts = null,
           trustSummaries = [],
         } = action.payload || {};
-        const valid = users.filter((u) => deriveUserId(u));
+        const valid = users.filter((u) => deriveUserId(u)).map(sanitizeUserRecord);
         adminUsersAdapter.setAll(state, valid);
         state.duplicateGroups = duplicateGroups;
         if (userCounts && typeof userCounts === 'object') {
@@ -231,8 +247,9 @@ const adminUsersSlice = createSlice({
         state.working.detailLoading = false;
         const { userId, user } = action.payload || {};
         if (userId && user) {
-          state.userDetailsById[userId] = user;
-          adminUsersAdapter.upsertOne(state, user);
+          const cleanUser = sanitizeUserRecord(user);
+          state.userDetailsById[userId] = cleanUser;
+          adminUsersAdapter.upsertOne(state, cleanUser);
         }
       })
       .addCase(fetchAdminUserDetails.rejected, (state, action) => {
@@ -371,6 +388,7 @@ const adminUsersSlice = createSlice({
           state.userDetailsById[userId] = {
             ...state.userDetailsById[userId],
             status: 'Suspended',
+            ...(result?.suspensionReason ? { suspensionReason: result.suspensionReason } : {}),
           };
         }
       })
@@ -382,6 +400,12 @@ const adminUsersSlice = createSlice({
             ...state.userDetailsById[uid],
             status: 'Active',
             activeWarningsCount: 0,
+            suspension: null,
+            suspensionReason: null,
+            suspendedAt: null,
+            suspendedBy: null,
+            suspendedByName: null,
+            suspensionType: null,
           };
         }
       })

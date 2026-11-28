@@ -135,16 +135,38 @@ export class AuditService {
 
   private readonly auditLog: AuditLogEntry[] = this.buildSeedEntries();
 
+  private normalizeEventText(event: any, details: any, actor: string, action: string): string {
+    const pickText = (val: any): string => {
+      if (typeof val === 'string') return val.trim();
+      if (val && typeof val === 'object') {
+        for (const key of ['message', 'reason', 'event', 'title', 'label']) {
+          if (typeof val[key] === 'string' && val[key].trim()) {
+            return val[key].trim();
+          }
+        }
+      }
+      return '';
+    };
+    return (
+      pickText(event) ||
+      pickText(details) ||
+      (() => {
+        const cleanAction = String(action || 'system-event').replace(/[-_]/g, ' ');
+        return `${actor} performed ${cleanAction}`;
+      })()
+    );
+  }
+
   log(entry: CreateAuditEntryDto): AuditLogEntry {
     const actor = entry.actor || entry.performedBy || 'System';
     const action = entry.action || 'system-event';
     const target = entry.target || (entry.entityId ? `${entry.entityType || 'Entity'} #${entry.entityId}` : '-');
 
-    let eventText = entry.event;
-    if (!eventText) {
-      const cleanAction = action.replace(/[-_]/g, ' ');
-      eventText = `${actor} performed ${cleanAction}${target && target !== '-' ? ` on ${target}` : ''}`;
-    }
+    const rawEventText = this.normalizeEventText(entry.event, entry.details, actor, action);
+    const eventText =
+      typeof entry.event === 'string' && entry.event.trim()
+        ? entry.event.trim()
+        : `${rawEventText}${target && target !== '-' && !rawEventText.includes(target) ? ` on ${target}` : ''}`;
 
     const newEntry: AuditLogEntry & { actor: string; target: string; event: string } = {
       id: `${Date.now()}-${Math.random().toString(36).substring(2, 8)}`,
@@ -170,7 +192,7 @@ export class AuditService {
     const actor = entry.actor || entry.performedBy || entry.userId || 'System';
     const action = entry.action || 'system-event';
     const target = entry.target || (entry.entityId ? `${entry.entityType || 'Entity'} #${entry.entityId}` : (entry.userId ? `User #${entry.userId}` : '-'));
-    const details = typeof entry.details === 'object' ? entry.details : { message: entry.details };
+    const details = typeof entry.details === 'object' && entry.details !== null ? entry.details : { message: entry.details };
 
     return this.log({
       action,
@@ -179,7 +201,7 @@ export class AuditService {
       target,
       entityType: entry.entityType || 'user',
       entityId: entry.entityId || entry.userId || '',
-      event: entry.event || entry.details || `${actor} executed ${action}`,
+      event: this.normalizeEventText(entry.event, entry.details, actor, action),
       details,
     });
   }
